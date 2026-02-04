@@ -13,7 +13,7 @@ Automate AWS infrastructure deployment using Terraform with security scanning, b
 ## Installation
 
 ```bash
-/plugin install github:sublimotion/terraform-automation
+/plugin install github:sublimotion/agent-aiops-on-aws
 ```
 
 ## Requirements
