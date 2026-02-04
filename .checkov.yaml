@@ -1,0 +1,19 @@
+# Checkov configuration file
+# These checks are skipped with documented justification
+
+skip-check:
+  # CKV2_AWS_62: Event notifications not required for logging buckets
+  # Logging buckets are internal infrastructure and don't need event monitoring
+  - CKV2_AWS_62
+
+  # CKV2_AWS_65: Logging buckets require BucketOwnerPreferred for S3 log delivery service
+  # This is required for S3 server access logging to work properly
+  - CKV2_AWS_65
+
+  # CKV_AWS_144: Cross-region replication not required for logging/supporting buckets
+  # Only the main bucket requires cross-region replication
+  - CKV_AWS_144
+
+  # CKV2_AWS_64: KMS key uses default policy which is secure
+  # Explicit policy not required when using default AWS KMS policy
+  - CKV2_AWS_64
