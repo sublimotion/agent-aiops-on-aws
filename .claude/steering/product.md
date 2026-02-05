@@ -17,3 +17,13 @@ This workbench is a collection of AI-powered development tools and learning reso
 - Security-first approach (Checkov scans required)
 - Infrastructure as Code best practices
 - Test-driven development where applicable
+- Pre-commit hooks must pass before merge
+
+## Contribution Workflow
+
+1. **Open Issue First** - Discuss significant changes before starting work
+2. **Setup Hooks** - Run `pre-commit install` after cloning
+3. **Validate Locally** - Run `pre-commit run -a` before commits
+4. **Include Evidence** - Add test output or screenshots in PRs
+5. **Security Scan** - Ensure `checkov -d .` passes
+6. **Format Code** - Run `terraform fmt -recursive`

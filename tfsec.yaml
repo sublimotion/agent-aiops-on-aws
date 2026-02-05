@@ -1,0 +1,14 @@
+# tfsec configuration
+# Documentation: https://aquasecurity.github.io/tfsec/
+
+minimum_severity: LOW
+
+exclude:
+  # Logging buckets don't need access logging (circular dependency)
+  - aws-s3-enable-bucket-logging
+
+  # Logging buckets don't need versioning
+  - aws-s3-enable-versioning
+
+  # Cross-region replication not required for all buckets
+  - aws-s3-enable-bucket-replication
