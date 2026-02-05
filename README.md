@@ -266,24 +266,133 @@ module "eks" {
 
 ## Prerequisites
 
-- AWS CLI configured
-- Terraform >= 1.0
-- Claude Code with ralph-loop plugin
-- pre-commit (optional but recommended)
+### 1. Claude Code with Bedrock
+
+Claude Code configured to use AWS Bedrock (or Anthropic API).
+
+```bash
+# Install Claude Code
+npm install -g @anthropic-ai/claude-code
+
+# Configure for Bedrock
+claude config set provider bedrock
+claude config set bedrock.region us-east-1
+
+# Or use Anthropic API
+claude config set provider anthropic
+claude config set apiKey sk-ant-...
+```
+
+### 2. Ralph Loop Plugin
+
+The ralph-loop plugin enables autonomous iteration.
+
+```bash
+# Install the plugin
+claude plugins install ralph-loop@claude-plugins-official
+
+# Verify installation
+claude plugins list
+```
+
+### 3. Terraform Automation Plugin (This Repo)
+
+Install this repository as a Claude Code plugin for the `/terraform` skill.
+
+```bash
+# Install from GitHub
+claude plugins install github:sublimotion/agent-aiops-on-aws
+
+# Or clone and install locally
+git clone https://github.com/sublimotion/agent-aiops-on-aws
+cd agent-aiops-on-aws
+claude plugins install .
+```
+
+### 4. MCP Servers
+
+AWS Labs MCP servers provide Terraform best practices and IaC patterns.
+
+```bash
+# Install MCP servers (requires uv or pip)
+uvx awslabs.terraform-mcp-server@latest --help
+uvx awslabs.aws-iac-mcp-server@latest --help
+```
+
+Add to your Claude Code MCP configuration (`~/.claude/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "terraform-mcp-server": {
+      "command": "uvx",
+      "args": ["awslabs.terraform-mcp-server@latest"]
+    },
+    "aws-iac-mcp-server": {
+      "command": "uvx",
+      "args": ["awslabs.aws-iac-mcp-server@latest"]
+    }
+  }
+}
+```
+
+### 5. Required Tools
+
+| Tool | Purpose | Install |
+|------|---------|---------|
+| Terraform | Infrastructure as Code | `brew install terraform` |
+| Checkov | Security scanning | `pip install checkov` |
+| AWS CLI | AWS access | `brew install awscli` |
+| kubectl | Kubernetes CLI | `brew install kubectl` |
+| pre-commit | Git hooks | `pip install pre-commit` |
 
 ## Setup
 
 ```bash
+# Clone the repository
+git clone https://github.com/sublimotion/agent-aiops-on-aws
+cd agent-aiops-on-aws
+
 # Install pre-commit hooks
 pre-commit install
 
-# Run all hooks
+# Run all hooks to verify setup
 pre-commit run -a
 
 # Verify tools
 terraform --version
 aws sts get-caller-identity
+checkov --version
+
+# Start Claude Code
+claude
+
+# Verify plugins
+/ralph-loop:help
+/terraform --help
 ```
+
+## MCP Server Tools
+
+Once configured, these tools are available in Claude Code:
+
+### Terraform MCP Server
+
+| Tool | Purpose |
+|------|---------|
+| `terraform://workflow_guide` | Security-focused development workflow |
+| `terraform://aws_best_practices` | AWS-specific Terraform guidance |
+| `RunTerraformCommand` | Execute terraform commands |
+| `RunCheckovScan` | Security and compliance scanning |
+| `SearchTerraformRegistry` | Find modules and providers |
+
+### AWS IaC MCP Server
+
+| Tool | Purpose |
+|------|---------|
+| `validate_cloudformation_template` | Validate CFN templates |
+| `search_cdk_documentation` | Find CDK patterns |
+| `cdk_best_practices` | Security guidelines |
 
 ## License
 
