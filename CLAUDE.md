@@ -1,43 +1,47 @@
 # Agent AIOps on AWS
 
-This repo explores Claude Code plugins, AWS infrastructure automation, and AI agent patterns.
+Template for autonomous infrastructure deployment using Claude Code, spec-driven development, and RALPH loops.
 
-## Quick Start
+## Workflow
 
-```bash
-# Install pre-commit hooks
-pre-commit install
-
-# Run all hooks
-pre-commit run -a
-
-# Security scan
-checkov -d .
-
-# Format Terraform
-terraform fmt -recursive
-```
+1. Write spec in `specs/<name>.md`
+2. Run `/ralph-loop Deploy specs/<name>.md`
+3. Claude iterates until deployment succeeds
+4. Update spec with lessons learned
 
 ## Key Directories
 
 | Directory | Purpose |
 |-----------|---------|
-| `terraform/` | Infrastructure as Code |
-| `.claude/` | Claude Code configuration |
-| `.claude/steering/` | Detailed context files |
-| `blueprints/` | Reusable infrastructure patterns |
+| `specs/` | Input specifications (requirements) |
+| `modules/` | Reusable Terraform modules |
+| `blueprints/` | Deployable compositions |
+| `.claude/steering/` | Persistent context files |
 
 ## Steering Files
 
-Detailed context is in `.claude/steering/`:
+- `product.md` - Business context, quality standards
+- `tech-stack.md` - Technology preferences, conventions
+- `project-structure.md` - Layout, naming patterns
 
-- `product.md` - Business context and quality standards
-- `tech-stack.md` - Technology preferences and conventions
-- `project-structure.md` - Project layout and naming conventions
+## Commands
 
-## Key Conventions
+```bash
+# Start RALPH loop
+/ralph-loop <task description>
 
-- **Terraform Provider**: Prefer AWSCC, fallback to AWS
-- **Naming**: Use `bucket_prefix` over hardcoded names
-- **Security**: Encryption enabled, public access blocked
-- **Features**: Default to `false`, enable per-environment
+# Cancel loop
+/ralph-loop:cancel-ralph
+
+# Validate
+pre-commit run -a
+checkov -d .
+terraform fmt -recursive
+```
+
+## Conventions
+
+- Prefer AWSCC provider, fallback to AWS
+- Use `bucket_prefix` over hardcoded names
+- Enable encryption on all storage
+- Default features to `false`
