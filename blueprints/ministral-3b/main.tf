@@ -165,11 +165,13 @@ module "vllm" {
   gpu_memory_utilization = var.vllm_gpu_memory_utilization
   max_model_len          = var.vllm_max_model_len
 
-  # Resources
-  replicas   = 1
-  gpu_count  = 1
-  enable_pvc = true
-  pvc_size   = "50Gi"
+  # Resources - sized for g6e.xlarge (4 vCPU, 16GB, ~3.9 allocatable CPU, ~14GB allocatable mem)
+  replicas       = 1
+  gpu_count      = 1
+  cpu_request    = "2"
+  memory_request = "12Gi"
+  enable_pvc     = true
+  pvc_size       = "50Gi"
 
   # Services
   enable_load_balancer   = true
