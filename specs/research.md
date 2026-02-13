@@ -255,11 +255,13 @@ Hot prefixes stay in VRAM/DRAM, FSx provides both overflow and cross-node sharin
 | Capability | LMCache | Mooncake |
 |------------|---------|----------|
 | **Tiered caching** | Single backend only | VRAM → DRAM → NVMe → Remote |
-| **GDS support** | No | Yes (optional build flag) |
-| **Transport protocols** | File I/O | RDMA, TCP, NVMe-oF, CXL |
+| **GDS support** | Yes | Yes (optional build flag) |
+| **Transport protocols** | File I/O, GDS | RDMA, TCP, NVMe-oF, CXL |
 | **Hotspot handling** | No | Multi-replica support |
 | **PD disaggregation** | No | Native support |
 | **vLLM integration** | Native plugin | Via Transfer Engine |
+
+**Note**: LMCache with GDS + FSx (on P5 with EFA) could achieve ~150 GB/s throughput, potentially addressing the bandwidth bottleneck observed in our benchmarks. The remaining limitation is single-tier architecture (no VRAM → DRAM → FSx tiering).
 
 ### Mooncake Architecture
 
@@ -308,13 +310,14 @@ For tiered caching, need instances with local NVMe (g6e.4xlarge+).
 
 ## Conclusions
 
-1. **LMCache single-backend design** is unsuitable for high-variety prefix workloads
-2. **Standard FSx** bottleneck is network latency (~ms) and bandwidth (~240 MB/s)
-3. **FSx GDS+EFA on P5** changes the equation: ~150 GB/s bandwidth, ~100s μs latency
-4. **With P5 + GDS+EFA**: FSx can potentially replace local NVMe tier entirely
+1. **Our benchmark bottleneck**: Standard FSx on g6e (~240 MB/s, ~ms latency)
+2. **FSx GDS+EFA on P5** changes the equation: ~150 GB/s bandwidth, ~100s μs latency
+3. **LMCache supports GDS**: Could achieve ~150 GB/s with FSx on P5+EFA instances
+4. **Remaining LMCache limitation**: Single-tier architecture (no VRAM → DRAM → FSx tiering)
 5. **For single-node on g6e**: Native vLLM prefix caching is optimal; skip LMCache
-6. **For multi-node on P5**: FSx + GDS + EFA + Mooncake could be highly effective
-7. **Cost tradeoff**: P5 (~$98/hr) vs g6e (~$1.19/hr) - 80x cost difference
+6. **For multi-node on P5**: LMCache + GDS + FSx + EFA worth re-evaluating
+7. **Mooncake advantage**: Tiered caching for latency-sensitive hot data
+8. **Cost tradeoff**: P5 (~$98/hr) vs g6e (~$1.19/hr) - 80x cost difference
 
 ## Future Work
 
