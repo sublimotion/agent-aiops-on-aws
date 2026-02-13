@@ -125,7 +125,7 @@ variable "enable_vllm" {
 variable "vllm_model_id" {
   description = "Model path for vLLM (HuggingFace ID or S3 path)"
   type        = string
-  default     = "mistralai/Ministral-3B-Instruct-2412" # Use HF directly for us-east-2
+  default     = "moonshotai/Kimi-K2.5" # Large MoE model for p5e GDS benchmarks
 }
 
 variable "vllm_image" {
@@ -187,6 +187,12 @@ variable "vllm_memory_request" {
   description = "Memory request for vLLM pod"
   type        = string
   default     = "256Gi"
+}
+
+variable "vllm_enable_kimi_args" {
+  description = "Enable Kimi K2.5 specific vLLM arguments"
+  type        = bool
+  default     = true
 }
 
 # Monitoring (uses private ECR images)

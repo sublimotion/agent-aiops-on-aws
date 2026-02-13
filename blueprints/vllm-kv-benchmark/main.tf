@@ -76,7 +76,14 @@ locals {
     # Multi-GPU tensor parallelism
     var.vllm_tensor_parallel_size > 1 ? ["--tensor-parallel-size", tostring(var.vllm_tensor_parallel_size)] : [],
     var.vllm_cpu_offload_gb > 0 ? ["--cpu-offload-gb", tostring(var.vllm_cpu_offload_gb)] : [],
-    var.vllm_swap_space_gb > 0 ? ["--swap-space", tostring(var.vllm_swap_space_gb)] : []
+    var.vllm_swap_space_gb > 0 ? ["--swap-space", tostring(var.vllm_swap_space_gb)] : [],
+    # Kimi K2.5 specific args
+    var.vllm_enable_kimi_args ? [
+      "--trust-remote-code",
+      "--mm-encoder-tp-mode", "data",
+      "--tool-call-parser", "kimi_k2",
+      "--reasoning-parser", "kimi_k2"
+    ] : []
   )
 }
 
