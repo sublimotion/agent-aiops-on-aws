@@ -250,3 +250,37 @@ The current benchmark infrastructure is single-node. To properly test LMCache mu
 2. Deploy load balancer with routing strategy support
 3. Configure all replicas to share FSx cache at `/fsx/kv-cache/`
 4. Run `routing/4-spec.yaml` to compare `kvaware` vs `round-robin`
+
+## Multi-Tenant Benchmark Results (2026-02-13)
+
+### Test: Many System Prompts (50 tenants × 4K tokens each)
+
+| Metric | Baseline | LMCache+FSx |
+|--------|----------|-------------|
+| TTFT (avg) | **482.9ms** | 40,613ms |
+| TTFT (p90) | **899.6ms** | 115,833ms |
+| Achieved QPS | **2.94** | 1.60 |
+| Cache benefit | 1.95x | 0.02x |
+
+**Finding**: Baseline significantly outperformed LMCache for high system prompt variety. LMCache's FSx I/O overhead caused cache thrashing.
+
+### Test: Cold Start Recovery (5 tenants, restart after warm cache)
+
+| Metric | Baseline | LMCache+FSx |
+|--------|----------|-------------|
+| First request (cold) | **659.7ms** | 808.0ms |
+| Subsequent (warm) | **107.0ms** | 120.8ms |
+
+**Finding**: LMCache did NOT successfully retrieve cached KV from FSx on cold start. First requests still computed prefixes.
+
+### Conclusion
+
+For **single-node deployments** with Ministral-3B on L40S 48GB:
+- Native vLLM prefix caching is optimal
+- LMCache adds I/O overhead without providing benefits
+- Do NOT use LMCache unless deploying multi-node
+
+**LMCache value requires**:
+- Multiple vLLM instances sharing FSx cache
+- High prefix reuse across instances (kvaware routing)
+- This is NOT achievable with single-node deployment
