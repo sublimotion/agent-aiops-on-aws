@@ -105,3 +105,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "nvidia_device_plugin_image" {
+  description = "NVIDIA device plugin container image (use ECR for private subnets)"
+  type        = string
+  default     = "nvcr.io/nvidia/k8s-device-plugin:v0.14.5"
+}

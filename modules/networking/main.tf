@@ -80,6 +80,41 @@ module "vpc_endpoints" {
       security_group_ids  = [aws_security_group.vpc_endpoints.id]
       tags                = { Name = "${var.project_name}-logs-endpoint" }
     }
+    ec2 = {
+      service             = "ec2"
+      private_dns_enabled = true
+      subnet_ids          = module.vpc.private_subnets
+      security_group_ids  = [aws_security_group.vpc_endpoints.id]
+      tags                = { Name = "${var.project_name}-ec2-endpoint" }
+    }
+    ec2messages = {
+      service             = "ec2messages"
+      private_dns_enabled = true
+      subnet_ids          = module.vpc.private_subnets
+      security_group_ids  = [aws_security_group.vpc_endpoints.id]
+      tags                = { Name = "${var.project_name}-ec2messages-endpoint" }
+    }
+    ssm = {
+      service             = "ssm"
+      private_dns_enabled = true
+      subnet_ids          = module.vpc.private_subnets
+      security_group_ids  = [aws_security_group.vpc_endpoints.id]
+      tags                = { Name = "${var.project_name}-ssm-endpoint" }
+    }
+    ssmmessages = {
+      service             = "ssmmessages"
+      private_dns_enabled = true
+      subnet_ids          = module.vpc.private_subnets
+      security_group_ids  = [aws_security_group.vpc_endpoints.id]
+      tags                = { Name = "${var.project_name}-ssmmessages-endpoint" }
+    }
+    fsx = {
+      service             = "fsx"
+      private_dns_enabled = true
+      subnet_ids          = module.vpc.private_subnets
+      security_group_ids  = [aws_security_group.vpc_endpoints.id]
+      tags                = { Name = "${var.project_name}-fsx-endpoint" }
+    }
   }
 
   tags = var.tags

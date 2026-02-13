@@ -152,20 +152,24 @@ resource "helm_release" "nvidia_device_plugin" {
   namespace  = "kube-system"
   version    = "0.14.5"
 
-  set {
-    name  = "tolerations[0].key"
-    value = "nvidia.com/gpu"
-  }
-
-  set {
-    name  = "tolerations[0].operator"
-    value = "Exists"
-  }
-
-  set {
-    name  = "tolerations[0].effect"
-    value = "NoSchedule"
-  }
+  values = [
+    yamlencode({
+      image = {
+        repository = split(":", var.nvidia_device_plugin_image)[0]
+        tag        = split(":", var.nvidia_device_plugin_image)[1]
+      }
+      nodeSelector = {
+        "nvidia.com/gpu.present" = "true"
+      }
+      tolerations = [
+        {
+          key      = "nvidia.com/gpu"
+          operator = "Exists"
+          effect   = "NoSchedule"
+        }
+      ]
+    })
+  ]
 
   depends_on = [module.eks]
 }
