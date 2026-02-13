@@ -111,3 +111,15 @@ variable "nvidia_device_plugin_image" {
   type        = string
   default     = "nvcr.io/nvidia/k8s-device-plugin:v0.14.5"
 }
+
+variable "enable_efa" {
+  description = "Enable Elastic Fabric Adapter for GPU nodes (required for p5e instances)"
+  type        = bool
+  default     = false
+}
+
+variable "gpu_ami_type" {
+  description = "AMI type for GPU nodes (AL2_x86_64_GPU or AL2023_x86_64_NVIDIA)"
+  type        = string
+  default     = "AL2_x86_64_GPU"
+}

@@ -73,6 +73,8 @@ locals {
     # KV cache config
     var.vllm_enable_prefix_caching ? ["--enable-prefix-caching"] : [],
     ["--disable-log-requests"],
+    # Multi-GPU tensor parallelism
+    var.vllm_tensor_parallel_size > 1 ? ["--tensor-parallel-size", tostring(var.vllm_tensor_parallel_size)] : [],
     var.vllm_cpu_offload_gb > 0 ? ["--cpu-offload-gb", tostring(var.vllm_cpu_offload_gb)] : [],
     var.vllm_swap_space_gb > 0 ? ["--swap-space", tostring(var.vllm_swap_space_gb)] : []
   )
@@ -103,17 +105,19 @@ module "eks" {
   system_instance_types = ["m6i.large"]
   system_desired_size   = 2
 
-  # GPU nodes - g6e with L40S (48GB VRAM) for high concurrency benchmarks
+  # GPU nodes - p5e.48xlarge with 8x H100 + EFA for GDS benchmarks
   enable_gpu_nodes   = var.enable_gpu_nodes
   gpu_instance_types = var.gpu_instance_types
   gpu_subnet_ids     = local.gpu_subnet_ids
   gpu_desired_size   = var.gpu_desired_size
   gpu_min_size       = var.gpu_min_size
   gpu_max_size       = var.gpu_max_size
-  gpu_volume_size    = 500 # Larger for model caching
+  gpu_volume_size    = var.gpu_volume_size
+  gpu_ami_type       = var.gpu_ami_type
+  enable_efa         = var.enable_efa
 
-  # Use ECR image for private subnets without NAT Gateway
-  nvidia_device_plugin_image = "615299764834.dkr.ecr.us-east-1.amazonaws.com/nvidia/k8s-device-plugin:v0.14.5"
+  # Use public NVIDIA image (NAT Gateway enabled)
+  nvidia_device_plugin_image = "nvcr.io/nvidia/k8s-device-plugin:v0.14.5"
 
   tags = local.tags
 }
@@ -182,31 +186,31 @@ resource "helm_release" "fsx_csi_driver" {
   values = [
     yamlencode({
       image = {
-        repository = "615299764834.dkr.ecr.us-east-1.amazonaws.com/fsx-csi-driver/aws-fsx-csi-driver"
+        repository = "public.ecr.aws/fsx-csi-driver/aws-fsx-csi-driver"
         tag        = "v1.2.0"
       }
       sidecars = {
         livenessProbe = {
           image = {
-            repository = "615299764834.dkr.ecr.us-east-1.amazonaws.com/eks-distro/kubernetes-csi/livenessprobe"
+            repository = "public.ecr.aws/eks-distro/kubernetes-csi/livenessprobe"
             tag        = "v2.12.0-eks-1-29-5"
           }
         }
         nodeDriverRegistrar = {
           image = {
-            repository = "615299764834.dkr.ecr.us-east-1.amazonaws.com/eks-distro/kubernetes-csi/node-driver-registrar"
+            repository = "public.ecr.aws/eks-distro/kubernetes-csi/node-driver-registrar"
             tag        = "v2.10.0-eks-1-29-5"
           }
         }
         provisioner = {
           image = {
-            repository = "615299764834.dkr.ecr.us-east-1.amazonaws.com/eks-distro/kubernetes-csi/external-provisioner"
+            repository = "public.ecr.aws/eks-distro/kubernetes-csi/external-provisioner"
             tag        = "v4.0.0-eks-1-29-5"
           }
         }
         resizer = {
           image = {
-            repository = "615299764834.dkr.ecr.us-east-1.amazonaws.com/eks-distro/kubernetes-csi/external-resizer"
+            repository = "public.ecr.aws/eks-distro/kubernetes-csi/external-resizer"
             tag        = "v1.10.0-eks-1-29-5"
           }
         }
@@ -325,7 +329,7 @@ resource "helm_release" "prometheus" {
     yamlencode({
       server = {
         image = {
-          repository = "615299764834.dkr.ecr.us-east-1.amazonaws.com/prometheus/prometheus"
+          repository = "quay.io/prometheus/prometheus"
           tag        = "v2.54.1"
         }
         global = {
@@ -359,7 +363,7 @@ resource "helm_release" "prometheus" {
       configmapReload = {
         prometheus = {
           image = {
-            repository = "615299764834.dkr.ecr.us-east-1.amazonaws.com/prometheus-operator/prometheus-config-reloader"
+            repository = "quay.io/prometheus-operator/prometheus-config-reloader"
             tag        = "v0.76.0"
           }
         }
@@ -488,12 +492,12 @@ resource "kubernetes_deployment" "vllm" {
 
           resources {
             limits = {
-              "nvidia.com/gpu" = 1
+              "nvidia.com/gpu" = var.vllm_gpu_count
             }
             requests = {
-              "nvidia.com/gpu" = 1
-              cpu              = "2"
-              memory           = "12Gi"
+              "nvidia.com/gpu" = var.vllm_gpu_count
+              cpu              = var.vllm_cpu_request
+              memory           = var.vllm_memory_request
             }
           }
 

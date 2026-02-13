@@ -64,7 +64,7 @@ module "eks" {
         name           = "gpu"
         instance_types = var.gpu_instance_types
         capacity_type  = "ON_DEMAND"
-        ami_type       = "AL2_x86_64_GPU"
+        ami_type       = var.gpu_ami_type
 
         # Use specific subnets for GPU nodes (AZ filtering)
         subnet_ids = var.gpu_subnet_ids != null ? var.gpu_subnet_ids : var.private_subnet_ids
@@ -73,10 +73,13 @@ module "eks" {
         max_size     = var.gpu_max_size
         desired_size = var.gpu_desired_size
 
-        labels = {
-          role                     = "gpu"
-          "nvidia.com/gpu.present" = "true"
-        }
+        labels = merge(
+          {
+            role                     = "gpu"
+            "nvidia.com/gpu.present" = "true"
+          },
+          var.enable_efa ? { "vpc.amazonaws.com/efa.present" = "true" } : {}
+        )
 
         taints = [
           {
@@ -98,6 +101,16 @@ module "eks" {
             }
           }
         }
+
+        # EFA configuration for p5e instances
+        network_interfaces = var.enable_efa ? [
+          {
+            delete_on_termination       = true
+            device_index                = 0
+            associate_public_ip_address = false
+            interface_type              = "efa"
+          }
+        ] : []
 
         tags = {
           Name = "${var.project_name}-gpu-node"

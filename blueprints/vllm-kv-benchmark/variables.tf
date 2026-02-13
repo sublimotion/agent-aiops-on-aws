@@ -1,7 +1,7 @@
 variable "aws_region" {
   description = "AWS region for resources"
   type        = string
-  default     = "us-east-1"
+  default     = "us-east-2" # Ohio - has p5e.48xlarge availability
 }
 
 variable "environment" {
@@ -26,19 +26,19 @@ variable "vpc_cidr" {
 variable "availability_zones" {
   description = "List of availability zones"
   type        = list(string)
-  default     = ["us-east-1a", "us-east-1b"]
+  default     = ["us-east-2a", "us-east-2b"]
 }
 
 variable "gpu_availability_zones" {
-  description = "Availability zones for GPU nodes (g7e availability)"
+  description = "Availability zones for GPU nodes (p5e availability)"
   type        = list(string)
-  default     = ["us-east-1a"]
+  default     = ["us-east-2a"]
 }
 
 variable "enable_nat_gateway" {
-  description = "Enable NAT Gateway for public registry access (requires EIP quota)"
+  description = "Enable NAT Gateway for public registry access (required for public vLLM images)"
   type        = bool
-  default     = false
+  default     = true # Required for pulling public images
 }
 
 # EKS
@@ -55,9 +55,9 @@ variable "enable_gpu_nodes" {
 }
 
 variable "gpu_instance_types" {
-  description = "GPU instance types - g6e/g7e with L40S (48GB VRAM) for high concurrency benchmarks"
+  description = "GPU instance types - p5e.48xlarge with 8x H100 (640GB VRAM) + EFA for GDS benchmarks"
   type        = list(string)
-  default     = ["g6e.xlarge", "g6e.2xlarge"]
+  default     = ["p5e.48xlarge"]
 }
 
 variable "gpu_desired_size" {
@@ -78,6 +78,24 @@ variable "gpu_max_size" {
   default     = 1
 }
 
+variable "enable_efa" {
+  description = "Enable Elastic Fabric Adapter for GPU nodes (required for p5e + GDS)"
+  type        = bool
+  default     = true # Required for p5e with GDS + FSx
+}
+
+variable "gpu_ami_type" {
+  description = "AMI type for GPU nodes"
+  type        = string
+  default     = "AL2_x86_64_GPU"
+}
+
+variable "gpu_volume_size" {
+  description = "Root volume size for GPU nodes (GB) - p5e needs more for local NVMe"
+  type        = number
+  default     = 500
+}
+
 # FSx Lustre for KV cache offloading (uses private ECR images)
 variable "enable_fsx_lustre" {
   description = "Enable FSx Lustre for KV cache offloading"
@@ -86,9 +104,9 @@ variable "enable_fsx_lustre" {
 }
 
 variable "fsx_storage_capacity" {
-  description = "FSx Lustre storage capacity in GiB (1200 = 1.2 TiB per spec)"
+  description = "FSx Lustre storage capacity in GiB (500000 = 500 TiB for max throughput with GDS)"
   type        = number
-  default     = 1200
+  default     = 500000 # 500 TiB - maximizes throughput for GDS benchmarks
 }
 
 variable "fsx_deployment_type" {
@@ -107,13 +125,13 @@ variable "enable_vllm" {
 variable "vllm_model_id" {
   description = "Model path for vLLM (HuggingFace ID or S3 path)"
   type        = string
-  default     = "s3://vllm-model-cache-615299764834/models--mistralai--Ministral-3-3B-Instruct-2512/snapshots/cfcb068fa7c44114cf77a462357c6cdcd2c304b4/"
+  default     = "mistralai/Ministral-3B-Instruct-2412" # Use HF directly for us-east-2
 }
 
 variable "vllm_image" {
-  description = "vLLM container image (using ECR for private subnets)"
+  description = "vLLM container image"
   type        = string
-  default     = "615299764834.dkr.ecr.us-east-1.amazonaws.com/vllm-openai:v0.15.1"
+  default     = "vllm/vllm-openai:v0.6.6.post1" # Public image, requires NAT gateway
 }
 
 variable "vllm_gpu_memory_utilization" {
@@ -145,6 +163,30 @@ variable "vllm_swap_space_gb" {
   description = "Swap space for KV cache in GB (0 = disabled)"
   type        = number
   default     = 0
+}
+
+variable "vllm_gpu_count" {
+  description = "Number of GPUs for vLLM (p5e.48xlarge has 8x H100)"
+  type        = number
+  default     = 8
+}
+
+variable "vllm_tensor_parallel_size" {
+  description = "Tensor parallel size for multi-GPU inference"
+  type        = number
+  default     = 8
+}
+
+variable "vllm_cpu_request" {
+  description = "CPU request for vLLM pod"
+  type        = string
+  default     = "32"
+}
+
+variable "vllm_memory_request" {
+  description = "Memory request for vLLM pod"
+  type        = string
+  default     = "256Gi"
 }
 
 # Monitoring (uses private ECR images)
