@@ -163,13 +163,32 @@ enable_prefix_caching: true
 - **24K context**: Memory pressure causes preemptions, 100x TTFT increase
 - **30K context**: Complete stall, requests never complete
 
-### When to Use LMCache/FSx
+### LMCache + FSx Results (100GB FSx cache)
 
-| Context Length | Recommended Config |
-|----------------|-------------------|
-| ≤16K | vllm-baseline (native prefix caching) |
-| 16K-24K | Consider vllm-swap or LMCache |
-| >24K | **LMCache + FSx required** |
+| Context | Metric | Baseline | LMCache+FSx | Change |
+|---------|--------|----------|-------------|--------|
+| 24K | TTFT | 16.6s | 25.9s | ❌ +56% |
+| 24K | Preemptions | 39 | 27 | ✅ -31% |
+| 24K | Gen tok/req/s | 6.5 | 4.9 | ❌ -25% |
+| 30K | Status | Stalled | Stalled | ➖ Same |
+| - | FSx Cache Used | 0 | 46GB | ✅ Active |
+
+**Finding**: LMCache reduces preemptions but adds disk I/O latency. Does NOT solve GPU memory capacity limits for 30K+ contexts.
+
+### When to Use Each Config
+
+| Context Length | Recommended Config | Rationale |
+|----------------|-------------------|-----------|
+| ≤16K | vllm-baseline | Best performance, no preemptions |
+| 16K-24K | vllm-baseline | Acceptable despite preemptions |
+| >24K | **Scale up GPU** | L40S insufficient; use A100/H100 80GB |
+
+### LMCache Best Use Cases
+
+- Multi-node deployments (shared KV cache)
+- High prefix reuse scenarios
+- Cost optimization (reuse expensive prefills)
+- NOT for increasing single-GPU memory capacity
 
 ## Conclusions
 

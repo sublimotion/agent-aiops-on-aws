@@ -265,7 +265,18 @@ Ran using LMBench multi-round-qa workload generator.
 | 24K | **16.6s** | 6.5 | **39** |
 | 30K | ∞ (stalled) | 0 | 39+ |
 
-**Conclusion**: Native vLLM prefix caching works well up to ~16K context. Beyond 24K, LMCache with FSx offloading would be required to avoid preemptions and stalls.
+**Conclusion**: Native vLLM prefix caching works well up to ~16K context. Beyond 24K, GPU memory becomes the bottleneck.
+
+### LMCache + FSx Test Results
+
+| Metric | Baseline | LMCache+FSx |
+|--------|----------|-------------|
+| 24K Preemptions | 39 | 27 (-31%) |
+| 24K TTFT | 16.6s | 25.9s (+56%) |
+| 30K Status | Stalled | Stalled |
+| FSx Cache Used | 0 | 46GB |
+
+**Finding**: LMCache reduces preemptions but adds I/O latency. Does NOT solve GPU memory limits for 30K+ contexts on L40S 48GB. For 30K+ concurrent contexts, scale to A100/H100 80GB.
 
 ### Additional Baselines Tested
 
