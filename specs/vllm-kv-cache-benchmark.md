@@ -58,6 +58,51 @@ Test Matrix = Baselines × Workloads × QPS Levels
 | FSx Lustre | SCRATCH_2, 1.2 TiB |
 | Endpoint | OpenAI-compatible API on `localhost:30080` |
 
+## Requirements (from lessons learned)
+
+### Infrastructure Requirements
+
+| Requirement | Rationale |
+|-------------|-----------|
+| Use VPC endpoints for ECR, S3, FSx | Avoids NAT Gateway EIP quota limits |
+| FSx VPC endpoint required | FSx CSI driver needs API access from private subnets |
+| Single GPU replica deployments | Scale to 0 before rolling updates to avoid scheduling conflicts |
+
+### GPU Sizing Requirements
+
+| Max Context Length | Minimum GPU | VRAM |
+|--------------------|-------------|------|
+| ≤16K tokens | L40S | 48GB |
+| ≤24K tokens | L40S (with preemptions) | 48GB |
+| >24K tokens | A100/H100 | 80GB |
+
+> **Critical**: L40S 48GB cannot handle 15+ concurrent 30K token contexts regardless of caching strategy.
+
+### Configuration Requirements
+
+| Setting | Requirement | Rationale |
+|---------|-------------|-----------|
+| `--enable-prefix-caching` | Always enable | 76-80% hit rate, no overhead |
+| `--cpu-offload-gb` | Never use for KV cache | 50x performance penalty |
+| `--swap-space` | Optional safety net | Zero overhead when not triggered |
+| `scrape_timeout` | Must be ≤ `scrape_interval` | Prometheus config validation |
+
+### Monitoring Requirements
+
+| Metric | Threshold | Action |
+|--------|-----------|--------|
+| `vllm:num_preemptions_total` | >0 sustained | GPU memory pressure, scale up or reduce concurrency |
+| `vllm:kv_cache_usage_perc` | >90% sustained | Approaching memory limit |
+| `vllm:prefix_cache_hit_rate` | <50% | Check workload has shared prefixes |
+
+### LMCache Requirements (if deployed)
+
+| Requirement | Rationale |
+|-------------|-----------|
+| Use for multi-node or high prefix reuse only | Does NOT expand single-GPU capacity |
+| Expect +50% TTFT overhead | Disk I/O latency tradeoff |
+| Monitor FSx cache size | LRU eviction at `max_local_disk_size` |
+
 ## Model
 
 | Model | Parameters | Context |
