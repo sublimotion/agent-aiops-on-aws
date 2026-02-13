@@ -203,36 +203,52 @@ With 50 unique system prompts competing for 100GB FSx cache limit:
 3. **Write amplification** - Every new prefix writes to FSx before serving
 4. **No local tier** - Every cache miss hits network immediately
 
-## FSx Lustre GDS Support
+## FSx Lustre GDS + EFA Support
 
-AWS FSx Lustre supports **GPUDirect Storage (GDS)** which bypasses CPU:
+AWS FSx Lustre supports **GPUDirect Storage (GDS)** with **Elastic Fabric Adapter (EFA)**, bypassing CPU:
 
 ```
-Traditional:     GPU → PCIe → CPU RAM → Network → FSx
-With GDS:        GPU → PCIe → Network → FSx (bypasses CPU)
+Traditional:     GPU → PCIe → CPU RAM → Network → FSx     (~240 MB/s)
+With GDS+EFA:    GPU → PCIe → EFA → FSx                   (~150 GB/s)
 ```
+
+| Configuration | Throughput | Latency |
+|---------------|------------|---------|
+| Standard FSx | ~240 MB/s | ~ms |
+| FSx + GDS + EFA (P5) | **1,200 Gbps (~150 GB/s)** | ~100s μs |
 
 Reference: https://aws.amazon.com/blogs/aws/amazon-fsx-for-lustre-unlocks-full-network-bandwidth-and-gpu-performance/
 
-**However**, GDS reduces CPU overhead but doesn't eliminate network latency. Tiered caching is still preferred.
+This is **12x more throughput** than standard FSx and approaches local NVMe bandwidth. However:
+- Requires P5 instances (8x H100, ~$98/hr)
+- Still has network latency vs local storage
+- Tiered caching still beneficial for latency-sensitive hot data
 
 ## Tiered Storage Architecture
 
 Optimal KV cache offloading requires multiple tiers:
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  Tier 0: GPU VRAM     │  ~ns latency   │  ~2 TB/s      │
-├───────────────────────┼────────────────┼───────────────┤
-│  Tier 1: Host DRAM    │  ~100ns        │  ~100 GB/s    │
-├───────────────────────┼────────────────┼───────────────┤
-│  Tier 2: Local NVMe   │  ~10-100μs     │  ~7 GB/s      │
-├───────────────────────┼────────────────┼───────────────┤
-│  Tier 3: FSx (GDS)    │  ~1-10ms       │  ~240 MB/s    │
-└───────────────────────┴────────────────┴───────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  Tier 0: GPU VRAM          │  ~ns latency   │  ~2 TB/s         │
+├────────────────────────────┼────────────────┼──────────────────┤
+│  Tier 1: Host DRAM         │  ~100ns        │  ~100 GB/s       │
+├────────────────────────────┼────────────────┼──────────────────┤
+│  Tier 2: Local NVMe        │  ~10-100μs     │  ~7 GB/s         │
+├────────────────────────────┼────────────────┼──────────────────┤
+│  Tier 3: FSx (standard)    │  ~1-10ms       │  ~240 MB/s       │
+├────────────────────────────┼────────────────┼──────────────────┤
+│  Tier 3: FSx (GDS+EFA/P5)  │  ~100s μs      │  ~150 GB/s       │
+└────────────────────────────┴────────────────┴──────────────────┘
 ```
 
-Hot prefixes stay in VRAM/DRAM, cold prefixes spill to NVMe, FSx provides cross-node sharing.
+With GDS+EFA on P5 instances, FSx bandwidth (~150 GB/s) rivals local NVMe (~7 GB/s) - **20x faster**. This potentially eliminates the need for local NVMe tier, simplifying architecture to:
+
+```
+GPU VRAM → Host DRAM → FSx (GDS+EFA)
+```
+
+Hot prefixes stay in VRAM/DRAM, FSx provides both overflow and cross-node sharing.
 
 ## LMCache vs Mooncake Comparison
 
@@ -293,11 +309,12 @@ For tiered caching, need instances with local NVMe (g6e.4xlarge+).
 ## Conclusions
 
 1. **LMCache single-backend design** is unsuitable for high-variety prefix workloads
-2. **Network latency** (not PCIe) is the bottleneck when using FSx as primary cache
-3. **Tiered architecture** (Mooncake) is required for production multi-tenant deployments
-4. **FSx GDS** helps but doesn't solve the fundamental latency gap
-5. **For single-node**: Native vLLM prefix caching is optimal; skip LMCache
-6. **For multi-node**: Consider Mooncake with tiered storage or wait for LMCache tiering support
+2. **Standard FSx** bottleneck is network latency (~ms) and bandwidth (~240 MB/s)
+3. **FSx GDS+EFA on P5** changes the equation: ~150 GB/s bandwidth, ~100s μs latency
+4. **With P5 + GDS+EFA**: FSx can potentially replace local NVMe tier entirely
+5. **For single-node on g6e**: Native vLLM prefix caching is optimal; skip LMCache
+6. **For multi-node on P5**: FSx + GDS + EFA + Mooncake could be highly effective
+7. **Cost tradeoff**: P5 (~$98/hr) vs g6e (~$1.19/hr) - 80x cost difference
 
 ## Future Work
 
