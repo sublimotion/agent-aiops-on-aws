@@ -253,8 +253,19 @@ Ran using LMBench multi-round-qa workload generator.
 
 1. **Prefix caching effective**: 76-80% cache hit rate with multi-turn conversations
 2. **Linear QPS scaling**: System handled 0.5→4.0 QPS with graceful throughput degradation
-3. **No memory pressure**: Zero preemptions on L40S 48GB with 32K max context
+3. **Memory limit at 24K context**: Zero preemptions up to 16K, but 39 preemptions at 24K
 4. **RAG latency**: Longer contexts (4K tokens) increase TTFT to ~234ms but still acceptable
+
+### Long Context Stress Test Results
+
+| Context | TTFT | Gen tok/req/s | Preemptions |
+|---------|------|---------------|-------------|
+| 8K | 263ms | 75 | 0 |
+| 16K | 728ms | 55 | 0 |
+| 24K | **16.6s** | 6.5 | **39** |
+| 30K | ∞ (stalled) | 0 | 39+ |
+
+**Conclusion**: Native vLLM prefix caching works well up to ~16K context. Beyond 24K, LMCache with FSx offloading would be required to avoid preemptions and stalls.
 
 ### Additional Baselines Tested
 

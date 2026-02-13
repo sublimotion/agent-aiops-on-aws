@@ -146,14 +146,39 @@ enable_prefix_caching: true
 | vllm-cpu-offload | 35 | $12.17 | 12x |
 | vllm-swap | 425 | $1.00 | 1.0x |
 
+## Long Context Stress Tests
+
+| Context | TTFT | Gen tok/req/s | Preemptions | Status |
+|---------|------|---------------|-------------|--------|
+| 1K | 120ms | 114 | 0 | ✅ Optimal |
+| 4K | 234ms | 104 | 0 | ✅ Good |
+| 8K | 263ms | 75 | 0 | ✅ Good |
+| 16K | 728ms | 55 | 0 | ⚠️ Acceptable |
+| 24K | **16.6s** | 6.5 | **39** | ❌ Degraded |
+| 30K | **∞ stall** | 0 | 39+ | ❌ Failed |
+
+### Breaking Point Analysis
+
+- **≤16K context**: System performs well, no preemptions
+- **24K context**: Memory pressure causes preemptions, 100x TTFT increase
+- **30K context**: Complete stall, requests never complete
+
+### When to Use LMCache/FSx
+
+| Context Length | Recommended Config |
+|----------------|-------------------|
+| ≤16K | vllm-baseline (native prefix caching) |
+| 16K-24K | Consider vllm-swap or LMCache |
+| >24K | **LMCache + FSx required** |
+
 ## Conclusions
 
-1. **For this model/hardware combo, baseline is optimal**: Ministral-3B fits comfortably on L40S 48GB with room for 32K context.
+1. **For short-medium contexts (≤16K), baseline is optimal**: Native prefix caching delivers 76-80% hit rate with no preemptions.
 
-2. **CPU offload has severe performance penalty**: Only use when absolutely necessary to fit a model.
+2. **Long contexts (>24K) require offloading**: GPU memory exhaustion causes preemptions and stalls.
 
-3. **Swap space is transparent**: No overhead when not triggered by memory pressure.
+3. **CPU offload has severe performance penalty**: Only use when model doesn't fit, not for KV cache.
 
-4. **Prefix caching delivers**: 76-80% hit rate significantly reduces prefill costs for multi-turn workloads.
+4. **FSx/LMCache needed for production long-context workloads**: Native vLLM cannot handle 24K+ concurrent contexts on L40S.
 
-5. **Cost efficiency**: ~$1/1M output tokens with g6e.xlarge, competitive with API pricing for high-volume workloads.
+5. **Cost efficiency at short contexts**: ~$1/1M output tokens with g6e.xlarge.
