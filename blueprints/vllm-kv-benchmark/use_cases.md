@@ -217,3 +217,36 @@ LMCache Value = Prefix Reuse × Instance Count × Request Volume
 | Multi-node scaling | 80% | 4 | 4000 | High |
 | Low reuse workload | 20% | 1 | 1000 | Low |
 | High volume shared | 90% | 2 | 10000 | Very High |
+
+## LMBench Preconfigured Tests
+
+The following LMBench specs align with the use cases above:
+
+| Use Case | LMBench Spec | Key Parameters |
+|----------|--------------|----------------|
+| Shared System Prompt | `0-bench-specs/strict-synthetic-spec.yaml` | `SHARED_SYSTEM_PROMPT_LEN: 1000`, `KV_REUSE_RATIO: 0.6` |
+| Multi-Node Routing | `0-bench-specs/routing/4-spec.yaml` | 4 replicas, `kvaware`/`session`/`prefixaware` routing |
+| vLLM vs LMCache | `0-bench-specs/vllm-prefix-caching-versus-lmcache/traces.yaml` | Direct A/B comparison |
+| Multi-Turn | `0-bench-specs/layerwise/layerwise-spec.yaml` | `CHAT_HISTORY: 20000`, `NUM_ROUNDS: 20` |
+
+### Running LMBench Specs
+
+```bash
+# From LMBench directory
+cd LMBench
+
+# Run strict synthetic (shared system prompt)
+python run_benchmark.py --spec 0-bench-specs/strict-synthetic-spec.yaml
+
+# Run multi-node routing comparison
+python run_benchmark.py --spec 0-bench-specs/routing/4-spec.yaml
+```
+
+### Note on Multi-Node Testing
+
+The current benchmark infrastructure is single-node. To properly test LMCache multi-node benefits:
+
+1. Scale vLLM deployment to 2-4 replicas
+2. Deploy load balancer with routing strategy support
+3. Configure all replicas to share FSx cache at `/fsx/kv-cache/`
+4. Run `routing/4-spec.yaml` to compare `kvaware` vs `round-robin`
