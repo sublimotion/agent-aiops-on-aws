@@ -113,15 +113,16 @@ module "eks" {
   system_desired_size   = 2
 
   # GPU nodes - p5e.48xlarge with 8x H100 + EFA for GDS benchmarks
-  enable_gpu_nodes   = var.enable_gpu_nodes
-  gpu_instance_types = var.gpu_instance_types
-  gpu_subnet_ids     = local.gpu_subnet_ids
-  gpu_desired_size   = var.gpu_desired_size
-  gpu_min_size       = var.gpu_min_size
-  gpu_max_size       = var.gpu_max_size
-  gpu_volume_size    = var.gpu_volume_size
-  gpu_ami_type       = var.gpu_ami_type
-  enable_efa         = var.enable_efa
+  enable_gpu_nodes        = var.enable_gpu_nodes
+  gpu_instance_types      = var.gpu_instance_types
+  gpu_subnet_ids          = local.gpu_subnet_ids
+  gpu_desired_size        = var.gpu_desired_size
+  gpu_min_size            = var.gpu_min_size
+  gpu_max_size            = var.gpu_max_size
+  gpu_volume_size         = var.gpu_volume_size
+  gpu_ami_type            = var.gpu_ami_type
+  enable_efa              = var.enable_efa
+  capacity_reservation_id = var.capacity_reservation_id
 
   # Use public NVIDIA image (NAT Gateway enabled)
   nvidia_device_plugin_image = "nvcr.io/nvidia/k8s-device-plugin:v0.14.5"
@@ -481,6 +482,23 @@ resource "kubernetes_deployment" "vllm" {
             allow_privilege_escalation = true
           }
 
+          # Use FSx for model cache (100TiB available)
+          dynamic "env" {
+            for_each = var.enable_fsx_lustre ? [1] : []
+            content {
+              name  = "HF_HOME"
+              value = "/fsx/huggingface"
+            }
+          }
+
+          dynamic "env" {
+            for_each = var.enable_fsx_lustre ? [1] : []
+            content {
+              name  = "TRANSFORMERS_CACHE"
+              value = "/fsx/huggingface/hub"
+            }
+          }
+
           # vllm-openai image args (uses python -m vllm.entrypoints.openai.api_server)
           args = concat(
             [
@@ -709,4 +727,122 @@ resource "kubernetes_service" "vllm_nodeport" {
 
     type = "NodePort"
   }
+}
+
+# Standalone GPU EC2 instance for capacity block reservation
+# ASG/Node groups don't support capacity blocks, so we use direct EC2
+data "aws_ssm_parameter" "eks_gpu_ami" {
+  count = var.capacity_reservation_id != null ? 1 : 0
+  name  = "/aws/service/eks/optimized-ami/${var.eks_cluster_version}/amazon-linux-2-gpu/recommended/image_id"
+}
+
+resource "aws_iam_instance_profile" "gpu_node" {
+  count = var.capacity_reservation_id != null ? 1 : 0
+  name  = "${var.project_name}-gpu-node-profile"
+  role  = aws_iam_role.gpu_node[0].name
+}
+
+resource "aws_iam_role" "gpu_node" {
+  count = var.capacity_reservation_id != null ? 1 : 0
+  name  = "${var.project_name}-gpu-node-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      }
+    }]
+  })
+
+  tags = local.tags
+}
+
+resource "aws_iam_role_policy_attachment" "gpu_node_worker" {
+  count      = var.capacity_reservation_id != null ? 1 : 0
+  role       = aws_iam_role.gpu_node[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "gpu_node_cni" {
+  count      = var.capacity_reservation_id != null ? 1 : 0
+  role       = aws_iam_role.gpu_node[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+}
+
+resource "aws_iam_role_policy_attachment" "gpu_node_ecr" {
+  count      = var.capacity_reservation_id != null ? 1 : 0
+  role       = aws_iam_role.gpu_node[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+resource "aws_iam_role_policy_attachment" "gpu_node_ssm" {
+  count      = var.capacity_reservation_id != null ? 1 : 0
+  role       = aws_iam_role.gpu_node[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+# EKS access entry for the GPU node
+resource "aws_eks_access_entry" "gpu_node" {
+  count         = var.capacity_reservation_id != null ? 1 : 0
+  cluster_name  = module.eks.cluster_name
+  principal_arn = aws_iam_role.gpu_node[0].arn
+  type          = "EC2_LINUX"
+}
+
+resource "aws_instance" "gpu_node" {
+  count = var.capacity_reservation_id != null && var.gpu_desired_size > 0 ? 1 : 0
+
+  ami           = data.aws_ssm_parameter.eks_gpu_ami[0].value
+  instance_type = var.gpu_instance_types[0]
+  subnet_id     = local.gpu_subnet_ids[0]
+
+  iam_instance_profile = aws_iam_instance_profile.gpu_node[0].name
+
+  vpc_security_group_ids = [module.eks.node_security_group_id]
+
+  # Target the capacity block reservation
+  capacity_reservation_specification {
+    capacity_reservation_target {
+      capacity_reservation_id = var.capacity_reservation_id
+    }
+  }
+
+  root_block_device {
+    volume_size           = var.gpu_volume_size
+    volume_type           = "gp3"
+    encrypted             = true
+    delete_on_termination = true
+  }
+
+  # EKS bootstrap user data
+  user_data = base64encode(<<-EOF
+#!/bin/bash
+set -ex
+
+# Install NVIDIA drivers and container toolkit (AL2 GPU AMI has these pre-installed)
+
+# Get cluster CA and endpoint
+B64_CLUSTER_CA="${module.eks.cluster_certificate_authority_data}"
+API_SERVER_URL="${module.eks.cluster_endpoint}"
+
+# Bootstrap the node to join EKS cluster
+/etc/eks/bootstrap.sh ${module.eks.cluster_name} \
+  --kubelet-extra-args '--node-labels=role=gpu,nvidia.com/gpu.present=true${var.enable_efa ? ",vpc.amazonaws.com/efa.present=true" : ""} --register-with-taints=nvidia.com/gpu=true:NoSchedule' \
+  --b64-cluster-ca $B64_CLUSTER_CA \
+  --apiserver-endpoint $API_SERVER_URL
+EOF
+  )
+
+  tags = merge(local.tags, {
+    Name                                            = "${var.project_name}-gpu-node"
+    "kubernetes.io/cluster/${module.eks.cluster_name}" = "owned"
+  })
+
+  depends_on = [
+    module.eks,
+    aws_eks_access_entry.gpu_node
+  ]
 }

@@ -284,3 +284,64 @@ For **single-node deployments** with Ministral-3B on L40S 48GB:
 - Multiple vLLM instances sharing FSx cache
 - High prefix reuse across instances (kvaware routing)
 - This is NOT achievable with single-node deployment
+
+---
+
+## Multi-Node Benchmark Results (2026-02-13)
+
+### Test: 2× g6e.xlarge Nodes with Shared FSx Cache
+
+**Configuration**:
+- 2 vLLM instances with LMCache
+- FSx Lustre 1.2 TiB SCRATCH_2 shared cache
+- 10 tenants × 10 users × 3 questions = 300 requests
+- ~4K token unique system prompt per tenant
+
+| Metric | Value |
+|--------|-------|
+| Average TTFT | **111ms** |
+| Median TTFT | 97.6ms |
+| P90 TTFT | 113ms |
+| P99 TTFT | 350ms |
+| Achieved QPS | 3.88 |
+| FSx Cache Size | 119GB |
+
+### Cold vs Warm Cache
+
+| Request Type | Avg TTFT | Cache Behavior |
+|--------------|----------|----------------|
+| Cold (first per user) | 132.5ms | Compute + write to FSx |
+| Warm (subsequent) | 100.3ms | Retrieve from FSx |
+
+**Cache Benefit**: 1.32x speedup on warm requests
+
+### Updated Recommendations
+
+| Scenario | Configuration | Expected TTFT | Notes |
+|----------|---------------|---------------|-------|
+| Single-node, few tenants | Baseline (native prefix) | ~100ms | Optimal for ≤16K context |
+| Single-node, many tenants | Baseline (native prefix) | ~480ms | Skip LMCache, causes thrashing |
+| Multi-node, few tenants | LMCache + FSx | ~111ms | ✅ VALIDATED |
+| Multi-node, many tenants | TBD | TBD | Risk of FSx thrashing |
+
+### Key Learnings
+
+1. **Multi-node FSx sharing works** when working set fits cache
+2. **LMCache adds ~30ms overhead** vs native prefix caching (for cache misses)
+3. **FSx thrashing risk** increases with tenant count (>10 unique system prompts)
+4. **Optimal use case**: Enterprise with few large tenants sharing common prefixes
+
+---
+
+## Next: P5e + GDS + EFA Benchmarks (us-east-2)
+
+The following configuration is prepared for high-bandwidth KV cache benchmarks:
+
+**Infrastructure**:
+- p5e.48xlarge: 8× H100 (640GB VRAM total)
+- FSx Lustre 500 TiB with GDS+EFA (~150 GB/s bandwidth)
+- Model: Kimi K2.5 (large MoE model)
+
+**Hypothesis**: With GDS bypassing CPU, FSx bandwidth (~150 GB/s) approaches local NVMe, potentially eliminating single-node FSx thrashing issues.
+
+See `benchmark_runs.md` for deployment commands

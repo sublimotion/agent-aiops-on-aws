@@ -1,5 +1,11 @@
 # EKS Cluster Module - Cluster, Node Groups, Addons, NVIDIA Plugin
 
+# Determine if using self-managed node group for capacity blocks
+locals {
+  use_self_managed_gpu = var.enable_gpu_nodes && var.capacity_reservation_id != null
+  use_managed_gpu      = var.enable_gpu_nodes && var.capacity_reservation_id == null
+}
+
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 20.0"
@@ -58,8 +64,8 @@ module "eks" {
         }
       }
     },
-    # GPU node group (conditional)
-    var.enable_gpu_nodes ? {
+    # GPU node group (conditional - only if NOT using capacity block)
+    local.use_managed_gpu ? {
       gpu = {
         name           = "gpu"
         instance_types = var.gpu_instance_types
@@ -118,6 +124,12 @@ module "eks" {
       }
     } : {}
   )
+
+  # Note: Self-managed node groups with capacity block reservations don't work
+  # because ASGs don't support CAPACITY_BLOCK market type.
+  # For capacity blocks, use standalone EC2 instances that join the cluster manually.
+  # See the gpu-capacity-block module in the blueprint for this approach.
+  self_managed_node_groups = {}
 
   # Security group rules for nodes
   node_security_group_additional_rules = {

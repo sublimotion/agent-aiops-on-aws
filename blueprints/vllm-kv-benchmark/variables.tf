@@ -26,13 +26,19 @@ variable "vpc_cidr" {
 variable "availability_zones" {
   description = "List of availability zones"
   type        = list(string)
-  default     = ["us-east-2a", "us-east-2b"]
+  default     = ["us-east-2a", "us-east-2b", "us-east-2c"] # Include us-east-2c for capacity block
 }
 
 variable "gpu_availability_zones" {
   description = "Availability zones for GPU nodes (p5e availability)"
   type        = list(string)
-  default     = ["us-east-2a"]
+  default     = ["us-east-2c"] # Capacity block reservation cr-0950e9f1e415a9b30
+}
+
+variable "capacity_reservation_id" {
+  description = "Capacity reservation ID for GPU instances (Note: EKS managed node groups don't support capacity blocks)"
+  type        = string
+  default     = "cr-0950e9f1e415a9b30" # Active capacity block in us-east-2c
 }
 
 variable "enable_nat_gateway" {
@@ -55,15 +61,15 @@ variable "enable_gpu_nodes" {
 }
 
 variable "gpu_instance_types" {
-  description = "GPU instance types - p5e.48xlarge with 8x H100 (640GB VRAM) + EFA for GDS benchmarks"
+  description = "GPU instance types - p5e with 8x H100 (640GB VRAM) + EFA for GDS benchmarks"
   type        = list(string)
-  default     = ["p5e.48xlarge"]
+  default     = ["p5e.48xlarge"] # Capacity block reservation active
 }
 
 variable "gpu_desired_size" {
   description = "Desired GPU nodes"
   type        = number
-  default     = 1
+  default     = 0 # GPU node launched via AWS CLI (capacity blocks don't work with Terraform)
 }
 
 variable "gpu_min_size" {
@@ -104,9 +110,9 @@ variable "enable_fsx_lustre" {
 }
 
 variable "fsx_storage_capacity" {
-  description = "FSx Lustre storage capacity in GiB (500000 = 500 TiB for max throughput with GDS)"
+  description = "FSx Lustre storage capacity in GiB (max ~100 TiB SCRATCH_2 quota in us-east-2)"
   type        = number
-  default     = 500000 # 500 TiB - maximizes throughput for GDS benchmarks
+  default     = 100800 # ~100 TiB - max SCRATCH_2 quota (request increase for 500 TiB)
 }
 
 variable "fsx_deployment_type" {
@@ -131,7 +137,7 @@ variable "vllm_model_id" {
 variable "vllm_image" {
   description = "vLLM container image"
   type        = string
-  default     = "vllm/vllm-openai:v0.6.6.post1" # Public image, requires NAT gateway
+  default     = "vllm/vllm-openai:nightly" # Nightly required for Kimi K2.5 support
 }
 
 variable "vllm_gpu_memory_utilization" {

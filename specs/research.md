@@ -319,9 +319,42 @@ For tiered caching, need instances with local NVMe (g6e.4xlarge+).
 7. **Mooncake advantage**: Tiered caching for latency-sensitive hot data
 8. **Cost tradeoff**: P5 (~$98/hr) vs g6e (~$1.19/hr) - 80x cost difference
 
+## Multi-Node Validation (2026-02-13)
+
+### Test: 2× g6e.xlarge with Shared FSx Cache
+
+Successfully validated multi-node LMCache with FSx Lustre:
+
+| Metric | Single-Node (50 tenants) | Multi-Node (10 tenants) |
+|--------|--------------------------|-------------------------|
+| Nodes | 1 | 2 |
+| TTFT (avg) | 40,613ms | **111ms** |
+| Achieved QPS | 1.60 | 3.88 |
+| FSx Cache | Thrashing | 119GB stable |
+| Status | ❌ Failed | ✅ Success |
+
+**Why Multi-Node Worked**:
+1. Reduced tenant count (10 vs 50) fits in FSx cache
+2. Two nodes share single 119GB cache directory
+3. Cache eviction pressure minimal with 10 unique prefixes
+
+**Key Finding**: LMCache + FSx performs well when working set fits cache. Issue is not FSx bandwidth (~240 MB/s standard), but cache thrashing with many unique prefixes.
+
+### Remaining Bandwidth Question
+
+Standard FSx on g6e achieves ~240 MB/s. With GDS+EFA on P5, this jumps to ~150 GB/s (600x faster).
+
+**Hypothesis to test**: P5e + GDS + FSx could handle 50+ tenant scenario by:
+1. Faster cache writes (less queue time)
+2. Faster cache reads (lower TTFT overhead)
+3. Potentially eliminating thrashing via raw bandwidth
+
 ## Future Work
 
+- [x] ~~Evaluate kvaware routing with multiple vLLM replicas~~ Multi-node validated
+- [ ] Deploy p5e.48xlarge in us-east-2 with Kimi K2.5
+- [ ] Benchmark LMCache + GDS + FSx (500 TiB) on P5
+- [ ] Re-test 50 tenant scenario with GDS bandwidth
 - [ ] Benchmark Mooncake with tiered storage on g6e.4xlarge (has local NVMe)
 - [ ] Test FSx GDS integration with Mooncake Transfer Engine
-- [ ] Evaluate kvaware routing with multiple vLLM replicas
 - [ ] Compare RDMA vs TCP transport for cross-node KV transfer

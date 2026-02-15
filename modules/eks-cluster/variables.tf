@@ -123,3 +123,9 @@ variable "gpu_ami_type" {
   type        = string
   default     = "AL2_x86_64_GPU"
 }
+
+variable "capacity_reservation_id" {
+  description = "Capacity reservation ID for GPU instances (e.g., for capacity blocks)"
+  type        = string
+  default     = null
+}
