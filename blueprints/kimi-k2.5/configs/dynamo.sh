@@ -30,7 +30,7 @@ done
 MODEL_PATH="${MODEL_PATH:-/mnt/nvme/models/Kimi-K2.5}"
 DYNAMO_IMAGE="${DYNAMO_IMAGE:-dynamo-kvbm:latest}"
 DYNAMO_CACHE_DIR="${DYNAMO_CACHE_DIR:-/mnt/fsx/kv-cache/dynamo}"
-DOCKERFILE_DIR="${DOCKERFILE_DIR:-$(dirname "$0")/../../vllm-kv-benchmark/docker}"
+DOCKERFILE_DIR="${DOCKERFILE_DIR:-$(dirname "$0")/../docker}"
 
 # ============================================
 # Build phase (optional)

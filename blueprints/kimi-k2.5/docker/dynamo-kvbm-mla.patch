@@ -1,0 +1,47 @@
+# Dynamo KVBM 0.9.0 — MLA outer_dim validation patch
+#
+# Problem: KVBM validates outer_dim ∈ [1, 2], but vLLM 0.15.1 passes
+# outer_dim=64 for MLA models (Kimi K2.5: 512 KV heads / 8 TP = 64).
+#
+# Apply after cloning ai-dynamo, before building with maturin:
+#   cd /path/to/ai-dynamo
+#   git apply /path/to/dynamo-kvbm-mla.patch
+#   cd lib/llm && maturin develop --release
+#
+# See lessons.md #24 for full context.
+
+--- a/lib/llm/src/block_manager/config.rs
++++ b/lib/llm/src/block_manager/config.rs
+@@ -66,7 +66,7 @@
+     pub num_kv_heads: usize,
+
+     /// outer_dim of KV cache blocks
+-    #[validate(range(min = 1, max = 2))]
++    #[validate(range(min = 1))]
+     pub outer_dim: usize,
+
+     /// head_dim of KV cache blocks
+
+--- a/lib/llm/src/block_manager/layout.rs
++++ b/lib/llm/src/block_manager/layout.rs
+@@ -290,7 +290,7 @@
+     pub num_kv_heads: usize,
+
+     /// outer_dim of KV cache blocks
+-    #[validate(range(min = 1, max = 2))]
++    #[validate(range(min = 1))]
+     pub outer_dim: usize,
+
+     /// head_dim of KV cache blocks
+
+--- a/lib/llm/src/block_manager/v2/physical/layout/config.rs
++++ b/lib/llm/src/block_manager/v2/physical/layout/config.rs
+@@ -19,7 +19,7 @@
+     pub num_kv_heads: usize,
+
+     /// outer_dim of KV cache blocks
+-    #[validate(range(min = 1, max = 2))]
++    #[validate(range(min = 1))]
+     pub outer_dim: usize,
+
+     /// head_dim of KV cache blocks

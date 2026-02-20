@@ -1,0 +1,155 @@
+# dynamo-config.yaml
+# NVIDIA Dynamo KV Block Manager configuration for FSx + GDS
+#
+# 4-tier memory hierarchy:
+#   G1: GPU HBM (fastest, limited capacity)
+#   G2: CPU DRAM (fast, larger capacity)
+#   G3: Local NVMe (fast with GDS, very large capacity)
+#   G4: FSx Lustre (network storage, unlimited capacity)
+
+kvbm:
+  # Enable KV Block Manager
+  enabled: true
+
+  # Memory tier configuration
+  tiers:
+    g1:
+      type: gpu_hbm
+      # Reserve 640GB of 1.1TB HBM for KV cache (remaining for model weights)
+      capacity_gb: 640
+      # Block allocation strategy
+      allocation: dynamic
+
+    g2:
+      type: cpu_dram
+      # Use 1.5TB of ~2TB available host memory
+      capacity_gb: 1500
+      # Pin memory for faster GPU transfers
+      pin_memory: true
+
+    g3:
+      type: local_nvme
+      # Local NVMe path (p5e has 8x 3.84TB drives)
+      path: /mnt/nvme
+      capacity_gb: 3000
+      # Enable GPUDirect Storage for local NVMe
+      use_gds: true
+
+    g4:
+      type: remote_fs
+      # FSx Lustre mount point (98 TiB PERSISTENT_2)
+      path: /mnt/fsx-dynamo/kvbm
+      # Allocate portion of 98 TiB FSx for KV cache
+      capacity_gb: 50000
+      # Note: GDS support depends on NIXL backend configuration
+
+  # Eviction policy for KV blocks
+  # Options: lru, lfu, fifo
+  eviction_policy: lru
+
+  # KV block size in tokens
+  # Larger blocks = better throughput, smaller blocks = better granularity
+  block_size: 64
+
+  # Prefetch threshold (0.0-1.0)
+  # Start prefetching from lower tier when current tier is X% full
+  prefetch_threshold: 0.8
+
+  # Async eviction
+  # Evict blocks to lower tier in background
+  async_eviction: true
+
+# KV-aware request router configuration
+router:
+  # Enable prefix-aware routing
+  enabled: true
+
+  # Routing algorithm
+  # Options: prefix_tree, hash, round_robin
+  algorithm: prefix_tree
+
+  # Cost function weights for routing decisions
+  cost_weights:
+    # Weight for KV cache overlap score (higher = prefer cache hits)
+    overlap_score: 2.0
+    # Weight for current GPU cache usage (higher = load balance)
+    gpu_cache_usage: 1.0
+    # Weight for request queue length (higher = avoid busy workers)
+    waiting_requests: 1.0
+
+  # Maximum prefix match depth (tokens)
+  max_prefix_depth: 8192
+
+# NIXL (NVIDIA Inference Transfer Library) configuration
+nixl:
+  # Data transfer backend
+  # Options: gds, posix, ucx
+  # Use 'gds' for GPUDirect Storage (fastest for local NVMe)
+  # Use 'posix' as fallback if GDS doesn't work with FSx
+  backend: gds
+
+  # Enable RDMA for inter-node transfers (requires EFA)
+  rdma_enabled: true
+
+  # Use async transfers for non-blocking I/O
+  async_transfers: true
+
+  # Transfer buffer size (bytes)
+  buffer_size: 67108864  # 64 MB
+
+  # Number of transfer workers
+  num_workers: 4
+
+# Inference engine configuration
+engine:
+  # Backend engine
+  # Options: vllm, trtllm, sglang
+  backend: vllm
+
+  # Model configuration
+  model:
+    name: moonshotai/Kimi-K2.5
+    # Model weights location (FSx)
+    path: /mnt/fsx-dynamo/models/Kimi-K2.5
+    # Tensor parallelism (use all 8 GPUs)
+    tensor_parallel_size: 8
+    # Maximum sequence length
+    max_model_len: 32768
+    # Enable trust remote code for custom models
+    trust_remote_code: true
+
+  # vLLM-specific settings
+  vllm:
+    # Enable prefix caching in vLLM
+    enable_prefix_caching: true
+    # GPU memory utilization (remaining goes to KV cache)
+    gpu_memory_utilization: 0.90
+    # Disable chunked prefill for better TTFT
+    enable_chunked_prefill: false
+
+# Disaggregation configuration (optional)
+disaggregation:
+  # Enable prefill/decode disaggregation
+  enabled: false
+  # Number of GPUs for prefill phase
+  prefill_gpus: 4
+  # Number of GPUs for decode phase
+  decode_gpus: 4
+  # Conditional disaggregation threshold (tokens)
+  # Only disaggregate requests longer than this
+  conditional_threshold: 4096
+
+# Observability
+metrics:
+  # Enable Prometheus metrics
+  enabled: true
+  # Metrics port
+  port: 9090
+  # Metric collection interval (seconds)
+  interval: 10
+
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  level: INFO
+  # Log format
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

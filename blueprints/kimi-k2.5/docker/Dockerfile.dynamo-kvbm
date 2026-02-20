@@ -1,0 +1,252 @@
+# Dockerfile.dynamo-kvbm
+# NVIDIA Dynamo with KV Block Manager for FSx + GDS benchmarks
+#
+# Build: docker build -f Dockerfile.dynamo-kvbm -t dynamo-kvbm:latest .
+# Run:   docker run --gpus all --privileged -v /mnt/fsx:/mnt/fsx dynamo-kvbm:latest
+
+# Use NVIDIA PyTorch container with CUDA 13.0 support
+# Requires CUDA 13.0 driver (580.x) on p5e instances with AL2023 NVIDIA AMI.
+# PyTorch 2.10.0+cu130 is the minimum that works with driver 580.
+# See: blueprints/kimi-k2.5/scripts/validate-gds.md section 8
+#
+# NOTE: 25.01 had CUDA 12.8 (incompatible with driver 580/CUDA 13.0).
+#       25.03 had NCCL hang (https://github.com/ai-dynamo/dynamo/pull/1065).
+#       25.05 has CUDA 12.9 + pytest==8.1.1 constraint (breaks ai-dynamo).
+#       26.01 includes PyTorch 2.10.0+cu13.1 and resolves all deps.
+ARG BASE_IMAGE=nvcr.io/nvidia/pytorch
+ARG BASE_TAG=26.01-py3
+
+FROM ${BASE_IMAGE}:${BASE_TAG}
+
+LABEL maintainer="benchmark-team"
+LABEL description="NVIDIA Dynamo KVBM with GDS support for FSx Lustre benchmarks"
+
+# Prevent interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ============================================
+# Install system dependencies
+# ============================================
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Build tools (needed for some Python packages)
+    build-essential \
+    cmake \
+    # Networking tools for debugging
+    iproute2 \
+    net-tools \
+    curl \
+    wget \
+    # RDMA/EFA support
+    libibverbs-dev \
+    librdmacm-dev \
+    rdma-core \
+    ibverbs-utils \
+    && rm -rf /var/lib/apt/lists/*
+# Note: nvidia-gds tools are accessed via the CUDA toolkit at /usr/local/cuda/gds/tools/
+#       or via host mount when --privileged. No separate nvidia-gds apt package needed.
+# Note: Lustre filesystem is mounted from the host — no client packages needed in container.
+
+# Note: EFA kernel driver and userspace libs come from the host via --privileged.
+# The RDMA userspace libraries (libibverbs, rdma-core) are installed above.
+
+# ============================================
+# Python environment setup
+# ============================================
+WORKDIR /workspace
+
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# ============================================
+# Install Dynamo and dependencies
+# Pin versions as of February 2026
+# ============================================
+ARG DYNAMO_VERSION=0.9.0
+
+# Install ai-dynamo with vLLM backend
+# Note: ai-dynamo[vllm] installs ai-dynamo-vllm (patched vLLM) and pins transformers
+RUN pip install --no-cache-dir \
+    "ai-dynamo[vllm]==${DYNAMO_VERSION}" \
+    etcd3>=0.12.0 \
+    nats-py>=2.9.0 \
+    pyzmq>=26.0.0 \
+    msgpack>=1.0.0 \
+    runai-model-streamer \
+    pandas \
+    matplotlib \
+    seaborn \
+    tqdm
+
+# Install NIXL separately (may be bundled with ai-dynamo, but ensure it's present)
+# NIXL provides the GDS backend for data transfers
+ARG NIXL_VERSION=0.9.0
+RUN pip install --no-cache-dir "nixl[cuda13]==${NIXL_VERSION}" || \
+    pip install --no-cache-dir "nixl[cuda12]==${NIXL_VERSION}" || { \
+    echo "WARNING: NIXL ${NIXL_VERSION} install failed. Checking if already bundled with ai-dynamo..." && \
+    python3 -c "import nixl; print(f'NIXL already available: {nixl.__version__}')" ; \
+    }
+
+# ============================================
+# Pre-download model tokenizer
+# Model weights will be on FSx
+# ============================================
+RUN python -c "\
+from transformers import AutoTokenizer; \
+print('Downloading Kimi-K2.5 tokenizer...'); \
+AutoTokenizer.from_pretrained('moonshotai/Kimi-K2.5', trust_remote_code=True); \
+print('Tokenizer downloaded successfully')" || { \
+    echo "WARNING: Tokenizer download failed. The tokenizer must be available at /mnt/fsx/models/Kimi-K2.5 at runtime." >&2 ; \
+    true ; \
+    }
+
+# ============================================
+# Environment configuration
+# ============================================
+
+# Offline mode to prevent network calls during inference
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
+
+# Use ZMQ event plane (reduces etcd/NATS dependency)
+ENV DYNAMO_EVENT_PLANE=zmq
+
+# GDS configuration
+ENV CUFILE_ENV_PATH_JSON=/etc/cufile.json
+
+# NIXL configuration
+ENV NIXL_LOG_LEVEL=INFO
+
+# vLLM configuration
+ENV VLLM_ATTENTION_BACKEND=FLASHINFER
+
+# ============================================
+# Copy configuration files
+# ============================================
+COPY dynamo-config.yaml /etc/dynamo/config.yaml
+COPY dynamo-config-posix.yaml /etc/dynamo/config-posix.yaml
+
+# ============================================
+# Create mount points
+# ============================================
+RUN mkdir -p /mnt/fsx /mnt/nvme /workspace/results
+
+# ============================================
+# Health check and validation scripts
+# ============================================
+COPY --chmod=755 <<'EOF' /usr/local/bin/validate-gds.sh
+#!/bin/bash
+set -e
+
+echo "=== GDS Validation Script ==="
+echo ""
+
+# Check NVIDIA driver
+echo "1. Checking NVIDIA driver..."
+nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1
+
+# Check GDS device
+echo ""
+echo "2. Checking GDS device..."
+if ls /dev/nvidia-fs* 2>/dev/null; then
+    echo "   GDS device found: $(ls /dev/nvidia-fs*)"
+else
+    echo "   WARNING: GDS device not found"
+fi
+
+# Check cuFile
+echo ""
+echo "3. Checking cuFile installation..."
+if which gdscheck >/dev/null 2>&1; then
+    gdscheck -V 2>/dev/null || echo "   gdscheck version check failed"
+else
+    # Try alternate location
+    if [ -f /usr/local/cuda/gds/tools/gdscheck ]; then
+        /usr/local/cuda/gds/tools/gdscheck -V
+    else
+        echo "   WARNING: gdscheck not found"
+    fi
+fi
+
+# Check FSx mount
+echo ""
+echo "4. Checking FSx mount..."
+if mountpoint -q /mnt/fsx 2>/dev/null; then
+    echo "   FSx mounted at /mnt/fsx"
+    df -h /mnt/fsx
+
+    # Run gdscheck on FSx
+    echo ""
+    echo "5. Testing GDS on FSx..."
+    if which gdscheck >/dev/null 2>&1; then
+        gdscheck -p /mnt/fsx || echo "   GDS check on FSx failed"
+    elif [ -f /usr/local/cuda/gds/tools/gdscheck ]; then
+        /usr/local/cuda/gds/tools/gdscheck -p /mnt/fsx || echo "   GDS check on FSx failed"
+    fi
+else
+    echo "   FSx not mounted at /mnt/fsx"
+fi
+
+echo ""
+echo "=== Validation Complete ==="
+EOF
+
+COPY --chmod=755 <<'EOF' /usr/local/bin/benchmark-gds.sh
+#!/bin/bash
+set -e
+
+FSX_PATH=${1:-/mnt/fsx}
+TEST_SIZE=${2:-4G}
+GPU_ID=${3:-0}
+
+echo "=== GDS Benchmark: FSx vs POSIX ==="
+echo "Path: $FSX_PATH"
+echo "Size: $TEST_SIZE"
+echo "GPU:  $GPU_ID"
+echo ""
+
+# Create test file if not exists
+TEST_FILE="${FSX_PATH}/gds_test_${TEST_SIZE}.bin"
+if [ ! -f "$TEST_FILE" ]; then
+    echo "Creating test file..."
+    dd if=/dev/zero of="$TEST_FILE" bs=1M count=4096 status=progress
+fi
+
+echo ""
+echo "Running GDS read benchmark..."
+gdsio -f "$TEST_FILE" -d $GPU_ID -w 0 -s $TEST_SIZE -x 0 -I 1 -T 60 2>&1 || \
+    echo "GDS benchmark failed - GDS may not be supported on this filesystem"
+
+echo ""
+echo "Running POSIX read benchmark..."
+gdsio -f "$TEST_FILE" -d $GPU_ID -w 0 -s $TEST_SIZE -x 2 -I 1 -T 60 2>&1 || \
+    echo "POSIX benchmark failed"
+
+echo ""
+echo "=== Benchmark Complete ==="
+EOF
+
+# ============================================
+# Entrypoint
+# ============================================
+COPY --chmod=755 <<'EOF' /usr/local/bin/entrypoint.sh
+#!/bin/bash
+
+echo "============================================"
+echo "NVIDIA Dynamo KVBM Container"
+echo "============================================"
+echo ""
+echo "Dynamo version: $(pip show ai-dynamo 2>/dev/null | grep Version || echo 'not installed')"
+echo "vLLM version:   $(pip show ai-dynamo-vllm 2>/dev/null | grep Version || echo 'not installed')"
+echo "NIXL version:   $(pip show nixl 2>/dev/null | grep Version || echo 'not installed')"
+echo ""
+echo "Available commands:"
+echo "  validate-gds.sh    - Validate GDS setup"
+echo "  benchmark-gds.sh   - Run GDS vs POSIX benchmark"
+echo "  dynamo-run         - Run Dynamo inference server"
+echo ""
+
+exec "$@"
+EOF
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["bash"]

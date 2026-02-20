@@ -1,0 +1,89 @@
+# dynamo-config-posix.yaml
+# POSIX fallback configuration if GDS doesn't work with FSx Lustre
+#
+# Use this configuration if:
+# - gdscheck -p /mnt/fsx fails
+# - GDS throughput on FSx < 500 MB/s
+# - GDS causes errors or instability
+#
+# Note: GDS is still used for local NVMe (G3 tier) which definitely supports it
+
+kvbm:
+  enabled: true
+
+  tiers:
+    g1:
+      type: gpu_hbm
+      capacity_gb: 640
+      allocation: dynamic
+
+    g2:
+      type: cpu_dram
+      capacity_gb: 1500
+      pin_memory: true
+
+    g3:
+      type: local_nvme
+      path: /mnt/nvme
+      capacity_gb: 3000
+      # GDS works for local NVMe
+      use_gds: true
+
+    g4:
+      type: remote_fs
+      path: /mnt/fsx-dynamo/kvbm
+      # With POSIX backend, smaller FSx may be sufficient
+      # (I/O bound anyway at ~1-3 GB/s)
+      capacity_gb: 10000
+
+  eviction_policy: lru
+  block_size: 64
+  prefetch_threshold: 0.8
+  async_eviction: true
+
+router:
+  enabled: true
+  algorithm: prefix_tree
+  cost_weights:
+    overlap_score: 2.0
+    gpu_cache_usage: 1.0
+    waiting_requests: 1.0
+  max_prefix_depth: 8192
+
+nixl:
+  # POSIX backend - slower but reliable
+  backend: posix
+  # RDMA can still be used for inter-node communication
+  rdma_enabled: true
+  async_transfers: true
+  buffer_size: 67108864
+  num_workers: 4
+
+engine:
+  backend: vllm
+  model:
+    name: moonshotai/Kimi-K2.5
+    path: /mnt/fsx-dynamo/models/Kimi-K2.5
+    tensor_parallel_size: 8
+    max_model_len: 32768
+    trust_remote_code: true
+
+  vllm:
+    enable_prefix_caching: true
+    gpu_memory_utilization: 0.90
+    enable_chunked_prefill: false
+
+disaggregation:
+  enabled: false
+  prefill_gpus: 4
+  decode_gpus: 4
+  conditional_threshold: 4096
+
+metrics:
+  enabled: true
+  port: 9090
+  interval: 10
+
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
