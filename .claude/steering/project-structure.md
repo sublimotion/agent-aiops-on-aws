@@ -32,7 +32,6 @@ agent-aiops-on-aws/
 │   └── stage-images-ecr.sh    # Mirror images to private ECR
 │
 ├── CLAUDE.md                   # Root context (routing layer)
-├── SKILL.md                    # Terraform automation skill
 └── README.md                   # Project documentation
 ```
 

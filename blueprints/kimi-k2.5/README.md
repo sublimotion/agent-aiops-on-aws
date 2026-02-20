@@ -249,7 +249,6 @@ These are always applied (see `configs/baseline.sh` for the canonical reference)
 | `docs/moe-checkpointing-best-practices.md` | MoE model checkpointing guide |
 | `docs/eagle-vllm-vs-sglang.md` | Eagle speculative decoding comparison |
 | `docs/sota-reasoning-models-analysis.md` | SOTA reasoning models landscape |
-| `docs/together-ai-infrastructure.md` | Together AI infrastructure reference |
 | `docs/use-cases.md` | Target use cases for KV cache offloading |
 | `lessons.md` | Operational lessons from p5e deployments |
 
