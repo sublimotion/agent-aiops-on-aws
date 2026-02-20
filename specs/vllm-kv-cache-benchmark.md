@@ -103,11 +103,12 @@ Test Matrix = Baselines × Workloads × QPS Levels
 | Expect +50% TTFT overhead | Disk I/O latency tradeoff |
 | Monitor FSx cache size | LRU eviction at `max_local_disk_size` |
 
-## Model
+## Models
 
 | Model | Parameters | Context |
 |-------|------------|---------|
-| mistralai/Ministral-3-3B-Reasoning-2512 
+| mistralai/Ministral-3-3B-Instruct-2512 | 3B | 4K |
+| nvidia/Llama-3.1-Nemotron-8B-UltraLong-1M-Instruct | 8B | 8K |
 
 ## KV Cache Configurations
 
@@ -123,11 +124,11 @@ Test Matrix = Baselines × Workloads × QPS Levels
 
 ### LMCache
 
-| Config | Backend | Capacity |
-|--------|---------|----------|
-| `cpu` | CPU memory | 8GB |
-| `disk` | Local NVMe | 50GB |
-| `fsx` | FSx Lustre | 100GB |
+| Config | Backend | Local Device | Capacity |
+|--------|---------|--------------|----------|
+| `cpu` | CPU memory | `cpu` | 8GB |
+| `disk` | Local NVMe | `file:///tmp/lmcache/` | 50GB |
+| `fsx` | FSx Lustre | `file:///mnt/fsx/lmcache/` | 100GB |
 
 ## Test Protocol
 
@@ -231,9 +232,86 @@ results/
 - [x] Summary table with recommendations per use case
 - [x] Cost analysis (instance hours × config)
 
+## How KV Cache Offloading Works
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         GPU VRAM (24GB)                         │
+│  ┌─────────────────┐  ┌─────────────────────────────────────┐   │
+│  │  Model Weights  │  │  KV Cache (hot/active sequences)    │   │
+│  │    (~15GB)      │  │       (gpu_util % of remaining)     │   │
+│  └─────────────────┘  └─────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+                                       │
+                                       │ PCIe Gen4 x16 (~25 GB/s)
+                                       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      CPU Memory (12-14GB)                       │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  KV Cache Offload (cpu_offload_gb)                      │    │
+│  └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+                                       │
+                                       │ NVMe/Network (~1-20 GB/s)
+                                       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   FSx Lustre (1.2 TiB SCRATCH_2)                │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  Swap Space (swap_space_gb) or LMCache storage          │    │
+│  └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Terraform Variables
+
+### KV Cache Backend Selection
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `kv_cache_backend` | string | `"native"` | `native` or `lmcache` |
+| `kv_cache_config` | string | `"none"` | Native preset name |
+| `lmcache_config` | string | `"cpu"` | LMCache preset name |
+
+### Native vLLM Settings
+
+| Variable | Type | Default | Maps to vLLM Flag |
+|----------|------|---------|-------------------|
+| `vllm_gpu_memory_utilization` | number | `0.9` | `--gpu-memory-utilization` |
+| `vllm_cpu_offload_gb` | number | `0` | `--cpu-offload-gb` |
+| `vllm_swap_space_gb` | number | `0` | `--swap-space` |
+
+### LMCache Settings
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `lmcache_chunk_size` | number | `256` | KV cache chunk size |
+| `lmcache_max_cache_size_gb` | number | `20` | Maximum cache size |
+
+## Usage Examples
+
+```bash
+# Native baseline (no offloading)
+terraform apply -var="kv_cache_config=none"
+
+# Native CPU offloading
+terraform apply -var="kv_cache_config=cpu-light"
+
+# Native FSx swap
+terraform apply -var="kv_cache_config=fsx-swap" -var="enable_fsx_lustre=true"
+
+# LMCache with CPU backend
+terraform apply -var="kv_cache_backend=lmcache" -var="lmcache_config=cpu"
+
+# LMCache with FSx backend
+terraform apply \
+  -var="kv_cache_backend=lmcache" \
+  -var="lmcache_config=fsx" \
+  -var="enable_fsx_lustre=true"
+```
+
 ## Non-Requirements
 
-- Multi-node distributed inference
+- Multi-node distributed inference (single node only)
 - Production autoscaling
 - Multi-region deployment
 - Long-running stability tests (> 1 hour)

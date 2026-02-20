@@ -1,5 +1,7 @@
 # [Blueprint Name] Requirements
 
+## Status: DRAFT | IN_PROGRESS | DEPLOYED | COMPLETED
+
 ## Overview
 Brief description of what this deployment does.
 
@@ -40,8 +42,21 @@ List what's explicitly out of scope:
 - Network isolation
 - IAM/RBAC
 
-## Known Limitations
-Document any known issues or constraints discovered during development.
-
 ## Cost Considerations
 Rough estimates or cost-saving recommendations.
+
+---
+
+<!-- Sections below are filled in during and after deployment -->
+
+## Deployment Notes
+<!-- Date, infrastructure deployed, access commands -->
+
+## Lessons Learned
+<!-- Constraints, workarounds, and gotchas discovered during deployment -->
+
+## Results
+<!-- Benchmark data, validation outcomes, success criteria pass/fail -->
+
+## Known Limitations
+<!-- Issues or constraints discovered during development -->

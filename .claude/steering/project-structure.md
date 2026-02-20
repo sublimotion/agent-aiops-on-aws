@@ -5,7 +5,7 @@
 ```
 agent-aiops-on-aws/
 ├── .claude/                    # Claude Code configuration
-│   ├── steering/               # Context files
+│   ├── steering/               # Context files (loaded on demand)
 │   │   ├── product.md          # Business context
 │   │   ├── tech-stack.md       # Technology preferences
 │   │   └── project-structure.md # This file
@@ -15,24 +15,35 @@ agent-aiops-on-aws/
 │   ├── networking/             # VPC, subnets, endpoints
 │   ├── eks-cluster/            # EKS with GPU support
 │   ├── sagemaker-studio/       # SageMaker domain + IAM
-│   └── vllm/                   # vLLM Kubernetes deployment
+│   ├── vllm/                   # vLLM Kubernetes deployment
+│   ├── fsx-lustre/             # FSx for Lustre filesystem
+│   └── monitoring/             # Prometheus + Grafana
 │
-├── blueprints/                 # Complete, deployable examples
+├── blueprints/                 # Complete, deployable compositions
 │   ├── ministral-3b/           # Ministral-3B on EKS + SageMaker
-│   ├── llama-8b/               # (future) Llama model
-│   └── multi-model/            # (future) Multiple models
+│   ├── kv-cache-benchmark/     # KV cache offloading benchmark
+│   └── vllm-kv-benchmark/      # vLLM KV benchmark results
 │
 ├── specs/                      # Requirements/specs (input docs)
+│   ├── _template.md            # Template for new specs
 │   ├── ministral-3b.md         # Ministral-3B requirements
-│   └── _template.md            # Template for new specs
+│   └── vllm-kv-cache-benchmark.md # KV cache benchmark spec
+│
+├── benchmarks/                 # Benchmark scripts and results
+├── LMBenchmark/                # LMBench workload generators
+├── kvcache-offloading/         # KV cache offloading tools
 │
 ├── docs/                       # Documentation
-│   └── getting-started.md      # Quick start guide
+│   ├── getting-started.md      # Quick start guide
+│   └── 2026-gtm-architecture.md
+│
+├── scripts/                    # Utility scripts
+│   └── validate.sh
 │
 ├── terraform/                  # Legacy monolithic deployment
 │                               # (kept for reference/migration)
 │
-├── CLAUDE.md                   # Root context for Claude
+├── CLAUDE.md                   # Root context (routing layer)
 └── README.md                   # Project documentation
 ```
 
@@ -78,19 +89,20 @@ Examples:
 
 ## Spec Files
 
-Specs in `specs/` define requirements before implementation:
+Specs in `specs/` are living documents that evolve through the deployment lifecycle:
 
 ```
 specs/
-├── _template.md        # Template for new specs
-├── ministral-3b.md     # Ministral-3B requirements
-└── <new-blueprint>.md  # Requirements for new blueprints
+├── _template.md                  # Template for new specs
+├── ministral-3b.md               # Ministral-3B requirements
+└── vllm-kv-cache-benchmark.md    # KV cache benchmark spec + results
 ```
 
-Use specs to:
-1. Define requirements before coding
-2. Document lessons learned
-3. Capture known limitations
+Spec lifecycle:
+1. Define requirements before coding (use `_template.md`)
+2. Deploy via `/ralph-loop Deploy specs/<name>.md`
+3. Add deployment notes and lessons learned after deployment
+4. Record benchmark results or validation outcomes
 
 ## File Naming Conventions
 

@@ -9,20 +9,23 @@ Template for autonomous infrastructure deployment using Claude Code, spec-driven
 3. Claude iterates until deployment succeeds
 4. Update spec with lessons learned
 
-## Key Directories
+## Context Loading
 
-| Directory | Purpose |
-|-----------|---------|
-| `specs/` | Input specifications (requirements) |
-| `modules/` | Reusable Terraform modules |
-| `blueprints/` | Deployable compositions |
-| `.claude/steering/` | Persistent context files |
+Read these files **on demand** based on what you're doing:
 
-## Steering Files
+| When you are... | Read |
+|-----------------|------|
+| Writing or modifying Terraform | `.claude/steering/tech-stack.md` |
+| Making architectural or product decisions | `.claude/steering/product.md` |
+| Creating new files, modules, or blueprints | `.claude/steering/project-structure.md` |
+| Deploying or modifying a specific blueprint | `specs/<matching-spec>.md` |
 
-- `product.md` - Business context, quality standards
-- `tech-stack.md` - Technology preferences, conventions
-- `project-structure.md` - Layout, naming patterns
+**Spec routing** — match blueprints to specs by name:
+
+| Blueprint | Spec |
+|-----------|------|
+| `blueprints/ministral-3b/` | `specs/ministral-3b.md` |
+| `blueprints/kv-cache-benchmark/` | `specs/vllm-kv-cache-benchmark.md` |
 
 ## Commands
 
@@ -38,10 +41,3 @@ pre-commit run -a
 checkov -d .
 terraform fmt -recursive
 ```
-
-## Conventions
-
-- Prefer AWSCC provider, fallback to AWS
-- Use `bucket_prefix` over hardcoded names
-- Enable encryption on all storage
-- Default features to `false`
