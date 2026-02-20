@@ -8,19 +8,24 @@
 #
 # Usage: ./run-kimi-k2.5.sh [--port PORT]
 # Requires: CUDA 13.0 driver (580+). Uses cu130-nightly for PyTorch 2.10+ compat.
+#
+# EKS nodes use containerd (not Docker). nerdctl is the default CLI.
+# Override with CONTAINER_RUNTIME=docker if running elsewhere.
 
 set -euo pipefail
 
 PORT="${1:-8000}"
 MODEL_PATH="${MODEL_PATH:-/mnt/nvme/models/Kimi-K2.5}"
 VLLM_IMAGE="${VLLM_IMAGE:-vllm/vllm-openai:cu130-nightly}"
+CTR="${CONTAINER_RUNTIME:-nerdctl}"
 
 echo "=== Config 0: Baseline vLLM ==="
-echo "Model: ${MODEL_PATH}"
-echo "Port:  ${PORT}"
-echo "Image: ${VLLM_IMAGE}"
+echo "Model:   ${MODEL_PATH}"
+echo "Port:    ${PORT}"
+echo "Image:   ${VLLM_IMAGE}"
+echo "Runtime: ${CTR}"
 
-docker run --rm \
+${CTR} run --rm \
   --gpus all \
   --ipc=host \
   --network=host \

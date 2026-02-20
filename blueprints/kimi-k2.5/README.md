@@ -109,7 +109,7 @@ See [docs/moe-loading-best-practices.md](docs/moe-loading-best-practices.md) for
 
 ### Step 5: Start a Serving Configuration
 
-Launch scripts for each configuration are in `configs/`. All use Docker with `--gpus all` and mount `/mnt/fsx` and `/mnt/nvme`:
+Launch scripts for each configuration are in `configs/`. All use `nerdctl` (the containerd CLI on EKS nodes) with `--gpus all` and mount `/mnt/fsx` and `/mnt/nvme`. Override with `CONTAINER_RUNTIME=docker` on non-EKS machines:
 
 | Config | Script | Description |
 |--------|--------|-------------|

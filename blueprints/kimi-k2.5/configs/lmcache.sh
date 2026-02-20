@@ -14,6 +14,9 @@
 #
 # Usage: ./run-kimi-k2.5.sh [--port PORT]
 # Requires: cuFile/GDS support, FSx Lustre mounted at /mnt/fsx.
+#
+# EKS nodes use containerd (not Docker). nerdctl is the default CLI.
+# Override with CONTAINER_RUNTIME=docker if running elsewhere.
 
 set -euo pipefail
 
@@ -21,12 +24,14 @@ PORT="${1:-8000}"
 MODEL_PATH="${MODEL_PATH:-/mnt/nvme/models/Kimi-K2.5}"
 LMCACHE_IMAGE="${LMCACHE_IMAGE:-vllm/vllm-openai:nightly}"
 LMCACHE_GDS_PATH="/mnt/fsx/kv-cache/lmcache"
+CTR="${CONTAINER_RUNTIME:-nerdctl}"
 
 echo "=== Config A: vLLM + LMCache (GDS) ==="
 echo "Model:     ${MODEL_PATH}"
 echo "Port:      ${PORT}"
 echo "Image:     ${LMCACHE_IMAGE}"
 echo "GDS path:  ${LMCACHE_GDS_PATH}"
+echo "Runtime:   ${CTR}"
 
 # Ensure cache directory exists
 mkdir -p "${LMCACHE_GDS_PATH}"
@@ -38,7 +43,7 @@ mkdir -p "${LMCACHE_GDS_PATH}"
 # 3. Builds LMCache from source against installed torch (~3-4 min)
 # 4. Starts vLLM with LMCacheConnectorV1
 echo "Starting vLLM + LMCache (GDS)..."
-docker run --rm \
+${CTR} run --rm \
   --gpus all \
   --ipc=host \
   --network=host \

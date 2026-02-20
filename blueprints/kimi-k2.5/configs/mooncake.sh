@@ -8,12 +8,16 @@
 #
 # Usage: ./run-kimi-k2.5.sh [--port PORT]
 # Requires: CUDA 13.0 driver (580+). Mooncake image must be built with cu130.
+#
+# EKS nodes use containerd (not Docker). nerdctl is the default CLI.
+# Override with CONTAINER_RUNTIME=docker if running elsewhere.
 
 set -euo pipefail
 
 PORT="${1:-8000}"
 MODEL_PATH="${MODEL_PATH:-/mnt/nvme/models/Kimi-K2.5}"
 MOONCAKE_IMAGE="${MOONCAKE_IMAGE:-vllm-mooncake:cu130}"
+CTR="${CONTAINER_RUNTIME:-nerdctl}"
 MOONCAKE_FSX_PATH="/mnt/fsx/kv-cache/mooncake"
 MOONCAKE_NVME_PATH="/mnt/nvme/mooncake"
 
@@ -23,12 +27,13 @@ echo "Port:      ${PORT}"
 echo "Image:     ${MOONCAKE_IMAGE}"
 echo "FSx path:  ${MOONCAKE_FSX_PATH}"
 echo "NVMe path: ${MOONCAKE_NVME_PATH}"
+echo "Runtime:   ${CTR}"
 
 # Ensure cache directories exist
 mkdir -p "${MOONCAKE_FSX_PATH}" "${MOONCAKE_NVME_PATH}"
 
 # Start vLLM with Mooncake transfer engine
-docker run --rm \
+${CTR} run --rm \
   --gpus all \
   --ipc=host \
   --network=host \

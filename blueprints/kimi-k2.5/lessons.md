@@ -392,6 +392,13 @@ The build machine has the same network access (FSx, S3, ECR) without burning $60
 
 **Lesson**: Every benchmark result must include where the client ran. Treat "client location" as a first-class dimension alongside serving config and workload type. Results without this metadata are ambiguous.
 
+### 34. EKS Nodes Use nerdctl, Not Docker
+**Problem**: All config scripts originally used `docker run`, but EKS-optimized AMIs ship with containerd as the container runtime. Docker CLI is not installed. The actual container CLI on EKS nodes is `nerdctl` (containerd's Docker-compatible CLI).
+
+**Solution**: Updated all configs to use `CONTAINER_RUNTIME` variable defaulting to `nerdctl`. Override with `CONTAINER_RUNTIME=docker` on non-EKS machines.
+
+**Lesson**: Always match the container CLI to the node's runtime. EKS nodes since Kubernetes 1.24 use containerd exclusively. Use `nerdctl` for standalone container execution on EKS nodes.
+
 ---
 
 ## Summary
@@ -431,3 +438,4 @@ The build machine has the same network access (FSx, S3, ECR) without burning $60
 | 31 | SGLang HiCache is the right architecture | Architecture | Cascading eviction vs admission gating |
 | 32 | Use a separate EC2 build machine | P5e Deployment | Iterate cheaply, save GPU hours for inference |
 | 33 | Always record benchmark execution location | Benchmarking | Client location is a first-class result dimension |
+| 34 | EKS nodes use nerdctl, not Docker | P5e Deployment | Use CONTAINER_RUNTIME variable in configs |

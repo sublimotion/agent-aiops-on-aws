@@ -8,7 +8,10 @@
 # vLLM auto-detects quantization from model config.json.
 #
 # Usage: ./run-kimi-k2.5.sh [--build] [--port PORT]
-# Requires: GDS support, FSx Lustre mounted at /mnt/fsx, Docker.
+# Requires: GDS support, FSx Lustre mounted at /mnt/fsx.
+#
+# EKS nodes use containerd (not Docker). nerdctl is the default CLI.
+# Override with CONTAINER_RUNTIME=docker if running elsewhere.
 #
 # Build the image first with --build, then run:
 #   ./run-kimi-k2.5.sh --build
@@ -31,6 +34,7 @@ MODEL_PATH="${MODEL_PATH:-/mnt/nvme/models/Kimi-K2.5}"
 DYNAMO_IMAGE="${DYNAMO_IMAGE:-dynamo-kvbm:latest}"
 DYNAMO_CACHE_DIR="${DYNAMO_CACHE_DIR:-/mnt/fsx/kv-cache/dynamo}"
 DOCKERFILE_DIR="${DOCKERFILE_DIR:-$(dirname "$0")/../docker}"
+CTR="${CONTAINER_RUNTIME:-nerdctl}"
 
 # ============================================
 # Build phase (optional)
@@ -40,7 +44,7 @@ if [ "$BUILD" = true ]; then
   echo "Dockerfile: ${DOCKERFILE_DIR}/Dockerfile.dynamo-kvbm"
   echo "Image tag:  ${DYNAMO_IMAGE}"
 
-  docker build \
+  ${CTR} build \
     -f "${DOCKERFILE_DIR}/Dockerfile.dynamo-kvbm" \
     -t "${DYNAMO_IMAGE}" \
     "${DOCKERFILE_DIR}"
@@ -57,6 +61,7 @@ echo "Model:      ${MODEL_PATH}"
 echo "Port:       ${PORT}"
 echo "Image:      ${DYNAMO_IMAGE}"
 echo "Cache dir:  ${DYNAMO_CACHE_DIR}"
+echo "Runtime:    ${CTR}"
 
 # Ensure cache directory exists
 mkdir -p "${DYNAMO_CACHE_DIR}"
@@ -71,7 +76,7 @@ mkdir -p "${DYNAMO_CACHE_DIR}"
 # See docs/DYNAMO_KV_CACHE_GDS.md for tier architecture details.
 
 echo "Starting NVIDIA Dynamo with KVBM..."
-docker run --rm \
+${CTR} run --rm \
   --gpus all \
   --ipc=host \
   --network=host \
