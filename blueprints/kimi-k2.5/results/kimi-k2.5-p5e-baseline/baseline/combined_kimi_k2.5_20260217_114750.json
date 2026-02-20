@@ -1,0 +1,272 @@
+[
+  {
+    "model": "moonshotai/Kimi-K2.5",
+    "instance_type": "p5e.48xlarge",
+    "workload": "reasoning_math",
+    "qps": 0.5,
+    "timestamp": "2026-02-17T11:43:57.800662",
+    "config": {
+      "serving_config": "baseline",
+      "serving_name": "Baseline vLLM",
+      "tensor_parallel": 8,
+      "max_model_len": 32768,
+      "workload_config": {
+        "description": "Math reasoning problems - tests reasoning parser",
+        "system_prompt": "You are a helpful math tutor. Show your step-by-step reasoning.",
+        "prompts": [
+          "If a car travels 60 mph for 2 hours, then 80 mph for 1.5 hours, what's the total distance?",
+          "A store sells apples for $1.50 each. If I buy 6 apples with a 10% discount, how much do I pay?",
+          "What is the sum of the first 10 prime numbers?",
+          "A rectangle has perimeter 24cm. If length is twice width, what's the area?",
+          "If 5x + 3 = 23, what is x?"
+        ],
+        "shared_context": "Previous context: We are practicing math problems step by step.",
+        "max_tokens": 500
+      },
+      "fsx_cache_snapshot": {
+        "path": null,
+        "size_bytes": 0,
+        "size_mb": 0,
+        "file_count": 0
+      }
+    },
+    "num_requests": 20,
+    "metrics": {
+      "success_rate": 0,
+      "total_requests": 20,
+      "failed_requests": 20,
+      "errors": [
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}"
+      ]
+    }
+  },
+  {
+    "model": "moonshotai/Kimi-K2.5",
+    "instance_type": "p5e.48xlarge",
+    "workload": "reasoning_math",
+    "qps": 1.0,
+    "timestamp": "2026-02-17T11:44:33.280351",
+    "config": {
+      "serving_config": "baseline",
+      "serving_name": "Baseline vLLM",
+      "tensor_parallel": 8,
+      "max_model_len": 32768,
+      "workload_config": {
+        "description": "Math reasoning problems - tests reasoning parser",
+        "system_prompt": "You are a helpful math tutor. Show your step-by-step reasoning.",
+        "prompts": [
+          "If a car travels 60 mph for 2 hours, then 80 mph for 1.5 hours, what's the total distance?",
+          "A store sells apples for $1.50 each. If I buy 6 apples with a 10% discount, how much do I pay?",
+          "What is the sum of the first 10 prime numbers?",
+          "A rectangle has perimeter 24cm. If length is twice width, what's the area?",
+          "If 5x + 3 = 23, what is x?"
+        ],
+        "shared_context": "Previous context: We are practicing math problems step by step.",
+        "max_tokens": 500
+      },
+      "fsx_cache_snapshot": {
+        "path": null,
+        "size_bytes": 0,
+        "size_mb": 0,
+        "file_count": 0
+      }
+    },
+    "num_requests": 20,
+    "metrics": {
+      "success_rate": 0,
+      "total_requests": 20,
+      "failed_requests": 20,
+      "errors": [
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}"
+      ]
+    }
+  },
+  {
+    "model": "moonshotai/Kimi-K2.5",
+    "instance_type": "p5e.48xlarge",
+    "workload": "multi_turn_qa",
+    "qps": 0.5,
+    "timestamp": "2026-02-17T11:45:28.761759",
+    "config": {
+      "serving_config": "baseline",
+      "serving_name": "Baseline vLLM",
+      "tensor_parallel": 8,
+      "max_model_len": 32768,
+      "workload_config": {
+        "description": "Multi-turn Q&A with long shared context (tests prefix caching)",
+        "system_prompt": "You are a helpful assistant. Answer based on the context provided.",
+        "prompts": [
+          "What is the main topic discussed in the context?",
+          "Can you summarize the key points?",
+          "What are the implications mentioned?",
+          "How does this relate to real-world applications?",
+          "What conclusions can be drawn?"
+        ],
+        "shared_context": "Context Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\nContext Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\nContext Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\nContext Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\nContext Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\n",
+        "max_tokens": 300
+      },
+      "fsx_cache_snapshot": {
+        "path": null,
+        "size_bytes": 0,
+        "size_mb": 0,
+        "file_count": 0
+      }
+    },
+    "num_requests": 20,
+    "metrics": {
+      "success_rate": 0,
+      "total_requests": 20,
+      "failed_requests": 20,
+      "errors": [
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}"
+      ]
+    }
+  },
+  {
+    "model": "moonshotai/Kimi-K2.5",
+    "instance_type": "p5e.48xlarge",
+    "workload": "multi_turn_qa",
+    "qps": 1.0,
+    "timestamp": "2026-02-17T11:46:04.244583",
+    "config": {
+      "serving_config": "baseline",
+      "serving_name": "Baseline vLLM",
+      "tensor_parallel": 8,
+      "max_model_len": 32768,
+      "workload_config": {
+        "description": "Multi-turn Q&A with long shared context (tests prefix caching)",
+        "system_prompt": "You are a helpful assistant. Answer based on the context provided.",
+        "prompts": [
+          "What is the main topic discussed in the context?",
+          "Can you summarize the key points?",
+          "What are the implications mentioned?",
+          "How does this relate to real-world applications?",
+          "What conclusions can be drawn?"
+        ],
+        "shared_context": "Context Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\nContext Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\nContext Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\nContext Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\nContext Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\n",
+        "max_tokens": 300
+      },
+      "fsx_cache_snapshot": {
+        "path": null,
+        "size_bytes": 0,
+        "size_mb": 0,
+        "file_count": 0
+      }
+    },
+    "num_requests": 20,
+    "metrics": {
+      "success_rate": 0,
+      "total_requests": 20,
+      "failed_requests": 20,
+      "errors": [
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}"
+      ]
+    }
+  },
+  {
+    "model": "moonshotai/Kimi-K2.5",
+    "instance_type": "p5e.48xlarge",
+    "workload": "agentic_tool_use",
+    "qps": 0.5,
+    "timestamp": "2026-02-17T11:46:59.732283",
+    "config": {
+      "serving_config": "baseline",
+      "serving_name": "Baseline vLLM",
+      "tensor_parallel": 8,
+      "max_model_len": 32768,
+      "workload_config": {
+        "description": "Agentic workload with tool calling (tests tool-call-parser)",
+        "system_prompt": "You are an AI assistant with access to the following tools:\n- search(query): Search the web for information\n- calculate(expression): Perform mathematical calculations\n- get_weather(location): Get current weather for a location\n- get_time(timezone): Get current time in a timezone\n\nUse tools when needed to answer questions.",
+        "prompts": [
+          "What's the weather in Tokyo?",
+          "Calculate the compound interest on $1000 at 5% for 3 years",
+          "Search for the latest news about AI",
+          "What time is it in London?",
+          "Calculate 15% tip on a $85.50 bill"
+        ],
+        "shared_context": "Previous tool results: search('AI news') -> 'Latest AI developments...'",
+        "max_tokens": 400
+      },
+      "fsx_cache_snapshot": {
+        "path": null,
+        "size_bytes": 0,
+        "size_mb": 0,
+        "file_count": 0
+      }
+    },
+    "num_requests": 20,
+    "metrics": {
+      "success_rate": 0,
+      "total_requests": 20,
+      "failed_requests": 20,
+      "errors": [
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}"
+      ]
+    }
+  },
+  {
+    "model": "moonshotai/Kimi-K2.5",
+    "instance_type": "p5e.48xlarge",
+    "workload": "agentic_tool_use",
+    "qps": 1.0,
+    "timestamp": "2026-02-17T11:47:35.223721",
+    "config": {
+      "serving_config": "baseline",
+      "serving_name": "Baseline vLLM",
+      "tensor_parallel": 8,
+      "max_model_len": 32768,
+      "workload_config": {
+        "description": "Agentic workload with tool calling (tests tool-call-parser)",
+        "system_prompt": "You are an AI assistant with access to the following tools:\n- search(query): Search the web for information\n- calculate(expression): Perform mathematical calculations\n- get_weather(location): Get current weather for a location\n- get_time(timezone): Get current time in a timezone\n\nUse tools when needed to answer questions.",
+        "prompts": [
+          "What's the weather in Tokyo?",
+          "Calculate the compound interest on $1000 at 5% for 3 years",
+          "Search for the latest news about AI",
+          "What time is it in London?",
+          "Calculate 15% tip on a $85.50 bill"
+        ],
+        "shared_context": "Previous tool results: search('AI news') -> 'Latest AI developments...'",
+        "max_tokens": 400
+      },
+      "fsx_cache_snapshot": {
+        "path": null,
+        "size_bytes": 0,
+        "size_mb": 0,
+        "file_count": 0
+      }
+    },
+    "num_requests": 20,
+    "metrics": {
+      "success_rate": 0,
+      "total_requests": 20,
+      "failed_requests": 20,
+      "errors": [
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+        "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}"
+      ]
+    }
+  }
+]

@@ -1,0 +1,152 @@
+Name: kimi-k2.5-p5e-comparison
+
+Serving:
+  # Config 0: Baseline vLLM (native prefix caching, no external KV cache)
+  - Flat:
+      configSelection: baseline-vllm/run-kimi-k2.5.sh
+      modelURL: /mnt/fsx/models/Kimi-K2.5
+      apiType: chat
+
+  # Config A: vLLM + LMCache (FSx-backed KV cache)
+  - Flat:
+      configSelection: lmcache/run-kimi-k2.5.sh
+      modelURL: /mnt/fsx/models/Kimi-K2.5
+      apiType: chat
+
+  # Config B: vLLM + Mooncake (tiered VRAM→DRAM→NVMe→FSx)
+  - Flat:
+      configSelection: mooncake/run-kimi-k2.5.sh
+      modelURL: /mnt/fsx/models/Kimi-K2.5
+      apiType: chat
+
+  # Config C: NVIDIA Dynamo (NIXL+GDS, disaggregated prefill/decode)
+  - Dynamo:
+      configSelection: dynamo/kimi-k2.5-gds.yaml
+      modelURL: /mnt/fsx/models/Kimi-K2.5
+      apiType: chat
+
+Workload:
+  # --- Run 1: Multi-turn Q&A (prefix caching sweet spot) ---
+  # Shared system prompt = high prefix reuse → LMCache/Mooncake should win
+  StrictSynthetic:
+    - NUM_CONCURRENT_USERS: 10
+      NUM_ROUNDS_PER_USER: 20
+      TIME_BETWEEN_REQUESTS_PER_USER: [10, 20]
+      SHARED_SYSTEM_PROMPT_LEN: 2500
+      FIRST_PROMPT_LEN: 200
+      FOLLOW_UP_PROMPTS_LEN: 100
+      ANSWER_LEN: 300
+      KV_REUSE_RATIO: 1.0
+
+  # --- Run 2: Long context RAG (KV cache pressure) ---
+  # 4K system prompt + 20K chat history = 24K total context
+  # Matches BENCHMARK_REPORT.md LMCacheSynthetic (20K chat history)
+  LMCacheSynthetic:
+    - NUM_USERS_WARMUP: 20
+      NUM_USERS: 15
+      NUM_ROUNDS: 10
+      SYSTEM_PROMPT: 4000
+      CHAT_HISTORY: 20000
+      ANSWER_LEN: 400
+      QPS: [0.5, 1.0]
+      USE_SHAREGPT: false
+
+  # --- Run 3: Code generation (no shared prefix) ---
+  # Unique prompts every time → baseline for cache miss scenario
+  LMCacheSynthetic:
+    - NUM_USERS_WARMUP: 30
+      NUM_USERS: 20
+      NUM_ROUNDS: 5
+      SYSTEM_PROMPT: 0
+      CHAT_HISTORY: 0
+      ANSWER_LEN: 800
+      QPS: [0.5, 2.0, 5.0]
+      USE_SHAREGPT: false
+
+  # --- Run 4: Agentic tool use (Kimi-K2.5 tool-call-parser) ---
+  Agentic:
+    - NUM_USERS_WARMUP: 30
+      NUM_AGENTS: 8
+      NUM_ROUNDS: 10
+      SYSTEM_PROMPT: 200
+      CHAT_HISTORY: 256
+      ANSWER_LEN: 400
+      NEW_USER_INTERVALS: [2, 5]
+
+  # --- Run 5: Stress test (find throughput ceiling) ---
+  VLLMBenchmark:
+    - BACKEND: vllm
+      DATASET_NAME: random
+      NUM_PROMPTS: 500
+      REQUEST_RATES: [1.0, 5.0, 10.0, 20.0]
+      RANDOM_INPUT_LEN: 512
+      RANDOM_OUTPUT_LEN: 256
+      TEMPERATURE: 0.0
+      MAX_TOKENS: 256
+
+  # --- Run 6: High prefix reuse (LMCache best case) ---
+  StrictSynthetic:
+    - NUM_CONCURRENT_USERS: 20
+      NUM_ROUNDS_PER_USER: 10
+      TIME_BETWEEN_REQUESTS_PER_USER: [5, 10]
+      SHARED_SYSTEM_PROMPT_LEN: 8000
+      FIRST_PROMPT_LEN: 100
+      FOLLOW_UP_PROMPTS_LEN: 50
+      ANSWER_LEN: 100
+      KV_REUSE_RATIO: 1.0
+
+  # --- Run 7: Cache miss scenario (Dynamo/GDS best case) ---
+  Random:
+    - NUM_USERS: 50
+      NUM_ROUNDS: 10
+      PROMPT_LEN: 500
+      ANSWER_LEN: 200
+      QPS: [1.0, 5.0]
+
+  # --- Run 8: Long context scaling (16K → 48K) ---
+  # Reproduces BENCHMARK_REPORT.md Long Context benchmarks
+  # Tests sub-linear latency scaling with increasing context sizes
+  LongContext:
+    - CONTEXT_SIZES: [16000, 24000, 36000, 48000]
+      NUM_REQUESTS_PER_SIZE: 15
+      SHARED_CONTEXT: true
+      ANSWER_LEN: 300
+      QPS: 0.5
+      WARMUP_REQUESTS: 5
+
+  # --- Run 9: Multi-tenant (50 unique system prompts) ---
+  # Reproduces BENCHMARK_REPORT.md Multi-Tenant benchmark
+  # Tests cache pressure with high prefix variety (worst case for caching)
+  MultiTenant:
+    - NUM_TENANTS: 50
+      SYSTEM_PROMPT_LEN: 4000
+      USERS_PER_TENANT: 3
+      ANSWER_LEN: 300
+      QPS: 3.0
+
+  # --- Run 10: StrictSynthetic 0% reuse (control for Run 1/6) ---
+  # Reproduces BENCHMARK_REPORT.md StrictSynthetic A/B comparison
+  # Without this, we can't measure cache benefit vs overhead
+  StrictSynthetic:
+    - NUM_CONCURRENT_USERS: 10
+      NUM_ROUNDS_PER_USER: 20
+      TIME_BETWEEN_REQUESTS_PER_USER: [10, 20]
+      SHARED_SYSTEM_PROMPT_LEN: 2500
+      FIRST_PROMPT_LEN: 200
+      FOLLOW_UP_PROMPTS_LEN: 100
+      ANSWER_LEN: 300
+      KV_REUSE_RATIO: 0.0
+
+  # --- Run 11: TraceReplayer (GMI production traces) ---
+  # Reproduces BENCHMARK_REPORT.md TraceReplayer benchmark
+  # Replays real production traffic patterns for realistic validation
+  TraceReplayer:
+    - TRACE_FILE: traces/gmi_trace.jsonl
+      PRESERVE_TIMING: true
+      QPS_SCALE: 1.0
+
+# FSx Cache Growth Tracking
+# Run `du -sh /mnt/fsx/kv-cache/` between each run to track cache growth.
+# Record in results as:
+#   initial_cache_size_mb, final_cache_size_mb, cache_files_count
+# This reproduces the FSx Cache Growth Analysis from BENCHMARK_REPORT.md.

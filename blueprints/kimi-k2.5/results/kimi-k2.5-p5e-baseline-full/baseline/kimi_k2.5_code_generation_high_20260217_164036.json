@@ -1,0 +1,74 @@
+{
+  "model": "/mnt/nvme/models/Kimi-K2.5",
+  "instance_type": "p5e.48xlarge",
+  "workload": "code_generation",
+  "qps": 2.0,
+  "timestamp": "2026-02-17T16:40:36.922170",
+  "config": {
+    "serving_config": "baseline",
+    "serving_name": "Baseline vLLM",
+    "tensor_parallel": 8,
+    "max_model_len": 32768,
+    "workload_config": {
+      "description": "Code generation tasks",
+      "system_prompt": "You are an expert programmer. Write clean, efficient code.",
+      "prompts": [
+        "Write a Python function to check if a string is a palindrome.",
+        "Implement binary search in Python.",
+        "Write a function to find the nth Fibonacci number.",
+        "Create a Python class for a linked list with append and print methods.",
+        "Write code to merge two sorted lists."
+      ],
+      "shared_context": "",
+      "max_tokens": 300
+    },
+    "fsx_cache_snapshot": {
+      "path": null,
+      "size_bytes": 0,
+      "size_mb": 0,
+      "file_count": 0
+    }
+  },
+  "num_requests": 20,
+  "metrics": {
+    "success_rate": 1.0,
+    "total_requests": 20,
+    "successful_requests": 20,
+    "failed_requests": 0,
+    "reasoning_responses": 20,
+    "reasoning_rate": 1.0,
+    "ttft_ms": {
+      "mean": 1114.3671687575988,
+      "min": 0,
+      "max": 22287.343375151977,
+      "p50": 0,
+      "p90": 0,
+      "p95": 22287.343375151977,
+      "p99": 22287.343375151977
+    },
+    "itl_ms": {
+      "mean": 89.03079249896109,
+      "p50": 89.03079249896109,
+      "p90": 89.03079249896109,
+      "p95": 89.03079249896109,
+      "p99": 89.03079249896109
+    },
+    "e2e_ms": {
+      "mean": 27136.995776940603,
+      "min": 26738.903208170086,
+      "max": 27565.284665906802,
+      "p50": 27211.348375072703,
+      "p90": 27505.42095885612,
+      "p95": 27565.284665906802,
+      "p99": 27565.284665906802
+    },
+    "throughput": {
+      "tokens_per_second": 0.09396766027309617,
+      "requests_per_second": 0.036850062852194575
+    },
+    "tokens": {
+      "total_completion": 51,
+      "avg_completion": 2.55
+    }
+  }
+}

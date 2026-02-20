@@ -19,25 +19,20 @@ agent-aiops-on-aws/
 │   ├── fsx-lustre/             # FSx for Lustre filesystem
 │   └── monitoring/             # Prometheus + Grafana
 │
-├── blueprints/                 # Complete, deployable compositions
+├── blueprints/                 # Self-contained deployable compositions
 │   ├── ministral-3b/           # Ministral-3B on EKS + SageMaker
-│   ├── kv-cache-benchmark/     # KV cache offloading benchmark
-│   └── vllm-kv-benchmark/      # vLLM KV benchmark results
+│   └── kimi-k2.5/             # Kimi K2.5 MoE on p5e (8x H200)
 │
-├── specs/                      # Requirements/specs (input docs)
+├── specs/                      # Requirements (input to blueprints)
 │   ├── _template.md            # Template for new specs
 │   ├── ministral-3b.md         # Ministral-3B requirements
-│   └── vllm-kv-cache-benchmark.md # KV cache benchmark spec
+│   └── vllm-kv-cache-benchmark.md # KV cache benchmark requirements
 │
-├── benchmarks/                 # Benchmark scripts and results
-├── LMBenchmark/                # LMBench workload generators
-├── kvcache-offloading/         # KV cache offloading tools
-│
-├── docs/                       # Documentation
+├── docs/                       # Project-wide documentation
 │   ├── getting-started.md      # Quick start guide
 │   └── 2026-gtm-architecture.md
 │
-├── scripts/                    # Utility scripts
+├── scripts/                    # Shared utility scripts
 │   └── validate.sh
 │
 ├── terraform/                  # Legacy monolithic deployment
@@ -70,39 +65,70 @@ modules/<module-name>/
 
 ## Blueprint Structure
 
-Each blueprint is self-contained and deployable:
+Blueprints are self-contained: they own their infrastructure, operational artifacts, and results. Specs define what to build; blueprints own what happened.
+
+### Core files (always present)
 
 ```
 blueprints/<name>/
 ├── main.tf             # Composes modules
 ├── variables.tf        # Blueprint-specific config
 ├── outputs.tf          # Useful outputs
-└── README.md           # Usage + architecture diagram
+└── README.md           # Architecture + quick start
+```
+
+### Operational artifacts (added during/after deployment)
+
+```
+blueprints/<name>/
+├── lessons.md          # Operational lessons (grows over time)
+├── benchmarks/         # Per-backend run configurations
+│   ├── baseline/
+│   └── <variant>/
+├── results/            # Raw data + summary reports
+│   ├── BENCHMARK_REPORT.md
+│   └── <run-name>/     # Per-run JSON results
+├── scripts/            # Blueprint-specific tooling
+├── docs/               # Deep technical guides
+├── plans/              # Evaluation/design documents
+├── docker/             # Custom container images (if needed)
+└── templates/          # EC2 user data, Helm values (if needed)
 ```
 
 **Naming Convention**: `<model>-<variant>` or `<purpose>-<details>`
 
 Examples:
-- `ministral-3b` - Ministral-3B inference
-- `llama-70b-multi-gpu` - Llama-70B on multiple GPUs
-- `multi-model-router` - Multiple models with routing
+- `ministral-3b` — Ministral-3B inference
+- `kimi-k2.5` — Kimi K2.5 MoE benchmarking
+
+## Specs vs Blueprints
+
+| Concern | Lives in | Example |
+|---------|----------|---------|
+| Requirements | `specs/<name>.md` | What to deploy, success criteria |
+| Infrastructure | `blueprints/<name>/*.tf` | Terraform code |
+| Lessons learned | `blueprints/<name>/lessons.md` | Operational gotchas |
+| Benchmark results | `blueprints/<name>/results/` | Raw JSON + reports |
+| Design evaluations | `blueprints/<name>/plans/` | Approach assessments |
+| Technical deep-dives | `blueprints/<name>/docs/` | Best practices guides |
+
+Specs stay at the repo root because they're authored before the blueprint exists. Everything operational belongs with the blueprint.
 
 ## Spec Files
 
-Specs in `specs/` are living documents that evolve through the deployment lifecycle:
+Specs define requirements and are the input to blueprint creation:
 
 ```
 specs/
 ├── _template.md                  # Template for new specs
 ├── ministral-3b.md               # Ministral-3B requirements
-└── vllm-kv-cache-benchmark.md    # KV cache benchmark spec + results
+└── vllm-kv-cache-benchmark.md    # KV cache benchmark requirements
 ```
 
 Spec lifecycle:
 1. Define requirements before coding (use `_template.md`)
 2. Deploy via `/ralph-loop Deploy specs/<name>.md`
-3. Add deployment notes and lessons learned after deployment
-4. Record benchmark results or validation outcomes
+3. Operational artifacts go into the blueprint, not the spec
 
 ## File Naming Conventions
 
@@ -124,10 +150,10 @@ Spec lifecycle:
 
 ## Adding a New Blueprint
 
-1. Create spec in `specs/<name>.md` using template
+1. Create spec in `specs/<name>.md` using `_template.md`
 2. Create `blueprints/<name>/` directory
 3. Compose existing modules in `main.tf`
-4. Add blueprint-specific `variables.tf`
-5. Document in `README.md` with architecture diagram
-6. Test deployment end-to-end
-7. Update spec with lessons learned
+4. Add `variables.tf`, `outputs.tf`, `README.md`
+5. Deploy and validate end-to-end
+6. Add `lessons.md` with operational findings
+7. Add `results/` and `benchmarks/` as work progresses

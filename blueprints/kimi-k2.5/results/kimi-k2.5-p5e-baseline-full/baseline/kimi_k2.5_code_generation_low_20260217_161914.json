@@ -1,0 +1,74 @@
+{
+  "model": "/mnt/nvme/models/Kimi-K2.5",
+  "instance_type": "p5e.48xlarge",
+  "workload": "code_generation",
+  "qps": 0.5,
+  "timestamp": "2026-02-17T16:19:14.342175",
+  "config": {
+    "serving_config": "baseline",
+    "serving_name": "Baseline vLLM",
+    "tensor_parallel": 8,
+    "max_model_len": 32768,
+    "workload_config": {
+      "description": "Code generation tasks",
+      "system_prompt": "You are an expert programmer. Write clean, efficient code.",
+      "prompts": [
+        "Write a Python function to check if a string is a palindrome.",
+        "Implement binary search in Python.",
+        "Write a function to find the nth Fibonacci number.",
+        "Create a Python class for a linked list with append and print methods.",
+        "Write code to merge two sorted lists."
+      ],
+      "shared_context": "",
+      "max_tokens": 300
+    },
+    "fsx_cache_snapshot": {
+      "path": null,
+      "size_bytes": 0,
+      "size_mb": 0,
+      "file_count": 0
+    }
+  },
+  "num_requests": 20,
+  "metrics": {
+    "success_rate": 1.0,
+    "total_requests": 20,
+    "successful_requests": 20,
+    "failed_requests": 0,
+    "reasoning_responses": 20,
+    "reasoning_rate": 1.0,
+    "ttft_ms": {
+      "mean": 1956.4293957897462,
+      "min": 0,
+      "max": 20453.47641594708,
+      "p50": 0,
+      "p90": 18675.111499847844,
+      "p95": 20453.47641594708,
+      "p99": 20453.47641594708
+    },
+    "itl_ms": {
+      "mean": 91.26762693478284,
+      "p50": 91.41844575060531,
+      "p90": 91.41844575060531,
+      "p95": 91.41844575060531,
+      "p99": 91.41844575060531
+    },
+    "e2e_ms": {
+      "mean": 27374.50706247473,
+      "min": 27021.456666989252,
+      "max": 27893.70712498203,
+      "p50": 27294.397291960195,
+      "p90": 27790.909708011895,
+      "p95": 27893.70712498203,
+      "p99": 27893.70712498203
+    },
+    "throughput": {
+      "tokens_per_second": 0.3178139420061395,
+      "requests_per_second": 0.03653033816162523
+    },
+    "tokens": {
+      "total_completion": 174,
+      "avg_completion": 8.7
+    }
+  }
+}

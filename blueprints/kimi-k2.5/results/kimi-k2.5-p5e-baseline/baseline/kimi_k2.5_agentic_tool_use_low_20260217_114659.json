@@ -1,0 +1,45 @@
+{
+  "model": "moonshotai/Kimi-K2.5",
+  "instance_type": "p5e.48xlarge",
+  "workload": "agentic_tool_use",
+  "qps": 0.5,
+  "timestamp": "2026-02-17T11:46:59.732283",
+  "config": {
+    "serving_config": "baseline",
+    "serving_name": "Baseline vLLM",
+    "tensor_parallel": 8,
+    "max_model_len": 32768,
+    "workload_config": {
+      "description": "Agentic workload with tool calling (tests tool-call-parser)",
+      "system_prompt": "You are an AI assistant with access to the following tools:\n- search(query): Search the web for information\n- calculate(expression): Perform mathematical calculations\n- get_weather(location): Get current weather for a location\n- get_time(timezone): Get current time in a timezone\n\nUse tools when needed to answer questions.",
+      "prompts": [
+        "What's the weather in Tokyo?",
+        "Calculate the compound interest on $1000 at 5% for 3 years",
+        "Search for the latest news about AI",
+        "What time is it in London?",
+        "Calculate 15% tip on a $85.50 bill"
+      ],
+      "shared_context": "Previous tool results: search('AI news') -> 'Latest AI developments...'",
+      "max_tokens": 400
+    },
+    "fsx_cache_snapshot": {
+      "path": null,
+      "size_bytes": 0,
+      "size_mb": 0,
+      "file_count": 0
+    }
+  },
+  "num_requests": 20,
+  "metrics": {
+    "success_rate": 0,
+    "total_requests": 20,
+    "failed_requests": 20,
+    "errors": [
+      "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+      "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+      "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+      "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}",
+      "HTTP 404: {\"error\":{\"message\":\"The model `moonshotai/Kimi-K2.5` does not exist.\",\"type\":\"NotFoundError\",\"param\":\"model\",\"code\":404}}"
+    ]
+  }
+}

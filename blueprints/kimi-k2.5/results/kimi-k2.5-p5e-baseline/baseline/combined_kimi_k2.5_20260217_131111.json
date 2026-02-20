@@ -1,0 +1,446 @@
+[
+  {
+    "model": "/mnt/nvme/models/Kimi-K2.5",
+    "instance_type": "p5e.48xlarge",
+    "workload": "reasoning_math",
+    "qps": 0.5,
+    "timestamp": "2026-02-17T12:08:04.096292",
+    "config": {
+      "serving_config": "baseline",
+      "serving_name": "Baseline vLLM",
+      "tensor_parallel": 8,
+      "max_model_len": 32768,
+      "workload_config": {
+        "description": "Math reasoning problems - tests reasoning parser",
+        "system_prompt": "You are a helpful math tutor. Show your step-by-step reasoning.",
+        "prompts": [
+          "If a car travels 60 mph for 2 hours, then 80 mph for 1.5 hours, what's the total distance?",
+          "A store sells apples for $1.50 each. If I buy 6 apples with a 10% discount, how much do I pay?",
+          "What is the sum of the first 10 prime numbers?",
+          "A rectangle has perimeter 24cm. If length is twice width, what's the area?",
+          "If 5x + 3 = 23, what is x?"
+        ],
+        "shared_context": "Previous context: We are practicing math problems step by step.",
+        "max_tokens": 500
+      },
+      "fsx_cache_snapshot": {
+        "path": null,
+        "size_bytes": 0,
+        "size_mb": 0,
+        "file_count": 0
+      }
+    },
+    "num_requests": 20,
+    "metrics": {
+      "success_rate": 1.0,
+      "total_requests": 20,
+      "successful_requests": 20,
+      "failed_requests": 0,
+      "reasoning_responses": 20,
+      "reasoning_rate": 1.0,
+      "ttft_ms": {
+        "mean": 18315.336660528556,
+        "min": 0,
+        "max": 39427.78387502767,
+        "p50": 20804.078083951026,
+        "p90": 25350.19808402285,
+        "p95": 39427.78387502767,
+        "p99": 39427.78387502767
+      },
+      "itl_ms": {
+        "mean": 91.61915950656103,
+        "p50": 91.82527339825891,
+        "p90": 92.37079280206845,
+        "p95": 92.54504558697775,
+        "p99": 92.54504558697775
+      },
+      "e2e_ms": {
+        "mean": 39275.75075624045,
+        "min": 26806.54045799747,
+        "max": 46143.774583004415,
+        "p50": 41118.41300013475,
+        "p90": 46131.065166089684,
+        "p95": 46143.774583004415,
+        "p99": 46143.774583004415
+      },
+      "throughput": {
+        "tokens_per_second": 3.9108100301709645,
+        "requests_per_second": 0.025461002800592217
+      },
+      "tokens": {
+        "total_completion": 3072,
+        "avg_completion": 153.6
+      }
+    }
+  },
+  {
+    "model": "/mnt/nvme/models/Kimi-K2.5",
+    "instance_type": "p5e.48xlarge",
+    "workload": "reasoning_math",
+    "qps": 1.0,
+    "timestamp": "2026-02-17T12:28:01.224230",
+    "config": {
+      "serving_config": "baseline",
+      "serving_name": "Baseline vLLM",
+      "tensor_parallel": 8,
+      "max_model_len": 32768,
+      "workload_config": {
+        "description": "Math reasoning problems - tests reasoning parser",
+        "system_prompt": "You are a helpful math tutor. Show your step-by-step reasoning.",
+        "prompts": [
+          "If a car travels 60 mph for 2 hours, then 80 mph for 1.5 hours, what's the total distance?",
+          "A store sells apples for $1.50 each. If I buy 6 apples with a 10% discount, how much do I pay?",
+          "What is the sum of the first 10 prime numbers?",
+          "A rectangle has perimeter 24cm. If length is twice width, what's the area?",
+          "If 5x + 3 = 23, what is x?"
+        ],
+        "shared_context": "Previous context: We are practicing math problems step by step.",
+        "max_tokens": 500
+      },
+      "fsx_cache_snapshot": {
+        "path": null,
+        "size_bytes": 0,
+        "size_mb": 0,
+        "file_count": 0
+      }
+    },
+    "num_requests": 20,
+    "metrics": {
+      "success_rate": 1.0,
+      "total_requests": 20,
+      "successful_requests": 20,
+      "failed_requests": 0,
+      "reasoning_responses": 20,
+      "reasoning_rate": 1.0,
+      "ttft_ms": {
+        "mean": 16063.318718702067,
+        "min": 0,
+        "max": 28204.25008307211,
+        "p50": 20137.031957972795,
+        "p90": 26555.058917030692,
+        "p95": 28204.25008307211,
+        "p99": 28204.25008307211
+      },
+      "itl_ms": {
+        "mean": 92.1677668686114,
+        "p50": 92.33853261875844,
+        "p90": 92.88609697625084,
+        "p95": 93.03066583350301,
+        "p99": 93.03066583350301
+      },
+      "e2e_ms": {
+        "mean": 39227.346164674964,
+        "min": 27626.45045807585,
+        "max": 46435.2046251297,
+        "p50": 40933.21275012568,
+        "p90": 46355.286250123754,
+        "p95": 46435.2046251297,
+        "p99": 46435.2046251297
+      },
+      "throughput": {
+        "tokens_per_second": 3.8493554819157922,
+        "requests_per_second": 0.02549242041003836
+      },
+      "tokens": {
+        "total_completion": 3020,
+        "avg_completion": 151
+      }
+    }
+  },
+  {
+    "model": "/mnt/nvme/models/Kimi-K2.5",
+    "instance_type": "p5e.48xlarge",
+    "workload": "multi_turn_qa",
+    "qps": 0.5,
+    "timestamp": "2026-02-17T12:41:45.674553",
+    "config": {
+      "serving_config": "baseline",
+      "serving_name": "Baseline vLLM",
+      "tensor_parallel": 8,
+      "max_model_len": 32768,
+      "workload_config": {
+        "description": "Multi-turn Q&A with long shared context (tests prefix caching)",
+        "system_prompt": "You are a helpful assistant. Answer based on the context provided.",
+        "prompts": [
+          "What is the main topic discussed in the context?",
+          "Can you summarize the key points?",
+          "What are the implications mentioned?",
+          "How does this relate to real-world applications?",
+          "What conclusions can be drawn?"
+        ],
+        "shared_context": "Context Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\nContext Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\nContext Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\nContext Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\nContext Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\n",
+        "max_tokens": 300
+      },
+      "fsx_cache_snapshot": {
+        "path": null,
+        "size_bytes": 0,
+        "size_mb": 0,
+        "file_count": 0
+      }
+    },
+    "num_requests": 20,
+    "metrics": {
+      "success_rate": 1.0,
+      "total_requests": 20,
+      "successful_requests": 20,
+      "failed_requests": 0,
+      "reasoning_responses": 20,
+      "reasoning_rate": 1.0,
+      "ttft_ms": {
+        "mean": 9085.771487501916,
+        "min": 0,
+        "max": 25011.472041951492,
+        "p50": 14165.063708089292,
+        "p90": 20817.078333115205,
+        "p95": 25011.472041951492,
+        "p99": 25011.472041951492
+      },
+      "itl_ms": {
+        "mean": 91.35644907563585,
+        "p50": 91.48444376986878,
+        "p90": 92.97180208003348,
+        "p95": 92.97180208003348,
+        "p99": 92.97180208003348
+      },
+      "e2e_ms": {
+        "mean": 27154.579327080864,
+        "min": 24972.04904188402,
+        "max": 27959.76695790887,
+        "p50": 27396.557749947533,
+        "p90": 27899.361624848098,
+        "p95": 27959.76695790887,
+        "p99": 27959.76695790887
+      },
+      "throughput": {
+        "tokens_per_second": 1.7805468248142313,
+        "requests_per_second": 0.03682620113369661
+      },
+      "tokens": {
+        "total_completion": 967,
+        "avg_completion": 48.35
+      }
+    }
+  },
+  {
+    "model": "/mnt/nvme/models/Kimi-K2.5",
+    "instance_type": "p5e.48xlarge",
+    "workload": "multi_turn_qa",
+    "qps": 1.0,
+    "timestamp": "2026-02-17T12:55:25.720306",
+    "config": {
+      "serving_config": "baseline",
+      "serving_name": "Baseline vLLM",
+      "tensor_parallel": 8,
+      "max_model_len": 32768,
+      "workload_config": {
+        "description": "Multi-turn Q&A with long shared context (tests prefix caching)",
+        "system_prompt": "You are a helpful assistant. Answer based on the context provided.",
+        "prompts": [
+          "What is the main topic discussed in the context?",
+          "Can you summarize the key points?",
+          "What are the implications mentioned?",
+          "How does this relate to real-world applications?",
+          "What conclusions can be drawn?"
+        ],
+        "shared_context": "Context Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\nContext Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\nContext Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\nContext Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\nContext Document: Understanding Large Language Models\n\nLarge Language Models (LLMs) represent a significant advancement in artificial intelligence.\nThese models are trained on vast amounts of text data and can perform various natural language tasks.\n\nKey Characteristics:\n1. Scale: Modern LLMs contain billions of parameters\n2. Architecture: Most use the Transformer architecture with attention mechanisms\n3. Training: Self-supervised learning on large text corpora\n4. Fine-tuning: Models can be adapted to specific tasks\n\nApplications include:\n- Text generation and completion\n- Question answering\n- Code generation\n- Translation\n- Summarization\n\nChallenges:\n- Computational resources for training and inference\n- Hallucination and factual accuracy\n- Bias in training data\n- Environmental impact\n\nRecent developments focus on efficiency improvements like quantization,\npruning, and knowledge distillation to make LLMs more accessible.\n",
+        "max_tokens": 300
+      },
+      "fsx_cache_snapshot": {
+        "path": null,
+        "size_bytes": 0,
+        "size_mb": 0,
+        "file_count": 0
+      }
+    },
+    "num_requests": 20,
+    "metrics": {
+      "success_rate": 1.0,
+      "total_requests": 20,
+      "successful_requests": 20,
+      "failed_requests": 0,
+      "reasoning_responses": 20,
+      "reasoning_rate": 1.0,
+      "ttft_ms": {
+        "mean": 15887.745762558188,
+        "min": 0,
+        "max": 27442.06004193984,
+        "p50": 21808.41024988331,
+        "p90": 25260.316333035007,
+        "p95": 27442.06004193984,
+        "p99": 27442.06004193984
+      },
+      "itl_ms": {
+        "mean": 90.35105710863313,
+        "p50": 89.57987303082926,
+        "p90": 92.82519138749626,
+        "p95": 92.84300866420381,
+        "p99": 92.84300866420381
+      },
+      "e2e_ms": {
+        "mean": 26610.07875215728,
+        "min": 21648.717625066638,
+        "max": 27911.520417081192,
+        "p50": 26947.05674983561,
+        "p90": 27876.65683380328,
+        "p95": 27911.520417081192,
+        "p99": 27911.520417081192
+      },
+      "throughput": {
+        "tokens_per_second": 1.6497508484991248,
+        "requests_per_second": 0.037579745979478926
+      },
+      "tokens": {
+        "total_completion": 878,
+        "avg_completion": 43.9
+      }
+    }
+  },
+  {
+    "model": "/mnt/nvme/models/Kimi-K2.5",
+    "instance_type": "p5e.48xlarge",
+    "workload": "agentic_tool_use",
+    "qps": 0.5,
+    "timestamp": "2026-02-17T13:03:04.420781",
+    "config": {
+      "serving_config": "baseline",
+      "serving_name": "Baseline vLLM",
+      "tensor_parallel": 8,
+      "max_model_len": 32768,
+      "workload_config": {
+        "description": "Agentic workload with tool calling (tests tool-call-parser)",
+        "system_prompt": "You are an AI assistant with access to the following tools:\n- search(query): Search the web for information\n- calculate(expression): Perform mathematical calculations\n- get_weather(location): Get current weather for a location\n- get_time(timezone): Get current time in a timezone\n\nUse tools when needed to answer questions.",
+        "prompts": [
+          "What's the weather in Tokyo?",
+          "Calculate the compound interest on $1000 at 5% for 3 years",
+          "Search for the latest news about AI",
+          "What time is it in London?",
+          "Calculate 15% tip on a $85.50 bill"
+        ],
+        "shared_context": "Previous tool results: search('AI news') -> 'Latest AI developments...'",
+        "max_tokens": 400
+      },
+      "fsx_cache_snapshot": {
+        "path": null,
+        "size_bytes": 0,
+        "size_mb": 0,
+        "file_count": 0
+      }
+    },
+    "num_requests": 20,
+    "metrics": {
+      "success_rate": 1.0,
+      "total_requests": 20,
+      "successful_requests": 20,
+      "failed_requests": 0,
+      "reasoning_responses": 20,
+      "reasoning_rate": 1.0,
+      "ttft_ms": {
+        "mean": 9614.233077142853,
+        "min": 0,
+        "max": 20195.7901250571,
+        "p50": 8126.799958059564,
+        "p90": 17954.30437498726,
+        "p95": 20195.7901250571,
+        "p99": 20195.7901250571
+      },
+      "itl_ms": {
+        "mean": 91.94722894533787,
+        "p50": 92.46338987473531,
+        "p90": 93.12518303548651,
+        "p95": 93.21891666493482,
+        "p99": 93.21891666493482
+      },
+      "e2e_ms": {
+        "mean": 14662.196791707538,
+        "min": 6436.080541927367,
+        "max": 36456.076625036076,
+        "p50": 11679.117625113577,
+        "p90": 27473.996417131275,
+        "p95": 36456.076625036076,
+        "p99": 36456.076625036076
+      },
+      "throughput": {
+        "tokens_per_second": 2.3973215268724055,
+        "requests_per_second": 0.06820260389395179
+      },
+      "tokens": {
+        "total_completion": 703,
+        "avg_completion": 35.15
+      }
+    }
+  },
+  {
+    "model": "/mnt/nvme/models/Kimi-K2.5",
+    "instance_type": "p5e.48xlarge",
+    "workload": "agentic_tool_use",
+    "qps": 1.0,
+    "timestamp": "2026-02-17T13:10:56.544742",
+    "config": {
+      "serving_config": "baseline",
+      "serving_name": "Baseline vLLM",
+      "tensor_parallel": 8,
+      "max_model_len": 32768,
+      "workload_config": {
+        "description": "Agentic workload with tool calling (tests tool-call-parser)",
+        "system_prompt": "You are an AI assistant with access to the following tools:\n- search(query): Search the web for information\n- calculate(expression): Perform mathematical calculations\n- get_weather(location): Get current weather for a location\n- get_time(timezone): Get current time in a timezone\n\nUse tools when needed to answer questions.",
+        "prompts": [
+          "What's the weather in Tokyo?",
+          "Calculate the compound interest on $1000 at 5% for 3 years",
+          "Search for the latest news about AI",
+          "What time is it in London?",
+          "Calculate 15% tip on a $85.50 bill"
+        ],
+        "shared_context": "Previous tool results: search('AI news') -> 'Latest AI developments...'",
+        "max_tokens": 400
+      },
+      "fsx_cache_snapshot": {
+        "path": null,
+        "size_bytes": 0,
+        "size_mb": 0,
+        "file_count": 0
+      }
+    },
+    "num_requests": 20,
+    "metrics": {
+      "success_rate": 1.0,
+      "total_requests": 20,
+      "successful_requests": 20,
+      "failed_requests": 0,
+      "reasoning_responses": 20,
+      "reasoning_rate": 1.0,
+      "ttft_ms": {
+        "mean": 10564.405553997494,
+        "min": 0,
+        "max": 24092.34929108061,
+        "p50": 8219.2052078899,
+        "p90": 22490.539791062474,
+        "p95": 24092.34929108061,
+        "p99": 24092.34929108061
+      },
+      "itl_ms": {
+        "mean": 92.97169133590363,
+        "p50": 93.01999381191477,
+        "p90": 93.34798237810341,
+        "p95": 93.35537811016872,
+        "p99": 93.35537811016872
+      },
+      "e2e_ms": {
+        "mean": 16399.252089532092,
+        "min": 7091.376374941319,
+        "max": 37252.223500050604,
+        "p50": 11010.006165830418,
+        "p90": 37239.93912502192,
+        "p95": 37252.223500050604,
+        "p99": 37252.223500050604
+      },
+      "throughput": {
+        "tokens_per_second": 2.615972958143851,
+        "requests_per_second": 0.060978390632723804
+      },
+      "tokens": {
+        "total_completion": 858,
+        "avg_completion": 42.9
+      }
+    }
+  }
+]

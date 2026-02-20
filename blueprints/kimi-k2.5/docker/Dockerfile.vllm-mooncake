@@ -1,0 +1,111 @@
+# Dockerfile.vllm-mooncake
+# vLLM + Mooncake Transfer Engine for tiered KV cache (VRAM→DRAM→NVMe→FSx)
+#
+# Requires CUDA 13.0 driver (580.x) on p5e instances with AL2023 NVIDIA AMI.
+# PyTorch 2.10.0+cu130 is the minimum version that works with driver 580.
+# See: blueprints/kimi-k2.5/benchmarks/validation.md section 8
+#
+# Build: docker build -f Dockerfile.vllm-mooncake -t vllm-mooncake:cu130 .
+# Run:   docker run --gpus all --privileged --network=host -v /mnt/fsx:/mnt/fsx vllm-mooncake:cu130
+
+FROM vllm/vllm-openai:cu130-nightly
+
+LABEL maintainer="benchmark-team"
+LABEL description="vLLM + Mooncake Transfer Engine with RDMA and GDS support"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ============================================
+# Install RDMA and GDS system dependencies
+# ============================================
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # RDMA/InfiniBand libraries
+    libibverbs-dev \
+    librdmacm-dev \
+    rdma-core \
+    ibverbs-utils \
+    # Networking tools
+    iproute2 \
+    net-tools \
+    && rm -rf /var/lib/apt/lists/*
+# Note: nvidia-gds tools are accessed via host mount (/usr/local/cuda/gds/tools/)
+# Note: Lustre filesystem is mounted from the host — no client packages needed in container
+
+# Note: EFA kernel driver and userspace libs come from the host via --privileged.
+# The RDMA userspace libraries (libibverbs, rdma-core) are installed above.
+
+# ============================================
+# Install Mooncake Transfer Engine
+# ============================================
+RUN pip install --no-cache-dir \
+    mooncake-transfer-engine \
+    pyzmq>=26.0.0 \
+    runai-model-streamer
+
+# ============================================
+# Environment configuration
+# ============================================
+
+# Offline mode — model weights served from FSx
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
+
+# GDS configuration
+ENV CUFILE_ENV_PATH_JSON=/etc/cufile.json
+
+# Mooncake tiered storage configuration (overridable at runtime)
+ENV MOONCAKE_ENABLE_GDS=1
+ENV MOONCAKE_STORAGE_TIERS="vram,dram,nvme,fsx"
+ENV MOONCAKE_NVME_PATH="/mnt/nvme"
+ENV MOONCAKE_FSX_PATH="/mnt/fsx/kv-cache"
+
+# vLLM configuration
+ENV VLLM_ATTENTION_BACKEND=FLASHINFER
+
+# ============================================
+# Create mount points
+# ============================================
+RUN mkdir -p /mnt/fsx /mnt/nvme /workspace/results /mnt/fsx/kv-cache
+
+# ============================================
+# Validation script
+# ============================================
+COPY --chmod=755 <<'EOF' /usr/local/bin/validate-mooncake.sh
+#!/bin/bash
+set -e
+
+echo "=== Mooncake + GDS Validation ==="
+echo ""
+
+echo "1. Checking mooncake-transfer-engine..."
+python -c "import mooncake; print(f'  mooncake version: {mooncake.__version__}')" 2>/dev/null || \
+    python -c "import mooncake_transfer_engine; print('  mooncake_transfer_engine importable')" 2>/dev/null || \
+    echo "  WARNING: mooncake not importable"
+
+echo ""
+echo "2. Checking RDMA devices..."
+if command -v ibv_devices &>/dev/null; then
+    ibv_devices 2>/dev/null || echo "  No RDMA devices found (expected outside cluster)"
+else
+    echo "  ibv_devices not found"
+fi
+
+echo ""
+echo "3. Checking GDS..."
+if command -v gdscheck &>/dev/null; then
+    gdscheck -V 2>/dev/null || echo "  gdscheck version check failed"
+elif [ -f /usr/local/cuda/gds/tools/gdscheck ]; then
+    /usr/local/cuda/gds/tools/gdscheck -V
+else
+    echo "  gdscheck not found"
+fi
+
+echo ""
+echo "4. Checking vLLM..."
+python -c "import vllm; print(f'  vLLM version: {vllm.__version__}')"
+
+echo ""
+echo "=== Validation Complete ==="
+EOF
+
+ENTRYPOINT ["python3", "-m", "vllm.entrypoints.openai.api_server"]

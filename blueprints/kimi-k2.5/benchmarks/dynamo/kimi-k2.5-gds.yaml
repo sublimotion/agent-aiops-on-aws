@@ -1,0 +1,49 @@
+# Config C: NVIDIA Dynamo with KVBM + GDS for Kimi-K2.5
+# Tiered KV cache offloading: VRAM → DRAM → FSx Lustre (via GDS)
+#
+# Model: Kimi K2.5 (1T params, native INT4 CompressedTensorsWNA16MarlinMoE)
+# No --quantization flag needed — weights are pre-quantized in safetensor shards.
+# vLLM auto-detects quantization from model config.json.
+#
+# Deploy with: dynamo-run --config /etc/dynamo/kimi-k2.5-gds.yaml
+#
+# GDS: NIXL auto-detects GDS capability at runtime via a 4KB test transfer.
+# Falls back to 2-hop (Device→Host→Disk via POSIX) if GDS is unavailable.
+# See docs/DYNAMO_KV_CACHE_GDS.md for details.
+
+model:
+  name: moonshotai/Kimi-K2.5
+  path: /mnt/nvme/models/Kimi-K2.5
+  tensor_parallel: 8
+  max_model_len: 32768
+  trust_remote_code: true
+  tool_call_parser: kimi_k2
+  reasoning_parser: kimi_k2
+  load_format: runai_streamer
+  model_loader_extra_config:
+    num_threads: 16
+    concurrency: 8
+
+serving:
+  port: 8000
+  gpu_memory_utilization: 0.85
+
+# KVBM tiered KV cache — configured via environment variables:
+#   DYN_KVBM_CPU_CACHE_GB=128        Host DRAM tier (G2)
+#   DYN_KVBM_DISK_CACHE_GB=500       Disk tier size (G3)
+#   DYN_KVBM_DISK_CACHE_DIR=/mnt/fsx/kv-cache/dynamo   FSx Lustre (persistent, shareable)
+#   DYN_KVBM_NIXL_BACKEND_GDS_MT=true                   Multi-threaded GDS backend
+#   CUFILE_ENV_PATH_JSON=/etc/cufile.json                cuFile driver config
+#
+# FSx Lustre is preferred over local NVMe for the disk tier because:
+# - KV cache persists across instance replacement/scaling
+# - Multiple instances can share warm cache via the same FSx volume
+# - New instances get pre-warmed inference immediately
+
+attention:
+  backend: FLASHINFER
+
+runtime:
+  enforce_eager: true
+  offline_mode: true
+  swap_space: 32

@@ -1,0 +1,74 @@
+{
+  "model": "/mnt/nvme/models/Kimi-K2.5",
+  "instance_type": "p5e.48xlarge",
+  "workload": "reasoning_math",
+  "qps": 2.0,
+  "timestamp": "2026-02-17T16:08:29.507528",
+  "config": {
+    "serving_config": "baseline",
+    "serving_name": "Baseline vLLM",
+    "tensor_parallel": 8,
+    "max_model_len": 32768,
+    "workload_config": {
+      "description": "Math reasoning problems - tests reasoning parser",
+      "system_prompt": "You are a helpful math tutor. Show your step-by-step reasoning.",
+      "prompts": [
+        "If a car travels 60 mph for 2 hours, then 80 mph for 1.5 hours, what's the total distance?",
+        "A store sells apples for $1.50 each. If I buy 6 apples with a 10% discount, how much do I pay?",
+        "What is the sum of the first 10 prime numbers?",
+        "A rectangle has perimeter 24cm. If length is twice width, what's the area?",
+        "If 5x + 3 = 23, what is x?"
+      ],
+      "shared_context": "Previous context: We are practicing math problems step by step.",
+      "max_tokens": 200
+    },
+    "fsx_cache_snapshot": {
+      "path": null,
+      "size_bytes": 0,
+      "size_mb": 0,
+      "file_count": 0
+    }
+  },
+  "num_requests": 20,
+  "metrics": {
+    "success_rate": 1.0,
+    "total_requests": 20,
+    "successful_requests": 20,
+    "failed_requests": 0,
+    "reasoning_responses": 20,
+    "reasoning_rate": 1.0,
+    "ttft_ms": {
+      "mean": 4359.168962400872,
+      "min": 0,
+      "max": 17623.093541013077,
+      "p50": 0,
+      "p90": 15160.263957921416,
+      "p95": 17623.093541013077,
+      "p99": 17623.093541013077
+    },
+    "itl_ms": {
+      "mean": 90.33390671686666,
+      "p50": 90.94308834057301,
+      "p90": 91.29489583170249,
+      "p95": 91.29489583170249,
+      "p99": 91.29489583170249
+    },
+    "e2e_ms": {
+      "mean": 18139.583220961504,
+      "min": 17937.666416866705,
+      "max": 18482.679542154074,
+      "p50": 18119.606042047963,
+      "p90": 18446.916250046343,
+      "p95": 18482.679542154074,
+      "p99": 18482.679542154074
+    },
+    "throughput": {
+      "tokens_per_second": 0.6863443249133305,
+      "requests_per_second": 0.05512805822597032
+    },
+    "tokens": {
+      "total_completion": 249,
+      "avg_completion": 12.45
+    }
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "model": "/mnt/nvme/models/Kimi-K2.5",
+  "instance_type": "p5e.48xlarge",
+  "workload": "agentic_tool_use",
+  "qps": 0.5,
+  "timestamp": "2026-02-17T13:03:04.420781",
+  "config": {
+    "serving_config": "baseline",
+    "serving_name": "Baseline vLLM",
+    "tensor_parallel": 8,
+    "max_model_len": 32768,
+    "workload_config": {
+      "description": "Agentic workload with tool calling (tests tool-call-parser)",
+      "system_prompt": "You are an AI assistant with access to the following tools:\n- search(query): Search the web for information\n- calculate(expression): Perform mathematical calculations\n- get_weather(location): Get current weather for a location\n- get_time(timezone): Get current time in a timezone\n\nUse tools when needed to answer questions.",
+      "prompts": [
+        "What's the weather in Tokyo?",
+        "Calculate the compound interest on $1000 at 5% for 3 years",
+        "Search for the latest news about AI",
+        "What time is it in London?",
+        "Calculate 15% tip on a $85.50 bill"
+      ],
+      "shared_context": "Previous tool results: search('AI news') -> 'Latest AI developments...'",
+      "max_tokens": 400
+    },
+    "fsx_cache_snapshot": {
+      "path": null,
+      "size_bytes": 0,
+      "size_mb": 0,
+      "file_count": 0
+    }
+  },
+  "num_requests": 20,
+  "metrics": {
+    "success_rate": 1.0,
+    "total_requests": 20,
+    "successful_requests": 20,
+    "failed_requests": 0,
+    "reasoning_responses": 20,
+    "reasoning_rate": 1.0,
+    "ttft_ms": {
+      "mean": 9614.233077142853,
+      "min": 0,
+      "max": 20195.7901250571,
+      "p50": 8126.799958059564,
+      "p90": 17954.30437498726,
+      "p95": 20195.7901250571,
+      "p99": 20195.7901250571
+    },
+    "itl_ms": {
+      "mean": 91.94722894533787,
+      "p50": 92.46338987473531,
+      "p90": 93.12518303548651,
+      "p95": 93.21891666493482,
+      "p99": 93.21891666493482
+    },
+    "e2e_ms": {
+      "mean": 14662.196791707538,
+      "min": 6436.080541927367,
+      "max": 36456.076625036076,
+      "p50": 11679.117625113577,
+      "p90": 27473.996417131275,
+      "p95": 36456.076625036076,
+      "p99": 36456.076625036076
+    },
+    "throughput": {
+      "tokens_per_second": 2.3973215268724055,
+      "requests_per_second": 0.06820260389395179
+    },
+    "tokens": {
+      "total_completion": 703,
+      "avg_completion": 35.15
+    }
+  }
+}

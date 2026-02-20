@@ -45,18 +45,11 @@ List what's explicitly out of scope:
 ## Cost Considerations
 Rough estimates or cost-saving recommendations.
 
+## Known Limitations
+Known issues or constraints to be aware of before deployment.
+
 ---
 
-<!-- Sections below are filled in during and after deployment -->
-
-## Deployment Notes
-<!-- Date, infrastructure deployed, access commands -->
-
-## Lessons Learned
-<!-- Constraints, workarounds, and gotchas discovered during deployment -->
-
-## Results
-<!-- Benchmark data, validation outcomes, success criteria pass/fail -->
-
-## Known Limitations
-<!-- Issues or constraints discovered during development -->
+> **Note**: Operational artifacts (lessons learned, benchmark results, deployment notes,
+> design evaluations) belong in the blueprint directory, not in this spec.
+> See `blueprints/<name>/lessons.md`, `blueprints/<name>/results/`, etc.

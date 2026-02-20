@@ -7,7 +7,7 @@ Template for autonomous infrastructure deployment using Claude Code, spec-driven
 1. Write spec in `specs/<name>.md`
 2. Run `/ralph-loop Deploy specs/<name>.md`
 3. Claude iterates until deployment succeeds
-4. Update spec with lessons learned
+4. Capture lessons in `blueprints/<name>/lessons.md`
 
 ## Context Loading
 
@@ -25,7 +25,9 @@ Read these files **on demand** based on what you're doing:
 | Blueprint | Spec |
 |-----------|------|
 | `blueprints/ministral-3b/` | `specs/ministral-3b.md` |
-| `blueprints/kv-cache-benchmark/` | `specs/vllm-kv-cache-benchmark.md` |
+| `blueprints/kimi-k2.5/` | `specs/vllm-kv-cache-benchmark.md` |
+
+**Blueprint-local context** — for operational details (lessons, results, plans), look inside the blueprint directory itself rather than in specs.
 
 ## Commands
 
