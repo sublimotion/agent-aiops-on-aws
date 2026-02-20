@@ -67,7 +67,7 @@ aws ec2 run-instances \
 # 3. Mount FSx and set up NVMe on the GPU node
 ssh ec2-user@<gpu-node>
 mount-fsx.sh <fsx-dns> <mount-name>
-# Set up NVMe RAID0 (see docs/MOE_LOADING_BEST_PRACTICES.md section 5.3)
+# Set up NVMe RAID0 (see docs/moe-loading-best-practices.md section 5.3)
 
 # 4. Copy model and start vLLM
 rsync -av /mnt/fsx/models/Kimi-K2.5/ /mnt/nvme/models/Kimi-K2.5/
@@ -99,10 +99,13 @@ These are always applied:
 
 | Document | Description |
 |----------|-------------|
-| [MoE Loading Best Practices](docs/MOE_LOADING_BEST_PRACTICES.md) | Comprehensive guide for loading and serving Kimi K2.5 |
 | [Lessons Learned](lessons.md) | Operational lessons from p5e deployments |
-| [Benchmark Runs](benchmark_runs.md) | Benchmark execution log |
-| [Dynamo GDS Plan](plans/dynamo_gds_fsx_plan.md) | GPU Direct Storage benchmarking plan |
+| [Benchmark Report](results/benchmark-report.md) | Consolidated LMCache + Dynamo KVBM results |
+| [Execution Log](results/execution-log.md) | kubectl commands used to run benchmarks |
+| [MoE Loading Best Practices](docs/moe-loading-best-practices.md) | Guide for loading and serving Kimi K2.5 |
+| [Dynamo KV Cache GDS](docs/dynamo-kv-cache-gds.md) | NVIDIA Dynamo architecture reference |
+| [Dynamo GDS Benchmark Plan](docs/dynamo-gds-benchmark-plan.md) | GPU Direct Storage benchmarking plan |
+| [Mooncake Assessment](docs/mooncake-assessment.md) | Mooncake as L3 storage backend evaluation |
 
 ## Cost Estimate
 

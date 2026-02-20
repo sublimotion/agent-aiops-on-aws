@@ -82,20 +82,42 @@ blueprints/<name>/
 ```
 blueprints/<name>/
 ├── lessons.md          # Operational lessons (grows over time)
-├── benchmarks/         # Per-backend run configurations
-│   ├── baseline/
-│   └── <variant>/
-├── results/            # Raw data + summary reports
-│   ├── BENCHMARK_REPORT.md
-│   └── <run-name>/     # Per-run JSON results
-├── scripts/            # Blueprint-specific tooling
-├── docs/               # Deep technical guides
-├── plans/              # Evaluation/design documents
+├── configs/            # Launch configurations per serving variant
+│   ├── baseline.sh
+│   └── <variant>.sh
+├── scripts/            # Orchestration + validation tooling
+│   ├── run-benchmarks.py
+│   └── validate-*.sh
+├── results/            # All benchmark outputs
+│   ├── benchmark-report.md    # Consolidated findings
+│   ├── execution-log.md       # Commands used to run benchmarks
+│   └── <run-name>/            # Per-run JSON results
+├── docs/               # All written knowledge (reference + decisions)
+│   ├── <topic>.md             # Technical reference
+│   └── <assessment>.md        # Technology evaluations / design plans
 ├── docker/             # Custom container images (if needed)
 └── templates/          # EC2 user data, Helm values (if needed)
 ```
 
-**Naming Convention**: `<model>-<variant>` or `<purpose>-<details>`
+### Directory purposes
+
+| Directory | Contains | Examples |
+|-----------|----------|---------|
+| `configs/` | What to launch | Shell scripts, YAML configs per serving variant |
+| `scripts/` | How to run and validate | Benchmark orchestrators, storage validators |
+| `results/` | What happened | Reports, execution logs, raw JSON data |
+| `docs/` | What we know | Technical reference, design plans, assessments |
+
+### File naming conventions
+
+| Rule | Example |
+|------|---------|
+| `lowercase-kebab-case` for all files | `moe-loading-best-practices.md` |
+| No model prefix on filenames | `run-benchmarks.py` not `run-kimi-benchmarks.py` |
+| Flat configs, one file per variant | `configs/lmcache.sh` not `configs/lmcache/run.sh` |
+| Single consolidated report | `results/benchmark-report.md` |
+
+**Blueprint naming**: `<model>-<variant>` or `<purpose>-<details>`
 
 Examples:
 - `ministral-3b` — Ministral-3B inference
@@ -108,9 +130,10 @@ Examples:
 | Requirements | `specs/<name>.md` | What to deploy, success criteria |
 | Infrastructure | `blueprints/<name>/*.tf` | Terraform code |
 | Lessons learned | `blueprints/<name>/lessons.md` | Operational gotchas |
-| Benchmark results | `blueprints/<name>/results/` | Raw JSON + reports |
-| Design evaluations | `blueprints/<name>/plans/` | Approach assessments |
-| Technical deep-dives | `blueprints/<name>/docs/` | Best practices guides |
+| Launch configs | `blueprints/<name>/configs/` | Per-variant shell scripts |
+| Benchmark tooling | `blueprints/<name>/scripts/` | Orchestrators, validators |
+| Benchmark outputs | `blueprints/<name>/results/` | Reports, raw JSON, execution logs |
+| Knowledge | `blueprints/<name>/docs/` | Reference, decisions, assessments |
 
 Specs stay at the repo root because they're authored before the blueprint exists. Everything operational belongs with the blueprint.
 
