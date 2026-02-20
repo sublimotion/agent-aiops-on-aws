@@ -369,6 +369,29 @@ SGLang's HiCache extends RadixAttention with GPU→CPU→Storage tiering. When G
 
 **Lesson**: The inference engine's scheduler policy is as important as the offloading framework. An async offloading framework (KVBM) paired with a gating scheduler (vLLM) is effectively dead code. Match the scheduler to the offloading strategy.
 
+### 32. Use a Separate EC2 Build Machine for Iterative Development
+**Problem**: Building Docker images, testing configs, and debugging deployment issues directly on a p5e.48xlarge capacity block instance is expensive and wastes GPU time. The GPU node should only run inference workloads.
+
+**Solution**: Launch a small EC2 instance (e.g., m6i.xlarge) in the same VPC and subnet as the GPU node. Use it to:
+1. Build and test Docker images (Dynamo KVBM, Mooncake) before pushing to ECR
+2. Iterate on vLLM launch configs and environment variables
+3. Debug FSx mount issues and model staging
+4. Run `validate-storage.sh` and other pre-flight checks
+
+The build machine has the same network access (FSx, S3, ECR) without burning $60-98/hr of GPU capacity during debug cycles.
+
+**Lesson**: Always provision a cheap build/debug instance alongside GPU capacity blocks. Factor it into the Terraform blueprint as an optional resource.
+
+### 33. Always Record Benchmark Execution Location
+**Problem**: During benchmark runs, there was confusion about whether the benchmark client was running locally (laptop via `kubectl port-forward`) or server-side (directly on the GPU node). This matters because:
+1. Port-forward adds network latency that inflates TTFT measurements
+2. Laptop-side execution is bandwidth-limited for throughput tests
+3. Results from different locations are not directly comparable
+
+**Solution**: The benchmark script should record the execution context (hostname, whether port-forward is active, network hop count) in the JSON output metadata. The README now documents both options explicitly (Step 6).
+
+**Lesson**: Every benchmark result must include where the client ran. Treat "client location" as a first-class dimension alongside serving config and workload type. Results without this metadata are ambiguous.
+
 ---
 
 ## Summary
@@ -406,3 +429,5 @@ SGLang's HiCache extends RadixAttention with GPU→CPU→Storage tiering. When G
 | 29 | Dynamo outperforms LMCache on prefix caching | Dynamo KVBM | 1.41-1.83x faster TTFT across all prefix tests |
 | 30 | No cache hit/miss metrics captured | Benchmarking | Must wire scrape_prefix_cache_metrics() into test flows |
 | 31 | SGLang HiCache is the right architecture | Architecture | Cascading eviction vs admission gating |
+| 32 | Use a separate EC2 build machine | P5e Deployment | Iterate cheaply, save GPU hours for inference |
+| 33 | Always record benchmark execution location | Benchmarking | Client location is a first-class result dimension |
