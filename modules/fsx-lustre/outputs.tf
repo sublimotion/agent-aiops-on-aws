@@ -22,3 +22,8 @@ output "arn" {
   description = "ARN of the FSx filesystem"
   value       = aws_fsx_lustre_file_system.main.arn
 }
+
+output "iam_policy_arn" {
+  description = "ARN of IAM policy for FSx access (use with IRSA)"
+  value       = aws_iam_policy.fsx_access.arn
+}
