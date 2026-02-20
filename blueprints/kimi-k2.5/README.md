@@ -265,4 +265,4 @@ These are always applied (see `configs/baseline.sh` for the canonical reference)
 
 ## Spec Reference
 
-See [specs/vllm-kv-cache-benchmark.md](../../specs/vllm-kv-cache-benchmark.md) for full requirements.
+See [specs/kimi-k2.5.md](../../specs/kimi-k2.5.md) for full requirements.

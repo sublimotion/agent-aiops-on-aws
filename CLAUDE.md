@@ -25,7 +25,7 @@ Read these files **on demand** based on what you're doing:
 | Blueprint | Spec |
 |-----------|------|
 | `blueprints/ministral-3b/` | `specs/ministral-3b.md` |
-| `blueprints/kimi-k2.5/` | `specs/vllm-kv-cache-benchmark.md` |
+| `blueprints/kimi-k2.5/` | `specs/kimi-k2.5.md` |
 
 **Blueprint-local context** — for operational details (lessons, results, plans), look inside the blueprint directory itself rather than in specs.
 

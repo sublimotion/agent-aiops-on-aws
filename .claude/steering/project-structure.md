@@ -26,7 +26,7 @@ agent-aiops-on-aws/
 ├── specs/                      # Requirements (input to blueprints)
 │   ├── _template.md            # Template for new specs
 │   ├── ministral-3b.md         # Ministral-3B requirements
-│   └── vllm-kv-cache-benchmark.md # KV cache benchmark requirements
+│   └── kimi-k2.5.md              # KV cache benchmark requirements
 │
 ├── docs/                       # Project-wide documentation
 │   ├── getting-started.md      # Quick start guide
