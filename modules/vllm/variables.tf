@@ -157,3 +157,47 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# KV Cache Offloading Configuration
+variable "cpu_offload_gb" {
+  description = "Amount of CPU memory (GB) to use for KV cache offloading. Set to 0 to disable."
+  type        = number
+  default     = 0
+}
+
+variable "swap_space_gb" {
+  description = "Amount of swap space (GB) for KV cache. Requires swap_space_path if using FSx."
+  type        = number
+  default     = 0
+}
+
+variable "swap_space_path" {
+  description = "Path to swap space directory (default /tmp, or /mnt/fsx/swap for FSx)"
+  type        = string
+  default     = "/tmp"
+}
+
+# FSx Lustre Mount Configuration
+variable "enable_fsx_mount" {
+  description = "Enable FSx Lustre mount for swap space"
+  type        = bool
+  default     = false
+}
+
+variable "fsx_dns_name" {
+  description = "FSx Lustre DNS name for mounting"
+  type        = string
+  default     = ""
+}
+
+variable "fsx_mount_name" {
+  description = "FSx Lustre mount name"
+  type        = string
+  default     = ""
+}
+
+variable "fsx_mount_path" {
+  description = "Mount path for FSx Lustre in the container"
+  type        = string
+  default     = "/mnt/fsx"
+}

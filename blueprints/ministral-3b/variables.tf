@@ -115,3 +115,45 @@ variable "vllm_max_model_len" {
   type        = number
   default     = 4096
 }
+
+# KV Cache Benchmark Configuration
+variable "enable_fsx_lustre" {
+  description = "Enable FSx for Lustre for KV cache offloading benchmarks"
+  type        = bool
+  default     = false
+}
+
+variable "fsx_storage_capacity_gib" {
+  description = "FSx storage capacity in GiB (minimum 1200 for SCRATCH_2)"
+  type        = number
+  default     = 1200
+}
+
+variable "fsx_deployment_type" {
+  description = "FSx deployment type: SCRATCH_2 recommended for benchmarks"
+  type        = string
+  default     = "SCRATCH_2"
+}
+
+variable "kv_cache_config" {
+  description = "KV cache offload config: none, cpu-light, cpu-aggressive, fsx-swap, hybrid"
+  type        = string
+  default     = "none"
+
+  validation {
+    condition     = contains(["none", "cpu-light", "cpu-aggressive", "fsx-swap", "hybrid"], var.kv_cache_config)
+    error_message = "kv_cache_config must be one of: none, cpu-light, cpu-aggressive, fsx-swap, hybrid"
+  }
+}
+
+variable "vllm_cpu_offload_gb" {
+  description = "CPU memory for KV cache offload (auto-set by kv_cache_config)"
+  type        = number
+  default     = 0
+}
+
+variable "vllm_swap_space_gb" {
+  description = "Swap space for KV cache (auto-set by kv_cache_config)"
+  type        = number
+  default     = 0
+}

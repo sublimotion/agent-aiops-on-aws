@@ -37,3 +37,25 @@ output "vllm_model" {
   description = "Model being served"
   value       = var.enable_vllm ? module.vllm[0].model_id : null
 }
+
+# FSx Lustre outputs (when enabled)
+output "fsx_file_system_id" {
+  description = "FSx Lustre filesystem ID"
+  value       = var.enable_fsx_lustre ? module.fsx_lustre[0].file_system_id : null
+}
+
+output "fsx_dns_name" {
+  description = "FSx Lustre DNS name"
+  value       = var.enable_fsx_lustre ? module.fsx_lustre[0].dns_name : null
+}
+
+output "fsx_mount_command" {
+  description = "FSx Lustre mount command"
+  value       = var.enable_fsx_lustre ? module.fsx_lustre[0].mount_command : null
+}
+
+# KV Cache config
+output "kv_cache_config" {
+  description = "Active KV cache configuration"
+  value       = var.kv_cache_config
+}

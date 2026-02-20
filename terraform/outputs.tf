@@ -94,6 +94,62 @@ output "vllm_model_source" {
   value       = var.vllm_use_s3_model ? "S3 (Run:ai Model Streamer)" : "HuggingFace Hub"
 }
 
+output "kv_cache_config" {
+  description = "Active KV cache offloading configuration"
+  value       = var.kv_cache_config
+}
+
+# FSx Lustre Outputs
+output "fsx_file_system_id" {
+  description = "FSx Lustre filesystem ID"
+  value       = var.enable_fsx_lustre ? aws_fsx_lustre_file_system.kv_cache[0].id : null
+}
+
+output "fsx_dns_name" {
+  description = "FSx Lustre DNS name for mounting"
+  value       = var.enable_fsx_lustre ? aws_fsx_lustre_file_system.kv_cache[0].dns_name : null
+}
+
+output "fsx_mount_name" {
+  description = "FSx Lustre mount name"
+  value       = var.enable_fsx_lustre ? aws_fsx_lustre_file_system.kv_cache[0].mount_name : null
+}
+
+output "fsx_mount_command" {
+  description = "FSx Lustre mount command for reference"
+  value       = var.enable_fsx_lustre ? "mount -t lustre ${aws_fsx_lustre_file_system.kv_cache[0].dns_name}@tcp:/${aws_fsx_lustre_file_system.kv_cache[0].mount_name} /mnt/fsx" : null
+}
+
+# KV Cache Benchmark Instructions
+output "benchmark_instructions" {
+  description = "Instructions for running KV cache benchmarks"
+  value = (
+    var.enable_fsx_lustre
+    ? <<-EOT
+    KV Cache Benchmark Quick Start:
+
+    1. Current config: ${var.kv_cache_config}
+       Model: ${var.vllm_model_id}
+
+    2. Switch KV cache configs:
+       terraform apply -var="kv_cache_config=cpu-light"
+       terraform apply -var="kv_cache_config=cpu-aggressive"
+       terraform apply -var="kv_cache_config=fsx-swap"
+       terraform apply -var="kv_cache_config=hybrid"
+
+    3. Switch to Nemotron-3-8B for benchmarks:
+       terraform apply -var="vllm_model_id=nvidia/Nemotron-3-8B-Chat-SFT" -var="kv_cache_config=fsx-swap"
+
+    4. Monitor PCIe bandwidth during tests:
+       kubectl exec -n ml-inference deploy/vllm-ministral -- nvidia-smi dmon -s pucvmet -d 1
+
+    5. Check vLLM logs:
+       kubectl logs -n ml-inference deploy/vllm-ministral -f
+    EOT
+    : "Enable FSx Lustre to run KV cache benchmarks: terraform apply -var=\"enable_fsx_lustre=true\""
+  )
+}
+
 # S3 Model Bucket Outputs
 output "model_bucket_name" {
   description = "Name of the S3 bucket for model storage"

@@ -144,6 +144,85 @@ module "sagemaker" {
   tags             = local.tags
 }
 
+# FSx for Lustre (optional - for KV cache offloading benchmarks)
+module "fsx_lustre" {
+  source = "../../modules/fsx-lustre"
+  count  = var.enable_fsx_lustre ? 1 : 0
+
+  project_name               = var.project_name
+  vpc_id                     = module.networking.vpc_id
+  subnet_id                  = local.gpu_subnet_ids[0]
+  storage_capacity_gib       = var.fsx_storage_capacity_gib
+  deployment_type            = var.fsx_deployment_type
+  allowed_security_group_ids = [module.eks.node_security_group_id]
+  tags                       = local.tags
+
+  depends_on = [module.eks]
+}
+
+# FSx CSI Driver (required when FSx is enabled)
+resource "helm_release" "fsx_csi_driver" {
+  count = var.enable_fsx_lustre ? 1 : 0
+
+  name       = "aws-fsx-csi-driver"
+  repository = "https://kubernetes-sigs.github.io/aws-fsx-csi-driver"
+  chart      = "aws-fsx-csi-driver"
+  namespace  = "kube-system"
+  version    = "1.9.0"
+
+  set {
+    name  = "controller.serviceAccount.create"
+    value = "true"
+  }
+
+  depends_on = [module.eks]
+}
+
+# KV cache configuration lookup
+locals {
+  kv_configs = {
+    "none" = {
+      gpu_util       = var.vllm_gpu_memory_utilization
+      cpu_offload_gb = 0
+      swap_space_gb  = 0
+      memory_request = "16Gi"
+    }
+    "cpu-light" = {
+      gpu_util       = 0.85
+      cpu_offload_gb = 10
+      swap_space_gb  = 0
+      memory_request = "32Gi"
+    }
+    "cpu-aggressive" = {
+      gpu_util       = 0.7
+      cpu_offload_gb = 30
+      swap_space_gb  = 0
+      memory_request = "48Gi"
+    }
+    "fsx-swap" = {
+      gpu_util       = 0.85
+      cpu_offload_gb = 0
+      swap_space_gb  = 50
+      memory_request = "24Gi"
+    }
+    "hybrid" = {
+      gpu_util       = 0.7
+      cpu_offload_gb = 20
+      swap_space_gb  = 50
+      memory_request = "48Gi"
+    }
+  }
+  active_kv_config = local.kv_configs[var.kv_cache_config]
+
+  # Determine if model needs mistral-specific args
+  is_mistral_model = can(regex("(?i)mistral|ministral", var.vllm_model_id))
+  mistral_args = local.is_mistral_model ? [
+    "--tokenizer_mode", "mistral",
+    "--config_format", "mistral",
+    "--load_format", "mistral"
+  ] : []
+}
+
 # vLLM Deployment
 module "vllm" {
   source = "../../modules/vllm"
@@ -151,27 +230,33 @@ module "vllm" {
 
   project_name    = var.project_name
   namespace       = "ml-inference"
-  deployment_name = "vllm-ministral"
+  deployment_name = "vllm-inference"
 
-  # Ministral-3B specific configuration
+  # Model configuration (supports Ministral or Nemotron)
   model_id   = var.vllm_model_id
   vllm_image = var.vllm_image
-  extra_args = [
-    "--tokenizer_mode", "mistral",
-    "--config_format", "mistral",
-    "--load_format", "mistral"
-  ]
+  extra_args = local.mistral_args
 
-  gpu_memory_utilization = var.vllm_gpu_memory_utilization
+  gpu_memory_utilization = local.active_kv_config.gpu_util
   max_model_len          = var.vllm_max_model_len
+
+  # KV Cache offloading
+  cpu_offload_gb  = local.active_kv_config.cpu_offload_gb
+  swap_space_gb   = local.active_kv_config.swap_space_gb
+  swap_space_path = var.enable_fsx_lustre && local.active_kv_config.swap_space_gb > 0 ? "/mnt/fsx/swap" : "/tmp"
+
+  # FSx mount (when enabled and config uses swap)
+  enable_fsx_mount = var.enable_fsx_lustre && local.active_kv_config.swap_space_gb > 0
+  fsx_dns_name     = var.enable_fsx_lustre ? module.fsx_lustre[0].dns_name : ""
+  fsx_mount_name   = var.enable_fsx_lustre ? module.fsx_lustre[0].mount_name : ""
 
   # Resources - sized for g6e.xlarge (4 vCPU, 16GB, ~3.9 allocatable CPU, ~14GB allocatable mem)
   replicas       = 1
   gpu_count      = 1
   cpu_request    = "2"
-  memory_request = "12Gi"
+  memory_request = local.active_kv_config.memory_request
   enable_pvc     = true
-  pvc_size       = "50Gi"
+  pvc_size       = "100Gi"
 
   # Services
   enable_load_balancer   = true
@@ -182,5 +267,5 @@ module "vllm" {
 
   tags = local.tags
 
-  depends_on = [module.eks]
+  depends_on = [module.eks, helm_release.fsx_csi_driver]
 }

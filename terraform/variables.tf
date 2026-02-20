@@ -32,7 +32,7 @@ variable "availability_zones" {
 variable "gpu_availability_zones" {
   description = "Availability zones for GPU node group (some AZs have limited GPU capacity)"
   type        = list(string)
-  default     = ["us-east-1a", "us-east-1c"]  # us-east-1b excluded due to limited g6e capacity
+  default     = ["us-east-1a", "us-east-1c"] # us-east-1b excluded due to limited g6e capacity
 }
 
 # EKS Configuration
@@ -89,7 +89,7 @@ variable "vllm_gpu_memory_utilization" {
 variable "vllm_use_s3_model" {
   description = "Load model from S3 using Run:ai Model Streamer instead of HuggingFace Hub"
   type        = bool
-  default     = false  # Using HuggingFace Hub for now - S3 model is Ministral which isn't supported yet
+  default     = false # Using HuggingFace Hub for now - S3 model is Ministral which isn't supported yet
 }
 
 variable "vllm_s3_model_path" {
@@ -127,4 +127,77 @@ variable "enable_nat_gateway" {
   description = "Enable NAT Gateway for private subnets"
   type        = bool
   default     = true
+}
+
+# FSx for Lustre Configuration
+variable "enable_fsx_lustre" {
+  description = "Enable FSx for Lustre for KV cache offloading benchmarks"
+  type        = bool
+  default     = false
+}
+
+variable "fsx_storage_capacity_gib" {
+  description = "FSx storage capacity in GiB (minimum 1200 for SCRATCH_2)"
+  type        = number
+  default     = 1200
+}
+
+variable "fsx_deployment_type" {
+  description = "FSx deployment type: SCRATCH_2 recommended for benchmarks"
+  type        = string
+  default     = "SCRATCH_2"
+}
+
+# KV Cache Offloading Configuration
+variable "kv_cache_config" {
+  description = "KV cache offload config: none, cpu-light, cpu-aggressive, fsx-swap, hybrid"
+  type        = string
+  default     = "none"
+}
+
+variable "vllm_cpu_offload_gb" {
+  description = "CPU memory for KV cache offload (overrides kv_cache_config if set > 0)"
+  type        = number
+  default     = 0
+}
+
+variable "vllm_swap_space_gb" {
+  description = "Swap space for KV cache on FSx (overrides kv_cache_config if set > 0)"
+  type        = number
+  default     = 0
+}
+
+# LMCache Configuration
+variable "kv_cache_backend" {
+  description = "KV cache backend: native (vLLM built-in) or lmcache (LMCache integration)"
+  type        = string
+  default     = "native"
+
+  validation {
+    condition     = contains(["native", "lmcache"], var.kv_cache_backend)
+    error_message = "kv_cache_backend must be 'native' or 'lmcache'."
+  }
+}
+
+variable "lmcache_config" {
+  description = "LMCache preset: cpu (memory), disk (local NVMe), fsx (FSx Lustre)"
+  type        = string
+  default     = "cpu"
+
+  validation {
+    condition     = contains(["cpu", "disk", "fsx"], var.lmcache_config)
+    error_message = "lmcache_config must be 'cpu', 'disk', or 'fsx'."
+  }
+}
+
+variable "lmcache_chunk_size" {
+  description = "LMCache chunk size for KV cache blocks"
+  type        = number
+  default     = 256
+}
+
+variable "lmcache_max_cache_size_gb" {
+  description = "Maximum LMCache size in GB"
+  type        = number
+  default     = 20
 }

@@ -1,14 +1,28 @@
 # vLLM Deployment Module - Kubernetes resources for vLLM inference
 
 locals {
-  # Merge default args with custom args
+  # Base args
+  base_args = [
+    "--model", var.model_id,
+    "--port", "8000",
+    "--gpu-memory-utilization", tostring(var.gpu_memory_utilization),
+    "--max-model-len", tostring(var.max_model_len)
+  ]
+
+  # KV cache offloading args
+  cpu_offload_args = var.cpu_offload_gb > 0 ? [
+    "--cpu-offload-gb", tostring(var.cpu_offload_gb)
+  ] : []
+
+  swap_space_args = var.swap_space_gb > 0 ? [
+    "--swap-space", tostring(var.swap_space_gb)
+  ] : []
+
+  # Merge all args
   vllm_args = concat(
-    [
-      "--model", var.model_id,
-      "--port", "8000",
-      "--gpu-memory-utilization", tostring(var.gpu_memory_utilization),
-      "--max-model-len", tostring(var.max_model_len)
-    ],
+    local.base_args,
+    local.cpu_offload_args,
+    local.swap_space_args,
     var.extra_args
   )
 }
@@ -174,6 +188,15 @@ resource "kubernetes_deployment" "vllm" {
             mount_path = "/dev/shm"
           }
 
+          # FSx Lustre mount for swap space
+          dynamic "volume_mount" {
+            for_each = var.enable_fsx_mount ? [1] : []
+            content {
+              name       = "fsx-lustre"
+              mount_path = var.fsx_mount_path
+            }
+          }
+
           liveness_probe {
             http_get {
               path = "/health"
@@ -214,6 +237,68 @@ resource "kubernetes_deployment" "vllm" {
             size_limit = "16Gi"
           }
         }
+
+        # FSx Lustre volume for KV cache swap
+        dynamic "volume" {
+          for_each = var.enable_fsx_mount ? [1] : []
+          content {
+            name = "fsx-lustre"
+            persistent_volume_claim {
+              claim_name = kubernetes_persistent_volume_claim.fsx[0].metadata[0].name
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+# FSx Lustre PV (static provisioning)
+resource "kubernetes_persistent_volume" "fsx" {
+  count = var.enable_fsx_mount ? 1 : 0
+
+  metadata {
+    name = "${var.deployment_name}-fsx-pv"
+  }
+
+  spec {
+    capacity = {
+      storage = "1200Gi"
+    }
+    access_modes                     = ["ReadWriteMany"]
+    persistent_volume_reclaim_policy = "Retain"
+    storage_class_name               = "fsx-lustre"
+
+    persistent_volume_source {
+      csi {
+        driver        = "fsx.csi.aws.com"
+        volume_handle = var.fsx_dns_name
+        volume_attributes = {
+          dnsname   = var.fsx_dns_name
+          mountname = var.fsx_mount_name
+        }
+      }
+    }
+  }
+}
+
+# FSx Lustre PVC
+resource "kubernetes_persistent_volume_claim" "fsx" {
+  count = var.enable_fsx_mount ? 1 : 0
+
+  metadata {
+    name      = "${var.deployment_name}-fsx-pvc"
+    namespace = kubernetes_namespace.ml.metadata[0].name
+  }
+
+  spec {
+    access_modes       = ["ReadWriteMany"]
+    storage_class_name = "fsx-lustre"
+    volume_name        = kubernetes_persistent_volume.fsx[0].metadata[0].name
+
+    resources {
+      requests = {
+        storage = "1200Gi"
       }
     }
   }
