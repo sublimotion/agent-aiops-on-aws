@@ -28,17 +28,11 @@ agent-aiops-on-aws/
 │   ├── ministral-3b.md         # Ministral-3B requirements
 │   └── kimi-k2.5.md              # KV cache benchmark requirements
 │
-├── docs/                       # Project-wide documentation
-│   ├── getting-started.md      # Quick start guide
-│   └── 2026-gtm-architecture.md
-│
 ├── scripts/                    # Shared utility scripts
-│   └── validate.sh
-│
-├── terraform/                  # Legacy monolithic deployment
-│                               # (kept for reference/migration)
+│   └── stage-images-ecr.sh    # Mirror images to private ECR
 │
 ├── CLAUDE.md                   # Root context (routing layer)
+├── SKILL.md                    # Terraform automation skill
 └── README.md                   # Project documentation
 ```
 
@@ -145,7 +139,7 @@ Specs define requirements and are the input to blueprint creation:
 specs/
 ├── _template.md                  # Template for new specs
 ├── ministral-3b.md               # Ministral-3B requirements
-└── vllm-kv-cache-benchmark.md    # KV cache benchmark requirements
+└── kimi-k2.5.md                  # KV cache benchmark requirements
 ```
 
 Spec lifecycle:
