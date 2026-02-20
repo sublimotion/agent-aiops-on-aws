@@ -255,7 +255,7 @@ else
 fi
 
 # --- Config C: Dynamo KVBM (custom build) ---
-DYNAMO_DOCKERFILE="${SCRIPT_DIR}/../blueprints/vllm-kv-benchmark/docker/Dockerfile.dynamo-kvbm"
+DYNAMO_DOCKERFILE="${SCRIPT_DIR}/../blueprints/kimi-k2.5/docker/Dockerfile.dynamo-kvbm"
 if [ -f "${DYNAMO_DOCKERFILE}" ]; then
   echo ">>> Building Dynamo KVBM custom image (Config C)..."
   DYNAMO_TAG="${ECR_REGISTRY}/dynamo-kvbm:v0.9.0"
