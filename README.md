@@ -39,16 +39,23 @@ claude
 
 specs/                        # Input specifications
 ├── _template.md              # Template for new specs
-└── ministral-3b.md           # Example: ML inference platform
+├── ministral-3b.md           # Ministral-3B requirements
+└── kimi-k2.5.md              # Kimi K2.5 KV cache benchmark requirements
 
 modules/                      # Reusable Terraform modules
 ├── networking/               # VPC, subnets, endpoints
 ├── eks-cluster/              # EKS with GPU support
 ├── sagemaker-studio/         # SageMaker domain + IAM
-└── vllm/                     # vLLM on Kubernetes
+├── vllm/                     # vLLM on Kubernetes
+├── fsx-lustre/               # FSx for Lustre filesystem
+└── monitoring/               # Prometheus + Grafana
 
 blueprints/                   # Deployable compositions
-└── ministral-3b/             # Example deployment
+├── ministral-3b/             # Ministral-3B on EKS + SageMaker
+└── kimi-k2.5/               # Kimi K2.5 MoE on p5e (8x H200)
+
+scripts/                      # Shared utility scripts
+└── stage-images-ecr.sh       # Mirror images to private ECR
 ```
 
 ## Setting Up Steering Files
@@ -222,11 +229,12 @@ Press `Ctrl+C` or use:
    - Document workarounds
    - Note version requirements
 
-## Example Blueprints
+## Blueprints
 
 | Blueprint | Description | Spec |
 |-----------|-------------|------|
-| [ministral-3b](blueprints/ministral-3b/) | vLLM + EKS + SageMaker | [specs/ministral-3b.md](specs/ministral-3b.md) |
+| [ministral-3b](blueprints/ministral-3b/) | Ministral-3B on EKS + SageMaker | [specs/ministral-3b.md](specs/ministral-3b.md) |
+| [kimi-k2.5](blueprints/kimi-k2.5/) | Kimi K2.5 (1T MoE) on p5e.48xlarge, KV cache benchmarks across vLLM, LMCache, Dynamo | [specs/kimi-k2.5.md](specs/kimi-k2.5.md) |
 
 ## Key Patterns
 
