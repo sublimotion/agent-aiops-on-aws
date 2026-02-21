@@ -49,3 +49,19 @@ Return a structured report:
 ```
 
 Be precise. Include file paths and line numbers for every issue. Do not suggest cosmetic changes — only flag things that are broken, missing, or inconsistent.
+
+## Optional visual output (interactive sessions)
+
+After writing the markdown report, you may render findings as a structured HTML audit report:
+
+1. Read `.claude/skills/visual-explainer/SKILL.md` for the workflow.
+2. Use the `templates/audit-report.html` template.
+3. Populate placeholders:
+   - Verdict banner: PASS / CONDITIONAL PASS / FAIL with summary sentence
+   - Score pills: count of passed, failed, pending, skipped checks
+   - Check cards: one card per check, grouped by category, with status class (`pass`/`fail`/`pending`)
+   - Action items table: priority (P0/P1/P2), issue description, file path:line, recommended action
+4. Save to `blueprints/<name>/results/audit-visual-<YYYYMMDD>.html`.
+5. Open with `open blueprints/<name>/results/audit-visual-<YYYYMMDD>.html`.
+
+Only generate the HTML if running interactively and the markdown report has findings worth visualizing (i.e., more than trivial issues or a non-trivial number of checks).

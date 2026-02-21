@@ -7,11 +7,20 @@ agent-aiops-on-aws/
 ├── .claude/                    # Claude Code configuration
 │   ├── steering/               # Context files (loaded on demand)
 │   │   ├── product.md          # Business context
-│   │   ├── tech-stack.md       # Technology preferences
+│   │   ├── tech-stack.md       # Technology preferences (all domains)
 │   │   └── project-structure.md # This file
+│   ├── agents/                 # Sub-agents
+│   │   ├── blueprint-reviewer.md  # Coherence auditor
+│   │   ├── spec-writer.md         # Spec authoring
+│   │   ├── benchmark-analyst.md   # Results analysis
+│   │   ├── infra-deployer.md      # GPU-serving deployment (8-stage)
+│   │   ├── agentcore-deployer.md  # Agent Runtime deployment (8-stage)
+│   │   └── compound-learner.md    # Post-deployment lesson elevation
+│   ├── skills/                 # Custom skills
+│   │   └── visual-explainer/   # Render dense output as interactive HTML
 │   └── ralph-loop.local.md     # RALPH loop state
 │
-├── modules/                    # Reusable Terraform modules
+├── modules/                    # Reusable Terraform modules (GPU Serving domain)
 │   ├── networking/             # VPC, subnets, endpoints
 │   ├── eks-cluster/            # EKS with GPU support
 │   ├── sagemaker-studio/       # SageMaker domain + IAM
@@ -19,14 +28,25 @@ agent-aiops-on-aws/
 │   ├── fsx-lustre/             # FSx for Lustre filesystem
 │   └── monitoring/             # Prometheus + Grafana
 │
-├── blueprints/                 # Self-contained deployable compositions
+├── blueprints/                 # GPU Serving blueprints
 │   ├── ministral-3b/           # Ministral-3B on EKS + SageMaker
 │   └── kimi-k2.5/             # Kimi K2.5 MoE on p5e (8x H200)
 │
-├── specs/                      # Requirements (input to blueprints)
+├── specs/                      # GPU Serving specs
 │   ├── _template.md            # Template for new specs
 │   ├── ministral-3b.md         # Ministral-3B requirements
-│   └── kimi-k2.5.md              # KV cache benchmark requirements
+│   └── kimi-k2.5.md            # KV cache benchmark requirements
+│
+├── domains/                    # Domain-specific modules, specs, blueprints
+│   └── agent-runtime/          # Bedrock AgentCore Runtime domain
+│       ├── modules/            # Reusable Terraform modules for agent runtime
+│       │   ├── agentcore-runtime/  # Bedrock AgentCore Runtime resource
+│       │   ├── cognito-app-auth/   # User pool + app client
+│       │   ├── websocket-proxy/    # Node.js proxy on ECS Fargate
+│       │   └── agent-memory/       # DynamoDB session state
+│       ├── blueprints/         # Agent Runtime blueprints (empty until first RALPH loop)
+│       └── specs/              # Agent Runtime specs
+│           └── _template-agent-runtime.md
 │
 ├── scripts/                    # Shared utility scripts
 │   └── stage-images-ecr.sh    # Mirror images to private ECR
@@ -166,10 +186,24 @@ Spec lifecycle:
 
 ## Adding a New Blueprint
 
+### GPU Serving domain
+
 1. Create spec in `specs/<name>.md` using `_template.md`
 2. Create `blueprints/<name>/` directory
 3. Compose existing modules in `main.tf`
 4. Add `variables.tf`, `outputs.tf`, `README.md`
-5. Deploy and validate end-to-end
+5. Deploy using `infra-deployer` agent
 6. Add `lessons.md` with operational findings
-7. Add `results/` and `benchmarks/` as work progresses
+7. Add `results/` and `configs/` as work progresses
+
+### Agent Runtime domain
+
+1. Create spec in `domains/agent-runtime/specs/<name>.md` using `_template-agent-runtime.md`
+2. Create `domains/agent-runtime/blueprints/<name>/` directory
+3. Compose modules from `domains/agent-runtime/modules/` in `main.tf`
+4. Add `variables.tf`, `outputs.tf`, `README.md`
+5. Deploy using `agentcore-deployer` agent (8-stage: Foundation → Compound)
+6. Add `lessons.md` with operational findings
+7. Add `results/` as work progresses
+
+See `CLAUDE.md` Domain Routing table for deployer agent and spec/blueprint location per domain.

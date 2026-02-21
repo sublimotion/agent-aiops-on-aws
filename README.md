@@ -32,17 +32,25 @@ claude
 .claude/
 ├── steering/                 # Persistent context files
 │   ├── product.md            # Business context, quality standards
-│   ├── tech-stack.md         # Technology preferences
+│   ├── tech-stack.md         # Technology preferences (all domains)
 │   └── project-structure.md  # Layout and conventions
-├── settings.local.json       # Permissions (gitignored)
-└── skills/                   # Custom skills (optional)
+├── agents/                   # Sub-agents for specialized tasks
+│   ├── blueprint-reviewer.md # Coherence auditor
+│   ├── spec-writer.md        # Spec authoring
+│   ├── benchmark-analyst.md  # Results analysis
+│   ├── infra-deployer.md     # GPU-serving deployment (8-stage)
+│   ├── agentcore-deployer.md # Agent Runtime deployment (8-stage)
+│   └── compound-learner.md   # Post-deployment lesson elevation
+├── skills/                   # Custom skills
+│   └── visual-explainer/     # Render dense output as interactive HTML
+└── settings.local.json       # Permissions (gitignored)
 
-specs/                        # Input specifications
+specs/                        # GPU Serving specs
 ├── _template.md              # Template for new specs
 ├── ministral-3b.md           # Ministral-3B requirements
 └── kimi-k2.5.md              # Kimi K2.5 KV cache benchmark requirements
 
-modules/                      # Reusable Terraform modules
+modules/                      # Reusable Terraform modules (GPU Serving)
 ├── networking/               # VPC, subnets, endpoints
 ├── eks-cluster/              # EKS with GPU support
 ├── sagemaker-studio/         # SageMaker domain + IAM
@@ -50,9 +58,20 @@ modules/                      # Reusable Terraform modules
 ├── fsx-lustre/               # FSx for Lustre filesystem
 └── monitoring/               # Prometheus + Grafana
 
-blueprints/                   # Deployable compositions
+blueprints/                   # GPU Serving blueprints
 ├── ministral-3b/             # Ministral-3B on EKS + SageMaker
 └── kimi-k2.5/               # Kimi K2.5 MoE on p5e (8x H200)
+
+domains/                      # Domain-specific modules, specs, blueprints
+└── agent-runtime/            # Bedrock AgentCore Runtime domain
+    ├── modules/              # Terraform modules for agent runtime
+    │   ├── agentcore-runtime/    # Bedrock AgentCore Runtime resource
+    │   ├── cognito-app-auth/     # User pool + app client
+    │   ├── websocket-proxy/      # Node.js proxy on ECS Fargate (ARM64)
+    │   └── agent-memory/         # DynamoDB session state
+    ├── blueprints/           # Agent Runtime blueprints
+    └── specs/                # Agent Runtime specs
+        └── _template-agent-runtime.md
 
 scripts/                      # Shared utility scripts
 └── stage-images-ecr.sh       # Mirror images to private ECR
@@ -224,10 +243,15 @@ Press `Ctrl+C` or use:
    > /ralph-loop Implement blueprints/my-blueprint using specs/my-blueprint.md
    ```
 
-4. **Update spec with lessons learned**
-   - Add any limitations discovered
-   - Document workarounds
-   - Note version requirements
+4. **Capture operational lessons**
+   - Append lessons to `blueprints/my-blueprint/lessons.md`
+   - Note version constraints, workarounds, and known pitfalls
+
+5. **Run the compound step**
+   ```
+   > Use the compound-learner agent for blueprints/my-blueprint
+   ```
+   This reviews lessons, readiness audits, and deployment logs then elevates cross-cutting rules to `.claude/steering/`.
 
 ## Blueprints
 
@@ -243,16 +267,15 @@ Press `Ctrl+C` or use:
 Instead of trying to get everything right upfront:
 1. Write a minimal spec
 2. Run RALPH loop
-3. Learn from failures
-4. Update spec with lessons learned
-5. Repeat
+3. Capture lessons in `blueprints/<name>/lessons.md`
+4. Run compound step — `compound-learner` elevates cross-cutting rules to steering files
+5. Repeat — next RALPH loop starts with the benefit of what the previous run taught
 
 ### Steering File Updates
 
-When you discover new patterns or preferences:
-1. Update relevant steering file
-2. Claude will use this context in future sessions
-3. Keeps knowledge persistent across conversations
+Steering files are updated automatically by the `compound-learner` agent after each deployment. The agent reviews readiness audits (for recurring P0 failures and action items), deployment logs (for numbered lessons and FAILED/fix pairs), and `lessons.md` to decide what gets elevated from blueprint-local knowledge to shared conventions.
+
+You can also update steering files manually when you discover a preference outside of a deployment cycle.
 
 ### Module Composition
 
@@ -271,6 +294,59 @@ module "eks" {
   # ...
 }
 ```
+
+## Domains
+
+The repo is organized into domains. Each domain has its own specs, Terraform modules, blueprints, and deployer agent. All domains share the same RALPH/steering/compound-learner framework.
+
+| Domain | AWS services | Specs | Blueprints | Deployer |
+|--------|-------------|-------|------------|---------|
+| **GPU Serving** (default) | EKS, FSx, vLLM, SageMaker | `specs/` | `blueprints/` | `infra-deployer` |
+| **Agent Runtime** | AgentCore Runtime, Cognito, ECS, DynamoDB | `domains/agent-runtime/specs/` | `domains/agent-runtime/blueprints/` | `agentcore-deployer` |
+
+See `CLAUDE.md` Domain Routing table for full routing rules.
+
+## Sub-Agents
+
+Specialized agents in `.claude/agents/` handle distinct phases of the lifecycle. Claude Code invokes them automatically based on context, or you can invoke them directly.
+
+| Agent | Domain | When to use |
+|-------|--------|-------------|
+| `spec-writer` | Any | Drafting a new spec from a brief description |
+| `blueprint-reviewer` | Any | Auditing a blueprint for broken references and consistency |
+| `infra-deployer` | GPU Serving | Running the full 8-stage GPU serving deployment |
+| `agentcore-deployer` | Agent Runtime | Running the full 8-stage AgentCore Runtime deployment |
+| `benchmark-analyst` | GPU Serving | Analyzing raw benchmark JSON and updating the benchmark report |
+| `compound-learner` | Any | After any deployment or benchmark session — elevates lessons to steering |
+
+**Example invocations:**
+
+```
+# After a benchmark run completes
+> Use the benchmark-analyst agent for blueprints/kimi-k2.5
+
+# After a deployment session ends
+> Use the compound-learner agent for blueprints/kimi-k2.5
+
+# Before starting a new RALPH loop
+> Use the blueprint-reviewer agent for blueprints/kimi-k2.5
+
+# Deploy an agent-runtime blueprint
+> Use the agentcore-deployer agent for domains/agent-runtime/blueprints/my-agent
+```
+
+## Visual Explainer Skill
+
+The `visual-explainer` skill (`.claude/skills/visual-explainer/`) converts dense terminal output and benchmark data into self-contained interactive HTML pages.
+
+**Primary use case**: `benchmark-analyst` automatically generates a visual HTML report alongside `benchmark-report.md` — sortable comparison tables, Mermaid throughput bar charts, dark/light toggle, no build step.
+
+**Other use cases**:
+- `/audit-visual` — render blueprint review findings as a color-coded PASS/FAIL status grid
+- `/generate-web-diagram` — render deployment architecture as a zoomable Mermaid diagram
+- `/compound-recap` — render compound summary as a visual two-panel layout
+
+Templates in `.claude/skills/visual-explainer/templates/`: `benchmark-comparison.html`, `architecture.html`, `audit-report.html`.
 
 ## Prerequisites
 

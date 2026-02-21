@@ -51,3 +51,19 @@ Use markdown tables for comparisons. Use inline code for metric values. Keep pro
 ### Key Findings
 [numbered list]
 ```
+
+## Visual report
+
+After writing `results/benchmark-report.md`, generate an interactive HTML version:
+
+1. Read `.claude/skills/visual-explainer/SKILL.md` for the workflow.
+2. Use the `templates/benchmark-comparison.html` template.
+3. Populate all `<!-- DATA: ... -->` placeholders:
+   - Hardware config card (instance type, GPU count, model, workload, concurrency)
+   - Summary stat cards (best TTFT p50, best ITL p50, best throughput — with config names)
+   - Table rows — one row per serving configuration with all metric columns
+   - Mermaid throughput bar chart (`xychart-beta`) and TTFT distribution chart
+4. Save to `results/benchmark-visual-<YYYYMMDD>.html` alongside the markdown report.
+5. Open with `open results/benchmark-visual-<YYYYMMDD>.html` (macOS) for immediate review.
+
+The HTML file is self-contained (no build step, CDN-only dependencies) and includes sortable columns and a dark/light toggle.

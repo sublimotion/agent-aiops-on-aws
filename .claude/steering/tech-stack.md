@@ -1,6 +1,10 @@
 # Technology Stack
 
-## Infrastructure
+> This file covers conventions for all domains. See section headers to find the right section for your domain.
+
+## GPU Serving Conventions
+
+### Infrastructure
 
 | Technology | Purpose | Preference |
 |------------|---------|------------|
@@ -96,3 +100,31 @@ Benefits:
 - Clear visibility of what's enabled
 - Easier cost control
 - Simpler testing of base infrastructure
+
+## AgentCore Conventions
+
+> This section grows as AgentCore Runtime blueprints accumulate lessons. Populated by `compound-learner` after each agent-runtime deployment.
+
+### Key AWS services
+
+| Service | Purpose |
+|---------|---------|
+| Bedrock AgentCore Runtime | Managed agent orchestration and session management |
+| Amazon Cognito | User pool + JWT auth for WebSocket proxy |
+| ECS Fargate (ARM64) | WebSocket proxy deployment (cost-efficient Graviton) |
+| DynamoDB | Session state storage (agent-memory module) |
+| CodeBuild | ARM64 container image builds |
+
+### VPC requirements
+
+AgentCore Runtime requires VPC endpoints for: `bedrock-runtime`, `bedrock-agent-runtime`, `ecr.api`, `ecr.dkr`, `s3` (gateway), `dynamodb` (gateway), `secretsmanager`.
+Verify all endpoints exist before starting a capacity block — missing endpoints cause silent failures at runtime.
+
+### Auth flow
+
+Always enable `ALLOW_USER_PASSWORD_AUTH` and `ALLOW_REFRESH_TOKEN_AUTH` on the Cognito app client. Do not enable `ALLOW_ADMIN_USER_PASSWORD_AUTH` in production.
+
+### Deployment sequence
+
+Follow the agentcore-deployer 8-stage sequence: Foundation → Container Build → AgentCore Runtime → Auth Wiring → WebSocket Proxy → Integration Test → Readiness Audit → Compound.
+Do not skip stages — each gate catches failures that are expensive to debug later.

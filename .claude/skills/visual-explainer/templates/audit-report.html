@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><!-- DATA: AUDIT_TITLE --> Audit Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --surface-2: #242740;
+      --border: #2e3151;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --accent: #6366f1;
+      --green: #22c55e;
+      --green-soft: rgba(34,197,94,0.12);
+      --red: #ef4444;
+      --red-soft: rgba(239,68,68,0.12);
+      --yellow: #f59e0b;
+      --yellow-soft: rgba(245,158,11,0.12);
+      --blue: #3b82f6;
+      --blue-soft: rgba(59,130,246,0.12);
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-2: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --green-soft: rgba(34,197,94,0.08);
+      --red-soft: rgba(239,68,68,0.08);
+      --yellow-soft: rgba(245,158,11,0.08);
+      --blue-soft: rgba(59,130,246,0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    .meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+    button {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-family: inherit;
+    }
+    button:hover { background: var(--border); }
+    main { max-width: 1000px; margin: 0 auto; padding: 2rem; }
+
+    /* Verdict banner */
+    .verdict {
+      padding: 1.25rem 1.75rem;
+      border-radius: 10px;
+      margin-bottom: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .verdict.pass { background: var(--green-soft); border: 1px solid var(--green); }
+    .verdict.conditional { background: var(--yellow-soft); border: 1px solid var(--yellow); }
+    .verdict.fail { background: var(--red-soft); border: 1px solid var(--red); }
+    .verdict-icon { font-size: 1.75rem; }
+    .verdict-label {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .verdict.pass .verdict-label { color: var(--green); }
+    .verdict.conditional .verdict-label { color: var(--yellow); }
+    .verdict.fail .verdict-label { color: var(--red); }
+    .verdict-sub { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem; }
+
+    /* Check grid */
+    .section { margin-bottom: 2.5rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
+    .check-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 0.75rem;
+    }
+    .check-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.875rem 1rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+    .check-card.pass { border-left: 3px solid var(--green); }
+    .check-card.fail { border-left: 3px solid var(--red); }
+    .check-card.pending { border-left: 3px solid var(--yellow); }
+    .check-card.skip { border-left: 3px solid var(--text-muted); }
+    .status-dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      margin-top: 1px;
+    }
+    .check-card.pass .status-dot { background: var(--green-soft); color: var(--green); }
+    .check-card.fail .status-dot { background: var(--red-soft); color: var(--red); }
+    .check-card.pending .status-dot { background: var(--yellow-soft); color: var(--yellow); }
+    .check-card.skip .status-dot { background: var(--surface-2); color: var(--text-muted); }
+    .check-content { flex: 1; min-width: 0; }
+    .check-name { font-size: 0.85rem; font-weight: 500; }
+    .check-detail {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+      font-family: 'JetBrains Mono', monospace;
+      word-break: break-all;
+    }
+
+    /* Action items table */
+    .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    thead { background: var(--surface-2); }
+    th {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+    }
+    td { padding: 0.75rem 1rem; border-top: 1px solid var(--border); font-size: 0.82rem; }
+    tr:hover td { background: rgba(99,102,241,0.05); }
+    .priority-p0 { color: var(--red); font-weight: 600; }
+    .priority-p1 { color: var(--yellow); font-weight: 600; }
+    .priority-p2 { color: var(--text-muted); }
+    .file-ref {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    /* Score summary */
+    .score-row {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+    .score-pill {
+      padding: 0.4rem 1rem;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .score-pill.pass { background: var(--green-soft); color: var(--green); }
+    .score-pill.fail { background: var(--red-soft); color: var(--red); }
+    .score-pill.pending { background: var(--yellow-soft); color: var(--yellow); }
+    .score-pill.skip { background: var(--surface-2); color: var(--text-muted); }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1><!-- DATA: AUDIT_TITLE --></h1>
+    <div class="meta"><!-- DATA: BLUEPRINT_NAME --> &nbsp;·&nbsp; <!-- DATA: AUDIT_DATE --></div>
+  </div>
+  <button onclick="toggleTheme()">Toggle theme</button>
+</header>
+
+<main>
+
+  <!-- Overall verdict -->
+  <!-- DATA: VERDICT_CLASS = pass | conditional | fail -->
+  <div class="verdict <!-- DATA: VERDICT_CLASS -->">
+    <div class="verdict-icon"><!-- DATA: VERDICT_ICON --></div>
+    <div>
+      <div class="verdict-label"><!-- DATA: VERDICT_LABEL --></div>
+      <div class="verdict-sub"><!-- DATA: VERDICT_SUMMARY --></div>
+    </div>
+  </div>
+
+  <!-- Score summary pills -->
+  <div class="score-row">
+    <div class="score-pill pass">✓ <!-- DATA: PASS_COUNT --> passed</div>
+    <div class="score-pill fail">✗ <!-- DATA: FAIL_COUNT --> failed</div>
+    <div class="score-pill pending">◌ <!-- DATA: PENDING_COUNT --> pending</div>
+    <div class="score-pill skip">— <!-- DATA: SKIP_COUNT --> skipped</div>
+  </div>
+
+  <!-- Checks by category -->
+  <!-- DATA: CHECK_SECTIONS
+  Repeat for each category. Example:
+
+  <div class="section">
+    <h2>Foundation</h2>
+    <div class="check-grid">
+      <div class="check-card pass">
+        <div class="status-dot">✓</div>
+        <div class="check-content">
+          <div class="check-name">VPC exists</div>
+          <div class="check-detail">vpc-0abc123def456 in us-east-1</div>
+        </div>
+      </div>
+      <div class="check-card fail">
+        <div class="status-dot">✗</div>
+        <div class="check-content">
+          <div class="check-name">Bedrock VPC endpoint</div>
+          <div class="check-detail">Not found — required for AgentCore</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  -->
+
+  <!-- Action items -->
+  <div class="section">
+    <h2>Action Items</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Priority</th>
+            <th>Issue</th>
+            <th>Location</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- DATA: ACTION_ROWS
+          Example:
+          <tr>
+            <td><span class="priority-p0">P0</span></td>
+            <td>Bedrock VPC endpoint missing</td>
+            <td class="file-ref">blueprints/kimi-k2.5/main.tf:42</td>
+            <td>Add aws_vpc_endpoint resource for com.amazonaws.us-east-1.bedrock-runtime</td>
+          </tr>
+          -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  Generated by visual-explainer · agent-aiops-on-aws · <!-- DATA: AUDIT_DATE -->
+</footer>
+
+<script>
+  function toggleTheme() {
+    const html = document.documentElement;
+    html.setAttribute('data-theme',
+      html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  }
+</script>
+</body>
+</html>

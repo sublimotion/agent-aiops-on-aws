@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><!-- DATA: DIAGRAM_TITLE --> Architecture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --surface-2: #242740;
+      --border: #2e3151;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --accent: #6366f1;
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-2: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    .meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .controls {
+      display: flex;
+      gap: 0.5rem;
+    }
+    button {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+    button:hover { background: var(--border); }
+    main { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+    .blueprint-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+    }
+    .meta-item .label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+    .meta-item .value { font-size: 0.85rem; font-weight: 500; }
+    .diagram-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 2rem;
+      overflow: auto;
+      cursor: grab;
+      position: relative;
+    }
+    .diagram-container:active { cursor: grabbing; }
+    .mermaid {
+      transform-origin: top left;
+      transition: transform 0.15s ease;
+      min-width: min-content;
+    }
+    .zoom-controls {
+      position: absolute;
+      bottom: 1rem;
+      right: 1rem;
+      display: flex;
+      gap: 0.4rem;
+    }
+    .zoom-btn {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      border-radius: 6px;
+    }
+    .notes {
+      margin-top: 2rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+    }
+    .notes h2 { font-size: 0.95rem; font-weight: 600; margin-bottom: 1rem; }
+    .notes ul { list-style: none; padding: 0; }
+    .notes li {
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+    .notes li:last-child { border-bottom: none; }
+    .notes li strong { color: var(--text); }
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1><!-- DATA: DIAGRAM_TITLE --></h1>
+    <div class="meta"><!-- DATA: BLUEPRINT_NAME --> &nbsp;·&nbsp; <!-- DATA: DIAGRAM_DATE --></div>
+  </div>
+  <div class="controls">
+    <button onclick="zoomIn()">+</button>
+    <button onclick="zoomReset()">1:1</button>
+    <button onclick="zoomOut()">−</button>
+    <button onclick="toggleTheme()">Theme</button>
+  </div>
+</header>
+
+<main>
+
+  <div class="blueprint-meta">
+    <div class="meta-item">
+      <div class="label">Blueprint</div>
+      <div class="value"><!-- DATA: BLUEPRINT_NAME --></div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Domain</div>
+      <div class="value"><!-- DATA: DOMAIN --></div>
+    </div>
+    <div class="meta-item">
+      <div class="label">AWS Region</div>
+      <div class="value"><!-- DATA: AWS_REGION --></div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Spec</div>
+      <div class="value"><!-- DATA: SPEC_NAME --></div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Status</div>
+      <div class="value"><!-- DATA: DEPLOY_STATUS --></div>
+    </div>
+  </div>
+
+  <div class="diagram-container" id="diagram-container">
+    <div class="mermaid" id="diagram">
+<!-- DATA: MERMAID_DIAGRAM
+Example architecture diagram (replace with actual):
+graph TB
+  subgraph VPC["VPC (10.0.0.0/16)"]
+    subgraph Private["Private Subnets"]
+      EKS["EKS Cluster\np5e.48xlarge × N"]
+      FSx["FSx for Lustre\nModel weights"]
+    end
+    subgraph Public["Public Subnets"]
+      ALB["Application\nLoad Balancer"]
+    end
+  end
+  S3["S3\nModel artifacts"] --> FSx
+  FSx --> EKS
+  ALB --> EKS
+  Client["Client"] --> ALB
+  EKS --> CloudWatch["CloudWatch\nMetrics"]
+-->
+    </div>
+    <div class="zoom-controls">
+      <button class="zoom-btn" onclick="zoomIn()" title="Zoom in">+</button>
+      <button class="zoom-btn" onclick="zoomReset()" title="Reset">⊙</button>
+      <button class="zoom-btn" onclick="zoomOut()" title="Zoom out">−</button>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h2>Architecture Notes</h2>
+    <ul>
+      <!-- DATA: NOTES
+      Example:
+      <li><strong>Networking</strong>: All compute in private subnets; only ALB is public-facing.</li>
+      <li><strong>Storage</strong>: FSx for Lustre mounted at /model; pre-warmed from S3 before serving starts.</li>
+      <li><strong>Scaling</strong>: EKS node group fixed at N nodes during capacity block (no auto-scaling).</li>
+      -->
+    </ul>
+  </div>
+
+</main>
+
+<footer>
+  Generated by visual-explainer · agent-aiops-on-aws · <!-- DATA: DIAGRAM_DATE -->
+</footer>
+
+<script>
+  let scale = 1;
+
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
+  });
+
+  function zoomIn() { scale = Math.min(scale + 0.15, 3); applyZoom(); }
+  function zoomOut() { scale = Math.max(scale - 0.15, 0.3); applyZoom(); }
+  function zoomReset() { scale = 1; applyZoom(); }
+  function applyZoom() {
+    document.getElementById('diagram').style.transform = `scale(${scale})`;
+  }
+
+  function toggleTheme() {
+    const html = document.documentElement;
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+  }
+
+  // Pan support
+  const container = document.getElementById('diagram-container');
+  let dragging = false, startX, startY, scrollLeft, scrollTop;
+  container.addEventListener('mousedown', e => {
+    dragging = true;
+    startX = e.pageX - container.offsetLeft;
+    startY = e.pageY - container.offsetTop;
+    scrollLeft = container.scrollLeft;
+    scrollTop = container.scrollTop;
+  });
+  container.addEventListener('mouseleave', () => dragging = false);
+  container.addEventListener('mouseup', () => dragging = false);
+  container.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    e.preventDefault();
+    const x = e.pageX - container.offsetLeft;
+    const y = e.pageY - container.offsetTop;
+    container.scrollLeft = scrollLeft - (x - startX);
+    container.scrollTop = scrollTop - (y - startY);
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><!-- DATA: REPORT_TITLE --> Benchmark Comparison</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --surface-2: #242740;
+      --border: #2e3151;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --accent: #6366f1;
+      --accent-soft: rgba(99,102,241,0.15);
+      --green: #22c55e;
+      --green-soft: rgba(34,197,94,0.12);
+      --red: #ef4444;
+      --red-soft: rgba(239,68,68,0.12);
+      --yellow: #f59e0b;
+      --yellow-soft: rgba(245,158,11,0.12);
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-2: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --accent-soft: rgba(99,102,241,0.08);
+      --green-soft: rgba(34,197,94,0.08);
+      --red-soft: rgba(239,68,68,0.08);
+      --yellow-soft: rgba(245,158,11,0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    header .meta {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+    .theme-toggle {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+    .theme-toggle:hover { background: var(--border); }
+    main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    .hw-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+    }
+    .hw-item { }
+    .hw-item .label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+    .hw-item .value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+    h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
+    .section { margin-bottom: 2.5rem; }
+    .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    thead {
+      background: var(--surface-2);
+    }
+    th {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    th:hover { color: var(--text); }
+    th.sorted-asc::after { content: ' ↑'; color: var(--accent); }
+    th.sorted-desc::after { content: ' ↓'; color: var(--accent); }
+    td {
+      padding: 0.75rem 1rem;
+      border-top: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+    }
+    tr:hover td { background: var(--accent-soft); }
+    td.config-name {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 0.85rem;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+    }
+    .badge-best { background: var(--green-soft); color: var(--green); }
+    .badge-worst { background: var(--red-soft); color: var(--red); }
+    .chart-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+    }
+    .mermaid { overflow-x: auto; }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+    .summary-card .stat-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+    .summary-card .stat-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    .summary-card .stat-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1><!-- DATA: REPORT_TITLE --></h1>
+    <div class="meta"><!-- DATA: HARDWARE_SUMMARY --> &nbsp;·&nbsp; <!-- DATA: REPORT_DATE --></div>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">Toggle theme</button>
+</header>
+
+<main>
+
+  <!-- Hardware config card -->
+  <div class="hw-card">
+    <div class="hw-item">
+      <div class="label">Instance</div>
+      <div class="value"><!-- DATA: INSTANCE_TYPE --></div>
+    </div>
+    <div class="hw-item">
+      <div class="label">GPUs</div>
+      <div class="value"><!-- DATA: GPU_COUNT --> × <!-- DATA: GPU_TYPE --></div>
+    </div>
+    <div class="hw-item">
+      <div class="label">Model</div>
+      <div class="value"><!-- DATA: MODEL_NAME --></div>
+    </div>
+    <div class="hw-item">
+      <div class="label">Workload</div>
+      <div class="value"><!-- DATA: WORKLOAD_TYPE --></div>
+    </div>
+    <div class="hw-item">
+      <div class="label">Concurrency</div>
+      <div class="value"><!-- DATA: CONCURRENCY --></div>
+    </div>
+  </div>
+
+  <!-- Summary stat cards -->
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="stat-label">Best TTFT p50</div>
+      <div class="stat-value"><!-- DATA: BEST_TTFT_P50 --></div>
+      <div class="stat-sub"><!-- DATA: BEST_TTFT_CONFIG --></div>
+    </div>
+    <div class="summary-card">
+      <div class="stat-label">Best ITL p50</div>
+      <div class="stat-value"><!-- DATA: BEST_ITL_P50 --></div>
+      <div class="stat-sub"><!-- DATA: BEST_ITL_CONFIG --></div>
+    </div>
+    <div class="summary-card">
+      <div class="stat-label">Best Throughput</div>
+      <div class="stat-value"><!-- DATA: BEST_THROUGHPUT --></div>
+      <div class="stat-sub"><!-- DATA: BEST_THROUGHPUT_CONFIG --></div>
+    </div>
+    <div class="summary-card">
+      <div class="stat-label">Configs Tested</div>
+      <div class="stat-value"><!-- DATA: CONFIG_COUNT --></div>
+      <div class="stat-sub"><!-- DATA: DATE_RANGE --></div>
+    </div>
+  </div>
+
+  <!-- Comparison table -->
+  <div class="section">
+    <h2>Configuration Comparison</h2>
+    <div class="table-wrap">
+      <table id="comparison-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable(0)">Config</th>
+            <th onclick="sortTable(1)">TTFT p50 (ms)</th>
+            <th onclick="sortTable(2)">TTFT p90 (ms)</th>
+            <th onclick="sortTable(3)">TTFT p99 (ms)</th>
+            <th onclick="sortTable(4)">ITL p50 (ms)</th>
+            <th onclick="sortTable(5)">ITL p90 (ms)</th>
+            <th onclick="sortTable(6)">ITL p99 (ms)</th>
+            <th onclick="sortTable(7)">Throughput (tok/s)</th>
+            <th onclick="sortTable(8)">Error rate</th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <!-- DATA: TABLE_ROWS
+          Example row format (replace with actual data):
+          <tr>
+            <td class="config-name">baseline</td>
+            <td>42.1</td>
+            <td>68.3</td>
+            <td>124.7</td>
+            <td>18.4</td>
+            <td>31.2</td>
+            <td>89.5</td>
+            <td>1240</td>
+            <td>0.0%</td>
+          </tr>
+          -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Throughput bar chart -->
+  <div class="section">
+    <h2>Throughput Comparison</h2>
+    <div class="chart-container">
+      <div class="mermaid" id="throughput-chart">
+<!-- DATA: MERMAID_CHART
+Example (replace config names and values):
+xychart-beta
+  title "Throughput by Configuration (tokens/s)"
+  x-axis ["baseline", "lmcache", "dynamo"]
+  y-axis "tokens/s" 0 --> 2000
+  bar [1240, 1620, 1890]
+-->
+      </div>
+    </div>
+  </div>
+
+  <!-- TTFT comparison chart -->
+  <div class="section">
+    <h2>TTFT Latency Distribution</h2>
+    <div class="chart-container">
+      <div class="mermaid" id="ttft-chart">
+<!-- DATA: TTFT_MERMAID_CHART
+Example:
+xychart-beta
+  title "TTFT p50 / p90 / p99 (ms)"
+  x-axis ["baseline", "lmcache", "dynamo"]
+  y-axis "ms" 0 --> 200
+  bar [42, 51, 38]
+  line [68, 79, 61]
+-->
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  Generated by visual-explainer · agent-aiops-on-aws · <!-- DATA: REPORT_DATE -->
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
+    themeVariables: {
+      primaryColor: '#6366f1',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#2e3151',
+      lineColor: '#8892a4',
+      background: '#1a1d2e',
+      mainBkg: '#1a1d2e',
+    }
+  });
+
+  function toggleTheme() {
+    const html = document.documentElement;
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    mermaid.initialize({ theme: next === 'dark' ? 'dark' : 'default' });
+  }
+
+  let sortDir = {};
+  function sortTable(col) {
+    const tbody = document.getElementById('table-body');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const asc = !sortDir[col];
+    sortDir = {};
+    sortDir[col] = asc;
+
+    const headers = document.querySelectorAll('#comparison-table th');
+    headers.forEach((h, i) => {
+      h.classList.remove('sorted-asc', 'sorted-desc');
+      if (i === col) h.classList.add(asc ? 'sorted-asc' : 'sorted-desc');
+    });
+
+    rows.sort((a, b) => {
+      const av = a.cells[col].textContent.trim().replace(/[^0-9.\-]/g, '');
+      const bv = b.cells[col].textContent.trim().replace(/[^0-9.\-]/g, '');
+      const an = parseFloat(av), bn = parseFloat(bv);
+      if (!isNaN(an) && !isNaN(bn)) return asc ? an - bn : bn - an;
+      return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+    });
+
+    rows.forEach(r => tbody.appendChild(r));
+  }
+</script>
+</body>
+</html>
