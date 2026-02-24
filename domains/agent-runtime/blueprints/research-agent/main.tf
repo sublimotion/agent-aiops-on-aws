@@ -239,6 +239,7 @@ module "runtime" {
   idle_session_ttl_seconds = 1800
   efs_file_system_arn      = aws_efs_file_system.files.arn
   s3_output_bucket_arn     = aws_s3_bucket.output.arn
+  search_secrets_arns      = [aws_secretsmanager_secret.tavily_api_key.arn, aws_secretsmanager_secret.brave_api_key.arn]
   tags                     = var.tags
 }
 
@@ -282,10 +283,11 @@ module "websocket_proxy" {
   agent_alias_id        = module.runtime.agent_alias_id
   cognito_user_pool_id  = module.auth.user_pool_id
   cognito_app_client_id = module.auth.app_client_id
-  efs_file_system_id    = aws_efs_file_system.files.id
-  s3_output_bucket_arn  = aws_s3_bucket.output.arn
-  s3_output_bucket_name = aws_s3_bucket.output.bucket
-  search_api_secret_arn = aws_secretsmanager_secret.brave_api_key.arn
+  efs_file_system_id        = aws_efs_file_system.files.id
+  s3_output_bucket_arn      = aws_s3_bucket.output.arn
+  s3_output_bucket_name     = aws_s3_bucket.output.bucket
+  search_api_secret_arn     = aws_secretsmanager_secret.brave_api_key.arn
+  tavily_api_key_secret_arn = aws_secretsmanager_secret.tavily_api_key.arn
   session_table_arn     = module.memory.table_arn
   session_table_name    = module.memory.table_name
   cpu                   = var.ecs_cpu

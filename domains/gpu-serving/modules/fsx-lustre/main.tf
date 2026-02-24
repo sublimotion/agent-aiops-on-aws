@@ -9,7 +9,7 @@ resource "aws_security_group" "fsx" {
   description = "Security group for FSx Lustre filesystem"
   vpc_id      = var.vpc_id
 
-  # Lustre client traffic (port 988)
+  # Lustre client traffic (port 988) — from EKS nodes
   ingress {
     description     = "Lustre MGS/MGC traffic"
     from_port       = 988
@@ -18,13 +18,30 @@ resource "aws_security_group" "fsx" {
     security_groups = var.allowed_security_group_ids
   }
 
-  # Lustre inter-router traffic (port range 1018-1023)
+  # Lustre inter-router traffic (port range 1018-1023) — from EKS nodes
   ingress {
     description     = "Lustre inter-node communication"
     from_port       = 1018
     to_port         = 1023
     protocol        = "tcp"
     security_groups = var.allowed_security_group_ids
+  }
+
+  # Lustre requires self-referencing rules for internal LNET communication
+  ingress {
+    description = "Lustre self - MGS/MGC traffic"
+    from_port   = 988
+    to_port     = 988
+    protocol    = "tcp"
+    self        = true
+  }
+
+  ingress {
+    description = "Lustre self - inter-node communication"
+    from_port   = 1018
+    to_port     = 1023
+    protocol    = "tcp"
+    self        = true
   }
 
   # EFA requires all internal traffic within the security group

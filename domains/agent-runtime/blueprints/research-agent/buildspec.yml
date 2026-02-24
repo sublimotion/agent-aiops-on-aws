@@ -1,0 +1,21 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - ECR_REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/research-agent
+      - IMAGE_TAG=${IMAGE_TAG:-latest}
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Building the Docker image for ARM64...
+      - cd docker
+      - docker buildx create --use --name multiarch || true
+      - docker buildx build --platform linux/arm64 --push -t $ECR_REPOSITORY_URI:$IMAGE_TAG -t $ECR_REPOSITORY_URI:latest .
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Image pushed to $ECR_REPOSITORY_URI:$IMAGE_TAG and $ECR_REPOSITORY_URI:latest
+      - aws ecr describe-images --repository-name research-agent --region $AWS_DEFAULT_REGION --image-ids imageTag=$IMAGE_TAG

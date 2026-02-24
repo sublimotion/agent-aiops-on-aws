@@ -60,6 +60,24 @@ SERVING_CONFIGS = {
         "endpoint_port": 8000,
         "launch_script": "dynamo/kimi-k2.5-gds.yaml",
     },
+    "sglang-hicache": {
+        "name": "SGLang HiCache",
+        "description": "SGLang cascading eviction (GPU→CPU), no external storage",
+        "endpoint_port": 8000,
+        "launch_script": "configs/sglang-hicache.sh",
+    },
+    "sglang-hicache-nvme": {
+        "name": "SGLang HiCache + NVMe",
+        "description": "SGLang cascading eviction with NVMe L3 tier",
+        "endpoint_port": 8000,
+        "launch_script": "configs/sglang-hicache-nvme.sh",
+    },
+    "sglang-mooncake": {
+        "name": "SGLang HiCache + Mooncake",
+        "description": "SGLang cascading eviction with Mooncake L3 via RDMA",
+        "endpoint_port": 8000,
+        "launch_script": "configs/sglang-mooncake.sh",
+    },
 }
 
 # Workloads optimized for Kimi-K2.5 with reasoning capabilities
@@ -520,6 +538,9 @@ async def run_benchmark_suite(
             print(f"Description: {WORKLOADS[workload_name]['description']}")
             print(f"{'='*60}")
 
+            # Scrape prefix cache counters BEFORE workload
+            pre_cache = await scrape_prefix_cache_metrics(endpoint)
+
             results = await run_workload(
                 endpoint=endpoint,
                 model=model,
@@ -530,6 +551,26 @@ async def run_benchmark_suite(
             )
 
             aggregated = aggregate_results(results)
+
+            # Scrape prefix cache counters AFTER workload and compute delta
+            post_cache = await scrape_prefix_cache_metrics(endpoint)
+            prefix_cache_delta = {}
+            if pre_cache and post_cache:
+                hits = post_cache.get("hits", 0) - pre_cache.get("hits", 0)
+                misses = post_cache.get("misses", 0) - pre_cache.get("misses", 0)
+                total = hits + misses
+                prefix_cache_delta = {
+                    "hits": hits,
+                    "misses": misses,
+                    "hit_rate": hits / total if total > 0 else None,
+                    "post_hit_rate_instant": post_cache.get("hit_rate"),
+                }
+                # Include SGLang HiCache per-tier metrics if present
+                for tier in ["l1", "l2", "l3"]:
+                    h_key, m_key = f"{tier}_hits", f"{tier}_misses"
+                    if h_key in post_cache:
+                        prefix_cache_delta[h_key] = post_cache[h_key] - pre_cache.get(h_key, 0)
+                        prefix_cache_delta[m_key] = post_cache[m_key] - pre_cache.get(m_key, 0)
 
             # Track FSx cache growth and LMCache metrics
             cache_snapshot = measure_fsx_cache(config)
@@ -550,6 +591,7 @@ async def run_benchmark_suite(
                     "workload_config": WORKLOADS[workload_name],
                     "fsx_cache_snapshot": cache_snapshot,
                     "lmcache_metrics": lmcache_metrics,
+                    "prefix_cache_metrics": prefix_cache_delta if prefix_cache_delta else {"info": "no prefix cache metrics found"},
                 },
                 num_requests=len(results),
                 metrics=aggregated,
@@ -574,6 +616,12 @@ async def run_benchmark_suite(
                     print(f"  TTFT-content p50/p90: {aggregated['ttft_content_ms']['p50']:.1f} / {aggregated['ttft_content_ms']['p90']:.1f} ms")
                 print(f"  E2E p50/p90/p99: {aggregated['e2e_ms']['p50']:.1f} / {aggregated['e2e_ms']['p90']:.1f} / {aggregated['e2e_ms']['p99']:.1f} ms")
                 print(f"  Throughput: {aggregated['throughput']['total_tokens_per_second']:.1f} tok/s (reasoning: {aggregated['throughput']['reasoning_tokens_per_second']:.1f}, content: {aggregated['throughput']['content_tokens_per_second']:.1f})")
+            if prefix_cache_delta and "info" not in prefix_cache_delta:
+                pc_hits = prefix_cache_delta.get("hits", 0)
+                pc_misses = prefix_cache_delta.get("misses", 0)
+                pc_rate = prefix_cache_delta.get("hit_rate")
+                rate_str = f"{pc_rate:.2%}" if pc_rate is not None else "N/A"
+                print(f"  Prefix Cache: hits={pc_hits:.0f}, misses={pc_misses:.0f}, hit_rate={rate_str}")
             if lmcache_metrics and "error" not in lmcache_metrics and "info" not in lmcache_metrics:
                 hit_rate = lmcache_metrics.get("lmcache:retrieve_hit_rate", 0)
                 stores = lmcache_metrics.get("lmcache:num_store_requests", 0)
@@ -766,6 +814,9 @@ async def run_long_context_scaling(
             print(f"FSx cache before: {cache_before['size_mb']} MB, {cache_before['file_count']} files")
             print(f"{'='*60}")
 
+            # Scrape prefix cache counters BEFORE
+            pre_cache_lcs = await scrape_prefix_cache_metrics(endpoint)
+
             # Warmup with this context size
             print(f"  Warmup: {warmup_requests} requests...")
             for i in range(warmup_requests):
@@ -794,6 +845,19 @@ async def run_long_context_scaling(
             cache_after = measure_fsx_cache(config)
             aggregated = aggregate_results(results)
 
+            # Scrape prefix cache counters AFTER and compute delta
+            post_cache_lcs = await scrape_prefix_cache_metrics(endpoint)
+            pc_delta_lcs = {}
+            if pre_cache_lcs and post_cache_lcs:
+                pc_h = post_cache_lcs.get("hits", 0) - pre_cache_lcs.get("hits", 0)
+                pc_m = post_cache_lcs.get("misses", 0) - pre_cache_lcs.get("misses", 0)
+                pc_t = pc_h + pc_m
+                pc_delta_lcs = {
+                    "hits": pc_h, "misses": pc_m,
+                    "hit_rate": pc_h / pc_t if pc_t > 0 else None,
+                    "post_hit_rate_instant": post_cache_lcs.get("hit_rate"),
+                }
+
             bench_result = BenchmarkResult(
                 model=model,
                 instance_type="p5e.48xlarge",
@@ -807,6 +871,7 @@ async def run_long_context_scaling(
                     "context_chars": len(context),
                     "fsx_cache_before": cache_before,
                     "fsx_cache_after": cache_after,
+                    "prefix_cache_metrics": pc_delta_lcs if pc_delta_lcs else {"info": "no prefix cache metrics found"},
                 },
                 num_requests=len(results),
                 metrics=aggregated,
@@ -823,6 +888,9 @@ async def run_long_context_scaling(
                 print(f"  E2E p50/p90/p99: {aggregated['e2e_ms']['p50']:.1f} / {aggregated['e2e_ms']['p90']:.1f} / {aggregated['e2e_ms']['p99']:.1f} ms")
                 print(f"  TTFT p50: {aggregated['ttft_ms']['p50']:.1f} ms")
             print(f"  FSx cache after: {cache_after['size_mb']} MB, {cache_after['file_count']} files")
+            if pc_delta_lcs and "info" not in pc_delta_lcs:
+                rate_s = f"{pc_delta_lcs['hit_rate']:.2%}" if pc_delta_lcs.get("hit_rate") is not None else "N/A"
+                print(f"  Prefix Cache: hits={pc_delta_lcs['hits']:.0f}, misses={pc_delta_lcs['misses']:.0f}, hit_rate={rate_s}")
             print(f"  Saved: {filepath}")
 
             print("\nCooldown: 15s...")
@@ -877,6 +945,7 @@ async def run_multi_tenant(
     ]
 
     cache_before = measure_fsx_cache(config)
+    pre_cache_mt = await scrape_prefix_cache_metrics(endpoint)
     results = []
     total_requests = num_tenants * users_per_tenant
 
@@ -905,6 +974,19 @@ async def run_multi_tenant(
     cache_after = measure_fsx_cache(config)
     aggregated = aggregate_results(results)
 
+    # Scrape prefix cache counters AFTER and compute delta
+    post_cache_mt = await scrape_prefix_cache_metrics(endpoint)
+    pc_delta_mt = {}
+    if pre_cache_mt and post_cache_mt:
+        pc_h = post_cache_mt.get("hits", 0) - pre_cache_mt.get("hits", 0)
+        pc_m = post_cache_mt.get("misses", 0) - pre_cache_mt.get("misses", 0)
+        pc_t = pc_h + pc_m
+        pc_delta_mt = {
+            "hits": pc_h, "misses": pc_m,
+            "hit_rate": pc_h / pc_t if pc_t > 0 else None,
+            "post_hit_rate_instant": post_cache_mt.get("hit_rate"),
+        }
+
     # Separate cold (first request per tenant) vs warm (subsequent)
     cold_results = [results[i * users_per_tenant] for i in range(num_tenants) if i * users_per_tenant < len(results)]
     warm_results = [r for i, r in enumerate(results) if i % users_per_tenant != 0]
@@ -925,6 +1007,7 @@ async def run_multi_tenant(
             "system_prompt_tokens": system_prompt_tokens,
             "fsx_cache_before": cache_before,
             "fsx_cache_after": cache_after,
+            "prefix_cache_metrics": pc_delta_mt if pc_delta_mt else {"info": "no prefix cache metrics found"},
         },
         num_requests=len(results),
         metrics={
@@ -957,6 +1040,9 @@ async def run_multi_tenant(
         speedup = bench_result.metrics["cache_benefit"]["speedup"]
         print(f"  Cache Benefit: {speedup:.2f}x")
     print(f"  FSx cache after: {cache_after['size_mb']} MB, {cache_after['file_count']} files")
+    if pc_delta_mt and "info" not in pc_delta_mt:
+        rate_s = f"{pc_delta_mt['hit_rate']:.2%}" if pc_delta_mt.get("hit_rate") is not None else "N/A"
+        print(f"  Prefix Cache: hits={pc_delta_mt['hits']:.0f}, misses={pc_delta_mt['misses']:.0f}, hit_rate={rate_s}")
     print(f"  Saved: {filepath}")
 
     return bench_result
@@ -2609,31 +2695,12 @@ async def fetch_vllm_metrics(endpoint: str) -> dict:
         return {}
 
 
-# TODO(next-round): Capture prefix cache hit/miss metrics from vLLM's /metrics endpoint
-# before and after each test. This was missing in the Dynamo KVBM and LMCache benchmark
-# rounds (2026-02-18/19), so we had no direct cache hit rate data — only inferred from
-# cold-vs-warm TTFT ratios.
+# Prefix cache hit/miss metrics are now captured in run_benchmark_suite(),
+# run_long_context_scaling(), and run_multi_tenant() via scrape_prefix_cache_metrics().
+# Addresses Lesson #30 gap from the 2026-02-18/19 rounds.
 #
-# vLLM exposes these Prometheus counters at /metrics:
-#   - vllm:prefix_cache_hit_total    (cumulative hits)
-#   - vllm:prefix_cache_miss_total   (cumulative misses)
-#   - vllm:gpu_prefix_cache_hit_rate (instantaneous rate)
-#
-# SGLang (HiCache) exposes additional per-tier metrics:
-#   - sglang:hicache_l1_hits / misses  (GPU tier)
-#   - sglang:hicache_l2_hits / misses  (CPU tier)
-#   - sglang:hicache_l3_hits / misses  (storage tier)
-#
-# Usage pattern — call before/after each test and store the delta:
-#
-#   pre = await scrape_prefix_cache_metrics(endpoint)
-#   ... run test ...
-#   post = await scrape_prefix_cache_metrics(endpoint)
-#   result["prefix_cache"] = {
-#       "hits": post.get("hits", 0) - pre.get("hits", 0),
-#       "misses": post.get("misses", 0) - pre.get("misses", 0),
-#       "hit_rate": hits / (hits + misses) if (hits + misses) > 0 else None,
-#   }
+# vLLM exposes: prefix_cache_hit_total, prefix_cache_miss_total, gpu_prefix_cache_hit_rate
+# SGLang HiCache exposes: hicache_l1/l2/l3_hits/misses (per-tier)
 #
 async def scrape_prefix_cache_metrics(endpoint: str) -> dict:
     """Scrape prefix cache hit/miss counters from vLLM or SGLang /metrics endpoint.
@@ -2995,7 +3062,7 @@ if __name__ == "__main__":
         ),
     )
     parser.add_argument("--config", choices=list(SERVING_CONFIGS.keys()), default="baseline",
-                        help="Serving stack config: baseline, lmcache, mooncake, dynamo")
+                        help="Serving stack config: baseline, lmcache, mooncake, dynamo, sglang-hicache, sglang-hicache-nvme, sglang-mooncake")
     parser.add_argument("--endpoint", default=ENDPOINT, help="vLLM API endpoint")
     parser.add_argument("--requests", type=int, default=30, help="Requests per workload")
     parser.add_argument("--output", default="results/kimi-k2.5-p5e", help="Output base directory")

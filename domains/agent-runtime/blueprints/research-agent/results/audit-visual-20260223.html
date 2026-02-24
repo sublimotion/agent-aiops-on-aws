@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Research Agent Blueprint Coherence Audit</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --surface-2: #242740;
+      --border: #2e3151;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --accent: #6366f1;
+      --green: #22c55e;
+      --green-soft: rgba(34,197,94,0.12);
+      --red: #ef4444;
+      --red-soft: rgba(239,68,68,0.12);
+      --yellow: #f59e0b;
+      --yellow-soft: rgba(245,158,11,0.12);
+      --blue: #3b82f6;
+      --blue-soft: rgba(59,130,246,0.12);
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-2: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --green-soft: rgba(34,197,94,0.08);
+      --red-soft: rgba(239,68,68,0.08);
+      --yellow-soft: rgba(245,158,11,0.08);
+      --blue-soft: rgba(59,130,246,0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    .meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+    button {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-family: inherit;
+    }
+    button:hover { background: var(--border); }
+    main { max-width: 1000px; margin: 0 auto; padding: 2rem; }
+
+    /* Verdict banner */
+    .verdict {
+      padding: 1.25rem 1.75rem;
+      border-radius: 10px;
+      margin-bottom: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .verdict.pass { background: var(--green-soft); border: 1px solid var(--green); }
+    .verdict.conditional { background: var(--yellow-soft); border: 1px solid var(--yellow); }
+    .verdict.fail { background: var(--red-soft); border: 1px solid var(--red); }
+    .verdict-icon { font-size: 1.75rem; }
+    .verdict-label {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .verdict.pass .verdict-label { color: var(--green); }
+    .verdict.conditional .verdict-label { color: var(--yellow); }
+    .verdict.fail .verdict-label { color: var(--red); }
+    .verdict-sub { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem; }
+
+    /* Check grid */
+    .section { margin-bottom: 2.5rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
+    .check-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 0.75rem;
+    }
+    .check-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.875rem 1rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+    .check-card.pass { border-left: 3px solid var(--green); }
+    .check-card.fail { border-left: 3px solid var(--red); }
+    .check-card.pending { border-left: 3px solid var(--yellow); }
+    .check-card.skip { border-left: 3px solid var(--text-muted); }
+    .status-dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      margin-top: 1px;
+    }
+    .check-card.pass .status-dot { background: var(--green-soft); color: var(--green); }
+    .check-card.fail .status-dot { background: var(--red-soft); color: var(--red); }
+    .check-card.pending .status-dot { background: var(--yellow-soft); color: var(--yellow); }
+    .check-card.skip .status-dot { background: var(--surface-2); color: var(--text-muted); }
+    .check-content { flex: 1; min-width: 0; }
+    .check-name { font-size: 0.85rem; font-weight: 500; }
+    .check-detail {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+      font-family: 'JetBrains Mono', monospace;
+      word-break: break-all;
+    }
+
+    /* Action items table */
+    .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    thead { background: var(--surface-2); }
+    th {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+    }
+    td { padding: 0.75rem 1rem; border-top: 1px solid var(--border); font-size: 0.82rem; }
+    tr:hover td { background: rgba(99,102,241,0.05); }
+    .priority-p0 { color: var(--red); font-weight: 600; }
+    .priority-p1 { color: var(--yellow); font-weight: 600; }
+    .priority-p2 { color: var(--text-muted); }
+    .file-ref {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    /* Score summary */
+    .score-row {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+    .score-pill {
+      padding: 0.4rem 1rem;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .score-pill.pass { background: var(--green-soft); color: var(--green); }
+    .score-pill.fail { background: var(--red-soft); color: var(--red); }
+    .score-pill.pending { background: var(--yellow-soft); color: var(--yellow); }
+    .score-pill.skip { background: var(--surface-2); color: var(--text-muted); }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Blueprint Coherence Audit</h1>
+    <div class="meta">research-agent &nbsp;·&nbsp; 2026-02-23</div>
+  </div>
+  <button onclick="toggleTheme()">Toggle theme</button>
+</header>
+
+<main>
+
+  <!-- Overall verdict -->
+  <div class="verdict pass">
+    <div class="verdict-icon">✓</div>
+    <div>
+      <div class="verdict-label">PASS WITH DOCUMENTATION GAPS</div>
+      <div class="verdict-sub">Production-ready blueprint with 2 recent bug fixes needing documentation</div>
+    </div>
+  </div>
+
+  <!-- Score summary pills -->
+  <div class="score-row">
+    <div class="score-pill pass">✓ 12 passed</div>
+    <div class="score-pill fail">✗ 2 failed</div>
+    <div class="score-pill pending">◌ 1 pending</div>
+    <div class="score-pill skip">— 3 orphaned</div>
+  </div>
+
+  <!-- Checks by category -->
+  <div class="section">
+    <h2>File References</h2>
+    <div class="check-grid">
+      <div class="check-card pass">
+        <div class="status-dot">✓</div>
+        <div class="check-content">
+          <div class="check-name">Spec reference</div>
+          <div class="check-detail">domains/agent-runtime/specs/research-agent.md</div>
+        </div>
+      </div>
+      <div class="check-card pass">
+        <div class="status-dot">✓</div>
+        <div class="check-content">
+          <div class="check-name">Docker files</div>
+          <div class="check-detail">Dockerfile, server.py, requirements.txt ✓</div>
+        </div>
+      </div>
+      <div class="check-card pass">
+        <div class="status-dot">✓</div>
+        <div class="check-content">
+          <div class="check-name">MCP proxy</div>
+          <div class="check-detail">mcp-proxy.py exists and referenced</div>
+        </div>
+      </div>
+      <div class="check-card pending">
+        <div class="status-dot">◌</div>
+        <div class="check-content">
+          <div class="check-name">Build alternatives</div>
+          <div class="check-detail">buildspec.yml, build-and-push.sh not in README</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Spec Alignment</h2>
+    <div class="check-grid">
+      <div class="check-card pass">
+        <div class="status-dot">✓</div>
+        <div class="check-content">
+          <div class="check-name">CLAUDE.md routing</div>
+          <div class="check-detail">Entry exists in spec routing table (line 33)</div>
+        </div>
+      </div>
+      <div class="check-card pass">
+        <div class="status-dot">✓</div>
+        <div class="check-content">
+          <div class="check-name">README spec link</div>
+          <div class="check-detail">Matches CLAUDE.md routing table</div>
+        </div>
+      </div>
+      <div class="check-card pass">
+        <div class="status-dot">✓</div>
+        <div class="check-content">
+          <div class="check-name">Domain placement</div>
+          <div class="check-detail">Correct domain: agent-runtime</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Cross-Artifact Consistency</h2>
+    <div class="check-grid">
+      <div class="check-card pass">
+        <div class="status-dot">✓</div>
+        <div class="check-content">
+          <div class="check-name">Container images</div>
+          <div class="check-detail">Dockerfile + README + terraform aligned</div>
+        </div>
+      </div>
+      <div class="check-card pass">
+        <div class="status-dot">✓</div>
+        <div class="check-content">
+          <div class="check-name">Environment variables</div>
+          <div class="check-detail">server.py + mcp-proxy.py consistent</div>
+        </div>
+      </div>
+      <div class="check-card pass">
+        <div class="status-dot">✓</div>
+        <div class="check-content">
+          <div class="check-name">Runtime ARN</div>
+          <div class="check-detail">README matches mcp-proxy.py hardcoded default</div>
+        </div>
+      </div>
+      <div class="check-card pending">
+        <div class="status-dot">◌</div>
+        <div class="check-content">
+          <div class="check-name">Runtime version</div>
+          <div class="check-detail">README claims v26 but not in terraform outputs</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Architecture Diagram</h2>
+    <div class="check-grid">
+      <div class="check-card pass">
+        <div class="status-dot">✓</div>
+        <div class="check-content">
+          <div class="check-name">NDJSON streaming</div>
+          <div class="check-detail">Diagram shows application/x-ndjson flow</div>
+        </div>
+      </div>
+      <div class="check-card pass">
+        <div class="status-dot">✓</div>
+        <div class="check-content">
+          <div class="check-name">Async polling pattern</div>
+          <div class="check-detail">research() + research_status() tools implemented</div>
+        </div>
+      </div>
+      <div class="check-card pass">
+        <div class="status-dot">✓</div>
+        <div class="check-content">
+          <div class="check-name">Progress ticks</div>
+          <div class="check-detail">30-second intervals shown in diagram</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Recent Bug Fixes</h2>
+    <div class="check-grid">
+      <div class="check-card fail">
+        <div class="status-dot">✗</div>
+        <div class="check-content">
+          <div class="check-name">server.py pipeline timeout</div>
+          <div class="check-detail">25-min hard ceiling implemented but not in lessons.md</div>
+        </div>
+      </div>
+      <div class="check-card fail">
+        <div class="status-dot">✗</div>
+        <div class="check-content">
+          <div class="check-name">mcp-proxy.py wall-clock timeout</div>
+          <div class="check-detail">30-min monotonic check implemented but not in lessons.md</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Steering Files</h2>
+    <div class="check-grid">
+      <div class="check-card pass">
+        <div class="status-dot">✓</div>
+        <div class="check-content">
+          <div class="check-name">Project structure entry</div>
+          <div class="check-detail">Blueprint in .claude/steering/project-structure.md</div>
+        </div>
+      </div>
+      <div class="check-card pass">
+        <div class="status-dot">✓</div>
+        <div class="check-content">
+          <div class="check-name">Spec entry</div>
+          <div class="check-detail">Spec listed in project-structure.md</div>
+        </div>
+      </div>
+      <div class="check-card fail">
+        <div class="status-dot">✗</div>
+        <div class="check-content">
+          <div class="check-name">Root README table</div>
+          <div class="check-detail">Agent-runtime blueprints section missing</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action items -->
+  <div class="section">
+    <h2>Action Items</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Priority</th>
+            <th>Issue</th>
+            <th>Location</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="priority-p1">P1</span></td>
+            <td>Two timeout bug fixes not documented</td>
+            <td class="file-ref">lessons.md</td>
+            <td>Add Lesson #19 documenting server.py 25-min ceiling and mcp-proxy.py 30-min wall-clock timeout</td>
+          </tr>
+          <tr>
+            <td><span class="priority-p1">P1</span></td>
+            <td>Blueprint missing from root README</td>
+            <td class="file-ref">README.md (root)</td>
+            <td>Add Agent Runtime section to blueprints table with research-agent entry</td>
+          </tr>
+          <tr>
+            <td><span class="priority-p2">P2</span></td>
+            <td>Runtime version not in terraform outputs</td>
+            <td class="file-ref">outputs.tf</td>
+            <td>Add agentcore_runtime_version output for verification</td>
+          </tr>
+          <tr>
+            <td><span class="priority-p2">P2</span></td>
+            <td>Alternative build files not documented</td>
+            <td class="file-ref">README.md</td>
+            <td>Add note explaining buildspec.yml, build-and-push.sh, build-instance.tf</td>
+          </tr>
+          <tr>
+            <td><span class="priority-p2">P2</span></td>
+            <td>Blueprint untracked in git</td>
+            <td class="file-ref">domains/agent-runtime/blueprints/</td>
+            <td>Commit blueprint after audit completes</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  Generated by blueprint-reviewer agent · agent-aiops-on-aws · 2026-02-23
+</footer>
+
+<script>
+  function toggleTheme() {
+    const html = document.documentElement;
+    html.setAttribute('data-theme',
+      html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  }
+</script>
+</body>
+</html>

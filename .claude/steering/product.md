@@ -19,6 +19,20 @@ This workbench is a collection of AI-powered development tools and learning reso
 - Test-driven development where applicable
 - Pre-commit hooks must pass before merge
 
+## AgentCore Runtime Design Principles
+
+### AgentCore Runtime is not ECS
+
+AgentCore Runtime has no task definition. This means: no EFS volume mounts, no native Secrets Manager injection, no `awslogs` log driver. Design agent containers assuming these ECS primitives are unavailable and substitute accordingly:
+- Secrets: load from Secrets Manager in application code at startup
+- Logs: instrument with OTEL SDK (`localhost:4318`)
+- Persistent output: upload to S3 from `server.py` after each invocation
+
+### Use S3 as the agent output bus, not shared filesystems
+
+Agent invocation results (reports, artifacts) must be uploaded to S3 before the MCP response is returned. Consumers poll or subscribe to S3; do not rely on any shared filesystem between the invoker and the container.
+This ensures outputs survive beyond the container's ephemeral storage and are accessible to callers regardless of AgentCore's container lifecycle management.
+
 ## Contribution Workflow
 
 1. **Open Issue First** - Discuss significant changes before starting work

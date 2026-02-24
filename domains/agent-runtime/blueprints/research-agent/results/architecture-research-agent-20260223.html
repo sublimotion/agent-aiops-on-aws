@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Research Agent on Amazon Bedrock AgentCore — Architecture (v27)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --surface-2: #242740;
+      --border: #2e3151;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --accent: #6366f1;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --cyan: #06b6d4;
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-2: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    .meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .controls { display: flex; gap: 0.5rem; }
+    button {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+    button:hover { background: var(--border); }
+    main { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+    .blueprint-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+    }
+    .meta-item .label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+    .meta-item .value { font-size: 0.85rem; font-weight: 500; }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+    .badge-cyan { background: rgba(6,182,212,0.15); color: var(--cyan); }
+
+    .streaming-banner {
+      background: linear-gradient(135deg, rgba(6,182,212,0.08), rgba(99,102,241,0.08));
+      border: 1px solid rgba(6,182,212,0.3);
+      border-radius: 10px;
+      padding: 1rem 1.5rem;
+      margin-bottom: 2rem;
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+    .streaming-banner .icon { font-size: 1.4rem; line-height: 1; }
+    .streaming-banner h3 { font-size: 0.9rem; color: var(--cyan); margin-bottom: 0.3rem; }
+    .streaming-banner p { font-size: 0.82rem; color: var(--text-muted); line-height: 1.6; }
+    .streaming-banner code { font-family: monospace; font-size: 0.8rem; color: var(--text); }
+
+    .diagram-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 2rem;
+      overflow: auto;
+      cursor: grab;
+      position: relative;
+      min-height: 500px;
+    }
+    .diagram-container:active { cursor: grabbing; }
+    .mermaid {
+      transform-origin: top left;
+      transition: transform 0.15s ease;
+      min-width: min-content;
+    }
+    .zoom-controls {
+      position: absolute;
+      bottom: 1rem;
+      right: 1rem;
+      display: flex;
+      gap: 0.4rem;
+    }
+    .zoom-btn {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      border-radius: 6px;
+    }
+
+    /* NDJSON stream visualizer */
+    .stream-section {
+      margin-top: 2rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+    }
+    .stream-section h2 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 1.25rem;
+    }
+    .ndjson-timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      font-family: monospace;
+      font-size: 0.8rem;
+    }
+    .ndjson-line {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 0.55rem 0.75rem;
+      border-radius: 6px;
+      border-left: 3px solid transparent;
+      margin-bottom: 4px;
+    }
+    .ndjson-line.progress {
+      background: rgba(99,102,241,0.07);
+      border-left-color: var(--accent);
+    }
+    .ndjson-line.final {
+      background: rgba(34,197,94,0.07);
+      border-left-color: var(--green);
+    }
+    .ndjson-time {
+      color: var(--text-muted);
+      min-width: 65px;
+      font-size: 0.72rem;
+      padding-top: 1px;
+    }
+    .ndjson-direction {
+      font-size: 0.7rem;
+      font-weight: 700;
+      min-width: 55px;
+      padding-top: 1px;
+    }
+    .ndjson-line.progress .ndjson-direction { color: var(--accent); }
+    .ndjson-line.final .ndjson-direction { color: var(--green); }
+    .ndjson-content { color: var(--text); flex: 1; word-break: break-all; line-height: 1.5; }
+    .ndjson-content .key { color: #7dd3fc; }
+    .ndjson-content .str { color: #86efac; }
+    .ndjson-content .dot { color: var(--text-muted); }
+
+    .notification-demo {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-top: 1rem;
+    }
+    .notification-demo h4 {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+    .notif-line {
+      font-family: monospace;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+    .notif-line .k { color: #7dd3fc; }
+    .notif-line .v { color: #fbbf24; }
+    .notif-line .s { color: #86efac; }
+
+    .flow-section {
+      margin-top: 2rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+    @media (max-width: 900px) { .flow-section { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+    }
+    .card h2 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .flow-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.65rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .flow-step:last-child { border-bottom: none; }
+    .step-num {
+      min-width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: white;
+      font-size: 0.7rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+    }
+    .step-text { font-size: 0.85rem; line-height: 1.5; }
+    .step-text strong { color: var(--text); }
+    .step-text span { color: var(--text-muted); }
+
+    .agent-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    .agent-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.85rem;
+    }
+    .agent-name {
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+    .agent-tools {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .tool-tag {
+      display: inline-block;
+      background: var(--border);
+      border-radius: 3px;
+      padding: 0.1rem 0.35rem;
+      font-size: 0.68rem;
+      margin: 0.1rem 0.1rem 0 0;
+    }
+
+    .lessons-list {
+      list-style: none;
+    }
+    .lessons-list li {
+      padding: 0.55rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.82rem;
+      display: flex;
+      gap: 0.6rem;
+      align-items: flex-start;
+    }
+    .lessons-list li:last-child { border-bottom: none; }
+    .lesson-num {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--accent);
+      min-width: 22px;
+      padding-top: 1px;
+    }
+    .lesson-num.new { color: var(--cyan); }
+    .lesson-text { color: var(--text-muted); line-height: 1.5; }
+    .lesson-text strong { color: var(--text); }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Research Agent on Amazon Bedrock AgentCore</h1>
+    <div class="meta">domains/agent-runtime/blueprints/research-agent &nbsp;·&nbsp; 2026-02-23 &nbsp;·&nbsp; v27 — NDJSON streaming + hard timeout</div>
+  </div>
+  <div class="controls">
+    <button onclick="zoomIn()">+</button>
+    <button onclick="zoomReset()">1:1</button>
+    <button onclick="zoomOut()">−</button>
+    <button onclick="toggleTheme()">Theme</button>
+  </div>
+</header>
+
+<main>
+
+  <div class="blueprint-meta">
+    <div class="meta-item">
+      <div class="label">Blueprint</div>
+      <div class="value">research-agent</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Domain</div>
+      <div class="value">Agent Runtime</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">AWS Region</div>
+      <div class="value">us-east-1</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Model</div>
+      <div class="value">Claude Opus 4.6</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Runtime Version</div>
+      <div class="value">v27 <span class="badge badge-cyan">streaming</span></div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Endpoint Status</div>
+      <div class="value"><span class="badge badge-green">READY</span></div>
+    </div>
+  </div>
+
+  <div class="streaming-banner">
+    <div class="icon">⚡</div>
+    <div>
+      <h3>v27: NDJSON Streaming + Hard Pipeline Timeout</h3>
+      <p>
+        Research queries take 10-15 minutes. MCP clients time out at ~2 minutes. The fix (v26): <code>/invocations</code> returns a
+        <code>StreamingResponse(media_type="application/x-ndjson")</code> that yields <code>{"type":"progress"}</code> keep-alive
+        lines every 30 s while the pipeline runs, followed by the final MCP result as the last line.
+        <code>mcp-proxy.py</code> converts progress lines to <code>notifications/progress</code> JSON-RPC notifications so
+        Claude Desktop shows a live progress indicator. v27 adds a hard 25-minute pipeline ceiling (<code>MAX_PIPELINE_SECONDS=1500</code>)
+        and a 30-minute wall-clock cap in the proxy (<code>MAX_JOB_SECONDS=1800</code>) to prevent infinite hangs from
+        rate-limited sub-agents (Lesson #19).
+      </p>
+    </div>
+  </div>
+
+  <div class="diagram-container" id="diagram-container">
+    <div class="mermaid" id="diagram">
+graph TD
+    subgraph Local["Local Machine"]
+        CD["Claude Desktop\n(MCP Client)"]
+        Proxy["mcp-proxy.py\nMCP stdio proxy\ninitialize + tools/list → local\ntools/call → AWS (NDJSON)"]
+    end
+
+    subgraph AgentCoreRuntime["AgentCore Runtime  (managed container, ARM64, v27)"]
+        Server["server.py  FastAPI · port 8080\nGET /ping · POST /invocations\ntools/call → StreamingResponse NDJSON\nother methods → JSONResponse"]
+        Generator["_stream_tools_call()\nasync generator\nyields progress every 30s\nhard ceiling: 25 min\nfinal MCP result as last line"]
+        Lead["Lead Agent\nClaude Opus 4.6\nclaude-agent-sdk · bypassPermissions"]
+        subgraph SubAgents["Sub-agents  (Claude Opus 4.6)"]
+            R["Researcher\nWebSearch · Write"]
+            DA["Data Analyst\nBash · Glob · Read · Write"]
+            RW["Report Writer\nSkill · Bash · Glob · Read"]
+        end
+        Server -- "tools/call" --> Generator
+        Generator -- "asyncio.create_task\n_collect()" --> Lead
+        Lead -- "Task tool" --> R
+        Lead -- "Task tool" --> DA
+        Lead -- "Task tool" --> RW
+    end
+
+    subgraph AWS["AWS Services"]
+        Bedrock["Amazon Bedrock\nus.anthropic.claude-opus-4-6-v1"]
+        SM["Secrets Manager\nresearch-agent/brave-api-key"]
+        S3["S3 Output Bucket\nsessions/session_id/\nreports · charts · data"]
+        ECR["ECR\nresearch-agent:latest"]
+        Brave["Brave Search API"]
+    end
+
+    CD -- "MCP tools/call\n(stdio)" --> Proxy
+    Proxy -- "invoke_agent_runtime\nboto3 · SigV4\naccept: application/x-ndjson\nread_timeout=1200s" --> Server
+    Proxy -- "notifications/progress\n(per progress line)" --> CD
+
+    Lead -- "InvokeModel" --> Bedrock
+    R -- "InvokeModel" --> Bedrock
+    DA -- "InvokeModel" --> Bedrock
+    RW -- "InvokeModel" --> Bedrock
+
+    R -- "WebSearch" --> Brave
+    Server -- "load at startup" --> SM
+    Generator -- "upload /app/files/*\nafter pipeline" --> S3
+    ECR -- "container image" --> AgentCoreRuntime
+
+    style Local fill:#1e293b,stroke:#334155,color:#e2e8f0
+    style AgentCoreRuntime fill:#1e1b4b,stroke:#4338ca,color:#e2e8f0
+    style SubAgents fill:#172554,stroke:#1d4ed8,color:#e2e8f0
+    style AWS fill:#14532d,stroke:#166534,color:#e2e8f0
+    style CD fill:#312e81,stroke:#4338ca,color:#e2e8f0
+    style Proxy fill:#312e81,stroke:#4338ca,color:#e2e8f0
+    style Server fill:#3730a3,stroke:#6366f1,color:#e2e8f0
+    style Generator fill:#0e4429,stroke:#06b6d4,color:#e2e8f0
+    style Lead fill:#1e40af,stroke:#3b82f6,color:#e2e8f0
+    style R fill:#1e3a5f,stroke:#2563eb,color:#e2e8f0
+    style DA fill:#1e3a5f,stroke:#2563eb,color:#e2e8f0
+    style RW fill:#1e3a5f,stroke:#2563eb,color:#e2e8f0
+    style Bedrock fill:#065f46,stroke:#059669,color:#e2e8f0
+    style SM fill:#713f12,stroke:#d97706,color:#e2e8f0
+    style S3 fill:#7c2d12,stroke:#ea580c,color:#e2e8f0
+    style ECR fill:#4a1d96,stroke:#7c3aed,color:#e2e8f0
+    style Brave fill:#374151,stroke:#6b7280,color:#e2e8f0
+    </div>
+    <div class="zoom-controls">
+      <button class="zoom-btn" onclick="zoomIn()" title="Zoom in">+</button>
+      <button class="zoom-btn" onclick="zoomReset()" title="Reset">⊙</button>
+      <button class="zoom-btn" onclick="zoomOut()" title="Zoom out">−</button>
+    </div>
+  </div>
+
+  <!-- NDJSON wire protocol visualizer -->
+  <div class="stream-section">
+    <h2>NDJSON Wire Protocol — v27 streaming (smoke test: "What is NDJSON?")</h2>
+    <div class="ndjson-timeline">
+      <div class="ndjson-line progress">
+        <div class="ndjson-time">t + 0 s</div>
+        <div class="ndjson-direction">▶ PROGRESS</div>
+        <div class="ndjson-content">
+          {<span class="key">"type"</span>:<span class="str">"progress"</span>, <span class="key">"label"</span>:<span class="str">"Research pipeline starting — query: What is NDJSON?"</span>}
+        </div>
+      </div>
+      <div class="ndjson-line progress">
+        <div class="ndjson-time">t + 30 s</div>
+        <div class="ndjson-direction">▶ PROGRESS</div>
+        <div class="ndjson-content">
+          {<span class="key">"type"</span>:<span class="str">"progress"</span>, <span class="key">"label"</span>:<span class="str">"Research in progress..."</span>}
+          <span class="dot">&nbsp; ← repeated every 30 s while pipeline runs</span>
+        </div>
+      </div>
+      <div class="ndjson-line progress">
+        <div class="ndjson-time">t + 90 s</div>
+        <div class="ndjson-direction">▶ PROGRESS</div>
+        <div class="ndjson-content">
+          {<span class="key">"type"</span>:<span class="str">"progress"</span>, <span class="key">"label"</span>:<span class="str">"Uploading research outputs to S3..."</span>}
+        </div>
+      </div>
+      <div class="ndjson-line final">
+        <div class="ndjson-time">t + 92 s</div>
+        <div class="ndjson-direction">✓ RESULT</div>
+        <div class="ndjson-content">
+          {<span class="key">"jsonrpc"</span>:<span class="str">"2.0"</span>, <span class="key">"id"</span>:1, <span class="key">"result"</span>:{<span class="key">"content"</span>:[{<span class="key">"type"</span>:<span class="str">"text"</span>, <span class="key">"text"</span>:<span class="str">"NDJSON (Newline Delimited JSON) is a text format..."</span>}], <span class="key">"isError"</span>:false}}
+        </div>
+      </div>
+    </div>
+
+    <div class="notification-demo">
+      <h4>mcp-proxy.py → Claude Desktop: notifications/progress JSON-RPC (one-way)</h4>
+      <div class="notif-line">
+        {<span class="k">"jsonrpc"</span>:<span class="s">"2.0"</span>,
+         <span class="k">"method"</span>:<span class="s">"notifications/progress"</span>,
+         <span class="k">"params"</span>:{<span class="k">"progressToken"</span>:<span class="v">42</span>,
+         <span class="k">"progress"</span>:<span class="v">0</span>,
+         <span class="k">"total"</span>:<span class="v">null</span>,
+         <span class="k">"message"</span>:<span class="s">"Research pipeline starting..."</span>}}
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-section">
+    <div class="card">
+      <h2>Request Flow (v27)</h2>
+      <div class="flow-step">
+        <div class="step-num">1</div>
+        <div class="step-text"><strong>User invokes research tool</strong><span> — types a query in Claude Desktop. The MCP client sends a <code>tools/call</code> JSON-RPC message with a <code>progressToken</code> in <code>_meta</code>.</span></div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">2</div>
+        <div class="step-text"><strong>mcp-proxy.py (local)</strong><span> — handles <code>initialize</code>, <code>tools/list</code>, <code>ping</code> instantly. For <code>tools/call</code>: calls <code>invoke_agent_runtime</code> with <code>accept: application/x-ndjson</code>.</span></div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">3</div>
+        <div class="step-text"><strong>AgentCore Runtime streams NDJSON</strong><span> — <code>POST /invocations</code> returns a <code>StreamingResponse</code>. The first byte arrives immediately (pipeline starting line), keeping the connection alive.</span></div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">4</div>
+        <div class="step-text"><strong>Progress ticks every 30 s</strong><span> — <code>_stream_tools_call()</code> runs <code>run_query()</code> as an <code>asyncio.Task</code>. While it runs, the generator yields <code>{"type":"progress","label":"Research in progress..."}</code> every 30 s.</span></div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">5</div>
+        <div class="step-text"><strong>mcp-proxy converts to notifications/progress</strong><span> — each progress NDJSON line is converted to a JSON-RPC <code>notifications/progress</code> notification written to stdout. Claude Desktop shows a spinner/progress indicator.</span></div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">6</div>
+        <div class="step-text"><strong>S3 upload + final result</strong><span> — after the pipeline completes, <code>_stream_tools_call()</code> yields an upload progress tick, performs <code>_upload_outputs_to_s3()</code>, then yields the complete MCP result JSON as the last NDJSON line.</span></div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">7</div>
+        <div class="step-text"><strong>mcp-proxy returns final result</strong><span> — the last NDJSON line (containing <code>"jsonrpc":"2.0"</code>) is returned as the <code>handle()</code> return value and written to stdout as the <code>tools/call</code> response.</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Agent Definitions</h2>
+      <div class="agent-grid">
+        <div class="agent-card">
+          <div class="agent-name">Lead Agent</div>
+          <div class="agent-tools">
+            Orchestrator — decomposes query into subtopics, delegates via Task tool. Returns markdown summary.
+            <br><br>
+            <span class="tool-tag">Task</span>
+          </div>
+        </div>
+        <div class="agent-card">
+          <div class="agent-name">Researcher (×2-4)</div>
+          <div class="agent-tools">
+            Web search via Brave API. Writes findings to <code>files/research_notes/</code>.
+            <br><br>
+            <span class="tool-tag">WebSearch</span>
+            <span class="tool-tag">Write</span>
+          </div>
+        </div>
+        <div class="agent-card">
+          <div class="agent-name">Data Analyst</div>
+          <div class="agent-tools">
+            Reads notes, extracts numeric data, generates matplotlib charts to <code>files/charts/</code>.
+            <br><br>
+            <span class="tool-tag">Glob</span>
+            <span class="tool-tag">Read</span>
+            <span class="tool-tag">Bash</span>
+            <span class="tool-tag">Write</span>
+          </div>
+        </div>
+        <div class="agent-card">
+          <div class="agent-name">Report Writer</div>
+          <div class="agent-tools">
+            Synthesizes notes + charts into PDF via reportlab. Saves to <code>files/reports/</code>.
+            <br><br>
+            <span class="tool-tag">Skill</span>
+            <span class="tool-tag">Glob</span>
+            <span class="tool-tag">Read</span>
+            <span class="tool-tag">Bash</span>
+            <span class="tool-tag">Write</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-section">
+    <div class="card">
+      <h2>Key Lessons (AgentCore Runtime)</h2>
+      <ul class="lessons-list">
+        <li>
+          <div class="lesson-num">#7</div>
+          <div class="lesson-text"><strong>HTTP protocol contract</strong>: <code>POST /invocations</code> + <code>GET /ping</code> on port 8080. Wrong endpoints → 404.</div>
+        </li>
+        <li>
+          <div class="lesson-num">#8</div>
+          <div class="lesson-text"><strong>Claude Code 2.x Bedrock env var</strong>: use <code>CLAUDE_CODE_USE_BEDROCK=1</code>, not <code>ANTHROPIC_BEDROCK=1</code>. Inject frozen boto3 credentials explicitly.</div>
+        </li>
+        <li>
+          <div class="lesson-num">#9</div>
+          <div class="lesson-text"><strong>Non-root Dockerfile required</strong>: claude binary refuses <code>--dangerously-skip-permissions</code> as root. Add <code>USER agent</code>.</div>
+        </li>
+        <li>
+          <div class="lesson-num">#10</div>
+          <div class="lesson-text"><strong>Endpoint version pinning</strong>: after <code>update-agent-runtime</code>, always call <code>update-agent-runtime-endpoint --agent-runtime-version N</code> separately.</div>
+        </li>
+        <li>
+          <div class="lesson-num">#13</div>
+          <div class="lesson-text"><strong>No EFS support</strong>: files are ephemeral in AgentCore Runtime. Upload <code>/app/files/*</code> to S3 from server.py after each invocation.</div>
+        </li>
+        <li>
+          <div class="lesson-num">#14</div>
+          <div class="lesson-text"><strong>Disable boto3 retries</strong>: set <code>max_attempts=1</code> + <code>read_timeout=1200</code>. Default retries × timeout = deadlock.</div>
+        </li>
+        <li>
+          <div class="lesson-num new">#16</div>
+          <div class="lesson-text"><strong>NDJSON streaming for long tools/call</strong>: return <code>StreamingResponse(application/x-ndjson)</code> and yield progress bytes every ≤30 s. MCP proxy converts to <code>notifications/progress</code>. Without this, Claude Desktop times out at ~2 min.</div>
+        </li>
+        <li>
+          <div class="lesson-num new">#17</div>
+          <div class="lesson-text"><strong>Build instance must be in public VPC</strong>: blueprint VPC is private-only (no NAT). Use default VPC + public subnet for build EC2. Transfer context via S3 + SSM.</div>
+        </li>
+        <li>
+          <div class="lesson-num new">#18</div>
+          <div class="lesson-text"><strong>update-agent-runtime requires --role-arn</strong>: even for image-only updates, the role ARN must be passed explicitly. Unlike most AWS update APIs, this is not optional.</div>
+        </li>
+        <li>
+          <div class="lesson-num new">#19</div>
+          <div class="lesson-text"><strong>Hard timeouts for streaming pipelines</strong>: <code>read_timeout</code> resets every byte received. Add explicit wall-clock deadlines: <code>MAX_PIPELINE_SECONDS=1500</code> in server.py, <code>MAX_JOB_SECONDS=1800</code> in proxy. Prevents infinite hangs from rate-limited sub-agents.</div>
+        </li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Infrastructure Components</h2>
+      <div class="flow-step">
+        <div class="step-num" style="background:#06b6d4">R</div>
+        <div class="step-text"><strong>AgentCore Runtime v27</strong><span> — Managed container service. Runtime ID: <code>research_agent-fyUZrR80VG</code>. HTTP protocol. Endpoint: <code>research_agent_endpoint</code>. liveVersion: <strong>27</strong>. Hard pipeline timeout: 25 min.</span></div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num" style="background:#059669">B</div>
+        <div class="step-text"><strong>Amazon Bedrock</strong><span> — Inference profile <code>us.anthropic.claude-opus-4-6-v1</code>. Used by all 4 agents. IAM role: <code>research-agent-agentcore-exec</code>.</span></div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num" style="background:#ea580c">S</div>
+        <div class="step-text"><strong>S3 Output Bucket</strong><span> — <code>research-agent-output-20260221145504871200000003</code>. Research notes, charts, PDF reports, and build context tarballs. Keyed by session ID.</span></div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num" style="background:#d97706">K</div>
+        <div class="step-text"><strong>Secrets Manager</strong><span> — <code>research-agent/brave-api-key</code>. Loaded by server.py at startup via boto3 (no task definition injection in AgentCore Runtime).</span></div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num" style="background:#7c3aed">E</div>
+        <div class="step-text"><strong>ECR</strong><span> — Image <code>research-agent:latest</code> (ARM64, linux/arm64). Built via S3 context tarball + SSM send-command on t4g.medium in default VPC.</span></div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num" style="background:#374151">P</div>
+        <div class="step-text"><strong>mcp-proxy.py</strong><span> — Local Python stdio proxy. Handles MCP handshake locally (no AWS roundtrip). For <code>tools/call</code>: uses <code>iter_lines()</code> on botocore StreamingBody, converts progress lines to MCP notifications.</span></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  Generated by visual-explainer · agent-aiops-on-aws · 2026-02-23 · v27 NDJSON streaming + hard timeout
+</footer>
+
+<script>
+  let scale = 1;
+
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
+    flowchart: { useMaxWidth: false, htmlLabels: true },
+  });
+
+  function zoomIn() { scale = Math.min(scale + 0.15, 3); applyZoom(); }
+  function zoomOut() { scale = Math.max(scale - 0.15, 0.3); applyZoom(); }
+  function zoomReset() { scale = 1; applyZoom(); }
+  function applyZoom() {
+    document.getElementById('diagram').style.transform = `scale(${scale})`;
+  }
+
+  function toggleTheme() {
+    const html = document.documentElement;
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: next === 'dark' ? 'dark' : 'default',
+      flowchart: { useMaxWidth: false, htmlLabels: true },
+    });
+  }
+
+  const container = document.getElementById('diagram-container');
+  let dragging = false, startX, startY, scrollLeft, scrollTop;
+  container.addEventListener('mousedown', e => {
+    dragging = true;
+    startX = e.pageX - container.offsetLeft;
+    startY = e.pageY - container.offsetTop;
+    scrollLeft = container.scrollLeft;
+    scrollTop = container.scrollTop;
+  });
+  container.addEventListener('mouseleave', () => dragging = false);
+  container.addEventListener('mouseup', () => dragging = false);
+  container.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    e.preventDefault();
+    const x = e.pageX - container.offsetLeft;
+    const y = e.pageY - container.offsetTop;
+    container.scrollLeft = scrollLeft - (x - startX);
+    container.scrollTop = scrollTop - (y - startY);
+  });
+</script>
+</body>
+</html>

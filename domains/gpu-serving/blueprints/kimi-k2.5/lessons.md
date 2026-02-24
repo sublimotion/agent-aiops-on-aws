@@ -399,6 +399,34 @@ The build machine has the same network access (FSx, S3, ECR) without burning $60
 
 **Lesson**: Always match the container CLI to the node's runtime. EKS nodes since Kubernetes 1.24 use containerd exclusively. Use `nerdctl` for standalone container execution on EKS nodes.
 
+### 35. AL2023 EKS AMIs Use nodeadm, Not bootstrap.sh
+**Problem**: Launched p5e instance with `bootstrap.sh` user data — instance failed to join EKS because AL2023 AMIs replaced `bootstrap.sh` with `nodeadm`. Additionally, the CA certificate in nodeadm's `certificateAuthority` field must be exact — encoding mismatches cause TLS cert mismatch (`x509: certificate signed by unknown authority`).
+
+**Solution**: Use nodeadm `NodeConfig` YAML format for user data. Prefer uploading bootstrap scripts to S3 to avoid base64 encoding issues in user data. When debugging cert mismatches, copy the correct CA PEM from a working system node via SSM.
+
+**Lesson**: Always check the EKS AMI bootstrap mechanism before launching GPU instances. AL2023 uses `nodeadm`, not `bootstrap.sh`. Upload complex user data to S3 to avoid encoding corruption.
+
+### 36. Verify SGLang Model Support Before Reserving GPU Capacity
+**Problem**: Planned SGLang HiCache benchmarks with Kimi K2.5, but SGLang v0.5.8 does not support `KimiK25ForConditionalGeneration`. Attempted workarounds (text-only wrapper, model registry patch) failed because the INT4 packed weight format (`w13_weight_packed`, `w2_weight_packed`) is incompatible with SGLang's DeepseekV2 loader which expects per-expert named weights.
+
+**Solution**: Before planning benchmarks with a new serving engine: (1) verify the model architecture is in the engine's model registry, (2) verify the weight format is compatible (quantized/packed formats vary across engines), (3) test loading on a CPU-only instance before reserving GPU capacity.
+
+**Lesson**: SGLang model support lags behind vLLM for newer models. Don't assume a model that works in vLLM will work in SGLang. Test the full model loading pipeline before committing expensive GPU hours.
+
+### 37. Disaggregated Prefill/Decode Reframes the FSx Value Proposition
+**Finding**: All single-node benchmarks (baseline, LMCache, Dynamo) showed generation-bound throughput (~11 tok/s flat) with TTFT scaling linearly with context (270ms → 558ms at 48K). The storage tier (FSx Lustre) was never exercised because the H200's 1.1 TB HBM holds 610K tokens — enough for typical workloads.
+
+However, in a **disaggregated prefill/decode architecture**, the role of FSx changes fundamentally:
+
+| Architecture | FSx Role | Value |
+|-------------|----------|-------|
+| Single-node (current) | Disk offload for KV eviction | Never triggers on H200s |
+| Disaggregated P/D | Shared KV cache fabric between node pools | Core data plane |
+
+In disaggregated serving, prefill nodes compute KV cache and transfer it to decode nodes via network. LMCache's multi-node mode (`--kv-connector LMCacheConnector --kv-role kv_producer/kv_consumer`) and Mooncake's RDMA transfer engine are designed for this — not disk offloading, but inter-node KV transfer. FSx Lustre + EFA becomes the shared KV store, and the 1000 MB/s/TiB throughput actually matters.
+
+**Lesson**: Single-node KV cache offloading to FSx is not viable on H200-class hardware — the HBM is too large for pressure to develop. Reframe the architecture as disaggregated prefill/decode, where FSx is the shared KV cache fabric between GPU pools. This is the use case where LMCache, Mooncake, and FSx Lustre + EFA deliver real value. Next benchmark should test 2-node disaggregated serving (TP=4 prefill, TP=4 decode) with KV transfer over FSx.
+
 ---
 
 ## Summary
@@ -439,3 +467,6 @@ The build machine has the same network access (FSx, S3, ECR) without burning $60
 | 32 | Use a separate EC2 build machine | P5e Deployment | Iterate cheaply, save GPU hours for inference |
 | 33 | Always record benchmark execution location | Benchmarking | Client location is a first-class result dimension |
 | 34 | EKS nodes use nerdctl, not Docker | P5e Deployment | Use CONTAINER_RUNTIME variable in configs |
+| 35 | AL2023 uses nodeadm, not bootstrap.sh | P5e Deployment | Check AMI bootstrap mechanism; upload user data to S3 |
+| 36 | Verify SGLang model support before GPU reservation | SGLang | Weight format incompatibility wasted capacity block time |
+| 37 | Disaggregated P/D reframes FSx value | Architecture | FSx as shared KV fabric between node pools, not disk offload |

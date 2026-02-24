@@ -25,6 +25,24 @@ Serving:
       modelURL: /mnt/fsx/models/Kimi-K2.5
       apiType: chat
 
+  # Config S1: SGLang HiCache baseline (cascading GPU→CPU eviction)
+  - Flat:
+      configSelection: sglang-hicache/run-kimi-k2.5.sh
+      modelURL: /mnt/fsx/models/Kimi-K2.5
+      apiType: chat
+
+  # Config S2: SGLang HiCache + NVMe L3 (GPU→CPU→NVMe)
+  - Flat:
+      configSelection: sglang-hicache-nvme/run-kimi-k2.5.sh
+      modelURL: /mnt/fsx/models/Kimi-K2.5
+      apiType: chat
+
+  # Config S3: SGLang HiCache + Mooncake L3 (GPU→CPU→Mooncake via RDMA)
+  - Flat:
+      configSelection: sglang-mooncake/run-kimi-k2.5.sh
+      modelURL: /mnt/fsx/models/Kimi-K2.5
+      apiType: chat
+
 Workload:
   # --- Run 1: Multi-turn Q&A (prefix caching sweet spot) ---
   # Shared system prompt = high prefix reuse → LMCache/Mooncake should win

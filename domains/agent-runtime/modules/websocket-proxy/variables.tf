@@ -14,7 +14,7 @@ variable "subnet_ids" {
 }
 
 variable "image_uri" {
-  description = "Full ECR image URI (including digest or tag) for the proxy container"
+  description = "Full ECR image URI (including digest or tag) for the agent container"
   type        = string
 }
 
@@ -29,7 +29,7 @@ variable "agent_alias_id" {
 }
 
 variable "cognito_user_pool_id" {
-  description = "Cognito user pool ID for JWT validation"
+  description = "Cognito user pool ID for JWT validation (informational; validated in server.py)"
   type        = string
 }
 
@@ -38,8 +38,43 @@ variable "cognito_app_client_id" {
   type        = string
 }
 
+variable "efs_file_system_id" {
+  description = "EFS file system ID to mount at /app/files in the container"
+  type        = string
+}
+
+variable "s3_output_bucket_arn" {
+  description = "ARN of the S3 bucket for research output files"
+  type        = string
+}
+
+variable "s3_output_bucket_name" {
+  description = "Name of the S3 bucket for research output files (injected as env var)"
+  type        = string
+}
+
+variable "search_api_secret_arn" {
+  description = "Secrets Manager ARN for the Brave search API key"
+  type        = string
+}
+
+variable "tavily_api_key_secret_arn" {
+  description = "Secrets Manager ARN for the Tavily search API key"
+  type        = string
+}
+
+variable "session_table_arn" {
+  description = "DynamoDB session table ARN"
+  type        = string
+}
+
+variable "session_table_name" {
+  description = "DynamoDB session table name (injected as env var)"
+  type        = string
+}
+
 variable "container_port" {
-  description = "Port the proxy listens on inside the container"
+  description = "Port the agent server listens on inside the container"
   type        = number
   default     = 8080
 }
@@ -53,13 +88,13 @@ variable "desired_count" {
 variable "cpu" {
   description = "ECS task CPU units (256, 512, 1024, 2048, 4096)"
   type        = number
-  default     = 512
+  default     = 2048
 }
 
 variable "memory" {
   description = "ECS task memory in MiB"
   type        = number
-  default     = 1024
+  default     = 4096
 }
 
 variable "tags" {

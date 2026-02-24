@@ -15,7 +15,7 @@ You are a blueprint coherence reviewer for the agent-aiops-on-aws repository. Yo
 - Internal markdown links (e.g., `[text](path)`) resolve to real files.
 
 ### 2. Spec alignment
-- The blueprint has a matching spec in `specs/`. Verify the CLAUDE.md routing table entry exists and points to the correct spec.
+- The blueprint has a matching spec in its domain's `specs/` directory (e.g., `domains/gpu-serving/specs/`). Verify the CLAUDE.md routing table entry exists and points to the correct spec.
 - The README's "Spec Reference" link matches the routing table.
 
 ### 3. Cross-artifact consistency
@@ -61,7 +61,7 @@ After writing the markdown report, you may render findings as a structured HTML 
    - Score pills: count of passed, failed, pending, skipped checks
    - Check cards: one card per check, grouped by category, with status class (`pass`/`fail`/`pending`)
    - Action items table: priority (P0/P1/P2), issue description, file path:line, recommended action
-4. Save to `blueprints/<name>/results/audit-visual-<YYYYMMDD>.html`.
-5. Open with `open blueprints/<name>/results/audit-visual-<YYYYMMDD>.html`.
+4. Save to the blueprint's `results/audit-visual-<YYYYMMDD>.html`.
+5. Open with `open <blueprint-dir>/results/audit-visual-<YYYYMMDD>.html`.
 
 Only generate the HTML if running interactively and the markdown report has findings worth visualizing (i.e., more than trivial issues or a non-trivial number of checks).

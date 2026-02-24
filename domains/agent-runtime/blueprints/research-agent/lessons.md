@@ -214,6 +214,26 @@ Until then, use `aws --cli-read-timeout 300` and watch S3 output for completion 
 
 **Why**: SSM commands return "Success" status based on script exit code, not on whether the application actually ran. If a binary is not found (`exit 127`), the shell script exits 127 but SSM may still report "Success" if the error was in a subshell. Always verify with `docker --version && echo DOCKER_READY`.
 
+## Lesson #23 - AgentCore Runtime Containers Do Not Inherit ECS Task Definition Volumes - 2026-02-23
+
+**Context**: EFS file system was configured in the ECS task definition (websocket-proxy module) with a volume mount at `/app/files`. Research pipeline outputs (PDFs, charts, research notes) were written there. Expected `_upload_outputs_to_s3` in server.py to find files and upload them. S3 upload silently returned empty after every run.
+
+**Observation**: The ECS service (websocket-proxy module) and the AgentCore Runtime are two completely separate compute paths. `invoke_agent_runtime` runs the container in AWS-managed Fargate infrastructure, not in the ECS cluster we define. The AgentCore Runtime container has no EFS mount; all files written to `/app/files` go to ephemeral container-local storage. Additionally, env vars like `S3_OUTPUT_BUCKET` set in the ECS task definition `environment` block are NOT inherited by AgentCore Runtime containers. The S3 upload silently skipped because `S3_OUTPUT_BUCKET` was empty in the AgentCore environment.
+
+**Rule**: (1) Pass all required env vars (`S3_OUTPUT_BUCKET`, `AWS_REGION`, `FILES_BASE`) to the AgentCore Runtime via `--environment-variables` in `update-agent-runtime`. (2) Add an auto-discovery fallback in server.py: if `S3_OUTPUT_BUCKET` is unset, call `s3.list_buckets()` to find the bucket by name prefix. (3) Add diagnostic logging of file count in `_upload_outputs_to_s3` so empty-upload failures are visible. (4) Add `S3_OUTPUT_BUCKET` and `FILES_BASE` to the `debug/env` diagnostic endpoint.
+
+**Why**: The two compute paths (ECS service vs AgentCore Runtime) look identical from the code perspective but have completely different environment setups. Without explicit env vars on the AgentCore path, any server-side S3 uploads will silently fail. CloudWatch logs from AgentCore Runtime containers are sparse (no container-level awslogs configured by default), making silent failures very hard to diagnose.
+
+## Lesson #24 - Use `--environment-variables` on `update-agent-runtime` for Container Config - 2026-02-23
+
+**Context**: Need to pass `S3_OUTPUT_BUCKET`, `AWS_REGION`, and other env vars to AgentCore Runtime containers without baking them into the Docker image.
+
+**Observation**: `aws bedrock-agentcore-control update-agent-runtime` supports `--environment-variables` as a top-level parameter (not inside `--agent-runtime-artifact`). The format is a JSON object: `{"KEY": "VALUE", ...}`. These vars are injected into every container instance spawned by the runtime. The API accepted it with the existing `--agent-runtime-artifact` and `--role-arn` params unchanged.
+
+**Rule**: Pass runtime-specific env vars (bucket names, region, feature flags) via `--environment-variables` rather than baking them into the Docker image. This keeps the image generic and lets different runtime deployments (dev/staging/prod) use different configs. Add these vars to the `debug/env` diagnostic endpoint to verify they're set on the next smoke test.
+
+**Why**: Docker image rebuild + ECR push + runtime update is expensive (~10 min). Env vars can be updated independently with just `update-agent-runtime` (seconds). Keeping config separate from image also avoids leaking bucket names or account IDs into the image layer history.
+
 ## Lesson #5 - AgentCore Runtime Doesn't Require Container at Creation - 2026-02-21
 
 **Context**: Was able to create and prepare AgentCore Runtime agent without having container image ready

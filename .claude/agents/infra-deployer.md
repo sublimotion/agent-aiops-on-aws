@@ -14,7 +14,7 @@ Follow these stages in order. Do not proceed to the next stage until the current
 ### Stage 1: Foundation
 Deploy the base infrastructure (EKS, VPC, S3, FSx).
 
-1. Read the blueprint's spec in `specs/<name>.md` for requirements.
+1. Read the blueprint's spec in `domains/gpu-serving/specs/<name>.md` for requirements.
 2. Read the blueprint's `lessons.md` for known pitfalls.
 3. Run `terraform init` and `terraform apply` in the blueprint directory.
 4. Capture Terraform outputs (FSx DNS, EKS cluster name, subnet IDs, security groups).
@@ -65,9 +65,30 @@ Run integration checks before benchmarks.
 
 1. If using LMCache, run `scripts/setup-lmcache-p5e.sh` and verify cache directory is writable.
 2. If using Dynamo, run `scripts/setup-dynamo-p5e.sh` and verify GDS drivers, GPU access, and FSx permissions.
-3. Check for known permission issues (UID mapping between containers and FSx — see lessons.md).
+3. If using SGLang HiCache, run `scripts/setup-sglang-p5e.sh` and verify HiCache flag is available in the SGLang build. For Phase 2 (NVMe L3), verify `/mnt/nvme/kv-cache` is writable. For Phase 3 (Mooncake), verify RDMA/EFA devices and Mooncake metadata server.
+4. Check for known permission issues (UID mapping between containers and FSx — see lessons.md).
 
 **Validation**: The serving stack with the target config starts successfully and handles test requests.
+
+### Stage 7: Readiness audit
+Run a comprehensive readiness audit before each capacity block session and write results to `results/readiness-audit-<date>.md`.
+
+Check each category and record PASS / FAIL / PENDING with details:
+
+1. **EKS cluster**: cluster status, API endpoint reachable, system nodes Ready, CoreDNS, kube-proxy.
+2. **Storage**: FSx Lustre lifecycle, throughput tier, DNS, mount name, PV/PVC bound, CSI drivers running.
+3. **Container images (ECR)**: For every image referenced by `configs/*.sh` and `docker/Dockerfile.*`, verify the ECR repo exists and has at least one tagged image. Cross-reference `scripts/stage-images-ecr.sh` — flag any Dockerfiles or config scripts that reference images not in the staging manifest.
+4. **GPU / accelerator plugins**: NVIDIA device plugin, EFA device plugin, DCGM exporter. Mark PENDING if they depend on a GPU node that hasn't joined yet (they self-heal).
+5. **Monitoring**: Prometheus, Grafana, kube-state-metrics, node-exporter.
+6. **Serving layer**: Deployment exists, services (ClusterIP + NodePort) configured.
+7. **Capacity block**: Reservation ID, state (payment-pending / active / expired), AZ, start/end times.
+8. **Config scripts & benchmark wiring**: All `configs/*.sh` pass `bash -n`. `SERVING_CONFIGS` in `run-benchmarks.py` has entries for every config script. `comparison.yaml` has matching entries.
+
+End the audit with:
+- **Action Items** table: `#`, `Priority (P0/P1/P2)`, `Action`, `Owner`
+- **Overall Verdict**: PASS, CONDITIONAL PASS (with required pre-session fixes), or FAIL
+
+Previous audits are stored in `results/readiness-audit-*.md` — read them to track what changed between sessions.
 
 ## Important operational lessons
 
@@ -78,6 +99,19 @@ These are hard-won lessons from previous deployments. Apply them proactively:
 - **Dynamo containers may have FSx permission issues** — check UID mapping, use container-local paths as fallback.
 - **Always record benchmark execution location** — note whether running via port-forward or server-side.
 - **Capture cache hit/miss metrics** — wire `scrape_prefix_cache_metrics()` into benchmark flows.
+- **SGLang HiCache uses cascading eviction** — unlike vLLM prefix caching, HiCache actively evicts from GPU→CPU→storage tiers. Verify with `hicache_l1_hits/misses`, `hicache_l2_hits/misses`, `hicache_l3_hits/misses` metrics.
+- **Every Dockerfile in `docker/` must have a matching ECR repo** — run the readiness audit (Stage 7) to catch missing repos before the capacity block starts.
+- **Run readiness audit before every capacity block** — capacity blocks are expensive and time-boxed. Catching a missing image after the block starts wastes GPU hours.
+
+### Stage 8: Compound
+Extract cross-cutting lessons and elevate them to shared steering files.
+
+1. Invoke the `compound-learner` sub-agent, passing the blueprint name.
+2. The compound-learner will review lessons.md, the deployment log, and readiness audit, then write any updates to `.claude/steering/*.md` and produce a compound summary in `results/compound-<date>.md`.
+
+This stage runs after every successful deployment and after every benchmark session. It is not optional — skipping it means lessons stay siloed in the blueprint and the next RALPH loop starts without the benefit of what this run taught.
+
+**Validation**: `results/compound-<date>.md` exists and lists at least one elevated rule or explicitly states no new rules were found.
 
 ## Output
 
@@ -88,3 +122,5 @@ After each stage, report:
 - Terraform outputs or connection details needed for the next stage
 
 Write a deployment log to `results/deployment-log-<date>.md` in the blueprint directory.
+
+After each readiness audit, write results to `results/readiness-audit-<date>.md`.

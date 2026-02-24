@@ -9,8 +9,8 @@ You are a spec writer for the agent-aiops-on-aws repository. You create spec fil
 
 ## Before writing
 
-1. Read `specs/_template.md` for the required structure.
-2. Read one or two existing specs in `specs/` to understand the level of detail and tone.
+1. Read `domains/gpu-serving/specs/_template.md` for the required structure.
+2. Read one or two existing specs in `domains/gpu-serving/specs/` to understand the level of detail and tone.
 3. Read `.claude/steering/project-structure.md` to understand how specs relate to blueprints.
 
 ## Writing rules
@@ -20,14 +20,14 @@ You are a spec writer for the agent-aiops-on-aws repository. You create spec fil
 - Include a "Non-Requirements" section that explicitly scopes out what this deployment does NOT do. This prevents scope creep during RALPH loops.
 - Include a "Known Limitations" section, even if empty initially. This is where operational lessons get captured later.
 - End with the note about operational artifacts belonging in the blueprint directory, not the spec.
-- Write the file to `specs/<name>.md` where `<name>` matches what the blueprint directory will be called.
+- Write the file to `domains/gpu-serving/specs/<name>.md` where `<name>` matches what the blueprint directory will be called.
 
 ## After writing
 
 Remind the user to:
 1. Update the CLAUDE.md routing table with the new `blueprint -> spec` mapping.
 2. Update `.claude/steering/project-structure.md` spec listing.
-3. Create the blueprint directory when ready: `mkdir blueprints/<name>`.
+3. Create the blueprint directory when ready: `mkdir domains/gpu-serving/blueprints/<name>`.
 
 ## Style
 

@@ -91,16 +91,31 @@ def _upload_outputs_to_s3(session_id: str) -> list[str]:
     """Upload all files from FILES_BASE to S3 after a research run. Returns uploaded S3 keys."""
     bucket = os.environ.get("S3_OUTPUT_BUCKET", "")
     if not bucket:
-        logger.warning("S3_OUTPUT_BUCKET not set — skipping output upload")
+        # Auto-discover: find the research-agent output bucket by name prefix
+        try:
+            import boto3 as _boto3
+            _s3 = _boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+            for b in _s3.list_buckets().get("Buckets", []):
+                if b["Name"].startswith("research-agent-output"):
+                    bucket = b["Name"]
+                    logger.info("Auto-discovered S3 output bucket: %s", bucket)
+                    break
+        except Exception as exc:
+            logger.warning("S3 bucket auto-discovery failed: %s", exc)
+    if not bucket:
+        logger.warning("S3_OUTPUT_BUCKET not set and auto-discovery failed — skipping upload")
         return []
     files_base = Path(os.environ.get("FILES_BASE", "/app/files"))
+    all_files = [p for p in sorted(files_base.rglob("*")) if p.is_file()]
+    logger.info("S3 upload: found %d files in %s", len(all_files), files_base)
+    if not all_files:
+        logger.warning("S3 upload: FILES_BASE %s is empty — nothing to upload", files_base)
+        return []
     uploaded: list[str] = []
     try:
         import boto3
         s3 = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
-        for path in sorted(files_base.rglob("*")):
-            if not path.is_file():
-                continue
+        for path in all_files:
             rel = path.relative_to(files_base)
             key = f"sessions/{session_id}/{rel}"
             s3.upload_file(str(path), bucket, key)
@@ -151,8 +166,10 @@ async def _stream_tools_call(req_id, query: str, session_id: str):
 
     # Yield keep-alive progress ticks every 30 s while the pipeline runs.
     # AgentCore flushes bytes immediately, preventing idle-connection timeouts.
-    # Hard ceiling: cancel after 25 minutes so the connection doesn't hang forever.
-    MAX_PIPELINE_SECONDS = 1500
+    # Hard ceiling: cancel after 45 minutes so the connection doesn't hang forever.
+    # Single-topic queries take ~15 min; 3-topic queries (e.g. "digital twins +
+    # physical AI + world models") spawn ~9 researchers and take ~45 min.
+    MAX_PIPELINE_SECONDS = 2700
     loop = asyncio.get_event_loop()
     deadline = loop.time() + MAX_PIPELINE_SECONDS
     while not task.done():
@@ -163,7 +180,7 @@ async def _stream_tools_call(req_id, query: str, session_id: str):
             except asyncio.CancelledError:
                 pass
             yield (json.dumps(_mcp_error(req_id, -32603,
-                "Research pipeline timed out after 25 minutes. "
+                "Research pipeline timed out after 45 minutes. "
                 "Check S3 for any partial output.")) + "\n").encode()
             return
         yield progress("Research in progress...")
@@ -325,6 +342,8 @@ async def _handle_mcp(body: dict) -> tuple[dict | None, bool]:
         diag: dict = {
             "CLAUDE_CODE_USE_BEDROCK": os.environ.get("CLAUDE_CODE_USE_BEDROCK", "NOT SET"),
             "AWS_REGION": os.environ.get("AWS_REGION", "NOT SET"),
+            "S3_OUTPUT_BUCKET": os.environ.get("S3_OUTPUT_BUCKET", "NOT SET"),
+            "FILES_BASE": os.environ.get("FILES_BASE", "/app/files (default)"),
             "TAVILY_API_KEY_SET": bool(os.environ.get("TAVILY_API_KEY")),
             "BRAVE_API_KEY_SET": bool(os.environ.get("BRAVE_API_KEY")),
             "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI": "set" if os.environ.get("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI") else "not set",

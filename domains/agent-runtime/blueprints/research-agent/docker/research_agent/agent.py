@@ -143,10 +143,21 @@ def _make_options(transcript: TranscriptWriter, tracker: SubagentTracker) -> Cla
         "This text will be returned directly to the user."
     )
 
+    # Cap researcher spawning so multi-topic queries stay within the 45-minute budget.
+    # Without this, a 3-topic query spawns ~9 researchers (3 per topic) and exceeds
+    # the pipeline timeout. Limit to 2 researchers per sub-topic (≤ 6 total).
+    scope_instruction = (
+        "\n\nIMPORTANT: Keep the research pipeline efficient. "
+        "Spawn at most 2 researcher sub-agents per sub-topic and no more than "
+        "6 researcher sub-agents in total for any query. "
+        "Prefer broader, well-structured research questions over narrow ones "
+        "so each researcher covers more ground per invocation."
+    )
+
     return ClaudeAgentOptions(
         permission_mode="bypassPermissions",
         setting_sources=["project"],
-        system_prompt=lead_agent_prompt + summary_instruction,
+        system_prompt=lead_agent_prompt + summary_instruction + scope_instruction,
         allowed_tools=["Task"],
         agents=agents,
         hooks=hooks,

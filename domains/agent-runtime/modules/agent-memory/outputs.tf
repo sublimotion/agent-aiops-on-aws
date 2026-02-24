@@ -1,9 +1,9 @@
 output "table_name" {
   description = "DynamoDB session state table name"
-  value       = "" # populated after first RALPH loop
+  value       = aws_dynamodb_table.sessions.name
 }
 
 output "table_arn" {
   description = "DynamoDB session state table ARN"
-  value       = "" # populated after first RALPH loop
+  value       = aws_dynamodb_table.sessions.arn
 }

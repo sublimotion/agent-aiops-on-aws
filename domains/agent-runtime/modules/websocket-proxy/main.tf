@@ -1,7 +1,8 @@
 # WebSocket Proxy module
-# Deploys a Node.js WebSocket proxy on ECS Fargate (ARM64) that forwards
-# authenticated client connections to the Bedrock AgentCore Runtime.
-# Stub — fill in resource definitions during first RALPH loop for an agent-runtime blueprint.
+# Deploys the research agent container on ECS Fargate (ARM64) behind an ALB.
+# The container runs server.py (FastAPI) which wraps agent.main() and streams
+# responses back as SSE. "websocket-proxy" is the historical module name;
+# it actually serves HTTP + SSE, not a raw WebSocket.
 
 terraform {
   required_providers {
@@ -10,4 +11,303 @@ terraform {
       version = ">= 5.0"
     }
   }
+}
+
+data "aws_region" "current" {}
+data "aws_caller_identity" "current" {}
+
+# ---------------------------------------------------------------------------
+# CloudWatch log group
+# ---------------------------------------------------------------------------
+
+resource "aws_cloudwatch_log_group" "agent" {
+  name              = "/ecs/${var.name}"
+  retention_in_days = 14
+  tags              = var.tags
+}
+
+# ---------------------------------------------------------------------------
+# IAM — ECS task execution role (image pull + log delivery)
+# ---------------------------------------------------------------------------
+
+data "aws_iam_policy_document" "ecs_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["ecs-tasks.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "exec" {
+  name               = "${var.name}-ecs-exec"
+  assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
+  tags               = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "exec_managed" {
+  role       = aws_iam_role.exec.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+# ---------------------------------------------------------------------------
+# IAM — ECS task role (agent runtime permissions)
+# ---------------------------------------------------------------------------
+
+resource "aws_iam_role" "task" {
+  name               = "${var.name}-ecs-task"
+  assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
+  tags               = var.tags
+}
+
+data "aws_iam_policy_document" "task_permissions" {
+  statement {
+    sid     = "BedrockInvoke"
+    actions = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
+    resources = [
+      "arn:aws:bedrock:*::foundation-model/*",
+      "arn:aws:bedrock:*:*:inference-profile/*",
+    ]
+  }
+
+  statement {
+    sid       = "BedrockAgentInvoke"
+    actions   = ["bedrock-agent-runtime:InvokeAgent", "bedrock-agent-runtime:InvokeAgentWithResponseStream"]
+    resources = ["arn:aws:bedrock:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:agent-alias/${var.agent_id}/${var.agent_alias_id}"]
+  }
+
+  statement {
+    sid     = "S3Output"
+    actions = ["s3:PutObject", "s3:GetObject", "s3:ListBucket"]
+    resources = [
+      var.s3_output_bucket_arn,
+      "${var.s3_output_bucket_arn}/*",
+    ]
+  }
+
+  statement {
+    sid       = "SecretsRead"
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [var.search_api_secret_arn, var.tavily_api_key_secret_arn]
+  }
+
+  statement {
+    sid = "DynamoSessions"
+    actions = [
+      "dynamodb:GetItem", "dynamodb:PutItem",
+      "dynamodb:UpdateItem", "dynamodb:DeleteItem",
+    ]
+    resources = [var.session_table_arn]
+  }
+}
+
+resource "aws_iam_role_policy" "task_permissions" {
+  name   = "agent-permissions"
+  role   = aws_iam_role.task.id
+  policy = data.aws_iam_policy_document.task_permissions.json
+}
+
+# ---------------------------------------------------------------------------
+# Security groups
+# ---------------------------------------------------------------------------
+
+resource "aws_security_group" "alb" {
+  name        = "${var.name}-alb"
+  description = "ALB inbound HTTP"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(var.tags, { Name = "${var.name}-alb" })
+}
+
+resource "aws_security_group" "ecs" {
+  name        = "${var.name}-ecs"
+  description = "ECS tasks - inbound from ALB only"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    from_port       = var.container_port
+    to_port         = var.container_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(var.tags, { Name = "${var.name}-ecs" })
+}
+
+# ---------------------------------------------------------------------------
+# ALB
+# ---------------------------------------------------------------------------
+
+resource "aws_lb" "this" {
+  name               = "${var.name}-alb"
+  internal           = true
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb.id]
+  subnets            = var.subnet_ids
+  tags               = var.tags
+}
+
+resource "aws_lb_target_group" "this" {
+  name        = "${var.name}-tg"
+  port        = var.container_port
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    path                = "/health"
+    interval            = 30
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+    timeout             = 5
+  }
+
+  tags = var.tags
+}
+
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.this.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.this.arn
+  }
+}
+
+# ---------------------------------------------------------------------------
+# ECS cluster + task definition + service
+# ---------------------------------------------------------------------------
+
+resource "aws_ecs_cluster" "this" {
+  name = var.name
+
+  setting {
+    name  = "containerInsights"
+    value = "enabled"
+  }
+
+  tags = var.tags
+}
+
+resource "aws_ecs_task_definition" "agent" {
+  family                   = var.name
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = tostring(var.cpu)
+  memory                   = tostring(var.memory)
+  execution_role_arn       = aws_iam_role.exec.arn
+  task_role_arn            = aws_iam_role.task.arn
+  runtime_platform {
+    operating_system_family = "LINUX"
+    cpu_architecture        = "ARM64"
+  }
+
+  volume {
+    name = "efs-files"
+    efs_volume_configuration {
+      file_system_id     = var.efs_file_system_id
+      root_directory     = "/"
+      transit_encryption = "ENABLED"
+    }
+  }
+
+  container_definitions = jsonencode([
+    {
+      name      = "agent"
+      image     = var.image_uri
+      essential = true
+
+      portMappings = [
+        {
+          containerPort = var.container_port
+          protocol      = "tcp"
+        }
+      ]
+
+      mountPoints = [
+        {
+          sourceVolume  = "efs-files"
+          containerPath = "/app/files"
+          readOnly      = false
+        }
+      ]
+
+      environment = [
+        { name = "AWS_DEFAULT_REGION", value = data.aws_region.current.id },
+        { name = "AWS_BEDROCK_REGION", value = data.aws_region.current.id },
+        { name = "ANTHROPIC_BEDROCK", value = "1" },
+        { name = "S3_OUTPUT_BUCKET", value = var.s3_output_bucket_name },
+        { name = "SEARCH_API_SECRET_ARN", value = var.search_api_secret_arn },
+        { name = "SESSION_TABLE_NAME", value = var.session_table_name },
+        { name = "PORT", value = tostring(var.container_port) },
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.agent.name
+          "awslogs-region"        = data.aws_region.current.id
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
+    }
+  ])
+
+  tags = var.tags
+}
+
+resource "aws_ecs_service" "agent" {
+  name                   = var.name
+  cluster                = aws_ecs_cluster.this.id
+  task_definition        = aws_ecs_task_definition.agent.arn
+  desired_count          = var.desired_count
+  launch_type            = "FARGATE"
+  enable_execute_command = true
+
+  network_configuration {
+    subnets          = var.subnet_ids
+    security_groups  = [aws_security_group.ecs.id]
+    assign_public_ip = false
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.this.arn
+    container_name   = "agent"
+    container_port   = var.container_port
+  }
+
+  depends_on = [aws_lb_listener.http]
+
+  tags = var.tags
 }

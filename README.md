@@ -70,6 +70,7 @@ domains/                      # Domain-specific modules, specs, blueprints
     │   ├── websocket-proxy/      # Node.js proxy on ECS Fargate (ARM64)
     │   └── agent-memory/         # DynamoDB session state
     ├── blueprints/           # Agent Runtime blueprints
+    │   └── research-agent/   # Multi-agent research system
     └── specs/                # Agent Runtime specs
         └── _template-agent-runtime.md
 

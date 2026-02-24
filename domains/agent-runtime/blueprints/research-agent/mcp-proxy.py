@@ -118,7 +118,7 @@ def _run_job(job_id: str, query: str) -> None:
         )
         body = resp.get("response", b"")
         final_result = None
-        MAX_JOB_SECONDS = 1800  # 30-minute wall-clock cap
+        MAX_JOB_SECONDS = 3600  # 60-minute wall-clock cap (server ceiling is 45 min)
         job_start = _time.monotonic()
         if hasattr(body, "iter_lines"):
             for raw in body.iter_lines():

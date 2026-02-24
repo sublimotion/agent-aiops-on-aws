@@ -109,6 +109,7 @@ done
 # Custom build repos (built separately via Dockerfiles)
 create_repo "vllm-mooncake"
 create_repo "dynamo-kvbm"
+create_repo "sglang-hicache"
 echo ""
 
 # ============================================================================
@@ -228,13 +229,19 @@ for source in "${!SUPPORT_IMAGES[@]}"; do
   mirror_image "${source}" "${SUPPORT_IMAGES[${source}]}"
 done
 
+# --- SGLang base image (for HiCache configs S1/S2) ---
+echo ">>> Mirroring SGLang base image..."
+SGLANG_SOURCE="lmsysorg/sglang:latest-cu130"
+SGLANG_REPO="sglang-hicache"
+mirror_image_pin_digest "${SGLANG_SOURCE}" "${SGLANG_REPO}"
+
 # ============================================================================
 # Step 4: Build and push custom images
 # ============================================================================
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # --- Config B: vLLM + Mooncake (custom build) ---
-MOONCAKE_DOCKERFILE="${SCRIPT_DIR}/../blueprints/kimi-k2.5/docker/Dockerfile.vllm-mooncake"
+MOONCAKE_DOCKERFILE="${SCRIPT_DIR}/../domains/gpu-serving/blueprints/kimi-k2.5/docker/Dockerfile.vllm-mooncake"
 if [ -f "${MOONCAKE_DOCKERFILE}" ]; then
   echo ">>> Building vLLM + Mooncake custom image (Config B)..."
   MOONCAKE_TAG="${ECR_REGISTRY}/vllm-mooncake:cu130"
@@ -255,7 +262,7 @@ else
 fi
 
 # --- Config C: Dynamo KVBM (custom build) ---
-DYNAMO_DOCKERFILE="${SCRIPT_DIR}/../blueprints/kimi-k2.5/docker/Dockerfile.dynamo-kvbm"
+DYNAMO_DOCKERFILE="${SCRIPT_DIR}/../domains/gpu-serving/blueprints/kimi-k2.5/docker/Dockerfile.dynamo-kvbm"
 if [ -f "${DYNAMO_DOCKERFILE}" ]; then
   echo ">>> Building Dynamo KVBM custom image (Config C)..."
   DYNAMO_TAG="${ECR_REGISTRY}/dynamo-kvbm:v0.9.0"
@@ -273,6 +280,27 @@ if [ -f "${DYNAMO_DOCKERFILE}" ]; then
   echo ""
 else
   echo "  [skip] Dynamo Dockerfile not found at ${DYNAMO_DOCKERFILE}"
+fi
+
+# --- Config S1/S2/S3: SGLang HiCache + Mooncake (custom build) ---
+SGLANG_DOCKERFILE="${SCRIPT_DIR}/../domains/gpu-serving/blueprints/kimi-k2.5/docker/Dockerfile.sglang-hicache"
+if [ -f "${SGLANG_DOCKERFILE}" ]; then
+  echo ">>> Building SGLang HiCache + Mooncake custom image (Config S1/S2/S3)..."
+  SGLANG_TAG="${ECR_REGISTRY}/sglang-hicache:cu130"
+
+  docker build \
+    --platform linux/amd64 \
+    -f "${SGLANG_DOCKERFILE}" \
+    -t "${SGLANG_TAG}" \
+    "$(dirname "${SGLANG_DOCKERFILE}")"
+
+  echo "  [push] ${SGLANG_TAG}"
+  docker push "${SGLANG_TAG}"
+
+  docker rmi "${SGLANG_TAG}" 2>/dev/null || true
+  echo ""
+else
+  echo "  [skip] SGLang Dockerfile not found at ${SGLANG_DOCKERFILE}"
 fi
 
 # ============================================================================
@@ -296,6 +324,12 @@ vllm_mooncake_image        = "${ECR_REGISTRY}/vllm-mooncake:cu130"
 
 # Config C: Dynamo
 dynamo_kvbm_image          = "${ECR_REGISTRY}/dynamo-kvbm:v0.9.0"
+
+# Config S1/S2: SGLang HiCache (base image for Phase 1/2)
+sglang_image               = "${ECR_REGISTRY}/sglang-hicache:latest-cu130"
+
+# Config S3: SGLang HiCache + Mooncake (custom build for Phase 3)
+sglang_mooncake_image      = "${ECR_REGISTRY}/sglang-hicache:cu130"
 
 # Shared support
 nats_image                 = "${ECR_REGISTRY}/nats:2.10"

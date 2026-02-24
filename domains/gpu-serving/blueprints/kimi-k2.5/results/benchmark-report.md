@@ -3,7 +3,7 @@
 **Model**: Kimi-K2.5 (1T params, native INT4 CompressedTensorsWNA16MarlinMoE)
 **Instance**: p5e.48xlarge (8x NVIDIA H200 143GB HBM3, 1144GB total)
 **Storage**: FSx Lustre PERSISTENT_2 (2.15 TiB, 1000 MB/s/TiB baseline)
-**Dates**: 2026-02-18 / 2026-02-19
+**Dates**: 2026-02-18 / 2026-02-19 / 2026-02-21
 
 ## Hardware & Configuration
 
@@ -367,7 +367,160 @@ that hurts more than helps when GPU KV cache is stressed.
 
 ---
 
+# Part 4: SGLang HiCache Assessment (2026-02-21)
+
+## Executive Summary
+
+SGLang HiCache was the primary target for the 2026-02-21 capacity block, identified in Lesson #31 as the architecturally correct approach for tiered KV cache offloading — it uses cascading eviction (GPU→CPU→Storage) instead of admission gating, so tiered offloading actually triggers under memory pressure.
+
+**Result: BLOCKED.** After four progressive attempts, SGLang v0.5.8.post1 cannot load Kimi K2.5. The root cause is a fundamental weight format incompatibility that cannot be resolved without upstream SGLang changes.
+
+## Attempt Timeline
+
+| # | Approach | Result | Root Cause |
+|---|----------|--------|------------|
+| 1 | Direct launch with `--enforce-eager` | CLI error | `--enforce-eager` is vLLM-only; SGLang uses `--disable-cuda-graph` |
+| 2 | Launch with `--disable-cuda-graph` | Model not found | `KimiK25ForConditionalGeneration` not in SGLang's model registry |
+| 3 | `--language-only` flag | CLI error | Requires `--encoder-urls` (disaggregated inference, not text-only mode) |
+| 4 | Custom `kimi_k25_text.py` wrapper | Weight loading crash | Packed MoE format incompatible with DeepseekV2 weight loader |
+
+## Technical Root Cause
+
+Kimi K2.5 is a multimodal MoE model with `KimiK25ForConditionalGeneration` architecture. Its text backbone is DeepseekV3-based, but the INT4 quantized weights use a **packed expert format**:
+
+```
+# Kimi K2.5 weight keys (packed MoE)
+language_model.model.layers.*.mlp.experts.w13_weight_packed    # gate_proj + up_proj fused
+language_model.model.layers.*.mlp.experts.w2_weight_packed     # down_proj
+
+# SGLang DeepseekV2 expects (per-expert named)
+model.layers.*.mlp.experts.*.gate_proj.weight
+model.layers.*.mlp.experts.*.up_proj.weight
+model.layers.*.mlp.experts.*.down_proj.weight
+```
+
+The `CompressedTensorsWNA16MarlinMoEMethod` quantization format uses group-packed tensors that SGLang's weight loader cannot unpack. vLLM handles this via its Marlin MoE kernel repacking pipeline.
+
+## Custom Wrapper Approach
+
+Created `patches/kimi_k25_text.py` — a text-only wrapper that:
+1. Maps `KimiK25ForConditionalGeneration` → `DeepseekV2ForCausalLM`
+2. Uses `language_model.` prefix for weight name routing
+3. Filters out `vision_tower.*` and `mm_projector.*` weights
+4. Registered via `EntryClass = KimiK25ForConditionalGeneration`
+
+The wrapper successfully passed SGLang's model registry discovery and began weight loading on all 8 GPUs. However, the weight loader crashed on every MoE layer due to the packed format.
+
+## GitHub Issue #18458
+
+SGLang's architecture tracking issue ([sgl-project/sglang#18458](https://github.com/sgl-project/sglang/issues/18458)) lists `KimiK25ForConditionalGeneration` as "Native: Y", but:
+- No `kimi_k25.py` file exists in SGLang's `main` branch (`git ls-tree` confirmed)
+- The `latest-cu130` Docker tag resolves to v0.5.8.post1, same version we tested
+- The issue appears auto-generated from model config scanning, not reflecting merged code
+
+## Requirements for Future SGLang + Kimi K2.5
+
+SGLang needs:
+1. A dedicated weight loader that handles `CompressedTensorsWNA16MarlinMoE` packed format
+2. A model implementation that maps the `language_model.` prefix and multimodal wrapper
+3. Support for MLA (Multi-head Latent Attention) with `outer_dim=64`
+
+Alternatively, test SGLang HiCache with a model SGLang already supports natively (e.g., DeepSeek-V3, Llama 3.1 405B).
+
+---
+
+# Part 5: Baseline Re-Run (2026-02-21)
+
+## Context
+
+After SGLang was blocked, the remaining capacity block time was used for vLLM baseline benchmarks using the `kv-cache` benchmark mode. This provides fresh baseline numbers on the same p5e.48xlarge hardware with vLLM v0.15.1.
+
+## Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Image | `vllm-openai:v0.15.1` |
+| Attention Backend | FLASH_ATTN_MLA |
+| Quantization | CompressedTensorsWNA16MarlinMoE (auto-detected) |
+| Tensor Parallel | 8 |
+| Max Model Len | 32,768 |
+| GPU Memory Util | 0.85 |
+| Model Source | `/mnt/nvme/models/Kimi-K2.5` (NVMe RAID0, copied from FSx) |
+| Model Load Time | ~2 hours (compute-bound Marlin MoE repacking) |
+
+## Results
+
+### KV Cache Workloads (medium QPS)
+
+| Workload | N | TTFT p50 (ms) | TTFT p90 (ms) | E2E p50 (ms) | E2E p90 (ms) | Throughput (tok/s) |
+|----------|---|---------------|---------------|--------------|--------------|-------------------|
+| multi_turn_qa | 10 | 274 | 277 | 13,523 | 13,581 | 11.1 |
+| long_context_rag | 30 | 361 | 367 | 17,958 | 18,035 | 11.1 |
+| strict_no_reuse | 30 | 270 | 276 | 13,420 | 13,630 | 11.2 |
+
+### Long Context Scaling
+
+| Context Size | N | TTFT p50 (ms) | TTFT p90 (ms) | E2E p50 (ms) | E2E p90 (ms) | Throughput (tok/s) |
+|-------------|---|---------------|---------------|--------------|--------------|-------------------|
+| 16K tokens | 10 | 361 | 509 | 13,570 | 13,923 | 11.0 |
+| 24K tokens | 10 | 411 | 449 | 13,704 | 13,822 | 10.9 |
+| 36K tokens | 10 | 506 | 558 | 13,713 | 13,916 | 10.9 |
+| 48K tokens | 10 | 558 | 592 | 13,730 | 13,804 | 10.9 |
+
+TTFT increases roughly linearly with context: 2.06x from 16K→48K (361→558 ms). E2E is nearly flat: 1.01x increase (13,570→13,730 ms) because generation time dominates at 150-token outputs.
+
+### Multi-Tenant (50 tenants, 2 users each)
+
+| Metric | Value |
+|--------|-------|
+| Total Requests | 100 |
+| Success Rate | 100% |
+| TTFT p50 / p90 | 293 / 304 ms |
+| E2E p50 / p90 | 13,492 / 13,638 ms |
+| Cold/Warm Speedup | 1.00x |
+| Throughput | 11.1 tok/s |
+
+No prefix caching benefit observed — cold and warm requests have identical latency.
+
+## Comparison with Feb 18/19 Baseline
+
+| Metric | Feb 18/19 | Feb 21 | Delta |
+|--------|-----------|--------|-------|
+| TTFT (short context) | ~150-180 ms | ~270 ms | +50-80% |
+| E2E (150 tokens) | ~13,500 ms | ~13,500 ms | ~0% |
+| Throughput | ~11 tok/s | ~11 tok/s | ~0% |
+| Reasoning rate | Variable | 0% | Different prompts |
+
+The TTFT increase in the Feb 21 run is attributable to different workload construction — the Feb 18/19 multi-turn tests used incrementally growing context with warmup, while the Feb 21 `kv-cache` mode sends all requests with full shared context from the start (no incremental buildup that benefits from prefix caching).
+
+E2E latency and throughput are consistent across sessions, confirming reproducible generation performance.
+
+## Key Findings
+
+1. **Generation-bound, not prefill-bound**: Throughput is flat at 11 tok/s across all context lengths (16K–48K). The Marlin MoE kernel dominates token generation time. Prefill cost (TTFT) is a small fraction of total E2E at 150-token output length.
+
+2. **No prefix caching benefit in multi-tenant**: The 50-tenant workload shows 1.00x cold/warm speedup, confirming that baseline vLLM's prefix cache doesn't help when each tenant has a unique system prompt. This is the scenario where KV cache offloading frameworks should provide the most value.
+
+3. **Prefix cache metrics were not captured**: The `scrape_prefix_cache_metrics()` function was commented out (Lesson #30 gap). Fix has been applied for future runs.
+
+4. **GDS unavailable on AL2023**: The `nvidia-fs` kernel module is not included in AL2023 EKS AMIs. LMCache must use POSIX mode, eliminating the GPU Direct Storage advantage.
+
+5. **Model loading is compute-bound**: ~2 hours for 64-shard INT4 MoE regardless of storage (NVMe or FSx). Marlin MoE kernel repacking per shard is the bottleneck.
+
+## Infrastructure Notes
+
+| Finding | Impact |
+|---------|--------|
+| AL2023 uses `nodeadm`, not `bootstrap.sh` | First instance launch failed; required CA cert fix |
+| `nvidia-fs` not in AL2023 kernel | GDS unavailable; LMCache falls back to POSIX |
+| SGLang v0.5.8 incompatible with Kimi K2.5 | 3+ hours of capacity block time spent on debugging |
+| SSM heredocs don't work (newline escaping) | Use base64 encoding for file transfers |
+
+---
+
 # Recommendations
+
+## Updated Recommendations (incorporating Feb 21 findings)
 
 ### Deploy LMCache+FSx when:
 - Small/medium GPUs (A10G, L4, A100 40GB) where KV cache is scarce
@@ -375,6 +528,7 @@ that hurts more than helps when GPU KV cache is stressed.
 - Persistent KV cache across restarts is valued
 - Low-to-moderate concurrency (< 10 simultaneous users)
 - 100% reliability under pressure is required
+- **Note**: Use POSIX mode on AL2023 (GDS unavailable); GDS requires custom AMI with `nvidia-fs`
 
 ### Deploy Dynamo KVBM when:
 - Prefix-heavy workloads where TTFT matters (API gateways, multi-tenant SaaS)
@@ -388,9 +542,27 @@ that hurts more than helps when GPU KV cache is stressed.
 - Throughput-critical deployments
 - Cost-sensitive deployments (no FSx Lustre needed)
 
+### Deploy SGLang HiCache when:
+- The model is natively supported by SGLang (check model registry AND weight loader)
+- Cascading eviction (GPU→CPU→NVMe) is desired instead of admission gating
+- Mooncake integration is needed for distributed KV cache
+- **NOT viable for Kimi K2.5** as of SGLang v0.5.8 (packed MoE weight format incompatible)
+- Consider testing with DeepSeek-V3 or Llama 3.1 405B instead
+
 ### Always:
 - Benchmark with your actual workload, reasoning parser config, and concurrency level
 - Monitor `vllm:num_preemptions_total` — sustained preemptions indicate GPU memory pressure
+- Capture prefix cache hit/miss metrics (`prefix_cache_hit_total` / `prefix_cache_miss_total`) in every run
+- Verify SGLang model support before reserving GPU capacity: (1) architecture in registry, (2) weight format compatible, (3) test on CPU-only instance first
+
+### Next Steps
+
+1. **Test disaggregated prefill/decode** — Split 8x H200 into TP=4 prefill + TP=4 decode pools. Use LMCache multi-node mode (`--kv-connector LMCacheConnector --kv-role kv_producer` / `kv_consumer`) with FSx as the shared KV cache fabric. This reframes FSx from "disk offload" (never triggers on H200s) to "inter-node KV transfer layer" (the actual high-value use case). See Lesson #37.
+2. **Re-run LMCache in POSIX mode** with prefix cache metrics enabled and memory pressure workload
+3. **Re-run Dynamo KVBM** with prefix cache metrics enabled
+4. **Increase output length** to 500–1000 tokens to create more KV cache pressure
+5. **Test SGLang HiCache** with a natively supported model (DeepSeek-V3) to validate the cascading eviction architecture
+6. **Build custom AMI with nvidia-fs** to enable GDS for LMCache if POSIX results are promising
 
 ---
 
@@ -412,14 +584,15 @@ and are not directly comparable to these results.
 
 Results are organized by configuration:
 
-| Directory | Configuration |
-|-----------|--------------|
-| `kimi-k2.5-p5e/baseline/` | Baseline vLLM |
-| `kimi-k2.5-p5e/lmcache/` | LMCache + GDS |
-| `kimi-k2.5-p5e-baseline/` | Early baseline runs |
-| `kimi-k2.5-p5e-baseline-full/` | Full baseline suite |
-| `kimi-k2.5-p5e-v2/` | Refined test runs |
-| `dynamo_*.json` | Dynamo KVBM results |
+| Directory | Configuration | Session |
+|-----------|--------------|---------|
+| `kimi-k2.5-p5e/baseline/` | Baseline vLLM | Feb 18/19 |
+| `kimi-k2.5-p5e/lmcache/` | LMCache + GDS | Feb 18/19 |
+| `kimi-k2.5-p5e-baseline/` | Early baseline runs | Feb 18 |
+| `kimi-k2.5-p5e-baseline-full/` | Full baseline suite | Feb 18 |
+| `kimi-k2.5-p5e-v2/` | Refined test runs | Feb 19 |
+| `dynamo_*.json` | Dynamo KVBM results | Feb 19 |
+| `session-20260221/baseline/` | Baseline re-run (kv-cache mode) | Feb 21 |
 
 # Appendix: Model Precision
 

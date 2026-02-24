@@ -118,6 +118,9 @@ Launch scripts for each configuration are in `configs/`. All use `nerdctl` (the 
 | LMCache + POSIX | `configs/lmcache-posix.sh` | KV cache offloading to FSx via CPU bounce (no GDS) |
 | Dynamo KVBM | `configs/dynamo.sh` | NVIDIA Dynamo tiered KV cache (VRAM -> DRAM -> NVMe -> FSx) |
 | Mooncake | `configs/mooncake.sh` | Mooncake as L3 storage backend |
+| SGLang HiCache | `configs/sglang-hicache.sh` | SGLang with cascading GPU→CPU KV cache |
+| SGLang HiCache + NVMe | `configs/sglang-hicache-nvme.sh` | SGLang HiCache with NVMe L3 tier |
+| SGLang Mooncake | `configs/sglang-mooncake.sh` | SGLang HiCache with Mooncake L3 via RDMA |
 
 **Baseline example** (start here to verify the model loads correctly):
 
@@ -139,9 +142,19 @@ bash scripts/setup-dynamo-p5e.sh     # install Dynamo, verify GPUs, GDS drivers
 bash configs/dynamo.sh               # start vLLM with Dynamo KVBM
 ```
 
+**SGLang HiCache** (requires additional setup):
+
+```bash
+bash scripts/setup-sglang-p5e.sh     # verify GPUs, pull SGLang image, check HiCache
+bash configs/sglang-hicache.sh       # Phase 1: HiCache baseline (GPU→CPU)
+bash configs/sglang-hicache-nvme.sh  # Phase 2: HiCache + NVMe L3
+bash configs/sglang-mooncake.sh      # Phase 3: HiCache + Mooncake L3 (RDMA)
+```
+
 Docker images for Dynamo and Mooncake are in `docker/`:
 - `docker/Dockerfile.dynamo-kvbm` -- Dynamo KVBM image with MLA patch (`docker/dynamo-kvbm-mla.patch`)
 - `docker/Dockerfile.vllm-mooncake` -- vLLM with Mooncake integration
+- `docker/Dockerfile.sglang-hicache` -- SGLang with HiCache + Mooncake support
 - `docker/dynamo-config.yaml` / `docker/dynamo-config-posix.yaml` -- Dynamo runtime configs
 
 ### Step 6: Run Benchmarks
@@ -199,6 +212,7 @@ These are always applied (see `configs/baseline.sh` for the canonical reference)
 | `scripts/stripe-model-fsx.sh` | Re-stripe model files across all FSx OSTs for max throughput |
 | `scripts/setup-dynamo-p5e.sh` | Install NVIDIA Dynamo KVBM, verify GPUs and GDS drivers |
 | `scripts/setup-lmcache-p5e.sh` | Install LMCache with vLLM integration |
+| `scripts/setup-sglang-p5e.sh` | Verify GPUs, pull SGLang image, validate HiCache |
 | `scripts/validate-storage.sh` | Pre-flight validation of S3, FSx, DRA, EFA |
 | `scripts/validate-gds.md` | GDS validation reference (manual steps) |
 | `scripts/run-benchmarks.py` | Full benchmark suite (10 workload types, JSON output) |
@@ -212,6 +226,9 @@ These are always applied (see `configs/baseline.sh` for the canonical reference)
 | `configs/lmcache-posix.sh` | vLLM + LMCache with POSIX fallback (no GDS) |
 | `configs/dynamo.sh` | vLLM + NVIDIA Dynamo KVBM |
 | `configs/mooncake.sh` | vLLM + Mooncake L3 backend |
+| `configs/sglang-hicache.sh` | SGLang HiCache baseline (GPU→CPU) |
+| `configs/sglang-hicache-nvme.sh` | SGLang HiCache + NVMe L3 tier |
+| `configs/sglang-mooncake.sh` | SGLang HiCache + Mooncake L3 (RDMA) |
 | `configs/comparison.yaml` | Side-by-side config comparison matrix |
 | `configs/dynamo-gds.yaml` | Dynamo GDS-specific Kubernetes manifest |
 
@@ -221,6 +238,7 @@ These are always applied (see `configs/baseline.sh` for the canonical reference)
 |------|---------|
 | `docker/Dockerfile.dynamo-kvbm` | Dynamo KVBM image with MLA patch |
 | `docker/Dockerfile.vllm-mooncake` | vLLM + Mooncake image |
+| `docker/Dockerfile.sglang-hicache` | SGLang + HiCache + Mooncake image |
 | `docker/dynamo-config.yaml` | Dynamo GDS runtime config |
 | `docker/dynamo-config-posix.yaml` | Dynamo POSIX fallback runtime config |
 | `docker/dynamo-kvbm-mla.patch` | Patch for MLA support in Dynamo |

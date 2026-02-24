@@ -20,33 +20,35 @@ agent-aiops-on-aws/
 │   │   └── visual-explainer/   # Render dense output as interactive HTML
 │   └── ralph-loop.local.md     # RALPH loop state
 │
-├── modules/                    # Reusable Terraform modules (GPU Serving domain)
-│   ├── networking/             # VPC, subnets, endpoints
-│   ├── eks-cluster/            # EKS with GPU support
-│   ├── sagemaker-studio/       # SageMaker domain + IAM
-│   ├── vllm/                   # vLLM Kubernetes deployment
-│   ├── fsx-lustre/             # FSx for Lustre filesystem
-│   └── monitoring/             # Prometheus + Grafana
-│
-├── blueprints/                 # GPU Serving blueprints
-│   ├── ministral-3b/           # Ministral-3B on EKS + SageMaker
-│   └── kimi-k2.5/             # Kimi K2.5 MoE on p5e (8x H200)
-│
-├── specs/                      # GPU Serving specs
-│   ├── _template.md            # Template for new specs
-│   ├── ministral-3b.md         # Ministral-3B requirements
-│   └── kimi-k2.5.md            # KV cache benchmark requirements
-│
 ├── domains/                    # Domain-specific modules, specs, blueprints
+│   ├── gpu-serving/            # GPU Serving domain
+│   │   ├── modules/            # Reusable Terraform modules
+│   │   │   ├── networking/     # VPC, subnets, endpoints
+│   │   │   ├── eks-cluster/    # EKS with GPU support
+│   │   │   ├── sagemaker-studio/ # SageMaker domain + IAM
+│   │   │   ├── vllm/           # vLLM Kubernetes deployment
+│   │   │   ├── fsx-lustre/     # FSx for Lustre filesystem
+│   │   │   └── monitoring/     # Prometheus + Grafana
+│   │   ├── blueprints/         # GPU Serving blueprints
+│   │   │   ├── ministral-3b/   # Ministral-3B on EKS + SageMaker
+│   │   │   ├── kimi-k2.5/     # Kimi K2.5 MoE on p5e (8x H200)
+│   │   │   └── qwen3-next/    # Qwen3-Next MoE on p5en (8x H200)
+│   │   └── specs/              # GPU Serving specs
+│   │       ├── _template.md    # Template for new specs
+│   │       ├── ministral-3b.md # Ministral-3B requirements
+│   │       ├── kimi-k2.5.md   # KV cache benchmark requirements
+│   │       └── qwen3-next.md  # Qwen3-Next KV cache benchmark
 │   └── agent-runtime/          # Bedrock AgentCore Runtime domain
 │       ├── modules/            # Reusable Terraform modules for agent runtime
 │       │   ├── agentcore-runtime/  # Bedrock AgentCore Runtime resource
 │       │   ├── cognito-app-auth/   # User pool + app client
 │       │   ├── websocket-proxy/    # Node.js proxy on ECS Fargate
 │       │   └── agent-memory/       # DynamoDB session state
-│       ├── blueprints/         # Agent Runtime blueprints (empty until first RALPH loop)
+│       ├── blueprints/         # Agent Runtime blueprints
+│       │   └── research-agent/ # Multi-agent research system on AgentCore Runtime
 │       └── specs/              # Agent Runtime specs
-│           └── _template-agent-runtime.md
+│           ├── _template-agent-runtime.md
+│           └── research-agent.md
 │
 ├── scripts/                    # Shared utility scripts
 │   └── stage-images-ecr.sh    # Mirror images to private ECR
@@ -100,110 +102,62 @@ blueprints/<name>/
 │   └── <variant>.sh
 ├── scripts/            # Orchestration + validation tooling
 │   ├── run-benchmarks.py
-│   └── validate-*.sh
-├── results/            # All benchmark outputs
-│   ├── benchmark-report.md    # Consolidated findings
-│   ├── execution-log.md       # Commands used to run benchmarks
-│   └── <run-name>/            # Per-run JSON results
-├── docs/               # All written knowledge (reference + decisions)
-│   ├── <topic>.md             # Technical reference
-│   └── <assessment>.md        # Technology evaluations / design plans
-├── docker/             # Custom container images (if needed)
-└── templates/          # EC2 user data, Helm values (if needed)
+│   └── validate.sh
+├── docker/             # Container images (if needed)
+│   ├── Dockerfile
+│   └── requirements.txt
+└── results/            # Benchmark reports, architecture diagrams
+    ├── <report>.md
+    └── <diagram>.html
 ```
 
-### Directory purposes
+## Spec Structure
 
-| Directory | Contains | Examples |
-|-----------|----------|---------|
-| `configs/` | What to launch | Shell scripts, YAML configs per serving variant |
-| `scripts/` | How to run and validate | Benchmark orchestrators, storage validators |
-| `results/` | What happened | Reports, execution logs, raw JSON data |
-| `docs/` | What we know | Technical reference, design plans, assessments |
+Specs live in `domains/<domain>/specs/` and define requirements for a blueprint.
 
-### File naming conventions
+```markdown
+# <Domain> Spec: <Name>
 
-| Rule | Example |
-|------|---------|
-| `lowercase-kebab-case` for all files | `moe-loading-best-practices.md` |
-| No model prefix on filenames | `run-benchmarks.py` not `run-kimi-benchmarks.py` |
-| Flat configs, one file per variant | `configs/lmcache.sh` not `configs/lmcache/run.sh` |
-| Single consolidated report | `results/benchmark-report.md` |
+## Overview
+Brief description (1-3 sentences)
 
-**Blueprint naming**: `<model>-<variant>` or `<purpose>-<details>`
+## Configuration
+Table of parameters (model, hardware, etc.)
 
-Examples:
-- `ministral-3b` — Ministral-3B inference
-- `kimi-k2.5` — Kimi K2.5 MoE benchmarking
+## Architecture
+Components and their relationships
 
-## Specs vs Blueprints
+## Success Criteria
+Concrete, testable outcomes
 
-| Concern | Lives in | Example |
-|---------|----------|---------|
-| Requirements | `specs/<name>.md` | What to deploy, success criteria |
-| Infrastructure | `blueprints/<name>/*.tf` | Terraform code |
-| Lessons learned | `blueprints/<name>/lessons.md` | Operational gotchas |
-| Launch configs | `blueprints/<name>/configs/` | Per-variant shell scripts |
-| Benchmark tooling | `blueprints/<name>/scripts/` | Orchestrators, validators |
-| Benchmark outputs | `blueprints/<name>/results/` | Reports, raw JSON, execution logs |
-| Knowledge | `blueprints/<name>/docs/` | Reference, decisions, assessments |
-
-Specs stay at the repo root because they're authored before the blueprint exists. Everything operational belongs with the blueprint.
-
-## Spec Files
-
-Specs define requirements and are the input to blueprint creation:
-
-```
-specs/
-├── _template.md                  # Template for new specs
-├── ministral-3b.md               # Ministral-3B requirements
-└── kimi-k2.5.md                  # KV cache benchmark requirements
+## Non-Requirements
+What this does NOT need to do
 ```
 
-Spec lifecycle:
-1. Define requirements before coding (use `_template.md`)
-2. Deploy via `/ralph-loop Deploy specs/<name>.md`
-3. Operational artifacts go into the blueprint, not the spec
+## Steering Files
+
+`.claude/steering/` contains persistent context loaded on demand by Claude Code.
+
+| File | Purpose | When to Update |
+|------|---------|----------------|
+| `product.md` | Business context, quality standards | Rarely (foundational) |
+| `tech-stack.md` | Technology preferences (all domains) | When adopting new tools |
+| `project-structure.md` | Layout and conventions | When adding domains/blueprints |
 
 ## File Naming Conventions
 
-| Pattern | Purpose |
-|---------|---------|
-| `*.tf` | Terraform configuration |
-| `*.tfvars` | Variable values |
-| `.checkov.yaml` | Checkov skip configuration |
-| `CLAUDE.md` | Project context for Claude |
-| `README.md` | Human documentation |
-
-## Configuration Locations
-
-| File | Scope | Purpose |
-|------|-------|---------|
-| `.claude/steering/` | Project | Persistent context |
-| `.checkov.yaml` | Blueprint | Security exceptions |
-| `.pre-commit-config.yaml` | Root | Pre-commit hooks |
+- Terraform: `main.tf`, `variables.tf`, `outputs.tf`
+- Modules: lowercase with hyphens (`eks-cluster/`, `agent-memory/`)
+- Blueprints: lowercase with hyphens (`ministral-3b/`, `research-agent/`)
+- Specs: match blueprint name (`ministral-3b.md`, `research-agent.md`)
+- Scripts: lowercase with hyphens (`run-benchmarks.py`, `stage-images-ecr.sh`)
+- Results: descriptive names with dates (`benchmark-report-20260221.md`)
 
 ## Adding a New Blueprint
 
-### GPU Serving domain
-
-1. Create spec in `specs/<name>.md` using `_template.md`
-2. Create `blueprints/<name>/` directory
-3. Compose existing modules in `main.tf`
-4. Add `variables.tf`, `outputs.tf`, `README.md`
-5. Deploy using `infra-deployer` agent
-6. Add `lessons.md` with operational findings
-7. Add `results/` and `configs/` as work progresses
-
-### Agent Runtime domain
-
-1. Create spec in `domains/agent-runtime/specs/<name>.md` using `_template-agent-runtime.md`
-2. Create `domains/agent-runtime/blueprints/<name>/` directory
-3. Compose modules from `domains/agent-runtime/modules/` in `main.tf`
-4. Add `variables.tf`, `outputs.tf`, `README.md`
-5. Deploy using `agentcore-deployer` agent (8-stage: Foundation → Compound)
-6. Add `lessons.md` with operational findings
-7. Add `results/` as work progresses
-
-See `CLAUDE.md` Domain Routing table for deployer agent and spec/blueprint location per domain.
+1. Write spec in `domains/<domain>/specs/<name>.md`
+2. Run `/ralph-loop:ralph-loop Deploy domains/<domain>/specs/<name>.md`
+3. Claude creates `domains/<domain>/blueprints/<name>/` with terraform files
+4. Deployment succeeds → capture lessons in `lessons.md`
+5. Run compound-learner to elevate cross-cutting lessons to steering files
+6. Update this file's repository layout tree if the blueprint introduces new patterns

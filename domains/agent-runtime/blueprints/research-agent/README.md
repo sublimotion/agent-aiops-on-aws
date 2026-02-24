@@ -51,8 +51,8 @@ Cognito (auth) · Secrets Manager (Tavily + Brave API keys) · ECR (container im
 |-----------|-------|
 | Runtime ARN | `arn:aws:bedrock-agentcore:us-east-1:615299764834:runtime/research_agent-fyUZrR80VG` |
 | Endpoint | `research_agent_endpoint` |
-| Live version | **28** (Tavily primary search + Brave fallback via MCP server) |
-| ECR image | `615299764834.dkr.ecr.us-east-1.amazonaws.com/research-agent:v28` |
+| Live version | **32** (S3_OUTPUT_BUCKET injected via --environment-variables; auto-discovery fallback) |
+| ECR image | `615299764834.dkr.ecr.us-east-1.amazonaws.com/research-agent:v32` |
 | S3 output bucket | `research-agent-output-20260221145504871200000003` |
 
 ## Deploy
@@ -136,12 +136,17 @@ ECR_URL="${ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/research-agent"
 RUNTIME_ID="research_agent-fyUZrR80VG"
 ROLE_ARN="arn:aws:iam::${ACCOUNT}:role/research-agent-agentcore-exec"
 
+S3_BUCKET=$(aws s3api list-buckets --query 'Buckets[?starts_with(Name,`research-agent-output`)].Name' --output text)
+
 # Update runtime → creates new version
+# --environment-variables injects S3_OUTPUT_BUCKET into every AgentCore container instance.
+# Without this, server.py's _upload_outputs_to_s3 cannot find the bucket and silently skips.
 NEW_VERSION=$(aws bedrock-agentcore-control update-agent-runtime \
   --agent-runtime-id $RUNTIME_ID \
   --role-arn $ROLE_ARN \
   --network-configuration '{"networkMode":"PUBLIC"}' \
   --agent-runtime-artifact "{\"containerConfiguration\":{\"containerUri\":\"${ECR_URL}:latest\"}}" \
+  --environment-variables "{\"S3_OUTPUT_BUCKET\":\"${S3_BUCKET}\",\"AWS_REGION\":\"us-east-1\",\"FILES_BASE\":\"/app/files\"}" \
   --query 'agentRuntimeVersion' --output text)
 
 echo "Created version $NEW_VERSION — waiting for READY..."

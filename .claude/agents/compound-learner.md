@@ -12,7 +12,7 @@ The guiding principle: each deployment cycle should reduce friction for the next
 ## Inputs to review
 
 Given a blueprint path (e.g., `kimi-k2.5` or `domains/agent-runtime/blueprints/my-agent`), resolve the full blueprint directory:
-- GPU Serving domain: `blueprints/<name>/`
+- GPU Serving domain: `domains/gpu-serving/blueprints/<name>/`
 - Agent Runtime domain: `domains/agent-runtime/blueprints/<name>/`
 
 Then collect:
