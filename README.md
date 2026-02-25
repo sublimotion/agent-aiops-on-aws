@@ -260,6 +260,7 @@ Press `Ctrl+C` or use:
 |-----------|-------------|------|
 | [ministral-3b](blueprints/ministral-3b/) | Ministral-3B on EKS + SageMaker | [specs/ministral-3b.md](specs/ministral-3b.md) |
 | [kimi-k2.5](blueprints/kimi-k2.5/) | Kimi K2.5 (1T MoE) on p5e.48xlarge, KV cache benchmarks across vLLM, LMCache, Dynamo | [specs/kimi-k2.5.md](specs/kimi-k2.5.md) |
+| [qwen3-next](blueprints/qwen3-next/) | Qwen3-Next-80B (80B MoE, 3B active) on p5en.48xlarge, latency-optimized benchmarks across vLLM and SGLang | [specs/qwen3-next.md](specs/qwen3-next.md) |
 
 ## Key Patterns
 

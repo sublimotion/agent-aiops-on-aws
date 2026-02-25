@@ -12,6 +12,38 @@
 | **AWS CDK** | Infrastructure as Code | Secondary |
 | **CloudFormation** | Infrastructure as Code | Avoid (use Terraform/CDK) |
 
+### Deployment Conventions
+
+#### Single-node GPU deployments: scale to 0 before changing GPU resource requests
+
+When changing GPU resource allocation on a single-node Kubernetes deployment (e.g., TP=4 to TP=8), scale to 0 replicas before applying Terraform changes, then scale back to 1. Rolling updates cannot work when the new pod requires more GPUs than are available after the old pod's allocation is accounted for. This prevents scheduling deadlocks where the new pod waits indefinitely for resources held by the old pod.
+
+```bash
+kubectl -n <namespace> scale deployment <name> --replicas=0
+terraform apply -target='<deployment_resource>' -auto-approve
+kubectl -n <namespace> scale deployment <name> --replicas=1
+```
+
+#### Air-gapped serving environments require local tokenizer paths for benchmarking
+
+When `HF_HUB_OFFLINE=1` is set in the serving container (air-gapped, no HuggingFace Hub access), benchmark tools like `vllm bench serve` must use `--tokenizer /path/to/local/model` to point at the local model directory. The `--model` flag specifies the API-facing served model name, not the filesystem path.
+
+#### Always document benchmark execution location before running
+
+Record whether benchmarks run via `kubectl port-forward` (from local machine) or server-side (inside the cluster via `kubectl exec`). Port-forward benchmarks measure client → API server → pod latency; server-side benchmarks measure pod-local inference latency only. This distinction is critical for interpreting TTFT and E2E latency results.
+
+#### FP8 quantization compatibility check for MoE models
+
+Before reserving GPU capacity for Mixture-of-Experts models with FP8 quantization, verify that all weight dimensions (including shared experts) remain divisible by `block_k` (typically 128) at the target tensor parallelism degree. Example: if a shared expert MLP `down_proj` has `input_size=512`, TP=8 produces `input_size_per_partition=64`, which is not divisible by 128 and will cause a ValueError at model load time. Test TP compatibility on a CPU-only or smaller GPU instance before committing to a capacity block.
+
+#### Budget for JIT compilation startup time on first-run serving stacks
+
+Serving frameworks with JIT compilation (e.g., SGLang's DeepGEMM, TensorRT-LLM engine builds) can take 10-15 minutes for first-time startup. Subsequent restarts are faster if the JIT cache is preserved. In capacity-block benchmarking scenarios, include this warmup time in the session plan to avoid losing billable GPU hours to compilation overhead. Consider pre-compiling before the capacity block starts if the serving framework supports offline compilation.
+
+#### For MoE models, favor tensor parallelism over data parallelism with expert parallelism at single-node scale
+
+When serving Mixture-of-Experts models with many experts (hundreds) on a single multi-GPU node, tensor parallelism typically outperforms data parallelism with expert parallelism. Expert parallelism requires cross-GPU communication for MoE routing at every layer, which adds significant latency overhead when each GPU runs a full replica with TP=1. Tensor parallelism keeps MoE routing local to each GPU's shard and benefits from weight distribution. Data parallelism with expert parallelism may become competitive in multi-node deployments where TP cannot efficiently span nodes, but at single-node scale, prioritize TP. Benchmark both configurations if the model fits in memory with either approach.
+
 ## Terraform Conventions
 
 ### Provider Priority

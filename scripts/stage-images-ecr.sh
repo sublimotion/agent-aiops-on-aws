@@ -303,6 +303,48 @@ else
   echo "  [skip] SGLang Dockerfile not found at ${SGLANG_DOCKERFILE}"
 fi
 
+# --- Qwen3-Next: vLLM + transformers-main + flash-linear-attention (custom build) ---
+QWEN3_VLLM_DOCKERFILE="${SCRIPT_DIR}/../domains/gpu-serving/blueprints/qwen3-next/docker/Dockerfile.vllm-qwen3next"
+if [ -f "${QWEN3_VLLM_DOCKERFILE}" ]; then
+  echo ">>> Building vLLM + Qwen3-Next custom image..."
+  QWEN3_VLLM_TAG="${ECR_REGISTRY}/vllm-qwen3next:v0.15.0"
+
+  docker build \
+    --platform linux/amd64 \
+    -f "${QWEN3_VLLM_DOCKERFILE}" \
+    -t "${QWEN3_VLLM_TAG}" \
+    "$(dirname "${QWEN3_VLLM_DOCKERFILE}")"
+
+  echo "  [push] ${QWEN3_VLLM_TAG}"
+  docker push "${QWEN3_VLLM_TAG}"
+
+  docker rmi "${QWEN3_VLLM_TAG}" 2>/dev/null || true
+  echo ""
+else
+  echo "  [skip] Qwen3-Next vLLM Dockerfile not found at ${QWEN3_VLLM_DOCKERFILE}"
+fi
+
+# --- Qwen3-Next: SGLang + transformers-main + flash-linear-attention (custom build) ---
+QWEN3_SGLANG_DOCKERFILE="${SCRIPT_DIR}/../domains/gpu-serving/blueprints/qwen3-next/docker/Dockerfile.sglang-qwen3next"
+if [ -f "${QWEN3_SGLANG_DOCKERFILE}" ]; then
+  echo ">>> Building SGLang + Qwen3-Next custom image..."
+  QWEN3_SGLANG_TAG="${ECR_REGISTRY}/sglang-qwen3next:v0.5.2"
+
+  docker build \
+    --platform linux/amd64 \
+    -f "${QWEN3_SGLANG_DOCKERFILE}" \
+    -t "${QWEN3_SGLANG_TAG}" \
+    "$(dirname "${QWEN3_SGLANG_DOCKERFILE}")"
+
+  echo "  [push] ${QWEN3_SGLANG_TAG}"
+  docker push "${QWEN3_SGLANG_TAG}"
+
+  docker rmi "${QWEN3_SGLANG_TAG}" 2>/dev/null || true
+  echo ""
+else
+  echo "  [skip] Qwen3-Next SGLang Dockerfile not found at ${QWEN3_SGLANG_DOCKERFILE}"
+fi
+
 # ============================================================================
 # Step 5: Print Terraform variable overrides
 # ============================================================================
@@ -334,6 +376,10 @@ sglang_mooncake_image      = "${ECR_REGISTRY}/sglang-hicache:cu130"
 # Shared support
 nats_image                 = "${ECR_REGISTRY}/nats:2.10"
 etcd_image                 = "${ECR_REGISTRY}/etcd:3.5"
+
+# terraform.tfvars (qwen3-next)
+vllm_qwen3next_image   = "${ECR_REGISTRY}/vllm-qwen3next:v0.15.0"
+sglang_qwen3next_image = "${ECR_REGISTRY}/sglang-qwen3next:v0.5.2"
 
 # For Helm chart image overrides, update main.tf or pass via values:
 # FSx CSI:       ${ECR_REGISTRY}/fsx-csi-driver:v1.2.0
