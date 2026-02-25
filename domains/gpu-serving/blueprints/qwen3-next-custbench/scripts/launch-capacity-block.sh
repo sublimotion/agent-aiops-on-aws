@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# Launch p5en.48xlarge into existing qwen3-next EKS cluster via capacity block
+# Reservation: cr-027183248ccb9f13e (Feb 26 11:30 UTC - Feb 27 11:30 UTC)
+#
+# Prerequisites:
+#   - Capacity block must be in 'active' state (check: aws ec2 describe-capacity-reservations)
+#   - EKS cluster qwen3-next-bench-eks-cluster must be running
+#   - Run from repo root or set BLUEPRINT_DIR
+#
+# Usage:
+#   ./scripts/launch-capacity-block.sh
+#   DRY_RUN=1 ./scripts/launch-capacity-block.sh   # print command without executing
+set -euo pipefail
+
+# --- Configuration (from existing qwen3-next terraform outputs) ---
+REGION="us-east-2"
+CAPACITY_RESERVATION_ID="${CAPACITY_RESERVATION_ID:-cr-027183248ccb9f13e}"
+INSTANCE_TYPE="p5en.48xlarge"
+SUBNET_ID="subnet-04be09c7bf104edb8"                    # us-east-2c private subnet
+INSTANCE_PROFILE_ARN="arn:aws:iam::615299764834:instance-profile/qwen3-next-bench-gpu-node-20260223212318728300000009"
+CLUSTER_NAME="qwen3-next-bench-eks-cluster"
+VOLUME_SIZE=500
+
+# Security groups: EKS node SG + NodePort SG + FSx SG
+SG_EKS_NODE="sg-0bf5ad07fc6c29df1"
+SG_GPU_NODEPORT="sg-02aeef8a922c45276"
+SG_FSX="sg-07c6da755ffe8af2d"
+
+DRY_RUN="${DRY_RUN:-0}"
+
+# --- Preflight checks ---
+echo "=== Preflight Checks ==="
+
+# 1. Check capacity block state
+CB_STATE=$(aws ec2 describe-capacity-reservations \
+  --capacity-reservation-ids "$CAPACITY_RESERVATION_ID" \
+  --region "$REGION" \
+  --query "CapacityReservations[0].State" \
+  --output text 2>&1)
+echo "Capacity block state: $CB_STATE"
+
+if [ "$CB_STATE" != "active" ]; then
+  echo "ERROR: Capacity block is '$CB_STATE', not 'active'."
+  echo "Start time: $(aws ec2 describe-capacity-reservations \
+    --capacity-reservation-ids "$CAPACITY_RESERVATION_ID" \
+    --region "$REGION" \
+    --query "CapacityReservations[0].StartDate" \
+    --output text 2>&1)"
+  echo "Wait until the block activates before launching."
+  exit 1
+fi
+
+# 2. Check EKS cluster
+EKS_STATE=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region "$REGION" \
+  --query "cluster.status" --output text 2>&1)
+echo "EKS cluster state: $EKS_STATE"
+if [ "$EKS_STATE" != "ACTIVE" ]; then
+  echo "ERROR: EKS cluster is not active."
+  exit 1
+fi
+
+# 3. Get user data from terraform output
+BLUEPRINT_DIR="${BLUEPRINT_DIR:-$(cd "$(dirname "$0")/../../../qwen3-next" && pwd)}"
+echo "Getting user data from: $BLUEPRINT_DIR"
+USER_DATA=$(cd "$BLUEPRINT_DIR" && terraform output -raw gpu_user_data_base64 2>/dev/null) || {
+  echo "ERROR: Could not get user data from terraform output."
+  echo "Make sure you're in the qwen3-next blueprint directory or set BLUEPRINT_DIR."
+  exit 1
+}
+echo "User data size: $(echo -n "$USER_DATA" | wc -c | tr -d ' ') bytes (base64)"
+
+echo ""
+echo "=== Launch Configuration ==="
+echo "Instance type:    $INSTANCE_TYPE"
+echo "Capacity block:   $CAPACITY_RESERVATION_ID"
+echo "Subnet:           $SUBNET_ID (us-east-2c)"
+echo "Instance profile: $INSTANCE_PROFILE_ARN"
+echo "Security groups:  $SG_EKS_NODE (node), $SG_GPU_NODEPORT (nodeport), $SG_FSX (fsx)"
+echo "Root volume:      ${VOLUME_SIZE}GB gp3"
+echo ""
+
+# --- Launch ---
+LAUNCH_CMD=(
+  aws ec2 run-instances
+  --region "$REGION"
+  --instance-type "$INSTANCE_TYPE"
+  --capacity-reservation-specification "CapacityReservationTarget={CapacityReservationId=$CAPACITY_RESERVATION_ID}"
+  --iam-instance-profile "Arn=$INSTANCE_PROFILE_ARN"
+  --subnet-id "$SUBNET_ID"
+  --security-group-ids "$SG_EKS_NODE" "$SG_GPU_NODEPORT" "$SG_FSX"
+  --user-data "$USER_DATA"
+  --block-device-mappings "DeviceName=/dev/xvda,Ebs={VolumeSize=$VOLUME_SIZE,VolumeType=gp3}"
+  --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=qwen3-custbench-gpu-node},{Key=Project,Value=qwen3-custbench},{Key=Purpose,Value=customer-benchmark},{Key=kubernetes.io/cluster/$CLUSTER_NAME,Value=owned}]"
+  --output json
+)
+
+if [ "$DRY_RUN" = "1" ]; then
+  echo "DRY RUN — would execute:"
+  echo "${LAUNCH_CMD[*]}"
+  exit 0
+fi
+
+echo "Launching instance..."
+RESULT=$("${LAUNCH_CMD[@]}" 2>&1)
+INSTANCE_ID=$(echo "$RESULT" | python3 -c "import json,sys; print(json.load(sys.stdin)['Instances'][0]['InstanceId'])")
+
+echo ""
+echo "=== Instance Launched ==="
+echo "Instance ID: $INSTANCE_ID"
+echo ""
+echo "=== Next Steps ==="
+echo "1. Wait for instance to join EKS cluster:"
+echo "   aws eks update-kubeconfig --region $REGION --name $CLUSTER_NAME"
+echo "   kubectl get nodes -w"
+echo ""
+echo "2. Copy model from FSx to NVMe (SSH or SSM to node):"
+echo "   # Model should already be on FSx at /mnt/fsx/models/qwen3-next/"
+echo "   mkdir -p /mnt/nvme/models"
+echo "   cp -r /mnt/fsx/models/qwen3-next /mnt/nvme/models/qwen3-next-fp8"
+echo ""
+echo "3. Build customer Docker image on the node:"
+echo "   # Copy docker/Dockerfile.vllm-customer to the node"
+echo "   nerdctl build -f Dockerfile.vllm-customer -t qwen3-next-custbench:latest ."
+echo ""
+echo "4. Run benchmarks:"
+echo "   # Config A (customer baseline):"
+echo "   ./configs/vllm-customer-baseline.sh"
+echo "   ./scripts/run-benchmarks.sh t1"
+echo ""
+echo "   # Config B (optimized) — stop Config A first:"
+echo "   nerdctl stop vllm-custbench-baseline"
+echo "   ./configs/vllm-optimized.sh"
+echo "   ./scripts/run-benchmarks.sh t2"
+echo ""
+echo "Monitor instance:"
+echo "   aws ec2 describe-instances --instance-ids $INSTANCE_ID --region $REGION --query 'Reservations[0].Instances[0].State.Name' --output text"
