@@ -9,7 +9,7 @@
 #   t1        — T1: Customer reproduction (Config A, 1000 concurrent)
 #   t2        — T2: Optimized head-to-head (Config B, same workload)
 #   t3        — T3: MTP isolation (Config C vs B)
-#   t4        — T4: Load scaling (Config B at 10, 100, 1000 concurrent)
+#   t4        — T4: Load scaling (Config B at 0.5/5.0/inf qps)
 #   all       — Run all phases sequentially (requires server restarts between)
 #
 # Prerequisites:
@@ -188,24 +188,24 @@ run_t3() {
 
 run_t4() {
   log "============================================================"
-  log "  T4: Load Scaling (Config B at varying concurrency)"
+  log "  T4: Load Scaling (Config B at varying request rates)"
   log "  Config: configs/vllm-optimized.sh"
-  log "  Concurrency: 10, 100, 1000"
+  log "  Rates: 0.5 qps (~10 concurrent), 5.0 qps (~100), inf (~512)"
   log "============================================================"
   log ""
   log "NOTE: Ensure optimized config is running (configs/vllm-optimized.sh)"
   wait_healthy "$VLLM_URL"
 
-  # Low load — latency floor
-  run_bench "t4_opt_10c_10k_1k" 100 10000 1000 0.5
+  # Low load (0.5 qps) — ~10 peak concurrent, latency floor
+  run_bench "t4_opt_low_qps0.5" 100 10000 1000 0.5
   cooldown
 
-  # Moderate load — realistic production
-  run_bench "t4_opt_100c_10k_1k" 100 10000 1000 5.0
+  # Moderate load (5.0 qps) — ~100 peak concurrent, realistic production
+  run_bench "t4_opt_moderate_qps5.0" 200 10000 1000 5.0
   cooldown
 
-  # High load — customer's concurrency level
-  run_bench "t4_opt_1000c_10k_1k" 1000 10000 1000 inf
+  # High load (inf) — all 1000 at once, ~512 concurrent (max-num-seqs cap)
+  run_bench "t4_opt_high_inf" 1000 10000 1000 inf
   capture_metrics "t4_scaling"
   cooldown
 
@@ -237,7 +237,7 @@ case "$PHASE" in
     echo "  t1  — Customer reproduction (Config A, 1000 concurrent)"
     echo "  t2  — Optimized head-to-head (Config B, same workload)"
     echo "  t3  — MTP isolation (Config C vs B)"
-    echo "  t4  — Load scaling (Config B at 10, 100, 1000 concurrent)"
+    echo "  t4  — Load scaling (Config B at 0.5/5.0/inf qps)"
     echo "  all — Run all phases sequentially"
     exit 1
     ;;
