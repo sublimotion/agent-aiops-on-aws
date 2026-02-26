@@ -4,7 +4,8 @@
 # Expected: ~3,612 tok/s throughput, TTFT p50 ~940ms at 1000 concurrent
 set -euo pipefail
 CTR="${CONTAINER_RUNTIME:-nerdctl}"
-IMAGE="${VLLM_IMAGE:-615299764834.dkr.ecr.us-east-2.amazonaws.com/qwen3-next-custbench:latest}"
+AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo '615299764834')}"
+IMAGE="${VLLM_IMAGE:-${AWS_ACCOUNT_ID}.dkr.ecr.us-east-2.amazonaws.com/qwen3-next-custbench:latest}"
 MODEL="${MODEL_PATH:-/mnt/nvme/models/qwen3-next-fp8}"
 
 $CTR run --rm -d --name vllm-custbench-baseline \

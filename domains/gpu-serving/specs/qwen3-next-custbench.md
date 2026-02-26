@@ -112,6 +112,28 @@ Apply our recommended fixes on top of the customer's base. All changes are expli
 
 Same as Config B but without `--speculative-config` to isolate MTP's contribution to throughput and decode latency.
 
+### Config D: Our Optimized + CPU KV Cache Offload
+
+Same as Config B plus `--cpu-offload-gb 64`. At 1000 concurrent requests × 10K input tokens (10M total), the TP=4 GPU KV cache (~4.6M tokens) is ~2.2x oversubscribed — requests queue waiting for KV cache slots. Offloading 64 GB per GPU to CPU DRAM via PCIe Gen5 (~64 GB/s) nearly doubles effective KV capacity to ~9.2M tokens, reducing queue wait time at the cost of ~1-3ms per-token decode latency from PCIe transfers.
+
+**Changes from Config B**:
+
+1. Add `--cpu-offload-gb 64` — offload 64 GB of KV cache per GPU to host DRAM
+
+**Rationale**: The g7e benchmarks (C4 test) showed that at 1000 concurrent × 10K input, KV cache oversubscription caused 229s mean TTFT on 4 GPUs (2.76M token capacity vs 10M demand). The customer's p5en sees the same effect at smaller scale (940ms TTFT p50). CPU offloading trades a small per-token latency penalty for dramatically reduced queuing under high concurrency.
+
+> **Compatibility note**: `--cpu-offload-gb` is broken on vLLM 0.16+ (V1 engine). The customer's image is based on vLLM v0.11.0 nightly, which predates V1 and likely supports it. If the flag fails at startup, skip Config D and note the incompatibility.
+
+### Config E: 2x TP=4 Replicas + CPU KV Cache Offload
+
+Two vLLM instances on the same p5en.48xlarge — replica 0 on GPUs 0-3 (port 8000), replica 1 on GPUs 4-7 (port 8001). Both with `--cpu-offload-gb 64`. This doubles both prefill compute and KV cache capacity vs single replica:
+
+- **Prefill compute**: 2x parallel prefill pipelines, halving queue wait
+- **KV cache**: ~9.2M GPU tokens + ~18.4M with CPU offload across 8 GPUs
+- **Total capacity**: Handles 1000-1500 concurrent × 10K input without severe oversubscription
+
+Benchmark requests are round-robin'd across both ports. This is the recommended production topology from the parent benchmark report.
+
 ---
 
 ## Benchmark Workload
@@ -154,6 +176,18 @@ Key metrics compared across all configs:
 | **Total tok/s** | Aggregate total token throughput (input + output) | Informational |
 | **Error rate** | Failed requests / total requests | 0% |
 
+**KV cache metrics** (captured before/after T2b and T5 runs):
+
+| Metric | Source | Relevance |
+|--------|--------|-----------|
+| `vllm:prefix_cache_hit_rate` | vLLM `/metrics` | Prefix caching effectiveness (T2b) |
+| `vllm:gpu_cache_usage_perc` | vLLM `/metrics` | GPU KV cache pressure |
+| `vllm:cpu_cache_usage_perc` | vLLM `/metrics` | CPU swap usage |
+| `vllm:num_preemptions_total` | vLLM `/metrics` | Requests preempted under memory pressure |
+| Dynamo KVBM per-tier hits/misses | Dynamo `/metrics` | Tier 0/1/2 offload activity (T5d) |
+| FSx cache directory size | `du -sh /mnt/fsx/kv-cache/` | Validates disk tier is being written (T5d) |
+| GPU memory per-GPU | `nvidia-smi` | Confirms constrained VRAM in T5 |
+
 > **Note**: SLO thresholds are from the parent spec's controlled QPS sweeps. At 1000 concurrent requests, SLOs will not be met — the purpose here is to compare A vs B under identical overload conditions, not to certify SLO compliance.
 
 Results will be reported as a comparison table showing Config A, B, and C side by side for each metric, with percentage improvement calculated as `(A - B) / A × 100`.
@@ -188,6 +222,15 @@ Same workload, our optimized config. Measure delta in:
 - Throughput tok/s
 - Error rate
 
+### T2b: Prefix Sharing (Config B vs A)
+
+Same 1000-concurrent workload but with `generated-shared-prefix` dataset: 8K shared system prompt + 128 unique question tokens per request. Tests prefix caching effectiveness with realistic shared prompts (e.g., tool definitions, system instructions). Two-way comparison:
+
+1. **Config B** (prefix caching enabled) — prefix caching benefit
+2. **Config A** (no prefix caching) — customer baseline for contrast
+
+With random datasets (T1/T2), prefix caching has no shared prefixes to exploit — T2b isolates the real-world impact. CPU offload is omitted here because the shared prefix workload fits trivially in HBM (~318 MB KV out of ~63 GiB available).
+
 ### T3: MTP Isolation (Config C vs B)
 
 Quantify MTP speculative decoding contribution by comparing Config B (with MTP) against Config C (without MTP) under the same workload.
@@ -198,6 +241,28 @@ Run optimized config at three load levels to find the throughput-latency Pareto 
 - **Low** (0.5 qps, ~10 concurrent) — latency floor
 - **Moderate** (5.0 qps, ~100 concurrent) — realistic production
 - **High** (inf, ~512 concurrent) — customer stress test
+
+### T5: Simulated Memory-Constrained KV Cache Offloading
+
+Simulates smaller-GPU scenarios (e.g., g7e with 96 GB GDDR7) by constraining `--gpu-memory-utilization` to 0.30, leaving ~22 GB KV cache per GPU (~920K tokens total). At 1000 concurrent × 10K input, this creates ~10.9x oversubscription — similar to what g7e.24xlarge experiences. Three sub-tests:
+
+- **T5a**: Constrained HBM, no offload, random data — baseline showing severe queuing
+- **T5b**: Constrained HBM + `--cpu-offload-gb 64` — does CPU offload reduce TTFT?
+- **T5c**: Constrained HBM, no offload, 8K shared prefix — does prefix caching alone mitigate the pressure?
+
+This demonstrates to the customer what happens on smaller GPUs and whether offloading/prefix caching are viable mitigations — directly applicable to g7e cost-optimization scenarios.
+
+- **T5d**: Constrained HBM + NVIDIA Dynamo KVBM with hierarchical offload to FSx Lustre — uses `dynamo-run` with 4-tier KV cache: GPU VRAM (~22 GB) → CPU DRAM (128 GB) → FSx Lustre (500 GB) via NIXL GDS_MT backend. Dynamo's async write-back architecture offloads KV blocks without blocking the vLLM scheduler. Tests whether hierarchical offloading can absorb the 10.9x KV oversubscription. Requires building `dynamo-kvbm-qwen3` image from the kimi-k2.5 Dockerfile adapted for Qwen3-Next.
+
+> **Scheduler gating caveat**: Previous kimi-k2.5 benchmarks showed vLLM's scheduler gates request admission before KV cache overflows, preventing Dynamo's tiered offloading from activating under normal conditions. The 0.30 gpu-memory-utilization constraint forces extreme memory pressure, which should trigger the overflow path. If T5d shows no improvement over T5a, the scheduler gating is the bottleneck — not the offloading mechanism.
+
+### T6: 2x Replica + CPU Offload (Config E)
+
+Same 1000-request workload, round-robin across two TP=4 replicas (ports 8000/8001). Tests whether doubling prefill compute + KV cache capacity via 2 replicas significantly reduces TTFT vs single replica (T5). This is the production-recommended topology.
+
+### T7: Stress Test at 1500 Concurrent (Config E)
+
+Push beyond the customer's 1000-concurrent workload to 1500 requests at inf QPS with 2x replicas + CPU offload. Tests headroom: 1500 × 10K = 15M input tokens against ~18.4M effective KV capacity (GPU + CPU offload across 8 GPUs). Determines whether the 2-replica + offload topology can handle 50% more load than the customer's current peak.
 
 ---
 

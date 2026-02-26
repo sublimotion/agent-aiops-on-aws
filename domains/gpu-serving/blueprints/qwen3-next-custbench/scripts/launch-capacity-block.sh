@@ -12,19 +12,29 @@
 #   DRY_RUN=1 ./scripts/launch-capacity-block.sh   # print command without executing
 set -euo pipefail
 
-# --- Configuration (from existing qwen3-next terraform outputs) ---
-REGION="us-east-2"
-CAPACITY_RESERVATION_ID="${CAPACITY_RESERVATION_ID:-cr-027183248ccb9f13e}"
-INSTANCE_TYPE="p5en.48xlarge"
-SUBNET_ID="subnet-04be09c7bf104edb8"                    # us-east-2c private subnet
-INSTANCE_PROFILE_ARN="arn:aws:iam::615299764834:instance-profile/qwen3-next-bench-gpu-node-20260223212318728300000009"
-CLUSTER_NAME="qwen3-next-bench-eks-cluster"
-VOLUME_SIZE=500
+# --- Configuration ---
+# These values come from the parent qwen3-next terraform outputs.
+# Override via environment variables or update defaults before running.
+REGION="${REGION:-us-east-2}"
+CAPACITY_RESERVATION_ID="${CAPACITY_RESERVATION_ID:-cr-027183248ccb9f13e}"  # UPDATE: set to your active capacity block
+INSTANCE_TYPE="${INSTANCE_TYPE:-p5en.48xlarge}"
+SUBNET_ID="${SUBNET_ID:-subnet-04be09c7bf104edb8}"                         # us-east-2c private subnet
+CLUSTER_NAME="${CLUSTER_NAME:-qwen3-next-bench-eks-cluster}"
+VOLUME_SIZE="${VOLUME_SIZE:-500}"
 
-# Security groups: EKS node SG + NodePort SG + FSx SG
-SG_EKS_NODE="sg-0bf5ad07fc6c29df1"
-SG_GPU_NODEPORT="sg-02aeef8a922c45276"
-SG_FSX="sg-07c6da755ffe8af2d"
+# Instance profile ARN — get from terraform: cd ../qwen3-next && terraform output gpu_instance_profile_arn
+INSTANCE_PROFILE_ARN="${INSTANCE_PROFILE_ARN:-arn:aws:iam::615299764834:instance-profile/qwen3-next-bench-gpu-node-20260223212318728300000009}"
+
+# Security groups: EKS node SG + NodePort SG + FSx SG + FSx-EFA SG
+# Get from terraform: cd ../qwen3-next && terraform output -json security_group_ids
+SG_EKS_NODE="${SG_EKS_NODE:-sg-0bf5ad07fc6c29df1}"
+SG_GPU_NODEPORT="${SG_GPU_NODEPORT:-sg-02aeef8a922c45276}"
+SG_FSX="${SG_FSX:-sg-07c6da755ffe8af2d}"
+SG_FSX_EFA="${SG_FSX_EFA:-sg-073b15d42ff3f4006}"
+
+# EFA-enabled FSx for Dynamo GDS (T5d)
+FSX_EFA_DNS="${FSX_EFA_DNS:-fs-0952e4fd84eed47af.fsx.us-east-2.amazonaws.com}"
+FSX_EFA_MOUNT="${FSX_EFA_MOUNT:-falszb4v}"
 
 DRY_RUN="${DRY_RUN:-0}"
 
@@ -75,7 +85,7 @@ echo "Instance type:    $INSTANCE_TYPE"
 echo "Capacity block:   $CAPACITY_RESERVATION_ID"
 echo "Subnet:           $SUBNET_ID (us-east-2c)"
 echo "Instance profile: $INSTANCE_PROFILE_ARN"
-echo "Security groups:  $SG_EKS_NODE (node), $SG_GPU_NODEPORT (nodeport), $SG_FSX (fsx)"
+echo "Security groups:  $SG_EKS_NODE (node), $SG_GPU_NODEPORT (nodeport), $SG_FSX (fsx), $SG_FSX_EFA (fsx-efa)"
 echo "Root volume:      ${VOLUME_SIZE}GB gp3"
 echo ""
 
@@ -87,7 +97,7 @@ LAUNCH_CMD=(
   --capacity-reservation-specification "CapacityReservationTarget={CapacityReservationId=$CAPACITY_RESERVATION_ID}"
   --iam-instance-profile "Arn=$INSTANCE_PROFILE_ARN"
   --subnet-id "$SUBNET_ID"
-  --security-group-ids "$SG_EKS_NODE" "$SG_GPU_NODEPORT" "$SG_FSX"
+  --security-group-ids "$SG_EKS_NODE" "$SG_GPU_NODEPORT" "$SG_FSX" "$SG_FSX_EFA"
   --user-data "$USER_DATA"
   --block-device-mappings "DeviceName=/dev/xvda,Ebs={VolumeSize=$VOLUME_SIZE,VolumeType=gp3}"
   --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=qwen3-custbench-gpu-node},{Key=Project,Value=qwen3-custbench},{Key=Purpose,Value=customer-benchmark},{Key=kubernetes.io/cluster/$CLUSTER_NAME,Value=owned}]"
