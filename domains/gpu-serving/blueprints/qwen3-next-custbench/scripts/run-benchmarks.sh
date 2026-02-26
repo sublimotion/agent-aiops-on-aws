@@ -238,6 +238,25 @@ run_t2() {
   log "========== T2 complete =========="
 }
 
+run_t2c() {
+  log "============================================================"
+  log "  T2c: Latest Stable vLLM (Config F)"
+  log "  Config: configs/vllm-stable-optimized.sh"
+  log "  Workload: same as T1 (1000 requests, 10K input, 1K output)"
+  log "  Tests: V1 engine architecture vs customer's v0.11.0 nightly"
+  log "============================================================"
+  log ""
+  log "NOTE: Start server with configs/vllm-stable-optimized.sh"
+  prompt_restart "vLLM stable optimized (configs/vllm-stable-optimized.sh)"
+  wait_healthy "$VLLM_URL"
+
+  run_bench "t2c_stable_1000c_10k_1k" 1000 10000 1000 inf
+  capture_metrics "t2c_stable"
+  cooldown
+
+  log "========== T2c complete =========="
+}
+
 run_t2b() {
   log "============================================================"
   log "  T2b: Prefix Sharing — Optimized (Config B)"
@@ -446,6 +465,7 @@ log ""
 case "$PHASE" in
   t1)  run_t1 ;;
   t2)  run_t2 ;;
+  t2c) run_t2c ;;
   t2b) run_t2b ;;
   t3)  run_t3 ;;
   t4)  run_t4 ;;
@@ -455,6 +475,7 @@ case "$PHASE" in
   all)
     run_t1
     run_t2
+    run_t2c
     run_t2b
     run_t3
     run_t4
@@ -463,18 +484,19 @@ case "$PHASE" in
     run_t7
     ;;
   *)
-    echo "Usage: $0 {t1|t2|t2b|t3|t4|t5|t6|t7|all}"
+    echo "Usage: $0 {t1|t2|t2c|t2b|t3|t4|t5|t6|t7|all}"
     echo ""
     echo "Phases:"
-    echo "  t1  — Customer reproduction (Config A, 1000 concurrent)"
-    echo "  t2  — Optimized head-to-head (Config B, same workload)"
-    echo "  t2b — Prefix sharing (Config B vs A, 8K shared prefix)"
-    echo "  t3  — MTP isolation (Config C vs B)"
-    echo "  t4  — Load scaling (Config B at 0.5/5.0/inf qps)"
-    echo "  t5  — Simulated memory-constrained KV offload (gpu-mem=0.30)"
-    echo "  t6  — 2x replica + CPU offload (Config E, 1000 concurrent)"
-    echo "  t7  — Stress test 1500 concurrent (Config E, 2x replica)"
-    echo "  all — Run all phases sequentially"
+    echo "  t1  -- Customer reproduction (Config A, 1000 concurrent)"
+    echo "  t2  -- Optimized head-to-head (Config B, same workload)"
+    echo "  t2c -- Latest stable vLLM (Config F, V1 engine)"
+    echo "  t2b -- Prefix sharing (Config B vs A, 8K shared prefix)"
+    echo "  t3  -- MTP isolation (Config C vs B)"
+    echo "  t4  -- Load scaling (Config B at 0.5/5.0/inf qps)"
+    echo "  t5  -- Simulated memory-constrained KV offload (gpu-mem=0.30)"
+    echo "  t6  -- 2x replica + CPU offload (Config E, 1000 concurrent)"
+    echo "  t7  -- Stress test 1500 concurrent (Config E, 2x replica)"
+    echo "  all -- Run all phases sequentially"
     exit 1
     ;;
 esac

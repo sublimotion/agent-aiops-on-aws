@@ -16,7 +16,14 @@
 
 **Lesson**: Always create FSx Lustre filesystems with `efa_enabled = true` if there's any chance of needing GDS or RDMA access. The cost is zero — EFA is free on supported instance types — but retroactively enabling it requires recreating the filesystem.
 
-### 3. Capacity Block Instance Needs Separate EKS Access Entry
+### 3. Capacity Block Requires --instance-market-options MarketType=capacity-block
+**Problem**: `aws ec2 run-instances` with `--capacity-reservation-specification` alone fails with "The market type (purchasing) option is not valid." Capacity blocks are a distinct market type from on-demand.
+
+**Fix**: Add `--instance-market-options 'MarketType=capacity-block'` and `--placement 'AvailabilityZone=us-east-2c'` to the `run-instances` command.
+
+**Lesson**: This is kimi lesson #1 again. Capacity blocks require explicit market type declaration. The launch script has been updated.
+
+### 4. Capacity Block Instance Needs Separate EKS Access Entry
 **Problem**: The instance profile used by `run-instances` has a different IAM role (`qwen3-next-bench-gpu-node-...`) than the managed node group role (`gpu-eks-node-group-...`). Without an explicit EKS access entry for the capacity block instance's role, the node fails to join the cluster with an authentication error.
 
 **Fix**: Created an `EC2_LINUX` access entry for the instance profile's role:
