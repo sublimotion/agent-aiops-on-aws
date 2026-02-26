@@ -16,7 +16,19 @@
 
 **Lesson**: Always create FSx Lustre filesystems with `efa_enabled = true` if there's any chance of needing GDS or RDMA access. The cost is zero — EFA is free on supported instance types — but retroactively enabling it requires recreating the filesystem.
 
-### 3. Dynamo KVBM FSx Permission Issue (from kimi-k2.5 lesson)
+### 3. Capacity Block Instance Needs Separate EKS Access Entry
+**Problem**: The instance profile used by `run-instances` has a different IAM role (`qwen3-next-bench-gpu-node-...`) than the managed node group role (`gpu-eks-node-group-...`). Without an explicit EKS access entry for the capacity block instance's role, the node fails to join the cluster with an authentication error.
+
+**Fix**: Created an `EC2_LINUX` access entry for the instance profile's role:
+```bash
+aws eks create-access-entry --cluster-name qwen3-next-bench-eks-cluster \
+  --principal-arn arn:aws:iam::615299764834:role/qwen3-next-bench-gpu-node-... \
+  --type EC2_LINUX
+```
+
+**Lesson**: When launching EC2 instances directly (not via managed node groups), always verify the instance's IAM role has an EKS access entry. Managed node groups auto-create these; `run-instances` does not.
+
+### 4. Dynamo KVBM FSx Permission Issue (from kimi-k2.5 lesson)
 **Problem**: Dynamo container user cannot create files on FSx Lustre mount even with 777 host permissions. This is a UID mapping issue — the container's internal user doesn't map to a valid Lustre UID.
 
 **Fix**: Run container as root (`--user 0:0`) and pre-create the cache directory with `chmod 777` on the host before starting the container. Added both to `configs/vllm-constrained-dynamo-fsx.sh`.
