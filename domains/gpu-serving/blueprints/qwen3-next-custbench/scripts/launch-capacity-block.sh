@@ -36,6 +36,13 @@ SG_FSX_EFA="${SG_FSX_EFA:-sg-073b15d42ff3f4006}"
 FSX_EFA_DNS="${FSX_EFA_DNS:-fs-0952e4fd84eed47af.fsx.us-east-2.amazonaws.com}"
 FSX_EFA_MOUNT="${FSX_EFA_MOUNT:-falszb4v}"
 
+# AMI: Use AL2 GPU AMI (not AL2023) to match the existing managed node group.
+# AL2 uses /etc/eks/bootstrap.sh; AL2023 uses nodeadm (different user data format).
+# Get the latest recommended AMI from SSM parameter store.
+AMI_ID="${AMI_ID:-$(aws ssm get-parameter \
+  --name /aws/service/eks/optimized-ami/1.32/amazon-linux-2-gpu/recommended/image_id \
+  --region "$REGION" --query 'Parameter.Value' --output text 2>/dev/null || echo 'ami-01750357dd1909542')}"
+
 DRY_RUN="${DRY_RUN:-0}"
 
 # --- Preflight checks ---
@@ -69,30 +76,51 @@ if [ "$EKS_STATE" != "ACTIVE" ]; then
   exit 1
 fi
 
-# 3. Get user data from terraform output
+# 3. Get user data from terraform output and append FSx-EFA mount
 BLUEPRINT_DIR="${BLUEPRINT_DIR:-$(cd "$(dirname "$0")/../../../qwen3-next" && pwd)}"
 echo "Getting user data from: $BLUEPRINT_DIR"
-USER_DATA=$(cd "$BLUEPRINT_DIR" && terraform output -raw gpu_user_data_base64 2>/dev/null) || {
+USER_DATA_RAW=$(cd "$BLUEPRINT_DIR" && terraform output -raw gpu_user_data_base64 2>/dev/null) || {
   echo "ERROR: Could not get user data from terraform output."
   echo "Make sure you're in the qwen3-next blueprint directory or set BLUEPRINT_DIR."
   exit 1
 }
+
+# Decode, append FSx-EFA mount for T5d (Dynamo KVBM), re-encode
+# The parent user data mounts the original FSx at /mnt/fsx.
+# We additionally mount the EFA-enabled FSx at /mnt/fsx-efa for Dynamo GDS benchmarks.
+USER_DATA_DECODED=$(echo "$USER_DATA_RAW" | base64 -d)
+FSX_EFA_APPEND=$(cat <<'EFAMOUNT'
+
+# =============================================================================
+# 6. FSx Lustre EFA Mount (for Dynamo KVBM T5d benchmarks)
+# EFA-enabled FSx: fs-0952e4fd84eed47af (PERSISTENT_2, 4800 GiB, EFA=true)
+# =============================================================================
+mkdir -p /mnt/fsx-efa
+EFAMOUNT
+)
+FSX_EFA_APPEND+=$'\n'"mount -t lustre -o noatime,flock ${FSX_EFA_DNS}@tcp:/${FSX_EFA_MOUNT} /mnt/fsx-efa || echo 'WARNING: FSx-EFA mount failed (non-fatal for T1-T4 benchmarks)'"
+FSX_EFA_APPEND+=$'\n'"chmod 777 /mnt/fsx-efa 2>/dev/null || true"
+
+USER_DATA=$(echo "${USER_DATA_DECODED}${FSX_EFA_APPEND}" | base64 | tr -d '\n')
 echo "User data size: $(echo -n "$USER_DATA" | wc -c | tr -d ' ') bytes (base64)"
 
 echo ""
 echo "=== Launch Configuration ==="
+echo "AMI:              $AMI_ID (AL2 GPU)"
 echo "Instance type:    $INSTANCE_TYPE"
 echo "Capacity block:   $CAPACITY_RESERVATION_ID"
 echo "Subnet:           $SUBNET_ID (us-east-2c)"
 echo "Instance profile: $INSTANCE_PROFILE_ARN"
 echo "Security groups:  $SG_EKS_NODE (node), $SG_GPU_NODEPORT (nodeport), $SG_FSX (fsx), $SG_FSX_EFA (fsx-efa)"
 echo "Root volume:      ${VOLUME_SIZE}GB gp3"
+echo "FSx-EFA mount:    ${FSX_EFA_DNS}@tcp:/${FSX_EFA_MOUNT} → /mnt/fsx-efa"
 echo ""
 
 # --- Launch ---
 LAUNCH_CMD=(
   aws ec2 run-instances
   --region "$REGION"
+  --image-id "$AMI_ID"
   --instance-type "$INSTANCE_TYPE"
   --capacity-reservation-specification "CapacityReservationTarget={CapacityReservationId=$CAPACITY_RESERVATION_ID}"
   --iam-instance-profile "Arn=$INSTANCE_PROFILE_ARN"
