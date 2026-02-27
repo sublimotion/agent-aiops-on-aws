@@ -220,6 +220,49 @@ The single-replica cost ($7.56–$17.87/1M) assumes 4 idle GPUs — you're payin
 
 ---
 
+## T5d: KV Cache Offloading — BLOCKED (6 Approaches)
+
+All KV cache offloading approaches are blocked for Qwen3-Next due to the model's unique architecture.
+
+### Approach 1: `--cpu-offload-gb` (vLLM native)
+**Status**: BLOCKED — `AssertionError` in V1 engine's `may_reinitialize_input_batch` (asserts `cpu_offload_gb == 0`).
+Note: This offloads **model weights**, not KV cache. Unnecessary on H200 (104.5 GiB KV cache/GPU).
+
+### Approach 2: Dynamo KVBM (ai-dynamo 0.9.0)
+**Status**: BLOCKED — `dynamo-run` CLI removed in ai-dynamo 0.9.0. The 0.9.0 release restructured to a distributed runtime API (`make_engine()`, `KvEventPublisher`, `KvPushRouter`). `ai-dynamo-vllm` only available up to 0.8.4.post4 on PyPI.
+
+### Approach 3: vLLM OffloadingConnector
+**Status**: BLOCKED — `ValueError: Hybrid KV cache manager is disabled but failed to convert the KV cache specs to one unified type.`
+All vLLM 0.16 KV connectors auto-disable HMA (Hybrid KV cache Manager) via `--kv-transfer-config`, but Qwen3-Next requires HMA for its hybrid attention architecture (full attention every 4th layer, linear attention otherwise).
+
+### Approach 4: vLLM LMCacheMPConnector
+**Status**: BLOCKED — Same HMA error as Approach 3. None of the registered KV connectors implement `SupportsHMA`.
+
+### Approach 5: vLLM + LMCache + FSx (kv-offloading-backend lmcache)
+**Status**: BLOCKED — Same HMA catch-22 as Approaches 3–4.
+
+Tested `--kv-offloading-backend lmcache --kv-offloading-size 64` with LMCache 0.3.14 (built into vLLM 0.16), configured with `LMCACHE_LOCAL_CPU=true`, `LMCACHE_MAX_LOCAL_CPU_SIZE=32`, `LMCACHE_LOCAL_DISK=/mnt/fsx-efa/lmcache-kv`, `LMCACHE_MAX_LOCAL_DISK_SIZE=500`. This would tier KV cache: GPU → CPU DRAM (32 GB) → FSx Lustre (500 GB).
+
+- **Without `--disable-hybrid-kv-cache-manager`**: Error: `Connector LMCacheConnectorV1 does not support HMA but HMA is enabled` (LMCacheConnectorV1 doesn't implement `SupportsHMA`)
+- **With `--disable-hybrid-kv-cache-manager`**: Error: `Hybrid KV cache manager is disabled but failed to convert the KV cache specs to one unified type` (Qwen3-Next has incompatible KV specs across layer groups)
+
+GDS (GPUDirect Storage) was also investigated but `nvidia_fs` kernel module is not installed on the instance and `libcufile` is not present. GDS would have been irrelevant anyway since LMCache uses CPU as intermediary, not direct GPU→storage DMA.
+
+### Approach 6: Dynamo + TRT-LLM
+**Status**: BLOCKED — `Qwen3NextForCausalLM` not supported by any TRT-LLM version.
+
+Investigation results:
+- **TRT-LLM 0.17.0** (25.01 NGC image): `MODEL_MAP` has `Qwen2MoeForCausalLM` but not `Qwen3NextForCausalLM`. Both `_autodeploy` and `pytorch` backends fail: `model type 'qwen3_next' but Transformers does not recognize this architecture` (ships `transformers<4.48`).
+- **TRT-LLM 1.1.0** (26.01 NGC image): Added `Qwen3ForCausalLM` and `Qwen3MoeForCausalLM` but still **no `Qwen3NextForCausalLM`**. Ships `transformers 4.56.0` which also does not recognize `qwen3_next`.
+- **Qwen3-Next architecture** (`model_type: qwen3_next`, `architectures: Qwen3NextForCausalLM`): Requires `transformers 4.57.0.dev0` (unreleased). Distinct from Qwen3MoE — has hybrid attention (`full_attention_interval: 4`), linear attention heads, shared experts, `partial_rotary_factor: 0.25`. Cannot be mapped to `Qwen3MoeForCausalLM`.
+- **ai-dynamo 0.9.0 + TRT-LLM**: Irreconcilable dependency conflict (ai-dynamo requires `transformers>=4.56`, TRT-LLM 0.17 requires `transformers<4.48`). NGC Dynamo container (pre-built) requires NGC API auth not available on instance.
+- `Qwen3NextForCausalLM` / `qwen3_next` does not appear anywhere in TRT-LLM GitHub repo (main branch) or public HuggingFace transformers repo.
+
+### Root Cause Summary
+Qwen3-Next is a **pre-release model architecture** requiring unreleased `transformers 4.57.0.dev0`. Its hybrid attention design (interleaved full + linear attention layers) creates unique KV cache specs per layer group, requiring HMA in vLLM. All KV transfer/offloading mechanisms in vLLM 0.16 disable HMA, and TRT-LLM has no support for this architecture at all.
+
+---
+
 ## Recommendations
 
 1. **Production config**: vLLM TP=4 at QPS 4–8 on 4 GPUs, `--enable-prefix-caching` always on
@@ -243,3 +286,4 @@ The single-replica cost ($7.56–$17.87/1M) assumes 4 idle GPUs — you're payin
 - [x] Cost: ~$3.78/1M output tokens at QPS 4 with 2x TP=4 replicas (capacity block)
 - [x] Recommended production config documented
 - [x] P2b: Extended context 126K–252K — cpu-offload blocked; 262K works without it; prefix caching extends viable context to 252K
+- [x] T5d: KV cache offloading — BLOCKED on all 6 approaches (cpu-offload, Dynamo KVBM, OffloadingConnector, LMCacheMPConnector, LMCache+FSx, Dynamo+TRT-LLM)

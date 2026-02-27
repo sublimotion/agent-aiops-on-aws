@@ -111,6 +111,48 @@ See https://github.com/vllm-project/vllm/pull/18298 for more details.
 
 **Lesson**: Verify benchmark dataset names against the installed vLLM version before running. The dataset API changes between versions.
 
+### 12. Qwen3-Next Is a Pre-Release Architecture Not in TRT-LLM
+**Problem**: Investigated Dynamo + TRT-LLM as an alternative KV offloading path. TRT-LLM 0.17.0 (25.01 NGC) supports Qwen2MoE but not Qwen3Next. TRT-LLM 1.1.0 (26.01 NGC, latest) added `Qwen3ForCausalLM` and `Qwen3MoeForCausalLM` but still has no `Qwen3NextForCausalLM`.
+
+**Root cause**: `Qwen3NextForCausalLM` (`model_type: qwen3_next`) requires `transformers 4.57.0.dev0` — an unreleased version. The architecture does not appear in the public HuggingFace transformers repo or anywhere in TRT-LLM's codebase. Qwen3-Next is architecturally distinct from Qwen3MoE (hybrid attention with `full_attention_interval=4`, linear attention heads, shared experts, `partial_rotary_factor=0.25`), so mapping it to `Qwen3MoeForCausalLM` is not viable.
+
+**Impact**: No TRT-LLM-based serving or KV offloading is possible until both `transformers` and TRT-LLM add `qwen3_next` support. Only vLLM (with custom transformers dev build) can serve this model.
+
+**Lesson**: Before planning TRT-LLM or alternative engine benchmarks, check if the model's `architectures` field in `config.json` appears in TRT-LLM's `MODEL_MAP` (via `from tensorrt_llm.models import automodel; automodel.MODEL_MAP.keys()`) and whether the required `transformers` version is publicly released.
+
+### 13. vLLM HMA Incompatible with All KV Transfer Connectors
+**Problem**: Attempted 3 different vLLM KV cache offloading mechanisms (OffloadingConnector, LMCacheMPConnector, and cpu-offload-gb). All fail because Qwen3-Next requires Hybrid KV cache Manager (HMA) for its mixed attention types, but all KV connectors auto-disable HMA.
+
+**Error**: `ValueError: Hybrid KV cache manager is disabled but failed to convert the KV cache specs to one unified type.`
+
+**Root cause**: `--kv-transfer-config` triggers the warning "Turning off hybrid kv cache manager because --kv-transfer-config is set". Qwen3-Next has different KV cache specs per layer group (standard attention layers have different head counts/dimensions than linear attention layers). Without HMA, vLLM can't reconcile these into a single spec.
+
+**Impact**: KV cache offloading is fundamentally blocked for any model requiring HMA in vLLM 0.16. This includes all hybrid-attention models with heterogeneous KV cache specs.
+
+**Lesson**: Before attempting KV offloading on MoE/hybrid models, check if the model requires HMA by looking for `full_attention_interval`, `linear_num_key_heads`, or other per-layer config differences. If HMA is required, KV offloading is blocked until vLLM connectors implement `SupportsHMA`.
+
+### 14. LMCache kv-offloading-backend Also Blocked by HMA
+**Problem**: Attempted `--kv-offloading-backend lmcache --kv-offloading-size 64` with LMCache 0.3.14 (built into vLLM 0.16) tiering KV cache to CPU DRAM (32 GB) → FSx Lustre (500 GB). This is a separate code path from `--kv-transfer-config` but ultimately sets `kv_transfer_config` internally.
+
+**Error sequence**:
+1. Without `--disable-hybrid-kv-cache-manager`: `Connector LMCacheConnectorV1 does not support HMA but HMA is enabled`
+2. With `--disable-hybrid-kv-cache-manager`: `Hybrid KV cache manager is disabled but failed to convert the KV cache specs to one unified type`
+
+**Root cause**: `--kv-offloading-backend lmcache` internally creates a `KVTransferConfig` with `kv_connector="LMCacheConnectorV1"`, which feeds into the same HMA disable logic as `--kv-transfer-config`. The `LMCacheConnectorV1` class extends `KVConnectorBase_V1` but not `SupportsHMA`. Disabling HMA explicitly also fails because Qwen3-Next's hybrid attention layers produce incompatible KV cache specs that can't be unified.
+
+**Also investigated**: GDS (GPUDirect Storage) for direct GPU→FSx DMA — `nvidia_fs` kernel module not installed, `libcufile` not present. Irrelevant anyway since LMCache uses CPU as intermediary.
+
+**Lesson**: All vLLM 0.16 KV offloading paths (`--kv-offloading-backend`, `--kv-transfer-config`) funnel through `KVTransferConfig` → HMA disable logic. There is no bypass. For hybrid-attention models requiring HMA, KV offloading is fundamentally blocked until vLLM connectors implement `SupportsHMA`.
+
+### 15. Dynamo 0.9.0 Removed dynamo-run CLI
+**Problem**: Built a Docker image with `ai-dynamo[vllm]==0.9.0` expecting `dynamo-run` CLI for KVBM (KV Block Manager) tiered caching. The CLI does not exist.
+
+**Root cause**: ai-dynamo 0.9.0 removed the `dynamo-run` CLI entirely. The project restructured from a CLI tool to a distributed runtime library (`make_engine()`, `KvEventPublisher`, `KvPushRouter`). The `ai-dynamo-vllm` extra package only exists up to version 0.8.4.post4 on PyPI and doesn't include `dynamo-run` either.
+
+**Additionally**: ai-dynamo 0.9.0 and TRT-LLM have irreconcilable dependency conflicts — ai-dynamo requires `transformers>=4.56` while TRT-LLM 0.17 requires `transformers<4.48`.
+
+**Lesson**: Check the actual console_scripts and entry_points of a package before building Docker images around its CLI. `pip show -f <package> | grep console_scripts` reveals available commands. Don't assume CLI tools persist across major version bumps.
+
 ---
 
 ## Summary
@@ -128,3 +170,7 @@ See https://github.com/vllm-project/vllm/pull/18298 for more details.
 | 9 | Extended 262K context works without offload on H200 | Serving Config | 104.5 GiB KV cache/GPU; prefix cache enables 252K |
 | 10 | Batching transforms long-context viability | Operations | 126K TTFT drops 4.6x at QPS 2.0 vs QPS 0.5 |
 | 11 | generated-shared-prefix dataset not in vLLM 0.16 | Benchmarking | Use prefix_repetition instead |
+| 12 | Qwen3-Next not in TRT-LLM (pre-release architecture) | Alt Engine | No TRT-LLM serving until transformers 4.57 + TRT-LLM update |
+| 13 | vLLM HMA incompatible with all KV transfer connectors | Serving Config | KV offloading blocked for all hybrid-attention models |
+| 14 | LMCache kv-offloading-backend also blocked by HMA | Serving Config | All offloading paths funnel through KVTransferConfig → HMA disable |
+| 15 | Dynamo 0.9.0 removed dynamo-run CLI | Alt Engine | ai-dynamo restructured; CLI-based KVBM approach obsolete |
