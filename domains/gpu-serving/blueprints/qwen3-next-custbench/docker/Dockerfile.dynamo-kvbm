@@ -1,0 +1,96 @@
+# Dockerfile.dynamo-kvbm
+# NVIDIA Dynamo with KV Block Manager for FSx + GDS benchmarks (Qwen3-Next)
+# Adapted from kimi-k2.5/docker/Dockerfile.dynamo-kvbm
+#
+# Build: docker build -f docker/Dockerfile.dynamo-kvbm -t dynamo-kvbm-qwen3:latest .
+# Run:   see configs/vllm-constrained-dynamo-fsx.sh
+
+ARG BASE_IMAGE=nvcr.io/nvidia/pytorch
+ARG BASE_TAG=26.01-py3
+
+FROM ${BASE_IMAGE}:${BASE_TAG}
+
+LABEL maintainer="benchmark-team"
+LABEL description="NVIDIA Dynamo KVBM with GDS support for Qwen3-Next customer benchmarks"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# System dependencies (build tools, RDMA/EFA support)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    iproute2 \
+    net-tools \
+    curl \
+    wget \
+    libibverbs-dev \
+    librdmacm-dev \
+    rdma-core \
+    ibverbs-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Install Dynamo and dependencies
+ARG DYNAMO_VERSION=0.9.0
+
+RUN pip install --no-cache-dir \
+    "ai-dynamo[vllm]==${DYNAMO_VERSION}" \
+    etcd3>=0.12.0 \
+    nats-py>=2.9.0 \
+    pyzmq>=26.0.0 \
+    msgpack>=1.0.0 \
+    runai-model-streamer \
+    pandas \
+    tqdm
+
+# Install NIXL for GDS backend
+ARG NIXL_VERSION=0.9.0
+RUN pip install --no-cache-dir "nixl[cuda13]==${NIXL_VERSION}" || \
+    pip install --no-cache-dir "nixl[cuda12]==${NIXL_VERSION}" || { \
+    echo "WARNING: NIXL ${NIXL_VERSION} install failed. Checking if bundled with ai-dynamo..." && \
+    python3 -c "import nixl; print(f'NIXL already available: {nixl.__version__}')" ; \
+    }
+
+# Install transformers with Qwen3-Next support
+RUN pip install --no-cache-dir "transformers>=4.57.1"
+
+# Pre-download Qwen3-Next tokenizer (falls back to runtime if unavailable)
+RUN python -c "\
+from transformers import AutoTokenizer; \
+print('Downloading Qwen3-Next tokenizer...'); \
+AutoTokenizer.from_pretrained('Qwen/Qwen3-Next-80B-A3B-Instruct', trust_remote_code=True); \
+print('Tokenizer downloaded successfully')" || { \
+    echo "WARNING: Tokenizer download failed. Must be available at model path at runtime." >&2 ; \
+    true ; \
+    }
+
+# Environment
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
+ENV DYNAMO_EVENT_PLANE=zmq
+ENV CUFILE_ENV_PATH_JSON=/etc/cufile.json
+ENV NIXL_LOG_LEVEL=INFO
+ENV VLLM_ATTENTION_BACKEND=FLASHINFER
+
+# Mount points
+RUN mkdir -p /mnt/fsx /mnt/fsx-efa /mnt/nvme /workspace/results
+
+# Entrypoint
+COPY --chmod=755 <<'EOF' /usr/local/bin/entrypoint.sh
+#!/bin/bash
+echo "============================================"
+echo "NVIDIA Dynamo KVBM Container (Qwen3-Next)"
+echo "============================================"
+echo ""
+echo "Dynamo version: $(pip show ai-dynamo 2>/dev/null | grep Version || echo 'not installed')"
+echo "vLLM version:   $(pip show ai-dynamo-vllm 2>/dev/null | grep Version || echo 'not installed')"
+echo "NIXL version:   $(pip show nixl 2>/dev/null | grep Version || echo 'not installed')"
+echo ""
+exec "$@"
+EOF
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["bash"]

@@ -1,0 +1,17 @@
+# Customer vLLM image for Qwen3-Next
+# Based on customer's Dockerfile — uses nightly vLLM wheels + transformers 4.57.1
+# MTP speculative decoding works on this version (blocked on vLLM 0.16.0rc2)
+ARG base_image=vllm/vllm-openai:v0.11.0
+FROM ${base_image} AS base
+
+FROM base AS final
+
+ARG model_type=qwen3-next
+
+# Install Qwen3-Next dependencies (nightly vLLM + transformers 4.57.1)
+RUN pip uninstall -y vllm && \
+    pip install transformers==4.57.1 accelerate && \
+    pip install vllm --pre --extra-index-url https://wheels.vllm.ai/nightly
+
+LABEL model.type="qwen3-next"
+LABEL benchmark.purpose="customer-config-reproduction"
