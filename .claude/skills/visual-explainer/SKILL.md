@@ -1,3 +1,8 @@
+---
+name: visual-explainer
+description: Converts dense terminal output, benchmark data, and audit reports into interactive single-file HTML pages. Use when user says "visualize benchmarks", "generate diagram", "audit visual", "compound recap", or after benchmark-analyst, blueprint-reviewer, or compound-learner produce markdown output. Do NOT use for generating raw markdown reports, editing existing HTML files, or general web development tasks.
+---
+
 # Visual Explainer Skill
 
 Converts dense AIOps terminal output and benchmark data into self-contained, interactive HTML pages. No build step required — all output is single-file HTML with CDN-only dependencies.
@@ -68,3 +73,23 @@ After compound-learner writes `results/compound-<date>.md`:
 - Dark/light mode toggle using CSS custom properties
 - Mobile-responsive layout
 - Accessible color palette (WCAG AA contrast ratios)
+
+## Troubleshooting
+
+For detailed error → cause → solution mappings, see `references/troubleshooting.md`.
+
+Quick checks:
+- **Blank chart area**: Validate mermaid syntax at mermaid.live; ensure x-axis labels and bar values have same count
+- **Raw placeholders in output**: Grep for `<!-- DATA:` in output file — all must be replaced
+- **Sort not working**: Sort comparator must strip units before parsing numbers
+- **File won't open**: Use `open` on macOS, `xdg-open` on Linux; verify `.html` extension
+
+## Success Criteria
+
+| Metric | Target | How to Measure |
+|--------|--------|----------------|
+| Skill triggers on visual/diagram requests | 90%+ | Test with 10 prompts: "visualize", "generate diagram", "audit visual", "benchmark chart" |
+| Does NOT trigger on markdown report requests | 0% false triggers | Test with "write benchmark report", "create audit markdown" |
+| All template placeholders replaced | 100% | Grep output for `<!-- DATA:` — zero matches |
+| HTML renders correctly in browser | 100% | Open output, verify charts render, tables sort, dark/light toggle works |
+| Output is self-contained | 100% | Disconnect network, reload HTML — all content except CDN fonts should work |

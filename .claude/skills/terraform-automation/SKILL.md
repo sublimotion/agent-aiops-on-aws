@@ -1,6 +1,6 @@
 ---
 name: terraform-automation
-description: Automate AWS infrastructure deployment using Terraform with security scanning, best practices, and iterative development. Use when creating, validating, or deploying Terraform configurations for AWS.
+description: Automate AWS infrastructure deployment using Terraform with security scanning, best practices, and iterative development. Use when user says "create infrastructure", "deploy with Terraform", "run Checkov scan", "validate Terraform", or "debug deployment failure". Do NOT use for reading or explaining existing Terraform code, answering general Terraform questions, or CloudFormation/CDK-only workflows.
 ---
 
 # Terraform Automation Skill
@@ -15,6 +15,16 @@ Comprehensive skill for AWS infrastructure automation using Terraform, integrati
 - Debugging failed deployments
 - Following AWS Well-Architected patterns
 - Implementing TDD for infrastructure
+
+## Context References
+
+For project conventions, consult these canonical steering files (do not duplicate their content):
+
+- **Technology preferences**: `.claude/steering/tech-stack.md`
+- **Project structure**: `.claude/steering/project-structure.md`
+- **Quality standards**: `.claude/steering/product.md`
+
+For HCL code patterns, see `references/terraform-patterns.md`.
 
 ## Available MCP Tools
 
@@ -47,42 +57,35 @@ Comprehensive skill for AWS infrastructure automation using Terraform, integrati
 
 ### Phase 1: Research and Design
 
-```
 1. Define infrastructure requirements
 2. Search Terraform Registry for existing modules
 3. Review AWS best practices for the services needed
 4. Identify security requirements and compliance rules
-```
 
 ### Phase 2: Implementation (TDD Approach)
 
-```
 1. Write specification/requirements file first
 2. Create initial Terraform configuration
-3. Run terraform validate - expect failures initially
-4. Run Checkov security scan - document baseline
+3. Run `terraform validate` — expect failures initially
+4. Run Checkov security scan — document baseline
 5. Iterate until validation passes
 6. Iterate until Checkov passes (no HIGH/CRITICAL)
-```
 
 ### Phase 3: Validation and Security
 
-```
-1. terraform fmt - format code
-2. terraform validate - syntax validation
-3. Checkov scan - security validation
-4. terraform plan - review changes
-5. Manual review of plan output
-```
+Run `scripts/validate.sh [directory]` or execute manually:
+
+1. `terraform fmt` — format code
+2. `terraform validate` — syntax validation
+3. Checkov scan — security validation
+4. `terraform plan` — review changes
 
 ### Phase 4: Deployment
 
-```
-1. terraform apply (with approval)
+1. `terraform apply` (with approval)
 2. Verify resources created
 3. Run post-deployment tests
 4. Document infrastructure
-```
 
 ## Best Practices
 
@@ -94,9 +97,9 @@ Comprehensive skill for AWS infrastructure automation using Terraform, integrati
 
 ### Resource Naming
 
-- **Let Terraform/CDK generate unique names** - don't hardcode resource names
-- Use consistent tagging strategy
-- Include environment, project, and owner tags
+- **Let Terraform/CDK generate unique names** — use `bucket_prefix`, `name_prefix`
+- Use consistent tagging: environment, project, owner, ManagedBy=terraform
+- Keep `var.project_name` to 12 characters or fewer to avoid IAM role name length limits (64 char max)
 
 ### Security First
 
@@ -110,43 +113,8 @@ Comprehensive skill for AWS infrastructure automation using Terraform, integrati
 
 - Use remote state (S3 + DynamoDB locking)
 - Enable state encryption
-- Implement state file access controls
-
-## Example Prompts
-
-### Create New Infrastructure
-
-```
-Create a production-ready VPC with:
-- 3 availability zones
-- Public and private subnets
-- NAT gateways for private subnet egress
-- VPC flow logs enabled
-- Follow AWS Well-Architected security pillar
-
-Use the terraform-mcp-server for best practices and run Checkov scan.
-```
-
-### Validate Existing Code
-
-```
-Validate the Terraform configuration in ./infrastructure/:
-1. Run terraform validate
-2. Run Checkov security scan
-3. Report any HIGH or CRITICAL findings
-4. Suggest fixes for each issue
-```
-
-### Debug Deployment Failure
-
-```
-The Terraform apply failed with this error: [error message]
-
-Use the AWS IaC MCP server to:
-1. Analyze the failure pattern
-2. Check CloudTrail for related events
-3. Suggest resolution steps
-```
+- Never run terraform in parallel background tasks — state locks cause deadlocks
+- If a lock persists, check for orphaned processes with `ps aux | grep terraform`
 
 ## RALPH Loop Integration
 
@@ -158,7 +126,6 @@ For autonomous iterative development, use with the ralph-loop plugin:
 Requirements:
 - VPC with public/private subnets
 - EKS cluster
-- RDS PostgreSQL
 - S3 buckets with encryption
 
 Process each iteration:
@@ -176,126 +143,87 @@ Success criteria:
 Output <promise>READY_FOR_APPLY</promise> when complete." --completion-promise "READY_FOR_APPLY" --max-iterations 25
 ```
 
-## File Structure Convention
-
-```
-infrastructure/
-├── main.tf              # Main configuration
-├── variables.tf         # Input variables
-├── outputs.tf           # Output values
-├── providers.tf         # Provider configuration
-├── backend.tf           # State backend config
-├── versions.tf          # Version constraints
-├── modules/             # Local modules
-│   └── vpc/
-│       ├── main.tf
-│       ├── variables.tf
-│       └── outputs.tf
-├── environments/        # Environment-specific
-│   ├── dev.tfvars
-│   ├── staging.tfvars
-│   └── prod.tfvars
-└── tests/               # Infrastructure tests
-    └── validate.sh
-```
-
-## Common Terraform Patterns for AWS
-
-### VPC with Best Practices
-
-```hcl
-module "vpc" {
-  source  = "terraform-aws-modules/vpc/aws"
-  version = "~> 5.0"
-
-  name = "my-vpc"
-  cidr = "10.0.0.0/16"
-
-  azs             = ["us-east-1a", "us-east-1b", "us-east-1c"]
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
-  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
-
-  enable_nat_gateway     = true
-  single_nat_gateway     = false  # One per AZ for HA
-  enable_dns_hostnames   = true
-  enable_flow_log        = true
-
-  tags = {
-    Environment = var.environment
-    Project     = var.project
-    ManagedBy   = "terraform"
-  }
-}
-```
-
-### S3 Bucket with Security
-
-```hcl
-resource "aws_s3_bucket" "secure" {
-  # Let AWS generate unique name
-  bucket_prefix = "myapp-data-"
-}
-
-resource "aws_s3_bucket_versioning" "secure" {
-  bucket = aws_s3_bucket.secure.id
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "secure" {
-  bucket = aws_s3_bucket.secure.id
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "aws:kms"
-    }
-    bucket_key_enabled = true
-  }
-}
-
-resource "aws_s3_bucket_public_access_block" "secure" {
-  bucket = aws_s3_bucket.secure.id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-```
-
 ## Troubleshooting
+
+### State Lock from Background Tasks
+
+**Error**: `Error locking state: Error acquiring the state lock`
+**Cause**: Multiple terraform processes or orphaned background tasks hold the state lock.
+**Solution**:
+1. Check for running processes: `ps aux | grep terraform`
+2. Kill orphaned processes: `pkill -9 terraform`
+3. If lock persists: `terraform force-unlock <LOCK_ID>`
+4. Prevention: never run terraform in parallel background tasks.
+
+### IAM Role Name Length Exceeded
+
+**Error**: `IAM role name exceeds 64 character limit` or `InvalidParameterValue`
+**Cause**: Long `var.project_name` combined with module suffixes like `-eks-cluster-node-role` exceeds the 64-character IAM limit.
+**Solution**: Keep `var.project_name` to 12 characters or fewer. Example: `qwen3-next-g7e-bench` (20 chars) + `-eks-cluster-node-role` (22 chars) = 42 chars before prefix, which can push over the limit with account-specific prefixes.
+
+### Kubernetes Provider Dependency During First Apply
+
+**Error**: `The kubernetes/helm provider configuration is not valid` on first `terraform apply`
+**Cause**: K8s and Helm providers depend on EKS cluster outputs that don't exist yet during initial apply.
+**Solution**: Apply in stages using `-target`:
+```bash
+terraform apply -target=module.networking -target=module.eks_cluster
+terraform apply  # Full apply after cluster exists
+```
+
+### GPU Resource Change Causes Scheduling Deadlock
+
+**Error**: Pod stuck in `Pending` after changing GPU count (e.g., TP=4 to TP=8)
+**Cause**: Rolling update requires new pod's GPUs before releasing old pod's allocation.
+**Solution**: Scale to 0, apply, scale back:
+```bash
+kubectl -n <ns> scale deployment <name> --replicas=0
+terraform apply -target='<deployment_resource>' -auto-approve
+kubectl -n <ns> scale deployment <name> --replicas=1
+```
+
+### State Attribute Mismatch After Import
+
+**Error**: `terraform plan` shows resource destruction for an imported resource due to attribute mismatch (e.g., `bootstrap_self_managed_addons`)
+**Cause**: Imported state has different default values than Terraform config expects.
+**Solution**: Edit state directly:
+```bash
+terraform state pull > state.json
+# Fix the mismatched attribute in JSON
+terraform state push state.json
+terraform plan  # Verify no destructive changes
+```
 
 ### Checkov False Positives
 
-If Checkov reports issues that are intentional:
-
-1. Document the reason clearly
-2. Use inline skip comments sparingly:
-   ```hcl
-   #checkov:skip=CKV_AWS_XX:Reason for skipping
-   ```
-3. Prefer fixing over skipping
-
-### State Lock Issues
-
-```bash
-# If state is locked unexpectedly
-terraform force-unlock LOCK_ID
+**Error**: Checkov flags intentional configurations (e.g., public ALB)
+**Cause**: Security policy doesn't match deployment intent.
+**Solution**: Use inline skip with documented reason:
+```hcl
+#checkov:skip=CKV_AWS_XX:Public ALB required for external API access
 ```
+Prefer fixing over skipping. Document all skips in the blueprint's `lessons.md`.
 
 ### Provider Version Conflicts
 
+**Error**: `Could not retrieve the list of available versions for provider`
+**Cause**: Version constraints too tight or provider not available.
+**Solution**: Use flexible constraints in `versions.tf`:
 ```hcl
 terraform {
   required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-    awscc = {
-      source  = "hashicorp/awscc"
-      version = "~> 1.0"
-    }
+    aws   = { source = "hashicorp/aws", version = "~> 5.0" }
+    awscc = { source = "hashicorp/awscc", version = "~> 1.0" }
   }
 }
 ```
+
+## Success Criteria
+
+| Metric | Target | How to Measure |
+|--------|--------|----------------|
+| Skill triggers on relevant queries | 90%+ | Test with 10 prompts that should trigger (create infra, deploy, validate, scan, debug) |
+| Workflow completes without user correction | 80%+ | Run same request 3x, compare outputs for structural consistency |
+| Zero failed API/MCP calls per workflow | 0 errors | Monitor MCP server logs during test runs |
+| Validation pipeline passes on first try | 70%+ | Track how often `scripts/validate.sh` passes without iteration |
+| Consistent file structure across runs | 100% | Verify output matches `references/terraform-patterns.md` conventions |

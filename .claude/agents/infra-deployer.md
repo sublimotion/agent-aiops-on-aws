@@ -113,6 +113,19 @@ This stage runs after every successful deployment and after every benchmark sess
 
 **Validation**: `results/compound-<date>.md` exists and lists at least one elevated rule or explicitly states no new rules were found.
 
+## Required Artifacts
+
+Every deployment must produce these artifacts. See `domains/gpu-serving/specs/_template-artifacts.md` for full templates.
+
+| Artifact | Path | When to Create |
+|----------|------|----------------|
+| Deployment log | `results/deployment-log-<YYYYMMDD>.md` | Start writing at Stage 1, append throughout |
+| Readiness audit | `results/readiness-audit-<YYYYMMDD>.md` | Stage 7 |
+| Lessons learned | `lessons.md` | Append after deployment completes |
+| Compound summary | `results/compound-<YYYYMMDD>.md` | Stage 8 (compound-learner writes this) |
+
+**Artifact gate**: Before marking a deployment as complete, verify all four files exist. If `lessons.md` doesn't exist yet, create it with the template header from `_template-artifacts.md`.
+
 ## Output
 
 After each stage, report:
@@ -121,6 +134,6 @@ After each stage, report:
 - Any issues encountered and how they were resolved
 - Terraform outputs or connection details needed for the next stage
 
-Write a deployment log to `results/deployment-log-<date>.md` in the blueprint directory.
+Write all entries to the deployment log (`results/deployment-log-<YYYYMMDD>.md`) with timestamps.
 
-After each readiness audit, write results to `results/readiness-audit-<date>.md`.
+After each readiness audit, write results to `results/readiness-audit-<YYYYMMDD>.md`.

@@ -17,7 +17,10 @@ agent-aiops-on-aws/
 │   │   ├── agentcore-deployer.md  # Agent Runtime deployment (8-stage)
 │   │   └── compound-learner.md    # Post-deployment lesson elevation
 │   ├── skills/                 # Custom skills
-│   │   └── visual-explainer/   # Render dense output as interactive HTML
+│   │   ├── terraform-automation/ # Terraform deployment with security scanning
+│   │   ├── visual-explainer/   # Render dense output as interactive HTML
+│   │   ├── deployment-orchestrator/ # Pre-flight, post-deploy, failure recovery
+│   │   └── tests/              # Skill trigger + functional tests
 │   └── ralph-loop.local.md     # RALPH loop state
 │
 ├── domains/                    # Domain-specific modules, specs, blueprints
@@ -32,12 +35,14 @@ agent-aiops-on-aws/
 │   │   ├── blueprints/         # GPU Serving blueprints
 │   │   │   ├── ministral-3b/   # Ministral-3B on EKS + SageMaker
 │   │   │   ├── kimi-k2.5/     # Kimi K2.5 MoE on p5e (8x H200)
-│   │   │   └── qwen3-next/    # Qwen3-Next MoE on p5en (8x H200)
+│   │   │   ├── qwen3-next/    # Qwen3-Next MoE on p5en (8x H200)
+│   │   │   └── qwen3-next-custbench/ # Customer A/B benchmark + KV offloading
 │   │   └── specs/              # GPU Serving specs
 │   │       ├── _template.md    # Template for new specs
 │   │       ├── ministral-3b.md # Ministral-3B requirements
 │   │       ├── kimi-k2.5.md   # KV cache benchmark requirements
-│   │       └── qwen3-next.md  # Qwen3-Next KV cache benchmark
+│   │       ├── qwen3-next.md  # Qwen3-Next KV cache benchmark
+│   │       └── qwen3-next-custbench.md # Customer A/B benchmark spec
 │   └── agent-runtime/          # Bedrock AgentCore Runtime domain
 │       ├── modules/            # Reusable Terraform modules for agent runtime
 │       │   ├── agentcore-runtime/  # Bedrock AgentCore Runtime resource
@@ -96,7 +101,7 @@ blueprints/<name>/
 
 ```
 blueprints/<name>/
-├── lessons.md          # Operational lessons (grows over time)
+├── lessons.md          # Operational lessons (append-only, grows over time)
 ├── configs/            # Launch configurations per serving variant
 │   ├── baseline.sh
 │   └── <variant>.sh
@@ -107,9 +112,14 @@ blueprints/<name>/
 │   ├── Dockerfile
 │   └── requirements.txt
 └── results/            # Benchmark reports, architecture diagrams
-    ├── <report>.md
-    └── <diagram>.html
+    ├── readiness-audit-<YYYYMMDD>.md   # Pre-flight checklist (Stage 7)
+    ├── deployment-log-<YYYYMMDD>.md    # Timestamped deployment log
+    ├── compound-<YYYYMMDD>.md          # Compound learner summary (Stage 8)
+    ├── benchmark-report.md             # Benchmark analysis (if applicable)
+    └── <visual>-<YYYYMMDD>.html        # Interactive HTML reports
 ```
+
+**Required artifacts**: Every deployment must produce `lessons.md`, `results/readiness-audit-*.md`, `results/deployment-log-*.md`, and `results/compound-*.md`. See `domains/gpu-serving/specs/_template-artifacts.md` for templates.
 
 ## Spec Structure
 

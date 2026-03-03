@@ -187,12 +187,20 @@ The compound-learner will review lessons.md, readiness audits, and deployment lo
 
 **DynamoDB session writes failing**: Verify ECS task role has `dynamodb:PutItem`, `dynamodb:GetItem`, `dynamodb:UpdateItem` on the session table ARN.
 
-## Operational artifacts
+## Required Artifacts
 
-Write all artifacts to `domains/agent-runtime/blueprints/<name>/`:
-- `results/readiness-audit-<date>.md` — Stage 7 output
-- `results/deployment-log-<date>.md` — timestamped log of all commands and outcomes
-- `lessons.md` — append new operational lessons after each deployment
+Every deployment must produce these artifacts. See `domains/gpu-serving/specs/_template-artifacts.md` for full templates (the format applies to both domains).
+
+| Artifact | Path | When to Create |
+|----------|------|----------------|
+| Deployment log | `results/deployment-log-<YYYYMMDD>.md` | Start writing at Stage 1, append throughout |
+| Readiness audit | `results/readiness-audit-<YYYYMMDD>.md` | Stage 7 |
+| Lessons learned | `lessons.md` | Append after deployment completes |
+| Compound summary | `results/compound-<YYYYMMDD>.md` | Stage 8 (compound-learner writes this) |
+
+**Artifact gate**: Before marking a deployment as complete, verify all four files exist. If `lessons.md` doesn't exist yet, create it with the template header.
+
+Write all artifacts to `domains/agent-runtime/blueprints/<name>/`.
 
 Lessons format:
 ```
