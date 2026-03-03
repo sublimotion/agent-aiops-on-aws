@@ -1,0 +1,244 @@
+#!/usr/bin/env bash
+# Benchmark runner for {{MODEL_DISPLAY_NAME}} on {{INSTANCE_TYPE}}
+#
+# Usage:
+#   ./scripts/run-benchmarks.sh [phase]
+#
+# Phases:
+#   p0        — Engine comparison (vLLM vs SGLang)
+#   p1a       — MTP comparison
+#   p1b       — Context scaling
+#   p1c       — QPS sweep
+#   p1d       — Parallelism comparison (TP vs DP+EP)
+#   p2a       — KV offloading (standard context)
+#   p2b       — Extended context (126K–252K)
+#   all       — Run all phases sequentially
+#
+# Prerequisites:
+#   - Model staged to {{MODEL_PATH}}
+#   - vllm bench serve available in PATH
+#   - Server running with appropriate config from configs/
+#
+# Environment:
+#   VLLM_URL      — Base URL (default: http://localhost:8000)
+#   MODEL_NAME    — Served model name (default: {{MODEL_NAME}})
+#   MODEL_PATH    — Model path for tokenizer (default: {{MODEL_PATH}})
+#   RESULT_DIR    — Output directory (default: ./results/session-YYYYMMDD-HHMM)
+#   RUNS          — Runs per config (default: 3)
+#   WARMUP        — Warmup requests (default: 30)
+#   COOLDOWN      — Seconds between benchmarks (default: 60)
+#   DRY_RUN       — Set to 1 to print commands without executing
+
+set -euo pipefail
+
+# --- Configuration ---
+PHASE="${1:-p0}"
+export MODEL_NAME="${MODEL_NAME:-{{MODEL_NAME}}}"
+export MODEL_PATH="${MODEL_PATH:-{{MODEL_PATH}}}"
+export VLLM_URL="${VLLM_URL:-http://localhost:8000}"
+export RESULT_DIR="${RESULT_DIR:-./results/session-$(date +%Y%m%d-%H%M)}"
+export RUNS="${RUNS:-3}"
+export WARMUP="${WARMUP:-30}"
+export COOLDOWN="${COOLDOWN:-60}"
+export DRY_RUN="${DRY_RUN:-0}"
+
+SGLANG_URL="${SGLANG_URL:-http://localhost:8001}"
+
+mkdir -p "$RESULT_DIR"
+
+# Source shared helpers
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "${SCRIPT_DIR}/../../../.claude/skills/benchmark-runner/scripts/benchmark-helpers.sh"
+
+# --- Phase Functions ---
+
+run_p0() {
+  log "============================================================"
+  log "  P0: Engine Comparison (vLLM vs SGLang)"
+  log "============================================================"
+
+  log "NOTE: Start vLLM with configs/vllm-baseline.sh"
+  wait_healthy "$VLLM_URL"
+
+  run_bench "p0_vllm_tp{{TP}}_32k_qps0.5" "$VLLM_URL" random 1024 512 0.5
+  capture_metrics "p0_vllm"
+  cooldown
+
+  log "NOTE: Start SGLang with configs/sglang-baseline.sh"
+  prompt_restart "SGLang baseline (configs/sglang-baseline.sh)"
+  wait_healthy "$SGLANG_URL"
+
+  run_bench "p0_sglang_tp{{TP}}_32k_qps0.5" "$SGLANG_URL" random 1024 512 0.5
+  capture_metrics "p0_sglang" "$SGLANG_URL"
+  cooldown
+
+  log "========== P0 complete =========="
+}
+
+run_p1a() {
+  log "============================================================"
+  log "  P1a: MTP Comparison"
+  log "============================================================"
+
+  log "NOTE: Start winner engine WITHOUT MTP"
+  wait_healthy "$VLLM_URL"
+
+  run_bench "p1a_noMTP_tp{{TP}}_32k_qps2" "$VLLM_URL" random 1024 512 2.0
+  capture_metrics "p1a_noMTP"
+  cooldown
+
+  log "NOTE: Restart winner engine WITH MTP (--num-speculative-tokens N)"
+  prompt_restart "Winner engine with MTP"
+  wait_healthy "$VLLM_URL"
+
+  run_bench "p1a_MTP_tp{{TP}}_32k_qps2" "$VLLM_URL" random 1024 512 2.0
+  capture_metrics "p1a_MTP"
+  cooldown
+
+  log "========== P1a complete =========="
+}
+
+run_p1b() {
+  log "============================================================"
+  log "  P1b: Context Scaling"
+  log "============================================================"
+
+  wait_healthy "$VLLM_URL"
+
+  for CTX in 1024 4096 32768 65536 131072; do
+    run_bench "p1b_ctx${CTX}_qps1" "$VLLM_URL" random "$CTX" 512 1.0
+    cooldown
+  done
+
+  # Shared prefix variants
+  for CTX in 4096 32768 65536; do
+    run_bench "p1b_gsp_ctx${CTX}_qps1" "$VLLM_URL" \
+      generated-shared-prefix "$CTX" 512 1.0 \
+      --gsp-system-prompt-len="$((CTX - 256))" --gsp-question-len=256 --gsp-output-len=512
+    cooldown
+  done
+
+  log "========== P1b complete =========="
+}
+
+run_p1c() {
+  log "============================================================"
+  log "  P1c: QPS Sweep"
+  log "============================================================"
+
+  wait_healthy "$VLLM_URL"
+
+  for QPS in 0.5 1.0 2.0 4.0 8.0; do
+    run_bench "p1c_qps${QPS}" "$VLLM_URL" random 2048 512 "$QPS"
+    cooldown
+  done
+
+  log "========== P1c complete =========="
+}
+
+run_p1d() {
+  log "============================================================"
+  log "  P1d: Parallelism Comparison (TP vs DP+EP)"
+  log "============================================================"
+
+  log "NOTE: Start with TP={{TP}} config"
+  wait_healthy "$VLLM_URL"
+
+  run_bench "p1d_tp{{TP}}_qps2" "$VLLM_URL" random 2048 512 2.0
+  capture_metrics "p1d_tp{{TP}}"
+  cooldown
+
+  log "NOTE: Restart with DP+EP config"
+  prompt_restart "DP+EP configuration"
+  wait_healthy "$VLLM_URL"
+
+  run_bench "p1d_dpep_qps2" "$VLLM_URL" random 2048 512 2.0
+  capture_metrics "p1d_dpep"
+  cooldown
+
+  log "========== P1d complete =========="
+}
+
+run_p2a() {
+  log "============================================================"
+  log "  P2a: KV Cache Offloading"
+  log "============================================================"
+
+  wait_healthy "$VLLM_URL"
+
+  capture_kv_metrics "p2a_pre"
+  run_bench "p2a_kvoffload_32k_qps2" "$VLLM_URL" \
+    generated-shared-prefix 32768 512 2.0 \
+    --gsp-system-prompt-len=32000 --gsp-question-len=256 --gsp-output-len=512
+  capture_kv_metrics "p2a_post"
+  cooldown
+
+  log "========== P2a complete =========="
+}
+
+run_p2b() {
+  log "============================================================"
+  log "  P2b: Extended Context (126K–252K)"
+  log "============================================================"
+
+  wait_healthy "$VLLM_URL"
+
+  for PREFIX in 126000 189000 252000; do
+    capture_kv_metrics "p2b_pre_${PREFIX}k"
+    run_bench "p2b_prefix${PREFIX}k" "$VLLM_URL" \
+      prefix_repetition "$PREFIX" 1024 1.0
+    capture_kv_metrics "p2b_post_${PREFIX}k"
+    cooldown
+  done
+
+  log "========== P2b complete =========="
+}
+
+# --- Main ---
+
+log "{{MODEL_DISPLAY_NAME}} Benchmark Runner"
+log "Phase: $PHASE | Runs: $RUNS | Warmup: $WARMUP | Cooldown: ${COOLDOWN}s"
+log "Results: $RESULT_DIR"
+log ""
+
+case "$PHASE" in
+  p0)   run_p0 ;;
+  p1a)  run_p1a ;;
+  p1b)  run_p1b ;;
+  p1c)  run_p1c ;;
+  p1d)  run_p1d ;;
+  p2a)  run_p2a ;;
+  p2b)  run_p2b ;;
+  all)
+    run_p0
+    run_p1a
+    run_p1b
+    run_p1c
+    run_p1d
+    run_p2a
+    run_p2b
+    ;;
+  *)
+    echo "Usage: $0 {p0|p1a|p1b|p1c|p1d|p2a|p2b|all}"
+    echo ""
+    echo "Phases:"
+    echo "  p0  -- Engine comparison (vLLM vs SGLang)"
+    echo "  p1a -- MTP comparison"
+    echo "  p1b -- Context scaling (1K–128K)"
+    echo "  p1c -- QPS sweep (0.5–8.0)"
+    echo "  p1d -- Parallelism comparison (TP vs DP+EP)"
+    echo "  p2a -- KV cache offloading"
+    echo "  p2b -- Extended context (126K–252K)"
+    echo "  all -- Run all phases sequentially"
+    exit 1
+    ;;
+esac
+
+log ""
+log "All benchmarks for phase '$PHASE' complete."
+log "Results saved to: $RESULT_DIR"
+log ""
+log "Next steps:"
+log "  1. Validate: bash .claude/skills/benchmark-runner/scripts/validate-results.sh $RESULT_DIR"
+log "  2. Analyze:  invoke benchmark-analyst agent with $RESULT_DIR"
+log "  3. Visualize: /benchmark-visual"

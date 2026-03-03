@@ -1,0 +1,231 @@
+#!/usr/bin/env bash
+# Customer benchmark runner for {{MODEL_DISPLAY_NAME}} on {{INSTANCE_TYPE}}
+# Compares customer's exact config (Config A) vs optimized (Config B).
+#
+# Usage:
+#   ./scripts/run-benchmarks.sh [phase]
+#
+# Phases:
+#   t1        — T1: Customer reproduction (Config A)
+#   t2        — T2: Optimized head-to-head (Config B)
+#   t2b       — T2b: Prefix sharing isolation
+#   t3        — T3: MTP isolation (Config B ± MTP)
+#   t4        — T4: Load scaling (Config B at 0.5/5.0/inf qps)
+#   t5        — T5: Memory-constrained KV offload
+#   t6        — T6: Multi-replica (2x replicas, round-robin)
+#   t7        — T7: Stress test (1500 concurrent)
+#   all       — Run all phases sequentially
+#
+# Prerequisites:
+#   - Model staged to {{MODEL_PATH}}
+#   - vllm bench serve available in PATH
+#   - Customer config: configs/vllm-customer-baseline.sh
+#   - Optimized config: configs/vllm-optimized.sh
+#
+# Environment:
+#   VLLM_URL      — Base URL (default: http://localhost:8000)
+#   MODEL_NAME    — Served model name (default: {{MODEL_NAME}})
+#   MODEL_PATH    — Model path for tokenizer (default: {{MODEL_PATH}})
+#   RESULT_DIR    — Output directory (default: ./results/session-YYYYMMDD-HHMM)
+#   RUNS          — Runs per config (default: 3)
+#   WARMUP        — Warmup requests (default: 30)
+#   COOLDOWN      — Seconds between benchmarks (default: 60)
+#   DRY_RUN       — Set to 1 to print commands without executing
+
+set -euo pipefail
+
+# --- Configuration ---
+PHASE="${1:-t1}"
+export MODEL_NAME="${MODEL_NAME:-{{MODEL_NAME}}}"
+export MODEL_PATH="${MODEL_PATH:-{{MODEL_PATH}}}"
+export VLLM_URL="${VLLM_URL:-http://localhost:8000}"
+export RESULT_DIR="${RESULT_DIR:-./results/session-$(date +%Y%m%d-%H%M)}"
+export RUNS="${RUNS:-3}"
+export WARMUP="${WARMUP:-30}"
+export COOLDOWN="${COOLDOWN:-60}"
+export DRY_RUN="${DRY_RUN:-0}"
+
+# Customer workload parameters (customize per engagement)
+NUM_PROMPTS={{NUM_PROMPTS:-1000}}
+INPUT_LEN={{INPUT_LEN:-10000}}
+OUTPUT_LEN={{OUTPUT_LEN:-1000}}
+
+mkdir -p "$RESULT_DIR"
+
+# Source shared helpers
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "${SCRIPT_DIR}/../../../.claude/skills/benchmark-runner/scripts/benchmark-helpers.sh"
+
+# --- Phase Functions ---
+# Replace run_bench calls with run_bench_custbench for the custbench signature.
+
+run_t1() {
+  log "============================================================"
+  log "  T1: Customer Reproduction (Config A)"
+  log "  Config: configs/vllm-customer-baseline.sh"
+  log "============================================================"
+
+  log "NOTE: Start server with configs/vllm-customer-baseline.sh"
+  wait_healthy "$VLLM_URL"
+
+  run_bench_custbench "t1_customer" "$NUM_PROMPTS" "$INPUT_LEN" "$OUTPUT_LEN" inf
+  capture_metrics "t1_customer"
+  cooldown
+
+  log "========== T1 complete =========="
+}
+
+run_t2() {
+  log "============================================================"
+  log "  T2: Optimized Head-to-Head (Config B)"
+  log "  Config: configs/vllm-optimized.sh"
+  log "============================================================"
+
+  log "NOTE: Start server with configs/vllm-optimized.sh"
+  prompt_restart "vLLM optimized (configs/vllm-optimized.sh)"
+  wait_healthy "$VLLM_URL"
+
+  run_bench_custbench "t2_optimized" "$NUM_PROMPTS" "$INPUT_LEN" "$OUTPUT_LEN" inf
+  capture_metrics "t2_optimized"
+  cooldown
+
+  log "========== T2 complete =========="
+}
+
+run_t2b() {
+  log "============================================================"
+  log "  T2b: Prefix Sharing Isolation"
+  log "============================================================"
+
+  wait_healthy "$VLLM_URL"
+
+  capture_kv_metrics "t2b_pre"
+  run_bench_custbench "t2b_prefix" "$NUM_PROMPTS" "$INPUT_LEN" "$OUTPUT_LEN" inf generated-shared-prefix
+  capture_kv_metrics "t2b_post"
+  cooldown
+
+  log "========== T2b complete =========="
+}
+
+run_t3() {
+  log "============================================================"
+  log "  T3: MTP Isolation (Config B without MTP)"
+  log "  Config: configs/vllm-optimized-nomtp.sh"
+  log "============================================================"
+
+  prompt_restart "vLLM optimized no-MTP (configs/vllm-optimized-nomtp.sh)"
+  wait_healthy "$VLLM_URL"
+
+  run_bench_custbench "t3_nomtp" "$NUM_PROMPTS" "$INPUT_LEN" "$OUTPUT_LEN" inf
+  capture_metrics "t3_nomtp"
+  cooldown
+
+  log "========== T3 complete =========="
+}
+
+run_t4() {
+  log "============================================================"
+  log "  T4: Load Scaling (Config B at varying QPS)"
+  log "============================================================"
+
+  log "NOTE: Ensure optimized config is running"
+  wait_healthy "$VLLM_URL"
+
+  for QPS in 0.5 5.0 inf; do
+    run_bench_custbench "t4_qps${QPS}" 100 "$INPUT_LEN" "$OUTPUT_LEN" "$QPS"
+    cooldown
+  done
+  capture_metrics "t4_scaling"
+
+  log "========== T4 complete =========="
+}
+
+run_t5() {
+  log "============================================================"
+  log "  T5: Memory-Constrained KV Offloading"
+  log "  Simulates smaller GPU with --gpu-memory-utilization 0.30"
+  log "============================================================"
+
+  prompt_restart "vLLM optimized, gpu-mem-util=0.30"
+  wait_healthy "$VLLM_URL"
+
+  capture_kv_metrics "t5_pre"
+  run_bench_custbench "t5_constrained" "$NUM_PROMPTS" "$INPUT_LEN" "$OUTPUT_LEN" inf
+  capture_kv_metrics "t5_post"
+  cooldown
+
+  log "========== T5 complete =========="
+}
+
+run_t6() {
+  log "============================================================"
+  log "  T6: Multi-Replica (2x replicas, round-robin)"
+  log "============================================================"
+
+  prompt_restart "vLLM 2x replica (ports 8000/8001)"
+  wait_healthy "$VLLM_URL"
+  wait_healthy "http://localhost:8001"
+
+  local half=$((NUM_PROMPTS / 2))
+  run_bench_custbench "t6_r0" "$half" "$INPUT_LEN" "$OUTPUT_LEN" inf
+  VLLM_URL_ORIG="$VLLM_URL"
+  VLLM_URL="http://localhost:8001"
+  run_bench_custbench "t6_r1" "$half" "$INPUT_LEN" "$OUTPUT_LEN" inf
+  VLLM_URL="$VLLM_URL_ORIG"
+  capture_metrics "t6_r0"
+  VLLM_URL="http://localhost:8001" capture_metrics "t6_r1"
+  cooldown
+
+  log "========== T6 complete =========="
+}
+
+run_t7() {
+  log "============================================================"
+  log "  T7: Stress Test (1500 concurrent)"
+  log "============================================================"
+
+  wait_healthy "$VLLM_URL"
+
+  run_bench_custbench "t7_stress" 1500 "$INPUT_LEN" "$OUTPUT_LEN" inf
+  capture_metrics "t7_stress"
+  cooldown
+
+  log "========== T7 complete =========="
+}
+
+# --- Main ---
+
+log "{{MODEL_DISPLAY_NAME}} Customer Benchmark Runner"
+log "Phase: $PHASE | Runs: $RUNS | Warmup: $WARMUP | Cooldown: ${COOLDOWN}s"
+log "Workload: ${NUM_PROMPTS} prompts, ${INPUT_LEN} input, ${OUTPUT_LEN} output"
+log "Results: $RESULT_DIR"
+log ""
+
+case "$PHASE" in
+  t1)  run_t1 ;;
+  t2)  run_t2 ;;
+  t2b) run_t2b ;;
+  t3)  run_t3 ;;
+  t4)  run_t4 ;;
+  t5)  run_t5 ;;
+  t6)  run_t6 ;;
+  t7)  run_t7 ;;
+  all)
+    run_t1
+    run_t2
+    run_t2b
+    run_t3
+    run_t4
+    run_t5
+    run_t6
+    run_t7
+    ;;
+  *)
+    echo "Usage: $0 {t1|t2|t2b|t3|t4|t5|t6|t7|all}"
+    exit 1
+    ;;
+esac
+
+log ""
+log "All benchmarks for phase '$PHASE' complete."
+log "Results saved to: $RESULT_DIR"

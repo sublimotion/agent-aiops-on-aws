@@ -130,6 +130,64 @@ check "Success Criteria section exists" "$?"
 
 echo ""
 
+# --- benchmark-runner ---
+echo "--- benchmark-runner ---"
+
+test -f "$REPO_ROOT/.claude/skills/benchmark-runner/SKILL.md"
+check "SKILL.md exists" "$?"
+
+grep -q '^---$' "$REPO_ROOT/.claude/skills/benchmark-runner/SKILL.md"
+check "SKILL.md has YAML frontmatter delimiters" "$?"
+
+grep -q '^name: benchmark-runner$' "$REPO_ROOT/.claude/skills/benchmark-runner/SKILL.md"
+check "SKILL.md has name field" "$?"
+
+grep -q 'Do NOT use for' "$REPO_ROOT/.claude/skills/benchmark-runner/SKILL.md"
+check "Description includes negative triggers" "$?"
+
+grep -q '## Phase Structure' "$REPO_ROOT/.claude/skills/benchmark-runner/SKILL.md"
+check "Phase Structure section exists" "$?"
+
+grep -q '## Benchmark Execution Rules' "$REPO_ROOT/.claude/skills/benchmark-runner/SKILL.md"
+check "Benchmark Execution Rules section exists" "$?"
+
+grep -q '## Metrics Checklist' "$REPO_ROOT/.claude/skills/benchmark-runner/SKILL.md"
+check "Metrics Checklist section exists" "$?"
+
+grep -q '## Troubleshooting' "$REPO_ROOT/.claude/skills/benchmark-runner/SKILL.md"
+check "Troubleshooting section exists" "$?"
+
+grep -q '## Success Criteria' "$REPO_ROOT/.claude/skills/benchmark-runner/SKILL.md"
+check "Success Criteria section exists" "$?"
+
+# Check references
+for ref in benchmark-patterns.md metrics-reference.md troubleshooting.md; do
+  test -f "$REPO_ROOT/.claude/skills/benchmark-runner/references/$ref"
+  check "references/$ref exists" "$?"
+done
+
+# Check scripts
+test -f "$REPO_ROOT/.claude/skills/benchmark-runner/scripts/benchmark-helpers.sh"
+check "scripts/benchmark-helpers.sh exists" "$?"
+
+bash -n "$REPO_ROOT/.claude/skills/benchmark-runner/scripts/benchmark-helpers.sh"
+check "scripts/benchmark-helpers.sh passes syntax check" "$?"
+
+test -f "$REPO_ROOT/.claude/skills/benchmark-runner/scripts/validate-results.sh"
+check "scripts/validate-results.sh exists" "$?"
+
+bash -n "$REPO_ROOT/.claude/skills/benchmark-runner/scripts/validate-results.sh"
+check "scripts/validate-results.sh passes syntax check" "$?"
+
+# Check templates
+test -f "$REPO_ROOT/.claude/skills/benchmark-runner/templates/run-benchmarks.sh.tmpl"
+check "templates/run-benchmarks.sh.tmpl exists" "$?"
+
+test -f "$REPO_ROOT/.claude/skills/benchmark-runner/templates/custbench-runner.sh.tmpl"
+check "templates/custbench-runner.sh.tmpl exists" "$?"
+
+echo ""
+
 # --- Blueprint artifact templates ---
 echo "--- Blueprint Artifact Templates ---"
 

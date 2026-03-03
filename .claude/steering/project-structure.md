@@ -20,6 +20,7 @@ agent-aiops-on-aws/
 │   │   ├── terraform-automation/ # Terraform deployment with security scanning
 │   │   ├── visual-explainer/   # Render dense output as interactive HTML
 │   │   ├── deployment-orchestrator/ # Pre-flight, post-deploy, failure recovery
+│   │   ├── benchmark-runner/   # LLM serving benchmark planning, execution, analysis
 │   │   └── tests/              # Skill trigger + functional tests
 │   └── ralph-loop.local.md     # RALPH loop state
 │
