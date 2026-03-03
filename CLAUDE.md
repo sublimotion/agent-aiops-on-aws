@@ -23,6 +23,8 @@ Read these files **on demand** based on what you're doing:
 | Deploying or modifying a GPU-serving blueprint | `domains/gpu-serving/specs/<matching-spec>.md` |
 | Deploying an agent-runtime blueprint | `domains/agent-runtime/specs/<name>.md` |
 | Running the compound step after deployment | `domains/<domain>/blueprints/<name>/lessons.md` + `.claude/steering/*.md` |
+| Running pre-flight or post-deploy checks | Use the `deployment-orchestrator` skill |
+| Diagnosing GPU hardware issues | Use the `gpu-infra-troubleshooting` skill (separate repo) |
 
 **Spec routing** — match blueprints to specs by name:
 
