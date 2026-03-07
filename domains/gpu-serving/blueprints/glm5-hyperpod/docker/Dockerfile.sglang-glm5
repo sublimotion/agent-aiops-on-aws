@@ -1,0 +1,30 @@
+# Dockerfile.sglang-glm5
+# Custom SGLang container for GLM-5 on SageMaker HyperPod
+# GLM-5 uses MLA via DeepseekV2 codepath — no extra model deps needed.
+#
+# Build: docker build --platform linux/amd64 -f Dockerfile.sglang-glm5 -t sglang-glm5:v0.5.2 .
+# Run:   Via HyperPod InferenceEndpointConfig CRD (see manifests/)
+
+FROM lmsys/sglang:v0.5.2-cu124
+
+LABEL maintainer="benchmark-team"
+LABEL description="SGLang for GLM-5 FP8 on SageMaker HyperPod"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Offline mode — model weights served from S3 via operator prefetch
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
+
+# Create mount points
+RUN mkdir -p /opt/ml/model /workspace/results
+
+# SageMaker entrypoint — converts OPTION_* env vars to CLI flags
+COPY --chmod=755 serve /usr/local/bin/serve
+
+# Validation script
+COPY --chmod=755 validate.sh /usr/local/bin/validate.sh
+
+EXPOSE 8080
+
+ENTRYPOINT ["/usr/local/bin/serve"]

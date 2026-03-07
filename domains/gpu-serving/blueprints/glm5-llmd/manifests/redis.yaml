@@ -1,0 +1,78 @@
+# Redis for cross-replica LMCache L2 KV cache sharing
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: ml-inference
+data:
+  redis.conf: |
+    maxmemory 75gb
+    maxmemory-policy allkeys-lfu
+    io-threads 8
+    io-threads-do-reads yes
+    save ""
+    appendonly no
+    tcp-backlog 511
+    timeout 0
+    tcp-keepalive 300
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-glm5
+  namespace: ml-inference
+  labels:
+    app: redis-glm5
+spec:
+  serviceName: redis-glm5
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-glm5
+  template:
+    metadata:
+      labels:
+        app: redis-glm5
+    spec:
+      # Schedule on system node (not GPU node)
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: nvidia.com/gpu.present
+                    operator: DoesNotExist
+      containers:
+        - name: redis
+          image: redis:7.4-alpine
+          command: ["redis-server", "/etc/redis/redis.conf"]
+          ports:
+            - containerPort: 6379
+              name: redis
+          resources:
+            requests:
+              cpu: "4"
+              memory: 80Gi
+            limits:
+              memory: 80Gi
+          volumeMounts:
+            - name: redis-config
+              mountPath: /etc/redis
+      volumes:
+        - name: redis-config
+          configMap:
+            name: redis-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-glm5
+  namespace: ml-inference
+spec:
+  selector:
+    app: redis-glm5
+  ports:
+    - port: 6379
+      targetPort: 6379
+      protocol: TCP
+  clusterIP: None

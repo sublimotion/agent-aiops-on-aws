@@ -12,6 +12,21 @@ Brief description of what this deployment does.
 - **Instance Types**: (specify with fallbacks for GPU)
 - **Scaling**: Min/Max/Desired
 
+### 1a. GPU & NCCL Pre-Flight (required for multi-GPU)
+Before any multi-GPU workload, run these diagnostics and record results:
+
+1. **GPU inventory**: `nvidia-smi` — driver version, CUDA version, GPU names, memory, ECC status
+2. **Topology**: `nvidia-smi topo -m` — verify NVLink vs PCIe-only, identify GPU groupings
+3. **PCIe link**: `nvidia-smi --query-gpu=pcie.link.gen.current,pcie.link.width.current` — verify expected gen/width under load
+4. **ECC/Xid errors**: `nvidia-smi --query-gpu=ecc.errors.*` + `dmesg | grep "NVRM: Xid"` — zero tolerance for uncorrected errors
+5. **NCCL collective test**: Run `nccl_diag.py` (all_reduce, broadcast, barrier across all GPUs) — must pass before deploying distributed training or tensor-parallel serving
+6. **NCCL transport**: Check `NCCL_DEBUG=INFO` output for P2P support, transport type (NVLink/SHM/NET), channel count
+
+**Known blockers** (see `devstral-sera/lessons.md`):
+- NCCL ≤ 2.25.1 has shared memory bug on Blackwell (sm_120) PCIe-only topology — upgrade to ≥ 2.26.2
+- g7e instances (RTX PRO 6000 Blackwell) are PCIe-only, no NVLink — affects multi-GPU training
+- vLLM inference unaffected (uses custom allreduce, not NCCL)
+
 ### 2. Model
 - **Model ID**: HuggingFace model ID or path
 - **Format**: safetensors / GGUF / etc.

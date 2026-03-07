@@ -1,0 +1,137 @@
+# llm-d EPP (Endpoint Picker Plugin) — prefix-cache-aware request routing
+# Uses Gateway API Inference Extension v1.3.1
+# Requires: Gateway API CRDs, InferencePool CRD, Envoy Gateway
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: glm5-epp-config
+  namespace: ml-inference
+data:
+  default-plugins.yaml: |
+    apiVersion: inference.networking.x-k8s.io/v1alpha1
+    kind: EndpointPickerConfig
+    plugins: []
+    schedulingProfiles:
+    - name: default
+      plugins: []
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: glm5-epp
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["inference.networking.k8s.io"]
+    resources: ["inferencepools"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["inference.networking.x-k8s.io"]
+    resources: ["inferencepools", "inferencemodelrewrites", "inferenceobjectives", "inferencepoolimports"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: glm5-epp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: glm5-epp
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: ml-inference
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: glm5-epp
+  namespace: ml-inference
+  labels:
+    app: glm5-epp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: glm5-epp
+  template:
+    metadata:
+      labels:
+        app: glm5-epp
+    spec:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: epp
+          image: registry.k8s.io/gateway-api-inference-extension/epp:v1.3.1
+          args:
+            - --pool-name=glm5-pool
+            - --pool-namespace=ml-inference
+            - --grpc-port=9002
+            - --secure-serving=false
+            - --config-file=/etc/epp/default-plugins.yaml
+            - -v=3
+          ports:
+            - containerPort: 9002
+              name: grpc
+            - containerPort: 9090
+              name: metrics
+          resources:
+            requests:
+              cpu: "1"
+              memory: 1Gi
+            limits:
+              memory: 2Gi
+          volumeMounts:
+            - name: epp-config
+              mountPath: /etc/epp
+      volumes:
+        - name: epp-config
+          configMap:
+            name: glm5-epp-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: glm5-epp
+  namespace: ml-inference
+spec:
+  selector:
+    app: glm5-epp
+  ports:
+    - port: 9002
+      targetPort: 9002
+      name: grpc
+    - port: 9090
+      targetPort: 9090
+      name: metrics
+  type: ClusterIP
+---
+# EnvoyExtensionPolicy — wires EPP ext-proc into Envoy data plane
+# Requires: envoyextensionpolicies.gateway.envoyproxy.io CRD installed
+# Note: messageTimeout must be >> 200ms default for LLM inference
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyExtensionPolicy
+metadata:
+  name: glm5-epp-extproc
+  namespace: ml-inference
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: glm5-route
+  extProc:
+    - backendRefs:
+        - name: glm5-epp
+          port: 9002
+      messageTimeout: 30s
+      failOpen: true
+      processingMode:
+        request:
+          body: Buffered
+        response:
+          body: Streamed

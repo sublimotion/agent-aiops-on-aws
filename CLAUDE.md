@@ -24,7 +24,7 @@ Read these files **on demand** based on what you're doing:
 | Deploying an agent-runtime blueprint | `domains/agent-runtime/specs/<name>.md` |
 | Running the compound step after deployment | `domains/<domain>/blueprints/<name>/lessons.md` + `.claude/steering/*.md` |
 | Running pre-flight or post-deploy checks | Use the `deployment-orchestrator` skill |
-| Diagnosing GPU hardware issues | Use the `gpu-infra-troubleshooting` skill (separate repo) |
+| Diagnosing GPU hardware issues | Use the `gpu-infra` MCP tools (`check_gpu_health`, `explain_xid`, `get_gpu_metrics`, `run_nccl_test`, `discover_cluster`) |
 
 **Spec routing** — match blueprints to specs by name:
 
@@ -35,6 +35,12 @@ Read these files **on demand** based on what you're doing:
 | `domains/gpu-serving/blueprints/qwen3-next/` | `domains/gpu-serving/specs/qwen3-next.md` |
 | `domains/gpu-serving/blueprints/qwen3-next-g7e/` | `domains/gpu-serving/specs/qwen3-next-g7e.md` |
 | `domains/gpu-serving/blueprints/qwen3-next-custbench/` | `domains/gpu-serving/specs/qwen3-next-custbench.md` |
+| `domains/gpu-serving/blueprints/qwen3-next-sglang/` | `domains/gpu-serving/specs/qwen3-next-sglang.md` |
+| `domains/gpu-serving/blueprints/devstral-sera/` | `domains/gpu-serving/specs/devstral-sera.md` |
+| `domains/gpu-serving/blueprints/glm5/` | `domains/gpu-serving/specs/glm5.md` |
+| `domains/gpu-serving/blueprints/glm5-hyperpod/` | `domains/gpu-serving/specs/glm5-hyperpod.md` |
+| `domains/gpu-serving/blueprints/glm5-lmcache/` | `domains/gpu-serving/specs/glm5-lmcache.md` |
+| `domains/gpu-serving/blueprints/glm5-llmd/` | `domains/gpu-serving/specs/glm5-llmd.md` |
 | `domains/agent-runtime/blueprints/research-agent/` | `domains/agent-runtime/specs/research-agent.md` |
 
 **Blueprint-local context** — for operational details (lessons, results, plans), look inside the blueprint directory itself rather than in specs.

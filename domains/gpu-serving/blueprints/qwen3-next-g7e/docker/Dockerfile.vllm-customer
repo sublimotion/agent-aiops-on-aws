@@ -1,0 +1,67 @@
+# Customer vLLM image for Qwen3-Next
+# Multi-model Dockerfile from customer — supports deepseek-v3.2-exp, qwen3-next, qwen3-vl, kimi-k2
+# For customer benchmark reproduction: build with --build-arg model_type=qwen3-next
+#
+# Build: docker build --platform linux/amd64 -f Dockerfile.vllm-customer \
+#          --build-arg model_type=qwen3-next -t qwen3-next-customer:latest .
+#
+# Notes:
+#   - Requires internet access at build time (downloads vLLM nightly + transformers from PyPI)
+#   - Build on internet-connected host, then push to ECR for air-gapped deployment
+#   - The qwen3-next branch installs transformers==4.57.1 + vLLM nightly (with --pre)
+#   - MTP speculative decoding works on this version (blocked on vLLM 0.16.0rc2)
+
+# ============================================
+# VLLM Base Image
+# ============================================
+ARG base_image=vllm/vllm-openai:v0.11.0
+FROM ${base_image} AS base
+
+
+# ============================================
+# Build Arguments
+# ============================================
+ARG model_type=base
+ARG vllm_version=
+ARG extra_packages=
+
+# ============================================
+# Final Model Image
+# ============================================
+FROM base AS final
+
+# Re-declare ARGs after FROM
+ARG model_type
+ARG vllm_version
+ARG extra_packages
+
+# Install dependencies according to the model type
+RUN if [ "$model_type" = "deepseek-v3.2-exp" ]; then \
+        uv venv && \
+        uv pip install vllm --extra-index-url https://wheels.vllm.ai/nightly && \
+        uv pip install https://wheels.vllm.ai/dsv32/deep_gemm-2.1.0%2B594953a-cp312-cp312-linux_x86_64.whl; \
+    # Qwen3-next
+    elif [ "$model_type" = "qwen3-next" ]; then \
+        pip uninstall -y vllm && \
+        pip install transformers==4.57.1 accelerate && \
+        pip install vllm --pre --extra-index-url https://wheels.vllm.ai/nightly; \
+    # Qwen3-VL
+    elif [ "$model_type" = "qwen3-vl" ]; then \
+        uv venv && \
+        uv pip install git+https://github.com/huggingface/transformers && \
+        uv pip install qwen-vl-utils==0.0.14; \
+     # Kimi-K2 (comment in customer source incorrectly says "Qwen3-next")
+     elif [ "$model_type" = "kimi-k2" ]; then \
+        pip install vllm --extra-index-url https://wheels.vllm.ai/nightly && \
+        pip install https://wheels.vllm.ai/dsv32/deep_gemm-2.1.0%2B594953a-cp312-cp312-linux_x86_64.whl; \
+    fi
+
+# Install additional packages if specified
+RUN if [ -n "$extra_packages" ]; then \
+        pip install ${extra_packages}; \
+    fi
+
+# Labels for identification
+LABEL model.type="${model_type}"
+LABEL vllm.version="${vllm_version}"
+LABEL benchmark.purpose="customer-config-reproduction"

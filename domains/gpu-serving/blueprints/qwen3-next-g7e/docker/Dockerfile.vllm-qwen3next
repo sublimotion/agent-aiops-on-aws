@@ -1,0 +1,102 @@
+# Dockerfile.vllm-qwen3next
+# vLLM with transformers-main + flash-linear-attention + causal-conv1d
+# For Qwen3-Next on g7e.48xlarge (Blackwell GB202, sm_100)
+#
+# Build: docker build --platform linux/amd64 -f Dockerfile.vllm-qwen3next -t vllm-qwen3next:v0.15.0-g7e .
+# Run:   docker run --gpus all --privileged --network=host -v /mnt/fsx:/mnt/fsx vllm-qwen3next:v0.15.0-g7e
+#
+# Note: cu130 should support Blackwell sm_100. If not, rebuild with cu131 base:
+#   FROM vllm/vllm-openai:v0.15.0-cu131
+
+FROM vllm/vllm-openai:v0.15.0-cu130
+
+LABEL maintainer="benchmark-team"
+LABEL description="vLLM with Qwen3-Next DeltaNet dependencies (g7e/Blackwell)"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ============================================
+# Install system dependencies
+# ============================================
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# ============================================
+# Install Qwen3-Next model dependencies
+# ============================================
+# transformers main branch — required for qwen3_next model architecture support
+RUN pip install --no-cache-dir \
+    "transformers @ git+https://github.com/huggingface/transformers.git@main"
+
+# flash-linear-attention and causal-conv1d — required for DeltaNet attention performance
+RUN pip install --no-cache-dir \
+    flash-linear-attention \
+    causal-conv1d
+
+# ============================================
+# Environment configuration
+# ============================================
+
+# Offline mode — model weights served from FSx/NVMe
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
+
+# FlashInfer attention backend
+ENV VLLM_ATTENTION_BACKEND=FLASHINFER
+
+# ============================================
+# Create mount points
+# ============================================
+RUN mkdir -p /mnt/fsx /mnt/nvme /workspace/results
+
+# ============================================
+# Validation script
+# ============================================
+COPY --chmod=755 <<'EOF' /usr/local/bin/validate-vllm-qwen3next.sh
+#!/bin/bash
+set -e
+
+echo "=== vLLM + Qwen3-Next Validation (g7e/Blackwell) ==="
+echo ""
+
+echo "1. Checking vLLM..."
+python3 -c "import vllm; print(f'  vLLM version: {vllm.__version__}')" 2>/dev/null || \
+    echo "  WARNING: vllm not importable"
+
+echo ""
+echo "2. Checking transformers (main branch)..."
+python3 -c "
+import transformers
+print(f'  transformers version: {transformers.__version__}')
+from transformers import AutoConfig
+print('  AutoConfig importable')
+" 2>/dev/null || echo "  WARNING: transformers not importable"
+
+echo ""
+echo "3. Checking flash-linear-attention..."
+python3 -c "import fla; print(f'  flash-linear-attention importable')" 2>/dev/null || \
+    echo "  WARNING: flash-linear-attention not importable"
+
+echo ""
+echo "4. Checking causal-conv1d..."
+python3 -c "import causal_conv1d; print(f'  causal-conv1d importable')" 2>/dev/null || \
+    echo "  WARNING: causal-conv1d not importable"
+
+echo ""
+echo "5. Checking GPU availability..."
+python3 -c "
+import torch
+n = torch.cuda.device_count()
+print(f'  GPUs: {n}')
+for i in range(n):
+    name = torch.cuda.get_device_name(i)
+    cap = torch.cuda.get_device_capability(i)
+    print(f'    [{i}] {name} (sm_{cap[0]}{cap[1]})')
+" 2>/dev/null || echo "  WARNING: CUDA not available"
+
+echo ""
+echo "=== Validation Complete ==="
+EOF
+
+ENTRYPOINT ["python3", "-m", "vllm.entrypoints.openai.api_server"]

@@ -1,0 +1,22 @@
+# SGLang GLM-5 Blackwell + LMCache (built from source for ABI compatibility)
+# Base: glm5-blackwell includes glm_moe_dsa architecture + DeepGEMM FP8 kernels
+# Lesson: PyTorch ABI mismatch between prebuilt wheels and SGLang's torch (kimi-k2.5 #13)
+# Lesson: Standard sglang:latest doesn't recognize glm_moe_dsa model type (glm5-lmcache #3)
+# BLOCKED: LMCache v0.3.15 incompatible with NSA/MLA attention (glm5-lmcache #10)
+#   - NSATokenToKVPool uses fused kv_buffer, LMCache expects separate k_buffer/v_buffer
+#   - Fix pending: LMCache PR #2629 (MLA layerwise support)
+#   - Default branch is 'dev' (not 'main')
+FROM lmsysorg/sglang:glm5-blackwell
+
+# Install LMCache from source with --no-build-isolation for ABI compat
+# Use 'dev' branch (default branch, 'main' does not exist)
+RUN pip install --no-build-isolation "lmcache @ git+https://github.com/LMCache/LMCache.git@dev"
+
+# cuFile symlinks for GDS support
+RUN if [ -f /usr/lib/x86_64-linux-gnu/libcufile.so.0 ]; then \
+      ln -sf /usr/lib/x86_64-linux-gnu/libcufile.so.0 /usr/lib/x86_64-linux-gnu/libcufile.so && \
+      ldconfig; \
+    fi
+
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1

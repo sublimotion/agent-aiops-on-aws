@@ -1,0 +1,19 @@
+# vLLM GLM-5 with LMCache (built from source for ABI compatibility)
+# Base image includes DeepGEMM, GLM-5 model architecture, tool-call parser
+# Ref: https://docs.vllm.ai/projects/recipes/en/latest/GLM/GLM5.html
+FROM vllm/vllm-openai:glm5
+
+# Install LMCache from source (PyTorch ABI mismatch with prebuilt wheels)
+RUN pip install --no-build-isolation "lmcache @ git+https://github.com/LMCache/LMCache.git@main"
+
+# cuFile symlinks for GDS support
+RUN if [ -f /usr/lib/x86_64-linux-gnu/libcufile.so.0 ]; then \
+      ln -sf /usr/lib/x86_64-linux-gnu/libcufile.so.0 /usr/lib/x86_64-linux-gnu/libcufile.so && \
+      ldconfig; \
+    fi
+
+COPY validate.sh /usr/local/bin/validate.sh
+RUN chmod +x /usr/local/bin/validate.sh
+
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1

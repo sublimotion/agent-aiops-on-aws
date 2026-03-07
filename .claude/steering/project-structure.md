@@ -37,13 +37,15 @@ agent-aiops-on-aws/
 │   │   │   ├── ministral-3b/   # Ministral-3B on EKS + SageMaker
 │   │   │   ├── kimi-k2.5/     # Kimi K2.5 MoE on p5e (8x H200)
 │   │   │   ├── qwen3-next/    # Qwen3-Next MoE on p5en (8x H200)
-│   │   │   └── qwen3-next-custbench/ # Customer A/B benchmark + KV offloading
+│   │   │   ├── qwen3-next-custbench/ # Customer A/B benchmark + KV offloading
+│   │   │   └── qwen3-next-sglang/ # SGLang + HiCache on g7e (coding agent feasibility)
 │   │   └── specs/              # GPU Serving specs
 │   │       ├── _template.md    # Template for new specs
 │   │       ├── ministral-3b.md # Ministral-3B requirements
 │   │       ├── kimi-k2.5.md   # KV cache benchmark requirements
 │   │       ├── qwen3-next.md  # Qwen3-Next KV cache benchmark
-│   │       └── qwen3-next-custbench.md # Customer A/B benchmark spec
+│   │       ├── qwen3-next-custbench.md # Customer A/B benchmark spec
+│   │       └── qwen3-next-sglang.md # SGLang + HiCache coding agent feasibility
 │   └── agent-runtime/          # Bedrock AgentCore Runtime domain
 │       ├── modules/            # Reusable Terraform modules for agent runtime
 │       │   ├── agentcore-runtime/  # Bedrock AgentCore Runtime resource

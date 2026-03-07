@@ -106,6 +106,18 @@ variable "tags" {
   default     = {}
 }
 
+variable "gpu_ami_type" {
+  description = "AMI type for GPU node group (AL2_x86_64_GPU for Hopper/Ampere, AL2023_x86_64_NVIDIA for Blackwell)"
+  type        = string
+  default     = "AL2_x86_64_GPU"
+}
+
+variable "gpu_post_bootstrap_user_data" {
+  description = "Shell script to run after EKS bootstrap on GPU nodes (NVMe RAID0, FSx mount, etc.)"
+  type        = string
+  default     = ""
+}
+
 variable "nvidia_device_plugin_image" {
   description = "NVIDIA device plugin container image (use ECR for private subnets)"
   type        = string

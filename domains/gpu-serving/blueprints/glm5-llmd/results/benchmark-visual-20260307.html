@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GLM-5 vLLM + llm-d Benchmark Comparison</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --surface-2: #242740;
+      --border: #2e3151;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --accent: #6366f1;
+      --accent-soft: rgba(99,102,241,0.15);
+      --green: #22c55e;
+      --green-soft: rgba(34,197,94,0.12);
+      --red: #ef4444;
+      --red-soft: rgba(239,68,68,0.12);
+      --yellow: #f59e0b;
+      --yellow-soft: rgba(245,158,11,0.12);
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-2: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --accent-soft: rgba(99,102,241,0.08);
+      --green-soft: rgba(34,197,94,0.08);
+      --red-soft: rgba(239,68,68,0.08);
+      --yellow-soft: rgba(245,158,11,0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; color: var(--text); }
+    header .meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .theme-toggle {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+    .theme-toggle:hover { background: var(--border); }
+    main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    .hw-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+    }
+    .hw-item .label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+    .hw-item .value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+    h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: var(--text); }
+    .section { margin-bottom: 2.5rem; }
+    .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    thead { background: var(--surface-2); }
+    th {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    th:hover { color: var(--text); }
+    th.sorted-asc::after { content: ' ↑'; color: var(--accent); }
+    th.sorted-desc::after { content: ' ↓'; color: var(--accent); }
+    td {
+      padding: 0.75rem 1rem;
+      border-top: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+    }
+    tr:hover td { background: var(--accent-soft); }
+    td.config-name { font-family: 'Inter', sans-serif; font-weight: 500; font-size: 0.85rem; }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+    }
+    .badge-best { background: var(--green-soft); color: var(--green); }
+    .badge-worst { background: var(--red-soft); color: var(--red); }
+    .badge-info { background: var(--accent-soft); color: var(--accent); }
+    .chart-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+    }
+    .mermaid { overflow-x: auto; }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+    .summary-card .stat-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+    .summary-card .stat-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    .summary-card .stat-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+    .note-box {
+      background: var(--yellow-soft);
+      border: 1px solid var(--yellow);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 2rem;
+      font-size: 0.85rem;
+    }
+    .note-box strong { color: var(--yellow); }
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>GLM-5 vLLM + llm-d Benchmark Comparison</h1>
+    <div class="meta">p6-b200.48xlarge · 8x NVIDIA B200 183GB · 2026-03-07</div>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">Toggle theme</button>
+</header>
+
+<main>
+
+  <div class="hw-card">
+    <div class="hw-item">
+      <div class="label">Instance</div>
+      <div class="value">p6-b200.48xlarge</div>
+    </div>
+    <div class="hw-item">
+      <div class="label">GPUs</div>
+      <div class="value">8 x B200 183GB</div>
+    </div>
+    <div class="hw-item">
+      <div class="label">Model</div>
+      <div class="value">GLM-5-FP8 (744B MoE)</div>
+    </div>
+    <div class="hw-item">
+      <div class="label">Engine</div>
+      <div class="value">vLLM v0.16.0rc2</div>
+    </div>
+    <div class="hw-item">
+      <div class="label">Config</div>
+      <div class="value">TP8, MTP spec-decode</div>
+    </div>
+  </div>
+
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="stat-label">Peak Throughput</div>
+      <div class="stat-value">2,375 tok/s</div>
+      <div class="stat-sub">64 concurrent (vLLM)</div>
+    </div>
+    <div class="summary-card">
+      <div class="stat-label">BFCL Accuracy</div>
+      <div class="stat-value">100%</div>
+      <div class="stat-sub">50/50 scenarios (glm47 parser)</div>
+    </div>
+    <div class="summary-card">
+      <div class="stat-label">Swarm Peak</div>
+      <div class="stat-value">586 tok/s</div>
+      <div class="stat-sub">32 agents, multi-turn tool calling</div>
+    </div>
+    <div class="summary-card">
+      <div class="stat-label">Cold Start</div>
+      <div class="stat-value">~16 min</div>
+      <div class="stat-sub">DeepGEMM JIT + torch.compile</div>
+    </div>
+  </div>
+
+  <!-- Throughput scaling table -->
+  <div class="section">
+    <h2>Throughput Scaling (256 output tokens)</h2>
+    <div class="table-wrap">
+      <table id="throughput-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable(0, 'throughput-table')">Concurrency</th>
+            <th onclick="sortTable(1, 'throughput-table')">Requests</th>
+            <th onclick="sortTable(2, 'throughput-table')">Throughput (tok/s)</th>
+            <th onclick="sortTable(3, 'throughput-table')">Latency p50 (ms)</th>
+            <th onclick="sortTable(4, 'throughput-table')">Latency p90 (ms)</th>
+            <th onclick="sortTable(5, 'throughput-table')">Errors</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>4</td>
+            <td>112.9</td>
+            <td>6,768</td>
+            <td>9,065</td>
+            <td>0</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>16</td>
+            <td>473.9</td>
+            <td>6,437</td>
+            <td>8,612</td>
+            <td>0</td>
+          </tr>
+          <tr>
+            <td>16</td>
+            <td>64</td>
+            <td>1,348.0</td>
+            <td>9,533</td>
+            <td>12,003</td>
+            <td>0</td>
+          </tr>
+          <tr>
+            <td>32</td>
+            <td>128</td>
+            <td>2,320.7</td>
+            <td>11,072</td>
+            <td>14,024</td>
+            <td>0</td>
+          </tr>
+          <tr>
+            <td>64</td>
+            <td>256</td>
+            <td>2,374.6 <span class="badge badge-best">PEAK</span></td>
+            <td>23,428</td>
+            <td>27,408</td>
+            <td>0</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- vLLM vs SGLang comparison -->
+  <div class="section">
+    <h2>vLLM vs SGLang HiCache (same hardware)</h2>
+    <div class="table-wrap">
+      <table id="comparison-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable(0, 'comparison-table')">Metric</th>
+            <th onclick="sortTable(1, 'comparison-table')">vLLM</th>
+            <th onclick="sortTable(2, 'comparison-table')">SGLang HiCache</th>
+            <th onclick="sortTable(3, 'comparison-table')">Winner</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="config-name">Peak throughput</td>
+            <td>2,374.6 tok/s</td>
+            <td>2,602 tok/s</td>
+            <td><span class="badge badge-best">SGLang</span> +10%</td>
+          </tr>
+          <tr>
+            <td class="config-name">Tool calling</td>
+            <td>Structured (glm47)</td>
+            <td>XML in content</td>
+            <td><span class="badge badge-best">vLLM</span></td>
+          </tr>
+          <tr>
+            <td class="config-name">Reasoning output</td>
+            <td>Built-in (glm45)</td>
+            <td>Not available</td>
+            <td><span class="badge badge-best">vLLM</span></td>
+          </tr>
+          <tr>
+            <td class="config-name">BFCL accuracy</td>
+            <td>100% (50/50)</td>
+            <td>N/A (no parser)</td>
+            <td><span class="badge badge-best">vLLM</span></td>
+          </tr>
+          <tr>
+            <td class="config-name">Cold start</td>
+            <td>~16 min</td>
+            <td>~3 min</td>
+            <td><span class="badge badge-best">SGLang</span> 5.3x faster</td>
+          </tr>
+          <tr>
+            <td class="config-name">KV cache offload</td>
+            <td>Not tested</td>
+            <td>HiCache CPU (+71%)</td>
+            <td><span class="badge badge-best">SGLang</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Throughput scaling chart -->
+  <div class="section">
+    <h2>Throughput Scaling</h2>
+    <div class="chart-container">
+      <div class="mermaid">
+xychart-beta
+  title "vLLM Throughput vs Concurrency (tok/s)"
+  x-axis ["1", "4", "16", "32", "64"]
+  y-axis "tokens/s" 0 --> 2600
+  bar [113, 474, 1348, 2321, 2375]
+      </div>
+    </div>
+  </div>
+
+  <!-- Agent Swarm -->
+  <div class="section">
+    <h2>Agent Swarm Benchmark (multi-turn tool calling)</h2>
+    <div class="table-wrap">
+      <table id="swarm-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable(0, 'swarm-table')">Agents</th>
+            <th onclick="sortTable(1, 'swarm-table')">Throughput (tok/s)</th>
+            <th onclick="sortTable(2, 'swarm-table')">TTFT p50 (ms)</th>
+            <th onclick="sortTable(3, 'swarm-table')">Tool Calls</th>
+            <th onclick="sortTable(4, 'swarm-table')">Avg Turns</th>
+            <th onclick="sortTable(5, 'swarm-table')">Errors</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>4</td><td>126.1</td><td>1,576</td><td>33</td><td>5.0</td><td>0</td></tr>
+          <tr><td>8</td><td>179.5</td><td>1,865</td><td>73</td><td>4.9</td><td>0</td></tr>
+          <tr><td>16</td><td>368.4</td><td>1,708</td><td>129</td><td>4.8</td><td>0</td></tr>
+          <tr><td>32</td><td>586.3 <span class="badge badge-best">PEAK</span></td><td>2,038</td><td>277</td><td>4.8</td><td>0</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Swarm chart -->
+  <div class="section">
+    <h2>Swarm Throughput Scaling</h2>
+    <div class="chart-container">
+      <div class="mermaid">
+xychart-beta
+  title "Agent Swarm Throughput (tok/s)"
+  x-axis ["4 agents", "8 agents", "16 agents", "32 agents"]
+  y-axis "tokens/s" 0 --> 700
+  bar [126, 180, 368, 586]
+      </div>
+    </div>
+  </div>
+
+  <!-- BFCL results -->
+  <div class="section">
+    <h2>BFCL Tool Calling Eval (50 scenarios)</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Pass Rate</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="config-name">Simple function call</td><td>5/5</td><td><span class="badge badge-best">PASS</span></td></tr>
+          <tr><td class="config-name">Multiple parameters</td><td>5/5</td><td><span class="badge badge-best">PASS</span></td></tr>
+          <tr><td class="config-name">Numeric parameters</td><td>5/5</td><td><span class="badge badge-best">PASS</span></td></tr>
+          <tr><td class="config-name">Array parameters</td><td>5/5</td><td><span class="badge badge-best">PASS</span></td></tr>
+          <tr><td class="config-name">Boolean parameters</td><td>5/5</td><td><span class="badge badge-best">PASS</span></td></tr>
+          <tr><td class="config-name">Tool selection (multi-tool)</td><td>5/5</td><td><span class="badge badge-best">PASS</span></td></tr>
+          <tr><td class="config-name">No-tool-needed</td><td>5/5</td><td><span class="badge badge-best">PASS</span></td></tr>
+          <tr><td class="config-name">Nested objects</td><td>5/5</td><td><span class="badge badge-best">PASS</span></td></tr>
+          <tr><td class="config-name">Date/time handling</td><td>5/5</td><td><span class="badge badge-best">PASS</span></td></tr>
+          <tr><td class="config-name">Complex multi-step</td><td>5/5</td><td><span class="badge badge-best">PASS</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- llm-d infrastructure status -->
+  <div class="section">
+    <h2>llm-d Infrastructure Status</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Status</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="config-name">Gateway API CRDs</td><td><span class="badge badge-best">OK</span></td><td>v1 + x-k8s.io installed</td></tr>
+          <tr><td class="config-name">Envoy Gateway</td><td><span class="badge badge-best">OK</span></td><td>GatewayClass + data plane, PROGRAMMED=True</td></tr>
+          <tr><td class="config-name">Gateway (ELB)</td><td><span class="badge badge-best">OK</span></td><td>External access working</td></tr>
+          <tr><td class="config-name">InferencePool (v1)</td><td><span class="badge badge-best">OK</span></td><td>GA API, EPP watching</td></tr>
+          <tr><td class="config-name">EPP v1.3.1</td><td><span class="badge badge-best">OK</span></td><td>Running, controllers started</td></tr>
+          <tr><td class="config-name">HTTPRoute</td><td><span class="badge badge-best">OK</span></td><td>Accepted, ResolvedRefs=True</td></tr>
+          <tr><td class="config-name">Redis</td><td><span class="badge badge-best">OK</span></td><td>Running on GPU node</td></tr>
+          <tr><td class="config-name">End-to-end routing</td><td><span class="badge badge-best">OK</span></td><td>Gateway -> vLLM working</td></tr>
+          <tr><td class="config-name">EnvoyExtensionPolicy</td><td><span class="badge badge-info">PARTIAL</span></td><td>CRD installed, filter configured</td></tr>
+          <tr><td class="config-name">EPP ext-proc</td><td><span class="badge badge-worst">BLOCKED</span></td><td>gRPC connected but not processing</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="note-box">
+    <strong>Note:</strong> EPP ext-proc integration requires proper scorer plugin configuration. With empty config, EPP accepts gRPC streams but doesn't respond. LoadAwareScorer type is not registered in v1.3.1. Full prefix-cache-aware routing needs multi-replica deployment + correct scorer plugin names.
+  </div>
+
+</main>
+
+<footer>
+  Generated by visual-explainer &middot; agent-aiops-on-aws &middot; 2026-03-07
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
+    themeVariables: {
+      primaryColor: '#6366f1',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#2e3151',
+      lineColor: '#8892a4',
+      background: '#1a1d2e',
+      mainBkg: '#1a1d2e',
+    }
+  });
+
+  function toggleTheme() {
+    const html = document.documentElement;
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    mermaid.initialize({ theme: next === 'dark' ? 'dark' : 'default' });
+  }
+
+  let sortDir = {};
+  function sortTable(col, tableId) {
+    const table = document.getElementById(tableId || 'comparison-table');
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const asc = !sortDir[tableId + col];
+    sortDir = {};
+    sortDir[tableId + col] = asc;
+
+    const headers = table.querySelectorAll('th');
+    headers.forEach((h, i) => {
+      h.classList.remove('sorted-asc', 'sorted-desc');
+      if (i === col) h.classList.add(asc ? 'sorted-asc' : 'sorted-desc');
+    });
+
+    rows.sort((a, b) => {
+      const av = a.cells[col].textContent.trim().replace(/[^0-9.\-]/g, '');
+      const bv = b.cells[col].textContent.trim().replace(/[^0-9.\-]/g, '');
+      const an = parseFloat(av), bn = parseFloat(bv);
+      if (!isNaN(an) && !isNaN(bn)) return asc ? an - bn : bn - an;
+      return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+    });
+
+    rows.forEach(r => tbody.appendChild(r));
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# SageMaker-compatible entrypoint for SGLang
+# Reads OPTION_* environment variables and converts them to SGLang CLI flags.
+# Used by the HyperPod Inference Operator's InferenceEndpointConfig CRD.
+set -euo pipefail
+
+ARGS=()
+
+# Model path — default to /opt/ml/model (operator-managed volume mount)
+ARGS+=(--model-path "${OPTION_MODEL_PATH:-/opt/ml/model}")
+
+# Tensor parallelism
+[ -n "${OPTION_TP_SIZE:-}" ] && ARGS+=(--tp-size "$OPTION_TP_SIZE")
+
+# Data type
+[ -n "${OPTION_DTYPE:-}" ] && ARGS+=(--dtype "$OPTION_DTYPE")
+
+# FP8 GEMM backend (required for Blackwell)
+[ -n "${OPTION_FP8_GEMM_BACKEND:-}" ] && ARGS+=(--fp8-gemm-backend "$OPTION_FP8_GEMM_BACKEND")
+
+# Context and batching
+[ -n "${OPTION_CONTEXT_LENGTH:-}" ] && ARGS+=(--context-length "$OPTION_CONTEXT_LENGTH")
+[ -n "${OPTION_CHUNKED_PREFILL_SIZE:-}" ] && ARGS+=(--chunked-prefill-size "$OPTION_CHUNKED_PREFILL_SIZE")
+[ -n "${OPTION_MAX_RUNNING_REQUESTS:-}" ] && ARGS+=(--max-running-requests "$OPTION_MAX_RUNNING_REQUESTS")
+
+# Memory
+[ -n "${OPTION_MEM_FRACTION_STATIC:-}" ] && ARGS+=(--mem-fraction-static "$OPTION_MEM_FRACTION_STATIC")
+
+# Tool call and reasoning parsers
+[ -n "${OPTION_TOOL_CALL_PARSER:-}" ] && ARGS+=(--tool-call-parser "$OPTION_TOOL_CALL_PARSER")
+[ -n "${OPTION_REASONING_PARSER:-}" ] && ARGS+=(--reasoning-parser "$OPTION_REASONING_PARSER")
+
+# Served model name
+[ -n "${OPTION_SERVED_MODEL_NAME:-}" ] && ARGS+=(--served-model-name "$OPTION_SERVED_MODEL_NAME")
+
+# EAGLE speculative decoding
+[ -n "${OPTION_SPECULATIVE_EAGLE_PATH:-}" ] && ARGS+=(--speculative-eagle-path "$OPTION_SPECULATIVE_EAGLE_PATH")
+[ -n "${OPTION_SPECULATIVE_NUM_STEPS:-}" ] && ARGS+=(--speculative-num-steps "$OPTION_SPECULATIVE_NUM_STEPS")
+[ -n "${OPTION_SPECULATIVE_NUM_DRAFT_TOKENS:-}" ] && ARGS+=(--speculative-num-draft-tokens "$OPTION_SPECULATIVE_NUM_DRAFT_TOKENS")
+
+# Port — SageMaker expects 8080
+ARGS+=(--port "${OPTION_PORT:-8080}")
+
+echo "=== SGLang GLM-5 Serving ==="
+echo "Command: python3 -m sglang.launch_server ${ARGS[*]}"
+echo ""
+
+exec python3 -m sglang.launch_server "${ARGS[@]}"

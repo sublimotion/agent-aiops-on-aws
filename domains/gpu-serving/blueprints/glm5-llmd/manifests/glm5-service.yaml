@@ -1,0 +1,31 @@
+# GLM-5 vLLM Services
+# Headless for EPP discovery + NodePort for direct access
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-glm5
+  namespace: ml-inference
+spec:
+  selector:
+    app: vllm-glm5
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
+      name: http
+  clusterIP: None
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-glm5-nodeport
+  namespace: ml-inference
+spec:
+  selector:
+    app: vllm-glm5
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 30080
+      protocol: TCP
+  type: NodePort

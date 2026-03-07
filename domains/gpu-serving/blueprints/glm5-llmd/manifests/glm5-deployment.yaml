@@ -1,0 +1,156 @@
+# GLM-5 vLLM + LMCache Deployment (multi-replica)
+# Uses official vLLM GLM-5 image with tool calling and reasoning support
+# Ref: https://docs.vllm.ai/projects/recipes/en/latest/GLM/GLM5.html
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-glm5
+  namespace: ml-inference
+  labels:
+    app: vllm-glm5
+    model: glm5
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: vllm-glm5
+  template:
+    metadata:
+      labels:
+        app: vllm-glm5
+        model: glm5
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: vllm-sa
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: nvidia.com/gpu.present
+                    operator: In
+                    values: ["true"]
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: vllm-glm5
+              topologyKey: kubernetes.io/hostname
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:glm5
+          securityContext:
+            runAsUser: 0
+            allowPrivilegeEscalation: true
+          command: ["bash", "-c"]
+          args:
+            - |
+              echo "Setting up cuFile symlinks for GDS..."
+              CUFILE_DIR=$(python3 -c "import nvidia.cufile; import os; print(os.path.dirname(nvidia.cufile.__file__) + '/lib')" 2>/dev/null || echo /usr/local/lib/python3.12/dist-packages/nvidia/cufile/lib)
+              if [ -d "${CUFILE_DIR}" ]; then
+                ln -sf ${CUFILE_DIR}/libcufile.so.0 ${CUFILE_DIR}/libcufile.so
+                ln -sf ${CUFILE_DIR}/libcufile_rdma.so.1 ${CUFILE_DIR}/libcufile_rdma.so
+                echo ${CUFILE_DIR} > /etc/ld.so.conf.d/cufile.conf && ldconfig
+                echo "cuFile symlinks created"
+              else
+                echo "cuFile not found, GDS unavailable (POSIX fallback)"
+              fi
+
+              exec python3 -m vllm.entrypoints.openai.api_server \
+                --model /mnt/nvme/models/GLM-5-FP8 \
+                --served-model-name glm5 \
+                --tensor-parallel-size 8 \
+                --enable-prefix-caching \
+                --max-model-len 131072 \
+                --swap-space 32 \
+                --gpu-memory-utilization 0.85 \
+                --speculative-config.method mtp \
+                --speculative-config.num_speculative_tokens 1 \
+                --tool-call-parser glm47 \
+                --reasoning-parser glm45 \
+                --enable-auto-tool-choice \
+                --port 8000 \
+                --disable-log-requests \
+                --kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}'
+          env:
+            - name: HF_HUB_OFFLINE
+              value: "1"
+            - name: TRANSFORMERS_OFFLINE
+              value: "1"
+            - name: NCCL_TIMEOUT
+              value: "1800"
+            - name: VLLM_ATTENTION_BACKEND
+              value: FLASHINFER
+            - name: FI_PROVIDER
+              value: efa
+            - name: FI_EFA_USE_DEVICE_RDMA
+              value: "1"
+            - name: NCCL_PROTO
+              value: Simple
+            - name: LMCACHE_USE_EXPERIMENTAL
+              value: "True"
+            - name: LMCACHE_LOCAL_CPU
+              value: "True"
+            - name: LMCACHE_MAX_LOCAL_CPU_SIZE
+              value: "400"
+            - name: LMCACHE_REMOTE_URL
+              value: "redis://redis-glm5.ml-inference.svc.cluster.local:6379"
+            - name: HUGGING_FACE_HUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token
+                  key: token
+                  optional: true
+          ports:
+            - containerPort: 8000
+              name: http
+          resources:
+            limits:
+              nvidia.com/gpu: "8"
+            requests:
+              nvidia.com/gpu: "8"
+              cpu: "32"
+              memory: 192Gi
+          volumeMounts:
+            - name: model-cache
+              mountPath: /root/.cache
+            - name: shm
+              mountPath: /dev/shm
+            - name: fsx-lustre
+              mountPath: /mnt/fsx
+            - name: nvme
+              mountPath: /mnt/nvme
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 900
+            periodSeconds: 30
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 600
+            periodSeconds: 10
+      volumes:
+        - name: model-cache
+          emptyDir: {}
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Gi
+        - name: fsx-lustre
+          persistentVolumeClaim:
+            claimName: glm5-llmd-fsx-pvc
+        - name: nvme
+          hostPath:
+            path: /mnt/nvme
+            type: Directory

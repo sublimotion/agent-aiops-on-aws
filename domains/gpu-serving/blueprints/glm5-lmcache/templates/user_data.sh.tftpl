@@ -1,0 +1,110 @@
+#!/bin/bash
+# GPU Node Bootstrap for GLM-5 LMCache
+# Sets up: EKS join, kernel tuning, NVMe RAID0, FSx mount, cuFile/GDS
+set -ex
+
+# =============================================================================
+# 1. EKS Bootstrap
+# =============================================================================
+/etc/eks/bootstrap.sh '${cluster_name}' \
+  --kubelet-extra-args '--node-labels=nvidia.com/gpu.present=true,node.kubernetes.io/instance-type=${instance_type}'
+
+# =============================================================================
+# 2. Lustre Kernel Module Tuning
+# =============================================================================
+cat > /etc/modprobe.d/lustre-tuning.conf << 'MODPROBE'
+options ptlrpc ptlrpcd_per_cpt_max=32
+options ksocklnd credits=2560
+MODPROBE
+
+# =============================================================================
+# 3. NVMe RAID0 Setup (P5e: 8x 3.84TB = ~30TB)
+# =============================================================================
+NVME_DEVS=$(lsblk -d -o NAME | grep -E '^nvme[1-9]' | awk '{print "/dev/"$1}' | xargs)
+NVME_COUNT=$(echo $NVME_DEVS | wc -w)
+
+if [ "$NVME_COUNT" -gt 0 ]; then
+  mdadm --stop /dev/md0 2>/dev/null || true
+
+  for dev in $NVME_DEVS; do
+    mdadm --zero-superblock "$dev" 2>/dev/null || true
+  done
+
+  mdadm --create /dev/md0 --level=0 --raid-devices=$NVME_COUNT $NVME_DEVS --force
+  mkfs.xfs -f /dev/md0
+  mkdir -p /mnt/nvme
+  mount -o noatime /dev/md0 /mnt/nvme
+  echo "/dev/md0 /mnt/nvme xfs defaults,noatime 0 0" >> /etc/fstab
+  echo "NVMe RAID0: $NVME_COUNT drives, $(df -h /mnt/nvme | tail -1 | awk '{print $2}') total"
+fi
+
+# =============================================================================
+# 4. FSx Lustre Mount + Client Tuning
+# =============================================================================
+%{ if fsx_dns != "" ~}
+yum install -y lustre-client || true
+mkdir -p /mnt/fsx
+mount -t lustre -o noatime,flock ${fsx_dns}@tcp:/${fsx_mount_name} /mnt/fsx
+echo "${fsx_dns}@tcp:/${fsx_mount_name} /mnt/fsx lustre noatime,flock 0 0" >> /etc/fstab
+
+lctl set_param osc.*.max_dirty_mb=64
+lctl set_param ldlm.namespaces.*.lru_max_age=600000
+lctl set_param ldlm.namespaces.*.lru_size=$((100 * $(nproc)))
+lctl set_param osc.*OST*.max_rpcs_in_flight=32
+lctl set_param mdc.*.max_rpcs_in_flight=64
+lctl set_param mdc.*.max_mod_rpcs_in_flight=50
+
+echo "FSx mounted at /mnt/fsx with client tuning applied"
+%{ endif ~}
+
+# =============================================================================
+# 5. cuFile / GDS Setup (for LMCache GDS backend)
+# =============================================================================
+# Load nvidia-fs kernel module if available
+modprobe nvidia-fs 2>/dev/null || true
+
+# Create cuFile symlinks (required by LMCache GDS)
+if [ -f /usr/lib/x86_64-linux-gnu/libcufile.so.0 ]; then
+  ln -sf /usr/lib/x86_64-linux-gnu/libcufile.so.0 /usr/lib/x86_64-linux-gnu/libcufile.so
+  ldconfig
+  echo "cuFile symlink created"
+fi
+
+# Create cuFile config for GDS
+mkdir -p /etc
+cat > /etc/cufile.json << 'CUFILE'
+{
+  "logging": { "level": 0 },
+  "profile": { "nvtx": false, "cufile_stats": 0 },
+  "fs": {
+    "generic": { "posix_unaligned_writes": false },
+    "lustre": { "posix_gds_min_kb": 0 }
+  },
+  "properties": {
+    "max_device_cache_size": 2048,
+    "max_device_pinned_mem_size": 8192,
+    "max_batch_io_size": 128,
+    "io_batchsize": 128,
+    "max_direct_io_size": 16384
+  }
+}
+CUFILE
+
+# =============================================================================
+# 6. Persist tuning across reboots
+# =============================================================================
+%{ if fsx_dns != "" ~}
+cat > /usr/local/bin/tune-lustre.sh << 'TUNE'
+#!/bin/bash
+lctl set_param osc.*.max_dirty_mb=64 2>/dev/null
+lctl set_param ldlm.namespaces.*.lru_max_age=600000 2>/dev/null
+lctl set_param ldlm.namespaces.*.lru_size=$((100 * $(nproc))) 2>/dev/null
+lctl set_param osc.*OST*.max_rpcs_in_flight=32 2>/dev/null
+lctl set_param mdc.*.max_rpcs_in_flight=64 2>/dev/null
+lctl set_param mdc.*.max_mod_rpcs_in_flight=50 2>/dev/null
+TUNE
+chmod +x /usr/local/bin/tune-lustre.sh
+echo "@reboot /usr/local/bin/tune-lustre.sh" | crontab -
+%{ endif ~}
+
+echo "GPU node bootstrap complete (GDS-ready)"

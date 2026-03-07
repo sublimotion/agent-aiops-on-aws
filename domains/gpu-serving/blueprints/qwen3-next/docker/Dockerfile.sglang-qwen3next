@@ -1,0 +1,94 @@
+# Dockerfile.sglang-qwen3next
+# SGLang with transformers-main + flash-linear-attention + causal-conv1d
+# Required for Qwen3-Next DeltaNet hybrid attention on air-gapped clusters.
+#
+# Build: docker build --platform linux/amd64 -f Dockerfile.sglang-qwen3next -t sglang-qwen3next:v0.5.2 .
+# Run:   docker run --gpus all --privileged --network=host -v /mnt/fsx:/mnt/fsx sglang-qwen3next:v0.5.2
+
+FROM lmsysorg/sglang:v0.5.2-cu130
+
+LABEL maintainer="benchmark-team"
+LABEL description="SGLang with Qwen3-Next DeltaNet dependencies"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ============================================
+# Install system dependencies
+# ============================================
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# ============================================
+# Install Qwen3-Next model dependencies
+# ============================================
+# transformers main branch — required for qwen3_next model architecture support
+RUN pip install --no-cache-dir \
+    "transformers @ git+https://github.com/huggingface/transformers.git@main"
+
+# flash-linear-attention and causal-conv1d — required for DeltaNet attention performance
+RUN pip install --no-cache-dir \
+    flash-linear-attention \
+    causal-conv1d
+
+# ============================================
+# Environment configuration
+# ============================================
+
+# Offline mode — model weights served from FSx/NVMe
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
+
+# ============================================
+# Create mount points
+# ============================================
+RUN mkdir -p /mnt/fsx /mnt/nvme /workspace/results
+
+# ============================================
+# Validation script
+# ============================================
+COPY --chmod=755 <<'EOF' /usr/local/bin/validate-sglang-qwen3next.sh
+#!/bin/bash
+set -e
+
+echo "=== SGLang + Qwen3-Next Validation ==="
+echo ""
+
+echo "1. Checking SGLang..."
+python3 -c "import sglang; print(f'  SGLang version: {sglang.__version__}')" 2>/dev/null || \
+    echo "  WARNING: sglang not importable"
+
+echo ""
+echo "2. Checking transformers (main branch)..."
+python3 -c "
+import transformers
+print(f'  transformers version: {transformers.__version__}')
+from transformers import AutoConfig
+print('  AutoConfig importable')
+" 2>/dev/null || echo "  WARNING: transformers not importable"
+
+echo ""
+echo "3. Checking flash-linear-attention..."
+python3 -c "import fla; print(f'  flash-linear-attention importable')" 2>/dev/null || \
+    echo "  WARNING: flash-linear-attention not importable"
+
+echo ""
+echo "4. Checking causal-conv1d..."
+python3 -c "import causal_conv1d; print(f'  causal-conv1d importable')" 2>/dev/null || \
+    echo "  WARNING: causal-conv1d not importable"
+
+echo ""
+echo "5. Checking GPU availability..."
+python3 -c "
+import torch
+n = torch.cuda.device_count()
+print(f'  GPUs: {n}')
+for i in range(n):
+    print(f'    [{i}] {torch.cuda.get_device_name(i)}')
+" 2>/dev/null || echo "  WARNING: CUDA not available"
+
+echo ""
+echo "=== Validation Complete ==="
+EOF
+
+ENTRYPOINT ["python3", "-m", "sglang.launch_server"]

@@ -1,0 +1,110 @@
+# Dockerfile.sglang-hicache
+# SGLang with HiCache + Mooncake Transfer Engine for tiered KV cache
+# Covers all three SGLang phases: HiCache baseline, NVMe L3, and Mooncake L3
+#
+# Requires CUDA 13.0 driver (580.x) on p5e instances with AL2023 NVIDIA AMI.
+#
+# Build: docker build -f Dockerfile.sglang-hicache -t sglang-mooncake:cu130 .
+# Run:   docker run --gpus all --privileged --network=host -v /mnt/fsx:/mnt/fsx sglang-mooncake:cu130
+
+FROM lmsysorg/sglang:latest-cu130
+
+LABEL maintainer="benchmark-team"
+LABEL description="SGLang HiCache with RDMA and Mooncake support"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ============================================
+# Install RDMA and GDS system dependencies
+# ============================================
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # RDMA/InfiniBand libraries
+    libibverbs-dev \
+    librdmacm-dev \
+    rdma-core \
+    ibverbs-utils \
+    # Networking tools
+    iproute2 \
+    net-tools \
+    && rm -rf /var/lib/apt/lists/*
+# Note: nvidia-gds tools are accessed via host mount (/usr/local/cuda/gds/tools/)
+# Note: Lustre filesystem is mounted from the host — no client packages needed in container
+
+# ============================================
+# Install Mooncake Transfer Engine
+# ============================================
+RUN pip install --no-cache-dir \
+    mooncake-transfer-engine \
+    pyzmq>=26.0.0
+
+# ============================================
+# Environment configuration
+# ============================================
+
+# Offline mode — model weights served from FSx/NVMe
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
+
+# GDS configuration
+ENV CUFILE_ENV_PATH_JSON=/etc/cufile.json
+
+# ============================================
+# Create mount points
+# ============================================
+RUN mkdir -p /mnt/fsx /mnt/nvme /workspace/results /mnt/nvme/kv-cache
+
+# ============================================
+# Validation script
+# ============================================
+COPY --chmod=755 <<'EOF' /usr/local/bin/validate-sglang.sh
+#!/bin/bash
+set -e
+
+echo "=== SGLang + HiCache Validation ==="
+echo ""
+
+echo "1. Checking SGLang..."
+python3 -c "import sglang; print(f'  SGLang version: {sglang.__version__}')" 2>/dev/null || \
+    echo "  WARNING: sglang not importable"
+
+echo ""
+echo "2. Checking HiCache availability..."
+python3 -c "
+from sglang.srt.server_args import ServerArgs
+import inspect
+sig = inspect.signature(ServerArgs.__init__)
+if 'enable_hierarchical_cache' in sig.parameters:
+    print('  HiCache: available')
+else:
+    print('  HiCache: NOT available in this SGLang version')
+" 2>/dev/null || echo "  WARNING: could not check HiCache"
+
+echo ""
+echo "3. Checking Mooncake..."
+python3 -c "import mooncake; print(f'  mooncake version: {mooncake.__version__}')" 2>/dev/null || \
+    python3 -c "import mooncake_transfer_engine; print('  mooncake_transfer_engine importable')" 2>/dev/null || \
+    echo "  WARNING: mooncake not importable (Phase 3 will not work)"
+
+echo ""
+echo "4. Checking RDMA devices..."
+if command -v ibv_devices &>/dev/null; then
+    ibv_devices 2>/dev/null || echo "  No RDMA devices found (expected outside cluster)"
+else
+    echo "  ibv_devices not found"
+fi
+
+echo ""
+echo "5. Checking GDS..."
+if command -v gdscheck &>/dev/null; then
+    gdscheck -V 2>/dev/null || echo "  gdscheck version check failed"
+elif [ -f /usr/local/cuda/gds/tools/gdscheck ]; then
+    /usr/local/cuda/gds/tools/gdscheck -V
+else
+    echo "  gdscheck not found"
+fi
+
+echo ""
+echo "=== Validation Complete ==="
+EOF
+
+ENTRYPOINT ["python3", "-m", "sglang.launch_server"]

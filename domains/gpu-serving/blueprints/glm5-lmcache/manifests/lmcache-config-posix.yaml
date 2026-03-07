@@ -1,0 +1,11 @@
+# LMCache ConfigMap — POSIX Disk Backend (FSx fallback)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lmcache-config-posix
+  namespace: ml-inference
+data:
+  config.yaml: |
+    chunk_size: 256
+    local_disk: "file:///mnt/fsx/kv-cache"
+    max_local_disk_size: 500

@@ -1,0 +1,13 @@
+# LMCache ConfigMap — CPU Backend (L1 offload)
+# Mount as /etc/lmcache/config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lmcache-config-cpu
+  namespace: ml-inference
+data:
+  config.yaml: |
+    chunk_size: 256
+    local_cpu: true
+    max_local_cpu_size: 400
+    use_layerwise: true

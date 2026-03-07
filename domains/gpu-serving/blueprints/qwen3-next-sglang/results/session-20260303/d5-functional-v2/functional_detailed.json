@@ -1,0 +1,327 @@
+[
+  {
+    "task_id": "parse_date_none",
+    "title": "Fix parse_date returning None",
+    "completed": true,
+    "tests_pass": true,
+    "turns_used": 6,
+    "total_latency_ms": 5532.4,
+    "error": null,
+    "svg_attempted": true,
+    "svg_reproduced": true,
+    "svg_recall": 1.0,
+    "trajectory": [
+      {
+        "role": "tool_exec",
+        "tool": "list_files",
+        "args_keys": [],
+        "result_preview": "test_utils.py\nutils.py",
+        "latency_ms": 310.9
+      },
+      {
+        "role": "tool_exec",
+        "tool": "read_file",
+        "args_keys": [
+          "path"
+        ],
+        "result_preview": "from datetime import datetime\n\ndef parse_date(date_str: str, fmt: str = \"%Y-%m-%d\") -> datetime | None:\n    \"\"\"Parse a date string into a datetime object.\"\"\"\n    return None  # TODO: implement\n",
+        "latency_ms": 332.6
+      },
+      {
+        "role": "tool_exec",
+        "tool": "read_file",
+        "args_keys": [
+          "path"
+        ],
+        "result_preview": "from utils import parse_date\nfrom datetime import datetime\n\ndef test_parse_date_basic():\n    result = parse_date(\"2024-01-15\")\n    assert result == datetime(2024, 1, 15)\n\ndef test_parse_date_custom_fo",
+        "latency_ms": 364.2
+      },
+      {
+        "role": "tool_exec",
+        "tool": "write_file",
+        "args_keys": [
+          "path",
+          "content"
+        ],
+        "result_preview": "File written: utils.py (258 chars)",
+        "latency_ms": 1881.2
+      },
+      {
+        "role": "tool_exec",
+        "tool": "run_command",
+        "args_keys": [
+          "command"
+        ],
+        "result_preview": "============================= test session starts ==============================\nplatform darwin -- Python 3.14.2, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/opt/python@3.14/bin/python3.14\ncachedir: ",
+        "latency_ms": 504.4
+      },
+      {
+        "role": "model",
+        "tool": null,
+        "args_keys": [],
+        "result_preview": "",
+        "latency_ms": 194.3
+      }
+    ]
+  },
+  {
+    "task_id": "off_by_one_pagination",
+    "title": "Fix off-by-one in pagination",
+    "completed": true,
+    "tests_pass": true,
+    "turns_used": 6,
+    "total_latency_ms": 10252.2,
+    "error": null,
+    "svg_attempted": true,
+    "svg_reproduced": true,
+    "svg_recall": 0.9167,
+    "trajectory": [
+      {
+        "role": "tool_exec",
+        "tool": "list_files",
+        "args_keys": [],
+        "result_preview": "paginator.py\ntest_paginator.py",
+        "latency_ms": 468.8
+      },
+      {
+        "role": "tool_exec",
+        "tool": "read_file",
+        "args_keys": [
+          "path"
+        ],
+        "result_preview": "from typing import TypeVar, Sequence\n\nT = TypeVar(\"T\")\n\ndef paginate(items: Sequence[T], page: int, page_size: int = 10) -> list[T]:\n    \"\"\"Return a single page of items. Pages are 1-indexed.\"\"\"\n    i",
+        "latency_ms": 362.0
+      },
+      {
+        "role": "tool_exec",
+        "tool": "read_file",
+        "args_keys": [
+          "path"
+        ],
+        "result_preview": "from paginator import paginate, total_pages\n\ndef test_first_page():\n    items = list(range(25))\n    result = paginate(items, page=1, page_size=10)\n    assert len(result) == 10\n    assert result == [0,",
+        "latency_ms": 387.6
+      },
+      {
+        "role": "tool_exec",
+        "tool": "write_file",
+        "args_keys": [
+          "path",
+          "content"
+        ],
+        "result_preview": "File written: paginator.py (513 chars)",
+        "latency_ms": 5225.2
+      },
+      {
+        "role": "tool_exec",
+        "tool": "run_command",
+        "args_keys": [
+          "command"
+        ],
+        "result_preview": "============================= test session starts ==============================\nplatform darwin -- Python 3.14.2, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/opt/python@3.14/bin/python3.14\ncachedir: ",
+        "latency_ms": 502.9
+      },
+      {
+        "role": "model",
+        "tool": null,
+        "args_keys": [],
+        "result_preview": "",
+        "latency_ms": 2173.6
+      }
+    ]
+  },
+  {
+    "task_id": "missing_auth_check",
+    "title": "Add expiration check to JWT auth",
+    "completed": true,
+    "tests_pass": true,
+    "turns_used": 6,
+    "total_latency_ms": 12304.1,
+    "error": null,
+    "svg_attempted": true,
+    "svg_reproduced": true,
+    "svg_recall": 0.9231,
+    "trajectory": [
+      {
+        "role": "tool_exec",
+        "tool": "list_files",
+        "args_keys": [],
+        "result_preview": "auth.py\ntest_auth.py",
+        "latency_ms": 470.6
+      },
+      {
+        "role": "tool_exec",
+        "tool": "read_file",
+        "args_keys": [
+          "path"
+        ],
+        "result_preview": "import json\nimport base64\nimport time\n\nSECRET = \"test-secret-key\"\n\ndef _b64decode(s: str) -> dict:\n    padded = s + \"=\" * (4 - len(s) % 4)\n    return json.loads(base64.urlsafe_b64decode(padded))\n\ndef ",
+        "latency_ms": 444.0
+      },
+      {
+        "role": "tool_exec",
+        "tool": "read_file",
+        "args_keys": [
+          "path"
+        ],
+        "result_preview": "import time\nfrom auth import authenticate, create_token\n\ndef test_valid_token():\n    token = create_token(\"user-123\", expires_in=3600)\n    result = authenticate(token)\n    assert result is not None\n  ",
+        "latency_ms": 383.2
+      },
+      {
+        "role": "tool_exec",
+        "tool": "write_file",
+        "args_keys": [
+          "path",
+          "content"
+        ],
+        "result_preview": "File written: auth.py (1049 chars)",
+        "latency_ms": 7324.2
+      },
+      {
+        "role": "tool_exec",
+        "tool": "run_command",
+        "args_keys": [
+          "command"
+        ],
+        "result_preview": "============================= test session starts ==============================\nplatform darwin -- Python 3.14.2, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/opt/python@3.14/bin/python3.14\ncachedir: ",
+        "latency_ms": 539.1
+      },
+      {
+        "role": "model",
+        "tool": null,
+        "args_keys": [],
+        "result_preview": "",
+        "latency_ms": 666.6
+      }
+    ]
+  },
+  {
+    "task_id": "race_condition_counter",
+    "title": "Fix thread-unsafe counter",
+    "completed": true,
+    "tests_pass": true,
+    "turns_used": 6,
+    "total_latency_ms": 9489.8,
+    "error": null,
+    "svg_attempted": true,
+    "svg_reproduced": true,
+    "svg_recall": 1.0,
+    "trajectory": [
+      {
+        "role": "tool_exec",
+        "tool": "list_files",
+        "args_keys": [],
+        "result_preview": "counter.py\ntest_counter.py",
+        "latency_ms": 449.9
+      },
+      {
+        "role": "tool_exec",
+        "tool": "read_file",
+        "args_keys": [
+          "path"
+        ],
+        "result_preview": "import threading\n\nclass ThreadSafeCounter:\n    \"\"\"A counter that should be safe to use from multiple threads.\"\"\"\n\n    def __init__(self, initial: int = 0):\n        self._value = initial\n        # BUG:",
+        "latency_ms": 1708.1
+      },
+      {
+        "role": "tool_exec",
+        "tool": "read_file",
+        "args_keys": [
+          "path"
+        ],
+        "result_preview": "import threading\nfrom counter import ThreadSafeCounter\n\ndef test_single_thread():\n    c = ThreadSafeCounter()\n    for _ in range(100):\n        c.increment()\n    assert c.value == 100\n\ndef test_concurr",
+        "latency_ms": 443.5
+      },
+      {
+        "role": "tool_exec",
+        "tool": "write_file",
+        "args_keys": [
+          "path",
+          "content"
+        ],
+        "result_preview": "File written: counter.py (689 chars)",
+        "latency_ms": 3979.3
+      },
+      {
+        "role": "tool_exec",
+        "tool": "run_command",
+        "args_keys": [
+          "command"
+        ],
+        "result_preview": "============================= test session starts ==============================\nplatform darwin -- Python 3.14.2, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/opt/python@3.14/bin/python3.14\ncachedir: ",
+        "latency_ms": 502.5
+      },
+      {
+        "role": "model",
+        "tool": null,
+        "args_keys": [],
+        "result_preview": "",
+        "latency_ms": 528.6
+      }
+    ]
+  },
+  {
+    "task_id": "csv_encoding_error",
+    "title": "Fix CSV export encoding handling",
+    "completed": true,
+    "tests_pass": true,
+    "turns_used": 6,
+    "total_latency_ms": 8260.6,
+    "error": null,
+    "svg_attempted": true,
+    "svg_reproduced": true,
+    "svg_recall": 1.0,
+    "trajectory": [
+      {
+        "role": "tool_exec",
+        "tool": "list_files",
+        "args_keys": [],
+        "result_preview": "exporter.py\ntest_exporter.py",
+        "latency_ms": 319.8
+      },
+      {
+        "role": "tool_exec",
+        "tool": "read_file",
+        "args_keys": [
+          "path"
+        ],
+        "result_preview": "import csv\nfrom typing import Sequence\n\ndef export_csv(\n    rows: Sequence[dict],\n    filepath: str,\n    columns: list[str] | None = None,\n) -> int:\n    \"\"\"Export rows to CSV. Returns number of rows w",
+        "latency_ms": 922.8
+      },
+      {
+        "role": "tool_exec",
+        "tool": "read_file",
+        "args_keys": [
+          "path"
+        ],
+        "result_preview": "import os\nimport tempfile\nfrom exporter import export_csv\n\ndef test_basic_export():\n    rows = [{\"name\": \"Alice\", \"age\": \"30\"}, {\"name\": \"Bob\", \"age\": \"25\"}]\n    with tempfile.NamedTemporaryFile(suffi",
+        "latency_ms": 366.3
+      },
+      {
+        "role": "tool_exec",
+        "tool": "write_file",
+        "args_keys": [
+          "path",
+          "content"
+        ],
+        "result_preview": "File written: exporter.py (568 chars)",
+        "latency_ms": 4668.3
+      },
+      {
+        "role": "tool_exec",
+        "tool": "run_command",
+        "args_keys": [
+          "command"
+        ],
+        "result_preview": "============================= test session starts ==============================\nplatform darwin -- Python 3.14.2, pytest-9.0.2, pluggy-1.6.0 -- /opt/homebrew/opt/python@3.14/bin/python3.14\ncachedir: ",
+        "latency_ms": 498.7
+      },
+      {
+        "role": "model",
+        "tool": null,
+        "args_keys": [],
+        "result_preview": "",
+        "latency_ms": 208.9
+      }
+    ]
+  }
+]

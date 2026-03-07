@@ -1,0 +1,135 @@
+# GLM-5 SGLang + LMCache Deployment
+# Standalone K8s manifest (alternative to Terraform-managed deployment)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sglang-glm5
+  namespace: ml-inference
+  labels:
+    app: sglang-glm5
+    model: glm5
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sglang-glm5
+  template:
+    metadata:
+      labels:
+        app: sglang-glm5
+        model: glm5
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "30000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: sglang-sa
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: nvidia.com/gpu.present
+                    operator: In
+                    values: ["true"]
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: sglang
+          image: ${SGLANG_IMAGE:-lmsysorg/sglang:v0.5.2-cu124}
+          securityContext:
+            runAsUser: 0
+            allowPrivilegeEscalation: true
+          command: ["python3", "-m", "sglang.launch_server"]
+          args:
+            - --model-path
+            - /mnt/nvme/models/GLM-5-FP8
+            - --tp-size
+            - "8"
+            - --context-length
+            - "131072"
+            - --chunked-prefill-size
+            - "32768"
+            - --max-running-requests
+            - "256"
+            - --mem-fraction-static
+            - "0.85"
+            - --served-model-name
+            - glm5
+            - --port
+            - "30000"
+            - --enable-lmcache
+          env:
+            - name: HF_HUB_OFFLINE
+              value: "1"
+            - name: TRANSFORMERS_OFFLINE
+              value: "1"
+            - name: NCCL_TIMEOUT
+              value: "1800"
+            - name: FI_PROVIDER
+              value: efa
+            - name: FI_EFA_USE_DEVICE_RDMA
+              value: "1"
+            - name: NCCL_PROTO
+              value: Simple
+            - name: LMCACHE_CONFIG_FILE
+              value: /etc/lmcache/config.yaml
+            - name: HUGGING_FACE_HUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token
+                  key: token
+                  optional: true
+          ports:
+            - containerPort: 30000
+              name: http
+          resources:
+            limits:
+              nvidia.com/gpu: "8"
+            requests:
+              nvidia.com/gpu: "8"
+              cpu: "32"
+              memory: 128Gi
+          volumeMounts:
+            - name: model-cache
+              mountPath: /root/.cache
+            - name: shm
+              mountPath: /dev/shm
+            - name: fsx-lustre
+              mountPath: /mnt/fsx
+            - name: nvme
+              mountPath: /mnt/nvme
+            - name: lmcache-config
+              mountPath: /etc/lmcache
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 30000
+            initialDelaySeconds: 600
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 30000
+            initialDelaySeconds: 300
+            periodSeconds: 10
+      volumes:
+        - name: model-cache
+          emptyDir: {}
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Gi
+        - name: fsx-lustre
+          persistentVolumeClaim:
+            claimName: glm5-fsx-pvc
+        - name: nvme
+          hostPath:
+            path: /mnt/nvme
+            type: Directory
+        - name: lmcache-config
+          configMap:
+            name: lmcache-config

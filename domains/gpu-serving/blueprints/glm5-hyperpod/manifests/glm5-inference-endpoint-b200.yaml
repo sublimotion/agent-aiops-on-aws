@@ -1,0 +1,58 @@
+# GLM-5 InferenceEndpointConfig — B200 Track (ml.p6-b200.48xlarge)
+# TRTLLM MLA default on Blackwell, cutlass FP8 backend, 512 max running requests
+apiVersion: inference.sagemaker.aws.amazon.com/v1
+kind: InferenceEndpointConfig
+metadata:
+  name: glm5-fp8-b200
+  namespace: default
+spec:
+  endpointName: glm5-fp8-b200
+  modelName: glm5-fp8
+  instanceType: ml.p6-b200.48xlarge
+  invocationEndpoint: v1/chat/completions
+  replicas: 1
+  modelSourceConfig:
+    modelSourceType: s3
+    s3Storage:
+      bucketName: ${MODEL_BUCKET}
+      region: ${AWS_REGION}
+    modelLocation: GLM-5-FP8
+    prefetchEnabled: true
+  loadBalancer:
+    healthCheckPath: /health
+  worker:
+    image: ${ECR_URI}
+    modelInvocationPort:
+      containerPort: 8080
+      name: http
+    modelVolumeMount:
+      name: model-weights
+      mountPath: /opt/ml/model
+    resources:
+      limits:
+        nvidia.com/gpu: 8
+      requests:
+        nvidia.com/gpu: 8
+        cpu: 180000m
+        memory: 1800Gi
+    environmentVariables:
+      - name: OPTION_TP_SIZE
+        value: "8"
+      - name: OPTION_DTYPE
+        value: "bfloat16"
+      - name: OPTION_FP8_GEMM_BACKEND
+        value: "cutlass"
+      - name: OPTION_CONTEXT_LENGTH
+        value: "131072"
+      - name: OPTION_CHUNKED_PREFILL_SIZE
+        value: "32768"
+      - name: OPTION_MAX_RUNNING_REQUESTS
+        value: "512"
+      - name: OPTION_MEM_FRACTION_STATIC
+        value: "0.85"
+      - name: OPTION_TOOL_CALL_PARSER
+        value: "glm47"
+      - name: OPTION_REASONING_PARSER
+        value: "glm45"
+      - name: OPTION_SERVED_MODEL_NAME
+        value: "glm-5-fp8"

@@ -1,0 +1,29 @@
+# GLM-5 SGLang Services
+apiVersion: v1
+kind: Service
+metadata:
+  name: sglang-glm5
+  namespace: ml-inference
+spec:
+  selector:
+    app: sglang-glm5
+  ports:
+    - port: 30000
+      targetPort: 30000
+      protocol: TCP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sglang-glm5-nodeport
+  namespace: ml-inference
+spec:
+  selector:
+    app: sglang-glm5
+  ports:
+    - port: 30000
+      targetPort: 30000
+      nodePort: 30080
+      protocol: TCP
+  type: NodePort

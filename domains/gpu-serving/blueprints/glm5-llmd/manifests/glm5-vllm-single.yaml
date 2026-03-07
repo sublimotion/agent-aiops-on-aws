@@ -1,0 +1,124 @@
+# GLM-5 vLLM single-replica deployment (for validation on existing node)
+# Uses official vllm/vllm-openai:glm5 image
+# No LMCache — baseline validation of tool calling + reasoning
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-glm5
+  namespace: ml-inference
+  labels:
+    app: vllm-glm5
+    model: glm5
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vllm-glm5
+  template:
+    metadata:
+      labels:
+        app: vllm-glm5
+        model: glm5
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: p6-b200.48xlarge
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:glm5
+          command: ["python3", "-m", "vllm.entrypoints.openai.api_server"]
+          args:
+            - "--model"
+            - "/mnt/nvme/models/GLM-5-FP8"
+            - "--served-model-name"
+            - "glm5"
+            - "--tensor-parallel-size"
+            - "8"
+            - "--enable-prefix-caching"
+            - "--max-model-len"
+            - "131072"
+            - "--swap-space"
+            - "32"
+            - "--gpu-memory-utilization"
+            - "0.85"
+            - "--speculative-config.method"
+            - "mtp"
+            - "--speculative-config.num_speculative_tokens"
+            - "1"
+            - "--tool-call-parser"
+            - "glm47"
+            - "--reasoning-parser"
+            - "glm45"
+            - "--enable-auto-tool-choice"
+            - "--port"
+            - "8000"
+            - "--host"
+            - "0.0.0.0"
+            - "--disable-log-requests"
+          env:
+            - name: HF_HUB_OFFLINE
+              value: "1"
+            - name: TRANSFORMERS_OFFLINE
+              value: "1"
+            - name: NCCL_TIMEOUT
+              value: "1800"
+            - name: VLLM_ATTENTION_BACKEND
+              value: FLASHINFER
+          ports:
+            - containerPort: 8000
+              name: http
+          resources:
+            limits:
+              nvidia.com/gpu: "8"
+            requests:
+              nvidia.com/gpu: "8"
+              cpu: "32"
+              memory: 192Gi
+          volumeMounts:
+            - name: shm
+              mountPath: /dev/shm
+            - name: nvme
+              mountPath: /mnt/nvme
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 900
+            periodSeconds: 30
+            failureThreshold: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 600
+            periodSeconds: 10
+      volumes:
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Gi
+        - name: nvme
+          hostPath:
+            path: /mnt/nvme
+            type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-glm5
+  namespace: ml-inference
+spec:
+  selector:
+    app: vllm-glm5
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: http
+  type: ClusterIP

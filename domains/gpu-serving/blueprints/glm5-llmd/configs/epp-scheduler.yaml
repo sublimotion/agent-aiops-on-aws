@@ -1,0 +1,22 @@
+# llm-d EPP Scheduler Configuration
+# Defines scorers and weights for prefix-cache-aware routing
+plugins:
+  - name: prefix-scorer
+    type: PrecisePrefixCacheScorer
+    params:
+      blockSize: 256
+      hashSeed: 123
+      enableMetrics: true
+  - name: load-scorer
+    type: LoadAwareScorer
+  - name: session-scorer
+    type: SessionAffinityScorer
+schedulingProfiles:
+  - name: default
+    scorers:
+      - name: prefix-scorer
+        weight: 3
+      - name: load-scorer
+        weight: 1
+      - name: session-scorer
+        weight: 1

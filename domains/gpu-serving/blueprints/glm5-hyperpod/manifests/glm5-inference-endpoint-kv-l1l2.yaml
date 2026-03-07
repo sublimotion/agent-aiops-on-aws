@@ -1,0 +1,65 @@
+# GLM-5 InferenceEndpointConfig — L1 + L2 KV Cache Enabled (H200)
+# GPU VRAM + CPU memory (L1) + Redis (L2) tiered KV cache
+apiVersion: inference.sagemaker.aws.amazon.com/v1
+kind: InferenceEndpointConfig
+metadata:
+  name: glm5-fp8-kv-l1l2
+  namespace: default
+spec:
+  endpointName: glm5-fp8-kv-l1l2
+  modelName: glm5-fp8
+  instanceType: ml.p5e.48xlarge
+  invocationEndpoint: v1/chat/completions
+  replicas: 1
+  modelSourceConfig:
+    modelSourceType: s3
+    s3Storage:
+      bucketName: ${MODEL_BUCKET}
+      region: ${AWS_REGION}
+    modelLocation: GLM-5-FP8
+    prefetchEnabled: true
+  kvCacheSpec:
+    enableL1Cache: true
+    enableL2Cache: true
+    l2CacheSpec:
+      l2CacheBackend: redis
+      l2CacheLocalUrl: redis://redis.default.svc.cluster.local:6379
+  intelligentRoutingSpec:
+    enabled: true
+    routingStrategy: prefixaware
+  loadBalancer:
+    healthCheckPath: /health
+  worker:
+    image: ${ECR_URI}
+    modelInvocationPort:
+      containerPort: 8080
+      name: http
+    modelVolumeMount:
+      name: model-weights
+      mountPath: /opt/ml/model
+    resources:
+      limits:
+        nvidia.com/gpu: 8
+      requests:
+        nvidia.com/gpu: 8
+        cpu: 180000m
+        memory: 1800Gi
+    environmentVariables:
+      - name: OPTION_TP_SIZE
+        value: "8"
+      - name: OPTION_DTYPE
+        value: "bfloat16"
+      - name: OPTION_CONTEXT_LENGTH
+        value: "131072"
+      - name: OPTION_CHUNKED_PREFILL_SIZE
+        value: "32768"
+      - name: OPTION_MAX_RUNNING_REQUESTS
+        value: "256"
+      - name: OPTION_MEM_FRACTION_STATIC
+        value: "0.85"
+      - name: OPTION_TOOL_CALL_PARSER
+        value: "glm47"
+      - name: OPTION_REASONING_PARSER
+        value: "glm45"
+      - name: OPTION_SERVED_MODEL_NAME
+        value: "glm-5-fp8"

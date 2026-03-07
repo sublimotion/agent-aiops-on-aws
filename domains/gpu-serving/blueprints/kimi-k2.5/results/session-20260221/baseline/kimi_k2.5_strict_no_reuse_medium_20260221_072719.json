@@ -1,0 +1,89 @@
+{
+  "model": "/mnt/nvme/models/Kimi-K2.5",
+  "instance_type": "p5e.48xlarge",
+  "workload": "strict_no_reuse",
+  "qps": 1.0,
+  "timestamp": "2026-02-21T07:27:19.698428",
+  "config": {
+    "serving_config": "baseline",
+    "serving_name": "Baseline vLLM",
+    "tensor_parallel": 8,
+    "max_model_len": 32768,
+    "workload_config": {
+      "description": "StrictSynthetic 0% KV reuse (control for cache benefit A/B test)",
+      "system_prompt": "You are a helpful assistant. Answer the question.",
+      "prompts": [
+        "What are the main differences between TCP and UDP?",
+        "Explain how a hash table works.",
+        "What is the CAP theorem?",
+        "Describe the observer pattern in software design.",
+        "How does garbage collection work in Java?"
+      ],
+      "shared_context": "",
+      "max_tokens": 150
+    },
+    "fsx_cache_snapshot": {
+      "path": null,
+      "size_bytes": 0,
+      "size_mb": 0,
+      "file_count": 0
+    },
+    "lmcache_metrics": {
+      "info": "no lmcache metrics found"
+    }
+  },
+  "num_requests": 30,
+  "metrics": {
+    "success_rate": 1.0,
+    "total_requests": 30,
+    "successful_requests": 30,
+    "failed_requests": 0,
+    "reasoning_responses": 0,
+    "reasoning_rate": 0.0,
+    "ttft_ms": {
+      "mean": 141.60605136712547,
+      "min": 138.24179201037623,
+      "max": 150.64312500180677,
+      "p50": 141.46991600864567,
+      "p90": 143.33195799554233,
+      "p95": 143.43712499248795,
+      "p99": 150.64312500180677
+    },
+    "ttft_content_ms": {
+      "mean": 141.60605136712547,
+      "p50": 141.46991600864567,
+      "p90": 143.33195799554233,
+      "p95": 143.43712499248795,
+      "p99": 150.64312500180677
+    },
+    "itl_ms": {
+      "mean": 88.48926678769146,
+      "p50": 88.67065463753826,
+      "p90": 89.20030341604365,
+      "p95": 89.24027684557988,
+      "p99": 89.26809871803279
+    },
+    "e2e_ms": {
+      "mean": 13326.522519502518,
+      "min": 13147.75716701115,
+      "max": 13451.6035419947,
+      "p50": 13353.352250007447,
+      "p90": 13431.740583997453,
+      "p95": 13437.852375005605,
+      "p99": 13451.6035419947
+    },
+    "throughput": {
+      "total_tokens_per_second": 11.255749561109026,
+      "content_tokens_per_second": 11.255749561109026,
+      "reasoning_tokens_per_second": 0.0,
+      "requests_per_second": 0.07503833040739351
+    },
+    "tokens": {
+      "total_content": 4500,
+      "total_reasoning": 0,
+      "total_all": 4500,
+      "avg_content": 150,
+      "avg_reasoning": 0
+    }
+  }
+}

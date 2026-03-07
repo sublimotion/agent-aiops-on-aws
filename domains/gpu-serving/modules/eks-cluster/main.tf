@@ -10,6 +10,8 @@ module "eks" {
   cluster_endpoint_public_access  = true
   cluster_endpoint_private_access = true
 
+  bootstrap_self_managed_addons = false
+
   # Cluster addons
   cluster_addons = {
     coredns = {
@@ -19,7 +21,8 @@ module "eks" {
       most_recent = true
     }
     vpc-cni = {
-      most_recent = true
+      most_recent    = true
+      before_compute = true
     }
     aws-ebs-csi-driver = {
       most_recent              = true
@@ -64,7 +67,7 @@ module "eks" {
         name           = "gpu"
         instance_types = var.gpu_instance_types
         capacity_type  = "ON_DEMAND"
-        ami_type       = "AL2_x86_64_GPU"
+        ami_type       = var.gpu_ami_type
 
         # Use specific subnets for GPU nodes (AZ filtering)
         subnet_ids = var.gpu_subnet_ids != null ? var.gpu_subnet_ids : var.private_subnet_ids
@@ -72,6 +75,9 @@ module "eks" {
         min_size     = var.gpu_min_size
         max_size     = var.gpu_max_size
         desired_size = var.gpu_desired_size
+
+        # Custom user data for NVMe RAID0, FSx mount, kernel tuning
+        post_bootstrap_user_data = var.gpu_post_bootstrap_user_data
 
         labels = {
           role                     = "gpu"
