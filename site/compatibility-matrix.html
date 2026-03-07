@@ -319,6 +319,35 @@ tr.detail-row.hidden { display: none; }
   color: var(--text-muted);
 }
 .blocker-card .workaround strong { color: var(--yellow); }
+.blocker-card .pr-link {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.blocker-card .pr-link a { color: var(--accent); text-decoration: none; }
+.blocker-card .pr-link a:hover { text-decoration: underline; }
+.pr-tag {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+.pr-tag a { text-decoration: none; }
+.pr-tag a:hover { text-decoration: underline; }
+.pr-open { background: var(--green-soft); color: var(--green); }
+.pr-open a { color: var(--green); }
+.pr-merged { background: var(--accent-soft); color: var(--accent); }
+.pr-merged a { color: var(--accent); }
+.pr-closed { background: var(--red-soft); color: var(--text-muted); }
+.pr-closed a { color: var(--text-muted); }
+.pr-released { background: var(--blue-soft); color: var(--blue); }
+.pr-released a { color: var(--blue); }
+.pr-none { background: var(--surface-2); color: var(--text-muted); }
 
 /* Leaderboard */
 .leaderboard {
@@ -543,6 +572,7 @@ const DATA = [
     throughput: "—",
     notes: "Tiered offloading never activates. vLLM scheduler gates admission.",
     detail: "Dynamo KVBM 4-tier hierarchy (GPU → CPU → NVMe → FSx) attempted. The tiered offloading never activates because vLLM's scheduler gates admission before KVBM can trigger offload. Dynamo 0.9.0 also removed CLI wrapper, requiring async API code changes.",
+    pr: { label: "No PR", cls: "pr-none" },
     blueprint: "kimi-k2.5",
     hwTag: "H200", engineTag: "vLLM", featureTag: "KV Offload"
   },
@@ -608,6 +638,7 @@ const DATA = [
     throughput: "—",
     notes: "AssertionError in V1 dummy_run. Warmup bug.",
     detail: "MTP (Multi-Token Prediction) speculative decoding blocked by vLLM 0.16 V1 engine warmup bug. AssertionError in dummy_run when TP=8. Also blocked by FP8 block_k=128 incompatibility with TP=8.",
+    pr: { label: "vllm #34474", url: "https://github.com/vllm-project/vllm/pull/34474", cls: "pr-open" },
     blueprint: "qwen3-next",
     hwTag: "H200", engineTag: "vLLM", featureTag: "MTP"
   },
@@ -621,6 +652,7 @@ const DATA = [
     throughput: "—",
     notes: "HMA incompatible with all --kv-transfer-config connectors.",
     detail: "Hybrid KV Cache Manager (HMA) used by Qwen3-Next's mixed Mamba+Attention architecture is incompatible with all vLLM KV transfer connectors (LMCache, OffloadingConnector, PipelineConnector). Any --kv-transfer-config flag disables HMA, breaking the model.",
+    pr: { label: "vllm #34680", url: "https://github.com/vllm-project/vllm/pull/34680", cls: "pr-open" },
     blueprint: "qwen3-next",
     hwTag: "H200", engineTag: "vLLM", featureTag: "KV Offload"
   },
@@ -633,7 +665,8 @@ const DATA = [
     status: "blocked",
     throughput: "—",
     notes: "Meta tensor error with FP8 on V1 engine.",
-    detail: "--cpu-offload-gb blocked on vLLM 0.16 V1 engine with FP8 models. Meta tensor error during weight loading. Unnecessary on H200 (141 GB HBM per GPU) but blocks cost optimization on smaller GPUs.",
+    detail: "--cpu-offload-gb blocked on vLLM 0.16 V1 engine with FP8 models. Meta tensor error during weight loading. Unnecessary on H200 (141 GB HBM per GPU) but blocks cost optimization on smaller GPUs. Fixed by transparent CPU offloading redesign.",
+    pr: { label: "vllm #15354 MERGED", url: "https://github.com/vllm-project/vllm/pull/15354", cls: "pr-merged" },
     blueprint: "qwen3-next",
     hwTag: "H200", engineTag: "vLLM", featureTag: "KV Offload"
   },
@@ -673,6 +706,7 @@ const DATA = [
     throughput: "—",
     notes: "-2% to -41% throughput degradation. MTP harmful on PCIe topology.",
     detail: "MTP speculative decoding is actively harmful on PCIe-only topology. Without NVLink, the speculative token verification overhead exceeds the savings from parallel generation. Throughput drops 2-41% depending on workload.",
+    pr: { label: "Architectural", cls: "pr-none" },
     blueprint: "qwen3-next-g7e",
     hwTag: "RTX PRO 6000", engineTag: "vLLM", featureTag: "MTP"
   },
@@ -698,7 +732,8 @@ const DATA = [
     status: "partial",
     throughput: "647 tok/s",
     notes: "91.7% BFCL. qwen3_coder parser puts calls in content as XML, not tool_calls array.",
-    detail: "Tool calling works functionally (91.7% BFCL pass rate) but output format is non-standard: qwen3_coder parser places tool calls in the content field as XML rather than in the tool_calls array. Multi-turn completions: 85.7% (12 failures in mt_run_test_then_fix Turn 3).",
+    detail: "Tool calling works functionally (91.7% BFCL pass rate) but output format is non-standard: qwen3_coder parser places tool calls in the content field as XML rather than in the tool_calls array. Multi-turn completions: 85.7% (12 failures in mt_run_test_then_fix Turn 3). Universal state machine refactor in progress.",
+    pr: { label: "sglang #17639", url: "https://github.com/sgl-project/sglang/pull/17639", cls: "pr-open" },
     blueprint: "qwen3-next-sglang",
     hwTag: "RTX PRO 6000", engineTag: "SGLang", featureTag: "Tool Calling"
   },
@@ -711,7 +746,8 @@ const DATA = [
     status: "blocked",
     throughput: "—",
     notes: "HiRadixCache only supports MHA and MLA. Mamba/DeltaNet not supported.",
-    detail: "ValueError: 'HiRadixCache only supports MHA and MLA yet'. Qwen3-Next's hybrid Mamba+DeltaNet architecture not supported in SGLang nightly's HiCache implementation. Waiting for PR #19663.",
+    detail: "ValueError: 'HiRadixCache only supports MHA and MLA yet'. Qwen3-Next's hybrid Mamba+DeltaNet architecture not supported in SGLang nightly's HiCache implementation.",
+    pr: { label: "sglang #19663", url: "https://github.com/sgl-project/sglang/pull/19663", cls: "pr-open" },
     blueprint: "qwen3-next-sglang",
     hwTag: "RTX PRO 6000", engineTag: "SGLang", featureTag: "HiCache"
   },
@@ -738,6 +774,7 @@ const DATA = [
     throughput: "52.9 tok/s",
     notes: "91.7% BFCL. Mistral parser ID bug affects multi-turn (66.7%).",
     detail: "BFCL overall: 91.7% (188/200 passed). Multi-turn: 66.7% (24/36) due to vLLM Mistral parser bug (#23180) generating 'call_0' IDs instead of 9-char alphanumeric. Standard OpenAI tool_calls array format (not XML like SGLang).",
+    pr: { label: "vllm #32537", url: "https://github.com/vllm-project/vllm/pull/32537", cls: "pr-open" },
     blueprint: "devstral-sera",
     hwTag: "RTX PRO 6000", engineTag: "vLLM", featureTag: "Tool Calling"
   },
@@ -802,7 +839,8 @@ const DATA = [
     status: "blocked",
     throughput: "—",
     notes: "LMCache 0.3.15 expects separate k/v buffers. NSA/MLA uses fused kv_buffer.",
-    detail: "LMCache v0.3.15 is incompatible with NSA/MLA attention: expects separate k_buffer and v_buffer, but GLM-5's NSA uses a fused kv_buffer. Fix pending in LMCache PR #2629 (not merged). Workaround: use SGLang HiCache instead.",
+    detail: "LMCache v0.3.15 is incompatible with NSA/MLA attention: expects separate k_buffer and v_buffer, but GLM-5's NSA uses a fused kv_buffer. Workaround: use SGLang HiCache instead.",
+    pr: { label: "LMCache #2629", url: "https://github.com/LMCache/LMCache/pull/2629", cls: "pr-open" },
     blueprint: "glm5-lmcache",
     hwTag: "B200", engineTag: "SGLang", featureTag: "LMCache"
   },
@@ -841,7 +879,8 @@ const DATA = [
     status: "partial",
     throughput: "2,374.6 tok/s",
     notes: "Gateway routing works. EPP ext-proc blocked (empty scheduler config).",
-    detail: "llm-d gateway with InferencePool v1 GA API + Envoy Gateway + EPP v1.3.1. Gateway routing to vLLM backends working. EPP ext-proc accepts gRPC streams but never responds with empty scheduler config. LoadAwareScorer not registered in v1.3.1. Prefix-cache-aware routing unavailable.",
+    detail: "llm-d gateway with InferencePool v1 GA API + Envoy Gateway + EPP v1.3.1. Gateway routing to vLLM backends working. EPP ext-proc accepts gRPC streams but never responds with empty scheduler config. LoadAwareScorer not registered in v1.3.1. Token load-aware scorer PR blocked on CLA.",
+    pr: { label: "gw-api #2490", url: "https://github.com/kubernetes-sigs/gateway-api-inference-extension/pull/2490", cls: "pr-open" },
     blueprint: "glm5-llmd",
     hwTag: "B200", engineTag: "vLLM", featureTag: "Baseline"
   },
@@ -855,6 +894,7 @@ const DATA = [
     throughput: "—",
     notes: "NCCL 2.25.1 Cuda failure 1 on Blackwell PCIe. Fixed in 2.26.2+.",
     detail: "NCCL 2.25.1 has shared memory bug on Blackwell sm_120 + PCIe topology. ALL collective operations fail with 'Cuda failure 1 invalid argument' at enqueue.cc:1500. Fixed in NCCL 2.26.2 (NGC 25.03+). Inference unaffected (uses custom allreduce). Workaround: single-GPU training at grad_accum=64 (~23 days vs 2-3 days).",
+    pr: { label: "NCCL 2.26.2", cls: "pr-released" },
     blueprint: "devstral-sera",
     hwTag: "RTX PRO 6000", engineTag: "Any", featureTag: "Baseline"
   },
@@ -868,6 +908,7 @@ const DATA = [
     throughput: "—",
     notes: "block_k=128 doesn't divide into TP=8 partitions. Use TP=4.",
     detail: "FP8 quantization uses block_k=128 which is incompatible with TP=8 partitioning on both vLLM and SGLang. Workaround: use TP=4 instead, which provides better performance anyway for Qwen3-Next.",
+    pr: { label: "No PR", cls: "pr-none" },
     blueprint: "qwen3-next",
     hwTag: "H200", engineTag: "Any", featureTag: "Baseline"
   },
@@ -880,7 +921,8 @@ const DATA = [
     status: "blocked",
     throughput: "—",
     notes: "Qwen3Next architecture not in TRT-LLM. Requires transformers 4.57+.",
-    detail: "TensorRT-LLM does not support the Qwen3Next architecture yet. The model requires transformers 4.57.0.dev0 (unreleased). Use vLLM or SGLang instead.",
+    detail: "TensorRT-LLM does not support the Qwen3Next architecture yet. The model requires transformers 4.57.0.dev0 (unreleased). Use vLLM or SGLang instead. SM120 MoE also broken in TRT-LLM v1.3.0rc4.",
+    pr: { label: "TRT-LLM #11932", url: "https://github.com/NVIDIA/TensorRT-LLM/issues/11932", cls: "pr-open" },
     blueprint: "qwen3-next",
     hwTag: "H200", engineTag: "TRT-LLM", featureTag: "Baseline"
   },
@@ -894,6 +936,7 @@ const DATA = [
     throughput: "—",
     notes: "AL2 kernel lacks ib_umad module. Fabric Manager fails. Use AL2023.",
     detail: "Amazon Linux 2 kernel does not include the ib_umad module required for NVIDIA Fabric Manager on NVL5+ (B200 NVSwitch). Containers cannot access GPUs. Must use AL2023 NVIDIA AMI (ami-02bb9f913067dadb1).",
+    pr: { label: "Use AL2023", cls: "pr-released" },
     blueprint: "glm5-lmcache",
     hwTag: "B200", engineTag: "Any", featureTag: "Baseline"
   },
@@ -933,6 +976,7 @@ const DATA = [
     throughput: "—",
     notes: "NCCL broken on g7e. Single-GPU training: ~23 days ETA.",
     detail: "SERA fine-tuning (SWE-bench training data generation) completed Phase 1: 300 issues processed, 246 fixes, 28 SVG-accepted examples (9.3% pass rate). Phase 2 multi-GPU training blocked by NCCL bug. Single-GPU workaround at grad_accum=64 estimated at ~23 days (vs 2-3 days on p5e with NCCL 2.26.2+).",
+    pr: { label: "NCCL 2.26.2", cls: "pr-released" },
     blueprint: "devstral-sera",
     hwTag: "RTX PRO 6000", engineTag: "Any", featureTag: "Baseline"
   },
@@ -959,31 +1003,36 @@ const BLOCKERS = [
     title: "NCCL 2.25.1 on Blackwell PCIe",
     affected: "g7e.24xlarge • All multi-GPU collective ops",
     cause: "Shared memory bug in NCCL 2.25.1 on sm_120 + PCIe topology. All collective operations fail with 'Cuda failure 1 invalid argument' at enqueue.cc:1500.",
-    workaround: "Upgrade to NCCL 2.26.2+ (NGC 25.03+). Inference unaffected (custom allreduce). Single-GPU training works but is ~4x slower."
+    workaround: "Upgrade to NCCL 2.26.2+ (NGC 25.03+). Inference unaffected (custom allreduce). Single-GPU training works but is ~4x slower.",
+    pr: { label: "Fixed in NCCL 2.26.2", cls: "pr-released" }
   },
   {
     title: "vLLM HMA vs KV Connectors",
     affected: "Qwen3-Next (hybrid Mamba+Attention) • All KV offload paths",
     cause: "Hybrid KV Cache Manager (HMA) required by mixed Mamba+Attention models is incompatible with all vLLM --kv-transfer-config connectors (LMCache, OffloadingConnector, PipelineConnector).",
-    workaround: "Use prefix caching only (no KV offload). Or use SGLang with HiCache for non-hybrid models."
+    workaround: "Use prefix caching only (no KV offload). Or use SGLang with HiCache for non-hybrid models.",
+    pr: { label: "vllm #34680 (1/N series)", url: "https://github.com/vllm-project/vllm/pull/34680", cls: "pr-open" }
   },
   {
     title: "LMCache vs MLA/NSA Attention",
     affected: "GLM-5 on SGLang • KV offload to CPU/FSx",
-    cause: "LMCache v0.3.15 expects separate k_buffer and v_buffer, but NSA/MLA (GLM-5, DeepSeek) uses a fused kv_buffer. Fix pending: LMCache PR #2629.",
-    workaround: "Use SGLang HiCache instead. Native NSATokenToKVPoolHost handles fused kv_buffer. Delivers 2.86x throughput gain."
+    cause: "LMCache v0.3.15 expects separate k_buffer and v_buffer, but NSA/MLA (GLM-5, DeepSeek) uses a fused kv_buffer.",
+    workaround: "Use SGLang HiCache instead. Native NSATokenToKVPoolHost handles fused kv_buffer. Delivers 2.86x throughput gain.",
+    pr: { label: "LMCache #2629", url: "https://github.com/LMCache/LMCache/pull/2629", cls: "pr-open" }
   },
   {
     title: "FP8 block_k vs TP Degree",
     affected: "Qwen3-Next FP8 • TP=8 on all engines",
     cause: "FP8 quantization uses block_k=128 which doesn't divide evenly into TP=8 partitions. Fails on both vLLM and SGLang.",
-    workaround: "Use TP=4 instead. TP=4 actually outperforms TP=8 for Qwen3-Next due to reduced communication overhead."
+    workaround: "Use TP=4 instead. TP=4 actually outperforms TP=8 for Qwen3-Next due to reduced communication overhead.",
+    pr: { label: "No upstream PR", cls: "pr-none" }
   },
   {
     title: "MTP on PCIe Topology",
     affected: "g7e.24xlarge • Speculative decoding",
     cause: "Multi-Token Prediction speculative decoding incurs verification overhead that exceeds savings without NVLink. 2-41% throughput degradation measured.",
-    workaround: "Disable MTP on PCIe-only hardware. Use only on NVLink/NVSwitch topologies (p5e, p6-b200)."
+    workaround: "Disable MTP on PCIe-only hardware. Use only on NVLink/NVSwitch topologies (p5e, p6-b200).",
+    pr: { label: "Architectural limitation", cls: "pr-none" }
   }
 ];
 
@@ -1064,13 +1113,18 @@ function renderTable() {
     const tr = document.createElement("tr");
     tr.className = "data-row";
     tr.dataset.index = i;
+    const prHtml = d.pr
+      ? (d.pr.url
+        ? `<span class="pr-tag ${d.pr.cls}"><a href="${d.pr.url}" target="_blank">${d.pr.label}</a></span>`
+        : `<span class="pr-tag ${d.pr.cls}">${d.pr.label}</span>`)
+      : '';
     tr.innerHTML = `
       <td>${d.model}</td>
       <td><span class="mono">${d.hardware}</span></td>
       <td>${d.engine}</td>
       <td class="mono">${d.tp}</td>
       <td>${d.feature}</td>
-      <td><span class="badge badge-${d.status}">${d.status}</span></td>
+      <td><span class="badge badge-${d.status}">${d.status}</span>${prHtml ? ' ' + prHtml : ''}</td>
       <td class="mono">${d.throughput}</td>
       <td>${d.notes}</td>`;
     tr.onclick = () => toggleDetail(i);
@@ -1168,13 +1222,21 @@ function updateStats() {
 // ============================================================
 function renderBlockers() {
   const c = document.getElementById("blockers");
-  c.innerHTML = BLOCKERS.map(b => `
+  c.innerHTML = BLOCKERS.map(b => {
+    const prTag = b.pr
+      ? (b.pr.url
+        ? `<div class="pr-link"><span class="pr-tag ${b.pr.cls}"><a href="${b.pr.url}" target="_blank">${b.pr.label}</a></span></div>`
+        : `<div class="pr-link"><span class="pr-tag ${b.pr.cls}">${b.pr.label}</span></div>`)
+      : '';
+    return `
     <div class="blocker-card">
       <h3>${b.title}</h3>
       <div class="affected">${b.affected}</div>
       <div class="cause">${b.cause}</div>
       <div class="workaround"><strong>Workaround:</strong> ${b.workaround}</div>
-    </div>`).join("");
+      ${prTag}
+    </div>`;
+  }).join("");
 }
 
 // ============================================================
