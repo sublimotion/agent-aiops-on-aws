@@ -15,6 +15,7 @@ agent-aiops-on-aws/
 │   │   ├── benchmark-analyst.md   # Results analysis
 │   │   ├── infra-deployer.md      # GPU-serving deployment (8-stage)
 │   │   ├── agentcore-deployer.md  # Agent Runtime deployment (8-stage)
+│   │   ├── autoresearch-runner.md # Autoresearch experiment loop (8-stage)
 │   │   └── compound-learner.md    # Post-deployment lesson elevation
 │   ├── skills/                 # Custom skills
 │   │   ├── terraform-automation/ # Terraform deployment with security scanning
@@ -46,17 +47,31 @@ agent-aiops-on-aws/
 │   │       ├── qwen3-next.md  # Qwen3-Next KV cache benchmark
 │   │       ├── qwen3-next-custbench.md # Customer A/B benchmark spec
 │   │       └── qwen3-next-sglang.md # SGLang + HiCache coding agent feasibility
-│   └── agent-runtime/          # Bedrock AgentCore Runtime domain
-│       ├── modules/            # Reusable Terraform modules for agent runtime
-│       │   ├── agentcore-runtime/  # Bedrock AgentCore Runtime resource
-│       │   ├── cognito-app-auth/   # User pool + app client
-│       │   ├── websocket-proxy/    # Node.js proxy on ECS Fargate
-│       │   └── agent-memory/       # DynamoDB session state
-│       ├── blueprints/         # Agent Runtime blueprints
-│       │   └── research-agent/ # Multi-agent research system on AgentCore Runtime
-│       └── specs/              # Agent Runtime specs
-│           ├── _template-agent-runtime.md
-│           └── research-agent.md
+│   ├── agent-runtime/          # Bedrock AgentCore Runtime domain
+│   │   ├── modules/            # Reusable Terraform modules for agent runtime
+│   │   │   ├── agentcore-runtime/  # Bedrock AgentCore Runtime resource
+│   │   │   ├── cognito-app-auth/   # User pool + app client
+│   │   │   ├── websocket-proxy/    # Node.js proxy on ECS Fargate
+│   │   │   └── agent-memory/       # DynamoDB session state
+│   │   ├── blueprints/         # Agent Runtime blueprints
+│   │   │   └── research-agent/ # Multi-agent research system on AgentCore Runtime
+│   │   └── specs/              # Agent Runtime specs
+│   │       ├── _template-agent-runtime.md
+│   │       └── research-agent.md
+│   └── autoresearch/           # Autonomous experiment loop domain
+│       ├── specs/
+│       │   ├── _template.md
+│       │   └── training-recipes.md  # GPT-2 training recipe optimization
+│       └── blueprints/
+│           ├── training-recipes/    # autoresearch-colab on g7e
+│           │   ├── program.md       # Agent loop instructions
+│           │   ├── scripts/         # Setup and launch scripts
+│           │   ├── lessons.md
+│           │   └── results/
+│           └── agent-harness/       # Coding agent harness optimization
+│               ├── program.md       # Harness experiment loop instructions
+│               ├── lessons.md
+│               └── results/
 │
 ├── scripts/                    # Shared utility scripts
 │   └── stage-images-ecr.sh    # Mirror images to private ECR

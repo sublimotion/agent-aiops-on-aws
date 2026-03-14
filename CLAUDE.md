@@ -22,6 +22,7 @@ Read these files **on demand** based on what you're doing:
 | Creating new files, modules, or blueprints | `.claude/steering/project-structure.md` |
 | Deploying or modifying a GPU-serving blueprint | `domains/gpu-serving/specs/<matching-spec>.md` |
 | Deploying an agent-runtime blueprint | `domains/agent-runtime/specs/<name>.md` |
+| Running an autoresearch experiment | `domains/autoresearch/specs/<name>.md` |
 | Running the compound step after deployment | `domains/<domain>/blueprints/<name>/lessons.md` + `.claude/steering/*.md` |
 | Running pre-flight or post-deploy checks | Use the `deployment-orchestrator` skill |
 | Diagnosing GPU hardware issues | Use the `gpu-infra` MCP tools (`check_gpu_health`, `explain_xid`, `get_gpu_metrics`, `run_nccl_test`, `discover_cluster`) |
@@ -41,7 +42,10 @@ Read these files **on demand** based on what you're doing:
 | `domains/gpu-serving/blueprints/glm5-hyperpod/` | `domains/gpu-serving/specs/glm5-hyperpod.md` |
 | `domains/gpu-serving/blueprints/glm5-lmcache/` | `domains/gpu-serving/specs/glm5-lmcache.md` |
 | `domains/gpu-serving/blueprints/glm5-llmd/` | `domains/gpu-serving/specs/glm5-llmd.md` |
+| `domains/gpu-serving/blueprints/nemotron-super/` | `domains/gpu-serving/specs/nemotron-super.md` |
 | `domains/agent-runtime/blueprints/research-agent/` | `domains/agent-runtime/specs/research-agent.md` |
+| `domains/autoresearch/blueprints/training-recipes/` | `domains/autoresearch/specs/training-recipes.md` |
+| `domains/autoresearch/blueprints/agent-harness/` | `domains/autoresearch/specs/agent-harness.md` |
 
 **Blueprint-local context** — for operational details (lessons, results, plans), look inside the blueprint directory itself rather than in specs.
 
@@ -53,13 +57,15 @@ The repo is organized into domains. **Infer the deployer agent automatically fro
 |--------|------------------|--------------------|----------------|
 | GPU Serving | `domains/gpu-serving/specs/` | `domains/gpu-serving/blueprints/` | `infra-deployer` |
 | Agent Runtime | `domains/agent-runtime/specs/` | `domains/agent-runtime/blueprints/` | `agentcore-deployer` |
+| Autoresearch | `domains/autoresearch/specs/` | `domains/autoresearch/blueprints/` | `autoresearch-runner` |
 
-**Auto-detection rule**: all specs live under `domains/<name>/specs/`. Use `domains/gpu-serving/` → `infra-deployer`, `domains/agent-runtime/` → `agentcore-deployer`.
+**Auto-detection rule**: all specs live under `domains/<name>/specs/`. Use `domains/gpu-serving/` → `infra-deployer`, `domains/agent-runtime/` → `agentcore-deployer`, `domains/autoresearch/` → `autoresearch-runner`.
 
 Examples:
 ```
 /ralph-loop:ralph-loop Deploy domains/agent-runtime/specs/research-agent.md   → agentcore-deployer
 /ralph-loop:ralph-loop Deploy domains/gpu-serving/specs/kimi-k2.5.md          → infra-deployer
+/ralph-loop:ralph-loop Run domains/autoresearch/specs/training-recipes.md     → autoresearch-runner
 ```
 
 ## Commands

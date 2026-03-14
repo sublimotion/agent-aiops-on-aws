@@ -1,0 +1,371 @@
+# Disaggregated SGLang: 2 Prefill + 2 Decode workers (TP=2 each, 8 GPUs total)
+# Uses NVIDIA Dynamo for KV transfer via NIXL
+---
+# Prefill Deployment (2 workers, TP=2 each = 4 GPUs)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nemotron-sglang-prefill
+  namespace: ml-inference
+  labels:
+    app: nemotron-super
+    role: prefill
+    backend: sglang
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nemotron-super
+      role: prefill
+  template:
+    metadata:
+      labels:
+        app: nemotron-super
+        role: prefill
+        backend: sglang
+        dynamo.nvidia.com/role: prefill
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "30000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: default
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: nvidia.com/gpu.present
+                    operator: In
+                    values: ["true"]
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      initContainers:
+        - name: stage-model
+          image: amazonlinux:2023
+          securityContext:
+            privileged: true
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+              MODEL_DIR="/host-nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
+              if [ -f "$MODEL_DIR/config.json" ]; then
+                echo "Model already staged on NVMe"
+                exit 0
+              fi
+              echo "Installing Lustre client on host via chroot..."
+              chroot /host bash -c '
+                if ! command -v mount.lustre &>/dev/null; then
+                  dnf install -y lustre-client 2>/dev/null || true
+                fi
+                mkdir -p /mnt/fsx
+                if ! mountpoint -q /mnt/fsx; then
+                  mount -t lustre 10.0.19.231@tcp:/gsyc5b4v /mnt/fsx
+                fi
+              '
+              echo "Copying model from FSx to NVMe..."
+              mkdir -p "$MODEL_DIR"
+              cp -r /host/mnt/fsx/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8/* "$MODEL_DIR/"
+              echo "Staging complete"
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+            - name: nvme
+              mountPath: /host-nvme
+      containers:
+        - name: sglang-prefill
+          image: 615299764834.dkr.ecr.us-east-2.amazonaws.com/nemotron-super-sglang:v0.5.9
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: true
+          command: ["python3", "-m", "sglang.launch_server"]
+          args:
+            - --model-path
+            - /mnt/nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+            - --served-model-name
+            - nemotron-3-super
+            - --host
+            - 0.0.0.0
+            - --port
+            - "30000"
+            - --trust-remote-code
+            - --tp
+            - "2"
+            - --disaggregation-mode
+            - prefill
+            - --disaggregation-transfer-backend
+            - nixl
+            - --tool-call-parser
+            - qwen3_coder
+            - --reasoning-parser
+            - nano_v3
+          env:
+            - name: HF_HUB_OFFLINE
+              value: "1"
+            - name: TRANSFORMERS_OFFLINE
+              value: "1"
+            - name: NCCL_TIMEOUT
+              value: "1800"
+            - name: TRUST_REMOTE_CODE
+              value: "1"
+          ports:
+            - containerPort: 30000
+              name: http
+          resources:
+            limits:
+              nvidia.com/gpu: 2
+            requests:
+              nvidia.com/gpu: 2
+              cpu: "32"
+              memory: 128Gi
+          volumeMounts:
+            - name: model-cache
+              mountPath: /root/.cache
+            - name: shm
+              mountPath: /dev/shm
+            - name: nvme
+              mountPath: /mnt/nvme
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 30000
+            initialDelaySeconds: 600
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 30000
+            initialDelaySeconds: 900
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+      volumes:
+        - name: model-cache
+          emptyDir: {}
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Gi
+        - name: nvme
+          hostPath:
+            path: /mnt/nvme
+            type: DirectoryOrCreate
+        - name: host-root
+          hostPath:
+            path: /
+            type: Directory
+---
+# Decode Deployment (2 workers, TP=2 each = 4 GPUs)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nemotron-sglang-decode
+  namespace: ml-inference
+  labels:
+    app: nemotron-super
+    role: decode
+    backend: sglang
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nemotron-super
+      role: decode
+  template:
+    metadata:
+      labels:
+        app: nemotron-super
+        role: decode
+        backend: sglang
+        dynamo.nvidia.com/role: decode
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "30000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: default
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: nvidia.com/gpu.present
+                    operator: In
+                    values: ["true"]
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      initContainers:
+        - name: stage-model
+          image: amazonlinux:2023
+          securityContext:
+            privileged: true
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+              MODEL_DIR="/host-nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
+              if [ -f "$MODEL_DIR/config.json" ]; then
+                echo "Model already staged on NVMe"
+                exit 0
+              fi
+              echo "Installing Lustre client on host via chroot..."
+              chroot /host bash -c '
+                if ! command -v mount.lustre &>/dev/null; then
+                  dnf install -y lustre-client 2>/dev/null || true
+                fi
+                mkdir -p /mnt/fsx
+                if ! mountpoint -q /mnt/fsx; then
+                  mount -t lustre 10.0.19.231@tcp:/gsyc5b4v /mnt/fsx
+                fi
+              '
+              echo "Copying model from FSx to NVMe..."
+              mkdir -p "$MODEL_DIR"
+              cp -r /host/mnt/fsx/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8/* "$MODEL_DIR/"
+              echo "Staging complete"
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+            - name: nvme
+              mountPath: /host-nvme
+      containers:
+        - name: sglang-decode
+          image: 615299764834.dkr.ecr.us-east-2.amazonaws.com/nemotron-super-sglang:v0.5.9
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: true
+          command: ["python3", "-m", "sglang.launch_server"]
+          args:
+            - --model-path
+            - /mnt/nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+            - --served-model-name
+            - nemotron-3-super
+            - --host
+            - 0.0.0.0
+            - --port
+            - "30000"
+            - --trust-remote-code
+            - --tp
+            - "2"
+            - --disaggregation-mode
+            - decode
+            - --disaggregation-transfer-backend
+            - nixl
+            - --tool-call-parser
+            - qwen3_coder
+            - --reasoning-parser
+            - nano_v3
+          env:
+            - name: HF_HUB_OFFLINE
+              value: "1"
+            - name: TRANSFORMERS_OFFLINE
+              value: "1"
+            - name: NCCL_TIMEOUT
+              value: "1800"
+            - name: TRUST_REMOTE_CODE
+              value: "1"
+          ports:
+            - containerPort: 30000
+              name: http
+          resources:
+            limits:
+              nvidia.com/gpu: 2
+            requests:
+              nvidia.com/gpu: 2
+              cpu: "32"
+              memory: 128Gi
+          volumeMounts:
+            - name: model-cache
+              mountPath: /root/.cache
+            - name: shm
+              mountPath: /dev/shm
+            - name: nvme
+              mountPath: /mnt/nvme
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 30000
+            initialDelaySeconds: 600
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 30000
+            initialDelaySeconds: 900
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+      volumes:
+        - name: model-cache
+          emptyDir: {}
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Gi
+        - name: nvme
+          hostPath:
+            path: /mnt/nvme
+            type: DirectoryOrCreate
+        - name: host-root
+          hostPath:
+            path: /
+            type: Directory
+---
+# Service for prefill workers
+apiVersion: v1
+kind: Service
+metadata:
+  name: nemotron-prefill
+  namespace: ml-inference
+spec:
+  selector:
+    app: nemotron-super
+    role: prefill
+  ports:
+    - port: 30000
+      targetPort: 30000
+      protocol: TCP
+  type: ClusterIP
+---
+# Service for decode workers
+apiVersion: v1
+kind: Service
+metadata:
+  name: nemotron-decode
+  namespace: ml-inference
+spec:
+  selector:
+    app: nemotron-super
+    role: decode
+  ports:
+    - port: 30000
+      targetPort: 30000
+      protocol: TCP
+  type: ClusterIP
+---
+# NodePort service for external benchmark access (routes to decode workers for responses)
+apiVersion: v1
+kind: Service
+metadata:
+  name: nemotron-disagg-nodeport
+  namespace: ml-inference
+spec:
+  selector:
+    app: nemotron-super
+    role: prefill
+  ports:
+    - port: 30000
+      targetPort: 30000
+      nodePort: 30089
+      protocol: TCP
+  type: NodePort

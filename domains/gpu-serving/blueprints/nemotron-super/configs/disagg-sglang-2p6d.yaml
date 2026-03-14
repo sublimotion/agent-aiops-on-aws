@@ -1,0 +1,76 @@
+# Disaggregated SGLang 2P+6D (P1 — decode-heavy split)
+# 1 prefill worker (GPU 6-7) + 3 decode workers (GPU 0-5), TP=2 each
+# Hypothesis: 12B active params → decode is cheap → decode-heavy split wins
+
+mode: disaggregated
+backend: sglang
+config_name: disagg-2p6d
+
+prefill:
+  image: nemotron-super-sglang:dynamo-0.9.1
+  tp_size: 2
+  num_workers: 1
+  gpus: [6, 7]
+  port: 30000
+  args:
+    - --model-path
+    - /mnt/nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+    - --served-model-name
+    - nemotron-3-super
+    - --host
+    - 0.0.0.0
+    - --port
+    - "30000"
+    - --trust-remote-code
+    - --tp
+    - "2"
+    - --ep
+    - "1"
+    - --disaggregation-mode
+    - prefill
+    - --tool-call-parser
+    - qwen3_coder
+    - --reasoning-parser
+    - nano_v3
+
+decode:
+  image: nemotron-super-sglang:dynamo-0.9.1
+  tp_size: 2
+  num_workers: 3
+  gpus: [0, 1, 2, 3, 4, 5]
+  port: 30000
+  args:
+    - --model-path
+    - /mnt/nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+    - --served-model-name
+    - nemotron-3-super
+    - --host
+    - 0.0.0.0
+    - --port
+    - "30000"
+    - --trust-remote-code
+    - --tp
+    - "2"
+    - --ep
+    - "1"
+    - --tool-call-parser
+    - qwen3_coder
+    - --reasoning-parser
+    - nano_v3
+
+dynamo:
+  frontend_port: 8000
+  router: round-robin
+  nixl_enabled: true
+  etcd_endpoints: "etcd:2379"
+  nats_url: "nats://nats:4222"
+
+benchmark:
+  priority: P1
+  workloads:
+    - name: disagg-sweep
+      dataset: random
+      input_tokens: 4096
+      output_tokens: 1024
+      concurrency: [1, 16, 64, 128]
+      reasoning: false

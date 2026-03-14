@@ -470,3 +470,32 @@ In disaggregated serving, prefill nodes compute KV cache and transfer it to deco
 | 35 | AL2023 uses nodeadm, not bootstrap.sh | P5e Deployment | Check AMI bootstrap mechanism; upload user data to S3 |
 | 36 | Verify SGLang model support before GPU reservation | SGLang | Weight format incompatibility wasted capacity block time |
 | 37 | Disaggregated P/D reframes FSx value | Architecture | FSx as shared KV fabric between node pools, not disk offload |
+| 38 | GDS mode caused scheduler blocking — CPU bounce path is async | LMCache | Re-test with LMCACHE_LOCAL_CPU=True (see lesson #38 below) |
+
+---
+
+## Next Run: Re-test LMCache with CPU Bounce Path
+
+### 38. GDS Mode Caused Scheduler Blocking — CPU Bounce Path Writes Asynchronously
+
+**Problem**: Our LMCache benchmarks used GDS mode (`LMCACHE_USE_EXPERIMENTAL=True`, `LMCACHE_LOCAL_CPU=False`), which performs GPU→FSx writes via cuFile DMA **directly in the scheduler thread**. This caused the 13x TTFT degradation under memory pressure (lesson #18).
+
+**Finding**: LMCache's `LocalDiskBackend` actually has a **fully async write path**:
+- `wait_for_save()` only blocks until GPU→CPU copy completes (~2ms)
+- CPU hot cache insert is instantaneous (dict + lock)
+- Disk writes are fire-and-forget via `asyncio.run_coroutine_threadsafe()` into a 4-worker `AsyncPQThreadPoolExecutor`
+- The vLLM scheduler proceeds immediately after the GPU→CPU copy — disk I/O is fully pipelined in background threads
+
+**Root cause of our 13x penalty**: GDS mode bypasses the CPU bounce buffer and thread pool entirely. The cuFile DMA call (GPU→FSx, ~10-80ms) executes synchronously in the scheduler thread, causing head-of-line blocking.
+
+**Action for next run**: Re-run the memory pressure benchmarks with:
+```bash
+LMCACHE_USE_EXPERIMENTAL=False   # Disable GDS (use CPU bounce path)
+LMCACHE_LOCAL_CPU=True           # Enable CPU hot cache as intermediate buffer
+LMCACHE_LOCAL_DISK=file:///mnt/fsx/kv-cache/lmcache
+LMCACHE_MAX_LOCAL_DISK_SIZE=100.0
+```
+
+**Expected outcome**: Scheduler blocks ~2ms per request (GPU→CPU) instead of ~10-80ms (GPU→FSx DMA). The 13x TTFT penalty under 25-concurrent-session pressure should largely disappear.
+
+**Tradeoff**: CPU→FSx write throughput (~1-3 GB/s POSIX) is lower than GDS (~9 GB/s), but for serving workloads TTFT matters more than cache write bandwidth. The CPU RAM also acts as a fast L2 cache layer before FSx.

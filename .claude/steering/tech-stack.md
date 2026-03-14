@@ -152,9 +152,13 @@ For Blackwell GPUs (sm_120), use CUDA 13.0 (`cu130`), not CUDA 13.1 (`cu131`). N
 
 Serving frameworks ship default kernel configurations that may be sub-optimal for newly-launched GPUs (e.g., RTX PRO 6000 Blackwell). Generate device-specific tuning configs using the framework's kernel benchmarking tools (e.g., `sglang/benchmark/kernels/fused_moe_triton` for MoE, vLLM's `benchmark_kernels.py` for FP8 GEMMs) before committing to a multi-hour capacity block. Tuned configs can improve throughput by 20-40% on new architectures.
 
-#### g7e instances have no EFA or GDS — HiCache L3 uses standard file I/O to NVMe
+#### g7e instances support EFA (kernel-bypass networking) but not GDS or NVLink
 
-g7e.24xlarge and g7e.48xlarge use PCIe interconnect (no NVLink), have no Elastic Fabric Adapter (EFA), and do not support GPUDirect Storage (GDS). HiCache L3/L4 KV offloading on g7e relies on standard file I/O to local NVMe, not GDS-accelerated FSx access. For GDS-backed KV offloading, use p5en.48xlarge with FSx for Lustre. For g7e, always copy models to NVMe RAID0 (`/mnt/nvme`) for best I/O throughput during model loading.
+All g7e sizes support EFA: g7e.12xlarge (1 interface), g7e.24xlarge (2 interfaces), g7e.48xlarge (4 interfaces). EFA provides kernel-bypass networking (AWS SRD protocol) for inter-node communication — this is independent of GPU interconnect (PCIe vs NVLink). EFA enables NIXL LIBFABRIC disaggregated prefill/decode between nodes via Dynamo's `NixlConnector`. However, EFA is **not true RDMA** — the KV transfer path is GPU VRAM → cudaMemcpy → CPU buffer → EFA SRD (kernel-bypass) → CPU buffer → cudaMemcpy → GPU VRAM. The CPU bounce is required on both sides because EC2 EFA does not support GPUDirect RDMA (direct NIC↔GPU DMA without CPU involvement). True GPUDirect RDMA requires InfiniBand + `nvidia-peermem`, available only on p5/p5e/p5en with NVSwitch.
+
+g7e does NOT support GPUDirect Storage (GDS) — `gdsio` compat mode shows zero benefit over standard POSIX I/O on EC2 NVMe controllers. HiCache L3/L4 KV offloading on g7e uses standard file I/O to local NVMe. For GDS-backed KV offloading via FSx Lustre, use p5en.48xlarge. Always copy models to NVMe RAID0 (`/mnt/nvme`) for best I/O throughput during model loading.
+
+For disaggregated serving on g7e without EFA-capable instances, NIXL LIBFABRIC falls back to TCP. Add `"kv_buffer_device":"cpu"` to the `kv-transfer-config` (default `cuda` requires RDMA). See Dynamo PR #7369 for EKS Auto Mode examples with both EFA and TCP fallback configs.
 
 #### Multi-replica architecture trades latency for reliability in tool-use workloads
 

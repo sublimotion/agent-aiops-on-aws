@@ -1,0 +1,69 @@
+# Aggregated vLLM TP=2 x 4 workers (P0 baseline)
+# All 8 GPUs, each pair handles prefill+decode
+
+mode: aggregated
+backend: vllm
+config_name: agg-tp2-x4
+
+serving:
+  image: nemotron-super-vllm:dynamo-0.9.1
+  tp_size: 2
+  num_workers: 4
+  total_gpus: 8
+  port: 8000
+
+  args:
+    - --model
+    - /mnt/nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+    - --served-model-name
+    - nemotron-3-super
+    - --dtype
+    - auto
+    - --kv-cache-dtype
+    - fp8
+    - --tensor-parallel-size
+    - "2"
+    - --swap-space
+    - "0"
+    - --trust-remote-code
+    - --attention-backend
+    - TRITON_ATTN
+    - --gpu-memory-utilization
+    - "0.90"
+    - --enable-chunked-prefill
+    - --max-num-seqs
+    - "256"
+    - --async-scheduling
+    - --host
+    - 0.0.0.0
+    - --port
+    - "8000"
+    - --enable-auto-tool-choice
+    - --tool-call-parser
+    - qwen3_coder
+    - --reasoning-parser-plugin
+    - /mnt/nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8/super_v3_reasoning_parser.py
+    - --reasoning-parser
+    - super_v3
+
+  env:
+    HF_HUB_OFFLINE: "1"
+    TRANSFORMERS_OFFLINE: "1"
+    NCCL_TIMEOUT: "1800"
+    TRUST_REMOTE_CODE: "1"
+
+dynamo:
+  frontend_port: 8000
+  router: prefix-hash
+  etcd_endpoints: "etcd:2379"
+  nats_url: "nats://nats:4222"
+
+benchmark:
+  priority: P0
+  workloads:
+    - name: smoke-test
+      dataset: random
+      input_tokens: 4096
+      output_tokens: 1024
+      concurrency: [1, 16]
+      reasoning: false
