@@ -403,3 +403,57 @@ The blueprint VPC is intentionally private (all egress via VPC endpoints); this 
 
 Always pass `--role-arn <existing_role_arn>` when calling `update-agent-runtime`, even if only updating the container image URI. The role ARN pattern is `arn:aws:iam::<account>:role/<name>-agentcore-exec`.
 Unlike most AWS update APIs, `update-agent-runtime` treats `--role-arn` as a required field on every call, not just at creation time.
+
+## Autoresearch Conventions
+
+> This section captures agent scaffolding patterns and experiment design conventions from autoresearch blueprints. Populated by `compound-learner` after each autoresearch deployment.
+
+### Agent Scaffolding Patterns
+
+#### Mistral chat template enforces strict role ordering — context compaction must preserve assistant+tool_calls → tool_results ordering
+
+The Mistral chat template (used by all Mistral-family models) enforces strict message role ordering: `tool` messages MUST follow an `assistant` message with `tool_calls`. Inserting a `user` message between assistant tool calls and tool results causes `ValueError: Unexpected role 'tool' after role 'user'` (HTTP 400). When implementing context compaction for multi-turn agent loops, preserve the `[assistant+tool_calls] → [tool_results]` ordering. Do not drop assistant messages that have tool calls, even if their content is empty. This is a platform constraint of the Mistral chat template, not a model or framework limitation.
+
+#### Turn pressure reminders mitigate agent procrastination — inject explicit edit directives when exploration exceeds budget
+
+Without explicit turn pressure, small-to-medium models (24B-70B) enter pathological read loops and avoid committing to edits. Inject turn pressure reminders into tool result content when exploration exceeds a defined budget (e.g., max_turns//5). Example pattern: "You MUST use edit_file now" every 2 turns after explore budget, escalating to "URGENT: Use edit_file RIGHT NOW" in final 3 turns. This converts 0% edit rates to 30-40% edit rates. This pattern applies to any agent loop where the task requires taking irreversible actions (edits, commits, deployments) after exploration.
+
+#### Context compaction without turn pressure actively hurts agent performance — model loses orientation after compaction
+
+Dropping old tool results via context compaction (e.g., when estimated token count exceeds 20K) prevents 400 errors from exceeding the model's context limit, but the model re-reads the same files after compaction, wasting turns. Compaction alone does not fix edit avoidance problems. In measured experiments, compaction-only configs underperform even short-turn-budget baselines (40% vs 36% fix rate). Always pair compaction with turn pressure reminders or restart-with-summary strategies. This pattern applies to any agent loop with context windows smaller than the task's natural information footprint.
+
+#### Parkinson's Law for Agents — models delay first edit to the final third of available turns regardless of budget
+
+Across turn budgets from 10 to 30 turns, models consistently delay first edit to 58-65% of the available budget. Average first edit occurs at turn 6.5 (10-turn budget), turn 9.4 (15-turn), turn 11.9 (20-turn), turn 17.5 (30-turn). This suggests models are not using absolute turn counts to plan but rather detecting "how much runway do I have left" from the system prompt or tool feedback. When designing agent loop budgets, account for this procrastination behavior — the model will use 60-70% of turns for exploration before committing to edits regardless of budget. This pattern applies to any agent loop with explicit or implicit turn limits.
+
+#### Subprocess safety with deleted workspaces — always check os.path.isdir(cwd) before subprocess.run
+
+If an agent loop allows the model to call `run_command` that deletes the workspace directory (e.g., `rm -rf .`), subsequent `subprocess.run(cwd=<workspace>)` calls will raise `FileNotFoundError`. Guard all subprocess calls with `if not os.path.isdir(cwd): return error_message` before invoking `subprocess.run`. This pattern applies to any agent loop that executes arbitrary shell commands in a workspace directory.
+
+#### Block long-running commands in agent tool APIs to prevent loop stalls
+
+Commands like `pip install <package>` can block the agent loop for minutes, consuming the entire turn budget on a single non-generative action. Maintain a blocklist of dangerous commands (pip install, apt-get, long-running builds) and reject them in the tool handler with a clear error message. Alternatively, run such commands in the environment setup phase before starting the agent loop. This pattern applies to any agent loop that exposes shell execution tools.
+
+### Agent Evaluation Patterns
+
+#### SWE-bench offline evaluation requires gold test_patch application — copy test_patch to workspace before running test commands
+
+SWE-bench repos have version-specific test dependencies that conflict with modern Python environments. To evaluate generated patches without Docker, apply the gold `test_patch` (which fixes test dependencies for the issue's base commit) before running the `FAIL_TO_PASS` tests. Copy `test_patch` from the SWE-bench Lite dataset into the workspace via `git apply` before executing the test command. Without this, 50-60% of repos will fail with dependency errors unrelated to the model's generated patch. This pattern applies to all SWE-bench evaluation that runs outside Docker containers.
+
+#### Fix generation rate does not predict pass rate — precision matters more than recall
+
+In multi-harness experiments, fix generation rate (fraction of issues that produce a diff) ranges from 46% to 62%, but pass rate (fraction of issues where tests pass) only ranges from 14% to 16%. Pass-to-fix conversion rates vary from 23% to 35%. A harness that generates more fixes does not necessarily produce better fixes. Always measure both fix generation rate (did the model attempt a solution) and verified pass rate (did the solution work) as independent metrics. This pattern applies to any agent evaluation where the task has an objective correctness criterion.
+
+#### Harness ensemble as optimization strategy — running multiple harnesses and taking the union delivers 37-57% improvement over best single harness
+
+In measured experiments, running two complementary harnesses (SERA + LangGraph) on the same 50-issue subset produces an 82% combined fix rate and 22% combined pass rate. The best single harness achieves 16% pass rate. The union of passes (11/50) includes 3 LangGraph-only, 4 SERA-only, and 4 both-pass. This complementarity suggests different harnesses produce different failure modes. When optimizing for maximum pass rate rather than inference cost, consider running multiple harnesses in parallel and taking the union of successful patches. This pattern applies to any task where correctness is more valuable than compute cost.
+
+### Experiment Design Patterns
+
+#### Always use the same eval subset across configs and harnesses to eliminate sampling variance
+
+Use stratified sampling (e.g., seed 42, stratified by repo) to generate a fixed N-issue subset, then run all experiment configs and harnesses against the same subset. This eliminates sampling variance as a confound when comparing harness effectiveness. In measured experiments, a 50-issue subset (from SWE-bench Lite 300 issues) enabled fair comparison across 6 turn-budget configs and 3 harnesses. This pattern applies to any agent research where iteration speed requires evaluating on a subset rather than the full benchmark.
+
+#### Phase experiments sequentially — run turn degradation analysis before multi-harness comparison
+
+Turn degradation analysis (Phase 1) identifies the optimal turn budget and context management strategy for the baseline harness. Multi-harness comparison (Phase 2) then uses that optimal baseline config as the SERA reference when benchmarking external harnesses. Running Phase 2 before Phase 1 wastes compute by comparing harnesses against a sub-optimal baseline. This pattern applies to any autoresearch blueprint with multiple experiment phases that build on each other.

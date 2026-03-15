@@ -61,7 +61,8 @@ agent-aiops-on-aws/
 │   └── autoresearch/           # Autonomous experiment loop domain
 │       ├── specs/
 │       │   ├── _template.md
-│       │   └── training-recipes.md  # GPT-2 training recipe optimization
+│       │   ├── training-recipes.md  # GPT-2 training recipe optimization
+│       │   └── agent-harness.md     # Turn degradation + multi-harness comparison
 │       └── blueprints/
 │           ├── training-recipes/    # autoresearch-colab on g7e
 │           │   ├── program.md       # Agent loop instructions
@@ -69,8 +70,14 @@ agent-aiops-on-aws/
 │           │   ├── lessons.md
 │           │   └── results/
 │           └── agent-harness/       # Coding agent harness optimization
-│               ├── program.md       # Harness experiment loop instructions
+│               ├── program.md       # Phase 1 + Phase 2 experiment instructions
+│               ├── README.md        # Overview and references
 │               ├── lessons.md
+│               ├── scripts/         # Evaluation scripts
+│               │   ├── harness_eval.py       # Phase 1: turn degradation evaluator
+│               │   ├── multi_harness_eval.py # Phase 2: multi-harness comparison
+│               │   ├── setup_vllm.sh         # vLLM serving startup
+│               │   └── adapters/             # Per-harness adapter scripts
 │               └── results/
 │
 ├── scripts/                    # Shared utility scripts

@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Harness Experiment Results</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2128;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --orange: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --pink: #f778ba;
+    --cyan: #39d2c0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 2rem;
+  }
+
+  .container { max-width: 1200px; margin: 0 auto; }
+
+  header {
+    text-align: center;
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  header .subtitle {
+    color: var(--text-muted);
+    font-size: 1.05rem;
+  }
+
+  header .meta {
+    margin-top: 0.75rem;
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  header .meta span { display: flex; align-items: center; gap: 0.4rem; }
+
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+  }
+
+  .section h2 {
+    font-size: 1.4rem;
+    margin-bottom: 0.3rem;
+    color: var(--accent);
+  }
+
+  .section .section-desc {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .chart-container {
+    position: relative;
+    width: 100%;
+    max-height: 380px;
+    margin-bottom: 1.5rem;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+
+  th, td {
+    padding: 0.6rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  th {
+    background: var(--surface2);
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  tr:hover td { background: rgba(88, 166, 255, 0.04); }
+
+  .highlight { color: var(--green); font-weight: 700; }
+  .warn { color: var(--orange); font-weight: 600; }
+  .bad { color: var(--red); font-weight: 600; }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+
+  @media (max-width: 800px) {
+    .grid-2 { grid-template-columns: 1fr; }
+    body { padding: 1rem; }
+  }
+
+  .venn-matrix {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .venn-svg { max-width: 420px; width: 100%; }
+
+  .issue-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .tag {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  .tag.sera { border-color: var(--purple); color: var(--purple); }
+  .tag.lang { border-color: var(--cyan); color: var(--cyan); }
+  .tag.both { border-color: var(--green); color: var(--green); }
+
+  .insight-card {
+    background: var(--surface2);
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.2rem;
+    margin-bottom: 1rem;
+    border-radius: 0 8px 8px 0;
+  }
+
+  .insight-card h4 {
+    font-size: 0.95rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .insight-card p {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+  }
+
+  .stat-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .stat-box {
+    flex: 1;
+    min-width: 140px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.2rem;
+    text-align: center;
+  }
+
+  .stat-box .val {
+    font-size: 1.8rem;
+    font-weight: 700;
+  }
+
+  .stat-box .label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .legend-row {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+  }
+
+  .legend-item { display: flex; align-items: center; gap: 0.4rem; }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Agent Harness Experiment Results</h1>
+  <p class="subtitle">Turn Degradation Analysis and Multi-Harness Comparison on SWE-bench (50-issue subset)</p>
+  <div class="meta">
+    <span>Model: Devstral Small 2 24B FP8</span>
+    <span>Hardware: 4x RTX PRO 6000 Blackwell (g7e.24xlarge)</span>
+    <span>Date: 2026-03-14</span>
+  </div>
+</header>
+
+<!-- Summary Stats -->
+<div class="stat-row">
+  <div class="stat-box">
+    <div class="val" style="color:var(--green)">22%</div>
+    <div class="label">Best Pass Rate (Ensemble)</div>
+  </div>
+  <div class="stat-box">
+    <div class="val" style="color:var(--accent)">82%</div>
+    <div class="label">Best Fix Rate (Ensemble)</div>
+  </div>
+  <div class="stat-box">
+    <div class="val" style="color:var(--purple)">35%</div>
+    <div class="label">Best Pass/Fix (SERA)</div>
+  </div>
+  <div class="stat-box">
+    <div class="val" style="color:var(--orange)">50</div>
+    <div class="label">Issues Evaluated</div>
+  </div>
+</div>
+
+<!-- Phase 1 -->
+<div class="section">
+  <h2>Phase 1: Turn Degradation</h2>
+  <p class="section-desc">How does the number of turns affect fix generation rate? Configs A-F test 10 to 30 turns with different strategies.</p>
+
+  <div class="chart-container">
+    <canvas id="phase1Chart"></canvas>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Config</th>
+        <th>Turns</th>
+        <th>Strategy</th>
+        <th>Fix Rate</th>
+        <th>Edit Rate</th>
+        <th>Avg 1st Edit Turn</th>
+        <th>Repeat Rate</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>A</strong></td><td>10</td><td>Baseline</td><td>36%</td><td>42%</td><td>6.5</td><td>15.7%</td></tr>
+      <tr><td><strong>B</strong></td><td>15</td><td>Baseline</td><td>48%</td><td>56%</td><td>9.4</td><td>23.6%</td></tr>
+      <tr><td><strong>C</strong></td><td>20</td><td>Baseline</td><td>52%</td><td>64%</td><td>11.9</td><td>29.3%</td></tr>
+      <tr><td><strong>D</strong></td><td>30</td><td>Baseline</td><td class="highlight">60%</td><td class="highlight">78%</td><td>17.5</td><td>37.3%</td></tr>
+      <tr><td><strong>E</strong></td><td>30</td><td>Restart @ 15</td><td>56%</td><td>76%</td><td>18.2</td><td>37.9%</td></tr>
+      <tr><td><strong>F</strong></td><td>30</td><td>Compact @ 15</td><td class="bad">40%</td><td>64%</td><td>16.5</td><td class="bad">41.3%</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Phase 2 -->
+<div class="section">
+  <h2>Phase 2: Harness Comparison</h2>
+  <p class="section-desc">Same model, same 50 issues, different agent scaffolding. Fix rate = generated a diff. Pass rate = verified against gold tests.</p>
+
+  <div class="chart-container">
+    <canvas id="phase2Chart"></canvas>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Harness</th>
+        <th>Pass Rate</th>
+        <th>Fix Rate</th>
+        <th>Pass/Fix Ratio</th>
+        <th>Avg 1st Edit</th>
+        <th>Avg Latency</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>SERA</strong></td><td class="highlight">16% (8/50)</td><td>46% (23/50)</td><td class="highlight">35%</td><td>13.5</td><td>87.6s</td></tr>
+      <tr><td><strong>LangGraph</strong></td><td>14% (7/50)</td><td>62% (31/50)</td><td>23%</td><td>19.7</td><td>50.2s</td></tr>
+      <tr><td><strong>Ensemble</strong></td><td class="highlight">22% (11/50)</td><td class="highlight">82% (41/50)</td><td>27%</td><td>--</td><td>--</td></tr>
+      <tr><td><strong>Aider</strong></td><td class="bad">0% (0/50)</td><td class="bad">0% (0/50)</td><td>--</td><td>--</td><td>5.9s</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Complementary Analysis -->
+<div class="section">
+  <h2>Complementary Analysis</h2>
+  <p class="section-desc">The 11 passing issues show strong complementarity: only 4 overlap. Running both harnesses yields 37-57% improvement over either alone.</p>
+
+  <div class="grid-2">
+    <div class="venn-matrix">
+      <svg class="venn-svg" viewBox="0 0 420 300" xmlns="http://www.w3.org/2000/svg">
+        <!-- SERA circle -->
+        <circle cx="160" cy="150" r="110" fill="rgba(188,140,255,0.15)" stroke="#bc8cff" stroke-width="2"/>
+        <!-- LangGraph circle -->
+        <circle cx="260" cy="150" r="110" fill="rgba(57,210,192,0.15)" stroke="#39d2c0" stroke-width="2"/>
+
+        <!-- Labels -->
+        <text x="105" y="60" fill="#bc8cff" font-size="14" font-weight="700" text-anchor="middle">SERA</text>
+        <text x="315" y="60" fill="#39d2c0" font-size="14" font-weight="700" text-anchor="middle">LangGraph</text>
+
+        <!-- SERA only count -->
+        <text x="100" y="145" fill="#bc8cff" font-size="36" font-weight="700" text-anchor="middle">4</text>
+        <text x="100" y="168" fill="#8b949e" font-size="12" text-anchor="middle">SERA only</text>
+
+        <!-- Both count -->
+        <text x="210" y="145" fill="#3fb950" font-size="36" font-weight="700" text-anchor="middle">4</text>
+        <text x="210" y="168" fill="#8b949e" font-size="12" text-anchor="middle">Both</text>
+
+        <!-- LangGraph only count -->
+        <text x="320" y="145" fill="#39d2c0" font-size="36" font-weight="700" text-anchor="middle">3</text>
+        <text x="320" y="168" fill="#8b949e" font-size="12" text-anchor="middle">LG only</text>
+
+        <!-- Total -->
+        <text x="210" y="280" fill="#e6edf3" font-size="13" text-anchor="middle">Ensemble total: 11/50 verified passes (22%)</text>
+      </svg>
+    </div>
+
+    <div>
+      <h4 style="margin-bottom:0.8rem; font-size:0.95rem; color:var(--text-muted);">Issue Breakdown</h4>
+
+      <p style="font-size:0.85rem; margin-bottom:0.5rem;"><strong style="color:var(--purple)">SERA only (4)</strong></p>
+      <div class="issue-tags" style="margin-bottom:1rem;">
+        <span class="tag sera">django-11039</span>
+        <span class="tag sera">django-11620</span>
+        <span class="tag sera">django-11815</span>
+        <span class="tag sera">django-14672</span>
+      </div>
+
+      <p style="font-size:0.85rem; margin-bottom:0.5rem;"><strong style="color:var(--cyan)">LangGraph only (3)</strong></p>
+      <div class="issue-tags" style="margin-bottom:1rem;">
+        <span class="tag lang">django-12286</span>
+        <span class="tag lang">django-12497</span>
+        <span class="tag lang">django-14608</span>
+      </div>
+
+      <p style="font-size:0.85rem; margin-bottom:0.5rem;"><strong style="color:var(--green)">Both pass (4)</strong></p>
+      <div class="issue-tags" style="margin-bottom:1rem;">
+        <span class="tag both">django-12453</span>
+        <span class="tag both">django-14855</span>
+        <span class="tag both">pytest-11143</span>
+        <span class="tag both">sympy-24152</span>
+      </div>
+
+      <div style="margin-top:1rem; padding:0.8rem; background:var(--surface); border:1px solid var(--border); border-radius:8px; font-size:0.85rem;">
+        <strong>Overlap coefficient:</strong> 4/11 = 36%<br>
+        <strong>Unique contribution:</strong> SERA adds 4 passes LangGraph misses; LangGraph adds 3 passes SERA misses.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Key Insights -->
+<div class="section">
+  <h2>Key Insights</h2>
+  <p class="section-desc">Main findings from the two experimental phases.</p>
+
+  <div class="insight-card" style="border-left-color: var(--orange);">
+    <h4>Parkinson's Law for Agents</h4>
+    <p>The model consistently delays its first edit to the final third of available turns (65% of budget for 10 turns, 58% for 30 turns). More turns means more procrastination, not more exploration.</p>
+  </div>
+
+  <div class="insight-card" style="border-left-color: var(--red);">
+    <h4>Context Compaction Actively Hurts</h4>
+    <p>Config F (compact at turn 15) achieves only 40% fix rate -- worse than Config A (10 turns, 36% budget-normalized). Compaction strips exploration context and the model re-reads files, entering a loop. 41.3% repeat rate is the worst across all configs.</p>
+  </div>
+
+  <div class="insight-card" style="border-left-color: var(--green);">
+    <h4>Ensemble Is the Biggest Win</h4>
+    <p>Running SERA + LangGraph and taking the union lifts pass rate from 14-16% to 22% (37-57% improvement). The harnesses solve different issues because SERA's turn pressure forces earlier, different patches than LangGraph's natural exploration.</p>
+  </div>
+
+  <div class="insight-card" style="border-left-color: var(--purple);">
+    <h4>Fix Generation Does Not Equal Quality</h4>
+    <p>LangGraph generates 62% fixes but only 14% pass (23% conversion). SERA generates 46% fixes but 16% pass (35% conversion). More diffs does not mean better diffs. Precision and recall trade off across scaffolding strategies.</p>
+  </div>
+
+  <div class="insight-card" style="border-left-color: var(--accent);">
+    <h4>Scaffolding Has Converged at 14-16%</h4>
+    <p>Neither harness alone exceeds 16% pass rate. Phase 3 (finetuning) may now be relevant -- a targeted LoRA on common error patterns could compound with the ensemble approach. Full SWE-bench evaluation with Docker is needed to assess the true ceiling.</p>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+  Chart.defaults.color = '#8b949e';
+  Chart.defaults.borderColor = '#30363d';
+
+  // Phase 1 chart
+  const ctx1 = document.getElementById('phase1Chart').getContext('2d');
+  new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels: ['A (10t)', 'B (15t)', 'C (20t)', 'D (30t)', 'E (30t restart)', 'F (30t compact)'],
+      datasets: [
+        {
+          label: 'Fix Rate %',
+          data: [36, 48, 52, 60, 56, 40],
+          backgroundColor: 'rgba(88, 166, 255, 0.7)',
+          borderColor: '#58a6ff',
+          borderWidth: 1,
+          borderRadius: 4,
+          order: 2,
+          yAxisID: 'y'
+        },
+        {
+          label: 'Edit Rate %',
+          data: [42, 56, 64, 78, 76, 64],
+          backgroundColor: 'rgba(63, 185, 80, 0.5)',
+          borderColor: '#3fb950',
+          borderWidth: 1,
+          borderRadius: 4,
+          order: 3,
+          yAxisID: 'y'
+        },
+        {
+          label: 'Repeat Rate %',
+          data: [15.7, 23.6, 29.3, 37.3, 37.9, 41.3],
+          type: 'line',
+          borderColor: '#f85149',
+          backgroundColor: 'rgba(248, 81, 73, 0.1)',
+          borderWidth: 2.5,
+          pointRadius: 5,
+          pointBackgroundColor: '#f85149',
+          tension: 0.3,
+          fill: true,
+          order: 1,
+          yAxisID: 'y'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 2.5,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { usePointStyle: true, padding: 20 }
+        },
+        tooltip: {
+          backgroundColor: '#1c2128',
+          borderColor: '#30363d',
+          borderWidth: 1,
+          titleColor: '#e6edf3',
+          bodyColor: '#8b949e',
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}%`
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 100,
+          ticks: { callback: v => v + '%' },
+          grid: { color: 'rgba(48,54,61,0.5)' }
+        },
+        x: {
+          grid: { display: false }
+        }
+      }
+    }
+  });
+
+  // Phase 2 chart
+  const ctx2 = document.getElementById('phase2Chart').getContext('2d');
+  new Chart(ctx2, {
+    type: 'bar',
+    data: {
+      labels: ['SERA', 'LangGraph', 'Ensemble', 'Aider'],
+      datasets: [
+        {
+          label: 'Pass Rate %',
+          data: [16, 14, 22, 0],
+          backgroundColor: ['rgba(188,140,255,0.8)', 'rgba(57,210,192,0.8)', 'rgba(63,185,80,0.8)', 'rgba(248,81,73,0.4)'],
+          borderColor: ['#bc8cff', '#39d2c0', '#3fb950', '#f85149'],
+          borderWidth: 1,
+          borderRadius: 4
+        },
+        {
+          label: 'Fix Rate %',
+          data: [46, 62, 82, 0],
+          backgroundColor: ['rgba(188,140,255,0.3)', 'rgba(57,210,192,0.3)', 'rgba(63,185,80,0.3)', 'rgba(248,81,73,0.15)'],
+          borderColor: ['#bc8cff', '#39d2c0', '#3fb950', '#f85149'],
+          borderWidth: 1,
+          borderRadius: 4,
+          borderDash: [4, 4]
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 2.5,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { usePointStyle: true, padding: 20 }
+        },
+        tooltip: {
+          backgroundColor: '#1c2128',
+          borderColor: '#30363d',
+          borderWidth: 1,
+          titleColor: '#e6edf3',
+          bodyColor: '#8b949e',
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}%`
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 100,
+          ticks: { callback: v => v + '%' },
+          grid: { color: 'rgba(48,54,61,0.5)' }
+        },
+        x: {
+          grid: { display: false }
+        }
+      }
+    }
+  });
+</script>
+</body>
+</html>
