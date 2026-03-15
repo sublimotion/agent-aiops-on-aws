@@ -49,6 +49,11 @@ Based on the "harness problem" insight: a single tool design change can produce 
 | Claude Code | CLI agent, auto-compaction, rich tool set | Production-grade context management |
 | OpenCode | Minimal CLI agent | Lightweight, similar paradigm to Claude Code |
 | LangGraph ReAct | ReAct agent with tool use | Standard agent framework |
+| DeepAgents | LangGraph + planning, sub-agents, auto-summarization | Claude Code-inspired batteries-included harness |
+| Pi Agent | Base Pi framework, skills, sub-agents | Control for oh-my-pi — same scaffolding without hashline |
+| oh-my-pi | Pi fork + hash-anchored edits, LSP, ast_grep | The "harness problem" framework — LINE#ID eliminates exact-match failures |
+| OpenCode | Terminal agent, 75+ providers, SDK | Client/server architecture, LSP integration |
+| Letta Code | Memory-first agent, persistent memory, skill learning | Self-hosted; agent learns across sessions |
 
 **Per-harness metrics**:
 - SWE-bench Lite pass rate (same 50-issue subset across all harnesses)
