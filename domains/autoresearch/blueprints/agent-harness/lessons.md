@@ -157,10 +157,30 @@ Aider with `--edit-format diff` produces zero fixes.
 #### Pass Rate Is a Lower Bound
 Evaluated with gold test_patch: Django (all 16 patches), pytest (3 patches), sympy (7 patches). Other repos (sphinx ×3, scikit-learn ×2, matplotlib ×2, astropy, seaborn, requests, pylint) could not be tested — their version-specific deps conflict with Python 3.11. SWE-bench Docker containers required for full evaluation.
 
+### Failure Analysis (Phase 3 Finetuning Inputs)
+
+Of 24 LangGraph patches that failed evaluation:
+
+| Category | Count | % | Description |
+|----------|-------|---|-------------|
+| dep_missing | 8 | 33% | Cannot evaluate — repo needs Docker (matplotlib, astropy, etc.) |
+| wrong_fix | ~10 | 42% | Patch applies, tests run, but assertions fail — model edits wrong code |
+| broken_fix | 3 | 12% | Patch introduces TypeError/AttributeError — syntax-level mistake |
+| other | 3 | 12% | Test output truncation, ambiguous |
+
+**Key insight for Phase 3**: The dominant failure mode is "wrong fix" (42%) — the model understands the problem area but edits the wrong lines or applies incorrect logic. This is a trainable error pattern. A LoRA finetuned on successful fix trajectories (especially the 4 both-pass issues) could target this class.
+
+**Wrong fix examples**:
+- django-12308: Returns `'a'` instead of `'"a"'` (string quoting)
+- django-13660: Returns `'False'` instead of `'True'` (logic inversion)
+- django-14997: Doesn't raise `IntegrityError` (missing constraint)
+- django-12747: Includes extra dict entries (deletion cascade logic)
+
 ### Conclusions
 
 1. **SERA has better precision** (35% pass/fix) but LangGraph has better recall (62% fix rate). Neither dominates.
 2. **Harness ensemble is the biggest win**: Running both yields **22% pass rate** (11/50) — 37-57% improvement over either alone.
 3. **Fix generation is not pass rate.** The correlation between generating a diff and generating a correct diff is weak (~25-35%).
-4. **Scaffolding has converged at 14-16%** individually. Phase 3 (finetuning) may now be relevant — a targeted LoRA on common error patterns could compound with the ensemble approach.
+4. **Scaffolding has converged at 14-16%** individually. Phase 3 (finetuning) is now relevant — 42% of failures are "wrong fix" (trainable error patterns).
 5. **Full SWE-bench evaluation requires Docker** — our bare-metal eval is a lower bound covering ~50% of patches.
+6. **Phase 3 target**: LoRA on successful fix trajectories targeting "wrong fix" errors — the model finds the right file but edits incorrectly.
