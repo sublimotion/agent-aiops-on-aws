@@ -18,7 +18,7 @@ Run 6 turn-budget configurations (10/15/20/30 turns + restart + compaction) on t
 ### Phase 2: Multi-Harness Comparison
 **Question**: Which scaffolding architecture extracts the most capability?
 
-Run 7 harnesses (SERA, Claude Code, OpenHands, SWE-agent, Aider, OpenCode, LangGraph) against the same 50-issue subset via Bedrock endpoint. Produces a harness leaderboard.
+Run multiple harnesses against the same 50-issue subset. Phase 2a tested SERA, LangGraph, Aider. Phase 2b added hashline editing (oh-my-pi style), PiAgent (str_replace control), and DeepAgents.
 
 ### Phase 3: Model Finetuning (future, not executing)
 **Question**: After harness optimization plateaus, can targeted LoRA finetuning compound further?
@@ -32,13 +32,29 @@ From SERA Phase 1 (devstral-sera blueprint):
 - **82% fix generation** (246/300 issues get a fix)
 - **29.6 avg turns** (nearly all exhaust 30-turn budget)
 
+## Results
+
+See **[RESULTS.md](RESULTS.md)** for the full experiment results, including:
+- Phase 1 turn degradation table (6 configs)
+- Phase 2a multi-harness leaderboard (verified pass rates)
+- Phase 2b hashline vs str_replace comparison
+- Ensemble analysis (28% union pass rate with 4 harnesses)
+- Failure analysis and Phase 3 finetuning recommendations
+
 ## Key Files
 
 | File | Purpose |
 |------|---------|
+| `RESULTS.md` | Experiment results and analysis |
 | `program.md` | Agent loop instructions (Phase 1 + Phase 2) |
-| `lessons.md` | Operational lessons (append-only) |
-| `results/` | Experiment logs (per-phase JSONL files) |
+| `lessons.md` | Operational lessons and debugging notes |
+| `results-report.html` | Interactive Chart.js visualization |
+| `results/` | Raw JSONL experiment data |
+| `scripts/adapters/langgraph_agent.py` | LangGraph ReAct agent (str_replace) |
+| `scripts/adapters/hashline_agent.py` | Hashline ReAct agent (LINE:HASH editing) |
+| `scripts/adapters/deepagents_agent.py` | DeepAgents adapter |
+| `scripts/multi_harness_eval.py` | Phase 2 orchestrator |
+| `scripts/adapters/run_*.sh` | Shell adapter wrappers |
 
 ## References
 

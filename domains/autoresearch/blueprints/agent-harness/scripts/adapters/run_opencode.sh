@@ -1,21 +1,12 @@
 #!/usr/bin/env bash
-# Adapter: OpenCode (anomalyco/opencode)
-# Terminal coding agent with 75+ LLM providers, LSP, multi-session.
-# Uses the OpenCode SDK for programmatic headless invocation.
+# Adapter: OpenCode style — str_replace edits via AI SDK runtime
+# NOTE: Blocked — Vercel AI SDK @ai-sdk/openai-compatible does not work with
+# vLLM (tool args come through as undefined, uses Responses API not Chat
+# Completions). Kept for reference; use langgraph_agent.py instead.
 #
 # Env vars: WORKSPACE, ENDPOINT, MODEL, ISSUE_ID, PROBLEM_STATEMENT, TEST_CMD, REPO
 # Output: JSON on last line
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-export OPENAI_BASE_URL="$ENDPOINT/v1"
-export OPENAI_API_KEY="${OPENAI_API_KEY:-dummy}"
-
-node "$SCRIPT_DIR/opencode_agent.mjs" \
-    --workspace "$WORKSPACE" \
-    --model "$MODEL" \
-    --issue "$PROBLEM_STATEMENT" \
-    --test-cmd "$TEST_CMD" \
-    --max-turns 30
+echo '{"pass":false,"turns":0,"tokens":0,"fix_generated":false,"error":"OpenCode adapter blocked: AI SDK incompatible with vLLM"}'

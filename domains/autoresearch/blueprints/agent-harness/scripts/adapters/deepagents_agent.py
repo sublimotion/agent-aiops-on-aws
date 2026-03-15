@@ -49,7 +49,7 @@ def main():
     )
 
     # FilesystemBackend scopes all file tools to the workspace directory
-    backend = FilesystemBackend(root=args.workspace)
+    backend = FilesystemBackend(root_dir=args.workspace)
 
     try:
         agent = create_deep_agent(
