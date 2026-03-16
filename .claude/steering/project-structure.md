@@ -62,23 +62,28 @@ agent-aiops-on-aws/
 │       ├── specs/
 │       │   ├── _template.md
 │       │   ├── training-recipes.md  # GPT-2 training recipe optimization
-│       │   └── agent-harness.md     # Turn degradation + multi-harness comparison
+│       │   ├── agent-harness.md     # Turn degradation + multi-harness comparison
+│       │   └── finetuning-recipes.md # LoRA/QLoRA fine-tuning with Unsloth
 │       └── blueprints/
 │           ├── training-recipes/    # autoresearch-colab on g7e
 │           │   ├── program.md       # Agent loop instructions
 │           │   ├── scripts/         # Setup and launch scripts
 │           │   ├── lessons.md
 │           │   └── results/
-│           └── agent-harness/       # Coding agent harness optimization
-│               ├── program.md       # Phase 1 + Phase 2 experiment instructions
-│               ├── README.md        # Overview and references
-│               ├── lessons.md
-│               ├── scripts/         # Evaluation scripts
-│               │   ├── harness_eval.py       # Phase 1: turn degradation evaluator
-│               │   ├── multi_harness_eval.py # Phase 2: multi-harness comparison
-│               │   ├── setup_vllm.sh         # vLLM serving startup
-│               │   └── adapters/             # Per-harness adapter scripts
-│               └── results/
+│           ├── agent-harness/       # Coding agent harness optimization
+│           │   ├── program.md       # Phase 1 + Phase 2 experiment instructions
+│           │   ├── README.md        # Overview and references
+│           │   ├── lessons.md
+│           │   ├── scripts/         # Evaluation scripts
+│           │   │   ├── harness_eval.py       # Phase 1: turn degradation evaluator
+│           │   │   ├── multi_harness_eval.py # Phase 2: multi-harness comparison
+│           │   │   ├── setup_vllm.sh         # vLLM serving startup
+│           │   │   └── adapters/             # Per-harness adapter scripts
+│           │   └── results/
+│           └── finetuning-recipes/  # LoRA/QLoRA fine-tuning with Unsloth
+│               ├── program.md       # Agent loop instructions
+│               ├── README.md        # Architecture and quick start
+│               └── lessons.md
 │
 ├── scripts/                    # Shared utility scripts
 │   └── stage-images-ecr.sh    # Mirror images to private ECR
@@ -188,11 +193,35 @@ What this does NOT need to do
 - Scripts: lowercase with hyphens (`run-benchmarks.py`, `stage-images-ecr.sh`)
 - Results: descriptive names with dates (`benchmark-report-20260221.md`)
 
+## External Dependencies
+
+### Model Deployment Cards (mdc)
+
+Sibling repo at `../model-deployment-card/`. Provides curated deployment recipes, upstream PR tracking, and tribal knowledge for LLM serving engines (vLLM, SGLang).
+
+- **Before deploying**: `mdc get <model> --engine <engine>` loads the card; `mdc prs <model>` checks upstream PRs
+- **After deploying**: `mdc learn <model> <engine> "<note>"` feeds lessons back to the card
+- **When writing specs**: `mdc get` pre-fills recommended flags and known issues
+
+The `infra-deployer` agent runs `mdc get` as Stage 0 before any infrastructure work. The `compound-learner` agent runs `mdc learn` to close the feedback loop.
+
+### GPU Infrastructure (gpu-infra)
+
+Sibling repo at `../gpu-infra-troubleshooting/`. MCP server for live diagnostics + CLI for feedback. Config in `.mcp.json`.
+
+- **Stage 4a (proactive)**: MCP tools `discover_cluster`, `check_gpu_health`, `run_nccl_test` validate hardware before deploying the serving stack
+- **Reactive**: MCP tools `explain_xid` for Xid error lookup, `get_gpu_metrics` for Prometheus/DCGM metrics
+- **After deploying**: `gpu-infra learn -c <category> "<note>"` feeds hardware/platform lessons into `field-notes.md` inbox
+- **Review**: `gpu-infra inbox` shows pending notes for triage into reference docs
+
+The `infra-deployer` agent uses MCP tools at Stage 4a. The `compound-learner` agent uses `gpu-infra learn` to feed back hardware lessons.
+
 ## Adding a New Blueprint
 
-1. Write spec in `domains/<domain>/specs/<name>.md`
-2. Run `/ralph-loop:ralph-loop Deploy domains/<domain>/specs/<name>.md`
-3. Claude creates `domains/<domain>/blueprints/<name>/` with terraform files
-4. Deployment succeeds → capture lessons in `lessons.md`
-5. Run compound-learner to elevate cross-cutting lessons to steering files
-6. Update this file's repository layout tree if the blueprint introduces new patterns
+1. Run `mdc get <model> --engine <engine>` to check for an existing deployment card
+2. Write spec in `domains/<domain>/specs/<name>.md` (incorporate card recommendations)
+3. Run `/ralph-loop:ralph-loop Deploy domains/<domain>/specs/<name>.md`
+4. Claude creates `domains/<domain>/blueprints/<name>/` with terraform files
+5. Deployment succeeds → capture lessons in `lessons.md`
+6. Run compound-learner to elevate cross-cutting lessons to steering files and feed model-specific lessons back to `mdc learn`
+7. Update this file's repository layout tree if the blueprint introduces new patterns

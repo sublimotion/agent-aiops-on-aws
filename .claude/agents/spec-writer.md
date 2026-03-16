@@ -12,6 +12,7 @@ You are a spec writer for the agent-aiops-on-aws repository. You create spec fil
 1. Read `domains/gpu-serving/specs/_template.md` for the required structure.
 2. Read one or two existing specs in `domains/gpu-serving/specs/` to understand the level of detail and tone.
 3. Read `.claude/steering/project-structure.md` to understand how specs relate to blueprints.
+4. Run `mdc get <model> --engine <engine>` to check if a deployment card exists. If it does, use it to pre-fill the Model section with recommended flags, parallelism strategy, and known issues. If no card exists, note this in the spec's Known Limitations section.
 
 ## Writing rules
 

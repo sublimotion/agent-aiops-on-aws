@@ -32,6 +32,7 @@ Before any multi-GPU workload, run these diagnostics and record results:
 - **Format**: safetensors / GGUF / etc.
 - **Serving**: vLLM / TGI / Triton / etc.
 - **Required Args**: Any model-specific arguments
+- **Deployment Card**: Run `mdc get <model> --engine <engine>` before deploying. If no card exists, run `mdc sync` and create one from upstream docs.
 
 ### 3. Networking
 - **VPC**: CIDR, AZs
@@ -62,6 +63,8 @@ Rough estimates or cost-saving recommendations.
 
 ## Known Limitations
 Known issues or constraints to be aware of before deployment.
+
+Check `mdc prs <model>` for recently merged upstream PRs that may affect this deployment.
 
 ---
 

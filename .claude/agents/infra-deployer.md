@@ -11,12 +11,25 @@ You are an infrastructure deployer for GPU inference blueprints on AWS. You hand
 
 Follow these stages in order. Do not proceed to the next stage until the current stage's validation passes.
 
+### Stage 0: Deployment card lookup
+Load the model deployment card, GPU architecture card, and check upstream PRs before touching any infrastructure.
+
+1. Run `mdc get <model> --engine <engine>` to load the curated model deployment card. This provides recommended launch flags, parallelism strategy, known issues, and field notes from previous deployments.
+2. Run `mdc prs <model>` to check for recently merged upstream PRs that may affect this deployment (bug fixes, regressions, new features).
+3. Run `gpu-infra card <instance>` to load the GPU architecture card for the target instance type. This provides NCCL thresholds, EFA details, AMI requirements, container runtime, and hardware-specific known issues.
+4. Cross-reference the two cards — verify the model's TP requirement fits the GPU count, check for known hardware+model incompatibilities (e.g., NCCL bugs on specific architectures, container runtime differences).
+5. If no model card exists, run `mdc sync` to pull the latest upstream docs. If no GPU card exists, check `gpu-infra cards` for available instance types.
+6. Record both cards' key recommendations in the deployment log.
+
+**Validation**: Both a model deployment card and a GPU architecture card were found. Their recommendations are noted in the deployment log. Any conflicts or upstream PRs are flagged.
+
 ### Stage 1: Foundation
 Deploy the base infrastructure (EKS, VPC, S3, FSx).
 
 1. Read the blueprint's spec in `domains/gpu-serving/specs/<name>.md` for requirements.
 2. Read the blueprint's `lessons.md` for known pitfalls.
-3. Run `terraform init` and `terraform apply` in the blueprint directory.
+3. Cross-reference spec requirements with the deployment card from Stage 0 — flag any conflicts (e.g., spec requests TP=4 but card recommends TP=8).
+4. Run `terraform init` and `terraform apply` in the blueprint directory.
 4. Capture Terraform outputs (FSx DNS, EKS cluster name, subnet IDs, security groups).
 
 **Validation**: Run `scripts/validate-storage.sh` if it exists. Verify EKS cluster is reachable via `kubectl get nodes`.
@@ -50,6 +63,17 @@ Provision the GPU instance and join it to EKS.
 4. Run `scripts/setup-nvme-model.sh` to create NVMe RAID and copy model from FSx to local NVMe.
 
 **Validation**: `kubectl get nodes` shows the GPU node. `nvidia-smi` shows expected GPU count and memory. Model files exist on NVMe.
+
+### Stage 4a: GPU health validation
+Run GPU diagnostics using the `gpu-infra` MCP tools before deploying the serving stack. This catches hardware issues before they waste GPU hours.
+
+1. Run `discover_cluster` to enumerate GPUs, topology, driver version, and EFA interfaces.
+2. Run `check_gpu_health` to validate ECC errors, row remapping, thermals, and PCIe link status.
+3. For multi-GPU serving (TP > 1), run `run_nccl_test` to verify collective operations pass.
+4. If any Xid errors are found, run `explain_xid` to look up the error code and recommended action.
+5. Cross-reference results with the deployment card from Stage 0 — check for known hardware-specific issues (e.g., NCCL broken on Blackwell PCIe with NCCL ≤ 2.25.1).
+
+**Validation**: All health checks pass. No uncorrectable ECC errors, no pending row remaps, no Xid errors. NCCL collectives pass for the target TP size. Record results in the deployment log.
 
 ### Stage 5: Serving stack deployment
 Deploy the inference serving configuration.

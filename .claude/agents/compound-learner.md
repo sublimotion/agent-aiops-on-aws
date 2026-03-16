@@ -75,6 +75,46 @@ Route elevated lessons to the right file:
 | AgentCore: deployment workflow, integration testing, readiness checks | `.claude/steering/tech-stack.md` | "AgentCore Conventions → Deployment sequence" |
 | Blueprint/spec structure, file layout, naming conventions (any domain) | `.claude/steering/project-structure.md` | Appropriate section |
 | Quality standards, security requirements, contribution workflow | `.claude/steering/product.md` | Appropriate section |
+| GPU hardware: new Xid patterns, NCCL bugs, driver issues, pass/fail thresholds | Flag for `gpu-infra` repo | See below |
+| Model-specific: configs, flags, known issues, Docker images, sizing rules | Feed back to `mdc learn` | See "Feedback to mdc" section |
+
+### GPU hardware lessons → gpu-infra repo
+
+Some lessons involve GPU hardware, drivers, or NCCL — not model configs or AWS services. These belong in the `gpu-infra-troubleshooting` sibling repo (`../gpu-infra-troubleshooting/`), not in steering files. Since compound-learner cannot write to external repos, **flag these in the compound summary** for manual application.
+
+Examples of gpu-infra lessons:
+- New Xid error pattern and its resolution
+- NCCL version incompatibility with specific GPU architecture (e.g., NCCL 2.25.1 + Blackwell PCIe)
+- Pass/fail threshold updates (e.g., new instance type busbw baselines)
+- Driver-specific bugs or workarounds
+- Container runtime differences per AMI (e.g., `nerdctl` vs `docker`)
+
+### How to feed back
+
+For each hardware/platform lesson, run `gpu-infra learn` with the appropriate category:
+
+```bash
+gpu-infra learn -c nccl "NCCL 2.25.1 broken on Blackwell PCIe (sm_120). Fixed in 2.26.2."
+gpu-infra learn -c threshold "RTX PRO 6000 NCCL busbw baseline: ~50 GB/s"
+gpu-infra learn -c platform "g7e uses nerdctl, not docker"
+gpu-infra learn -c xid "Xid 79 on g7e after hot-plug — requires full reboot, not just GPU reset"
+gpu-infra learn -c inference "vLLM custom allreduce bypasses NCCL — unaffected by NCCL bugs"
+gpu-infra learn -c k8s "GPU device plugin self-heals after node join — do not investigate until node is Ready"
+```
+
+Categories: `xid`, `threshold`, `nccl`, `driver`, `platform`, `inference`, `k8s`, `cluster`. Each routes to the correct reference file.
+
+Notes land in `gpu-infra/field-notes.md` as an inbox, pending triage into reference docs.
+
+Add a `### Fed back to gpu-infra` section to the compound summary:
+
+```
+### Fed back to gpu-infra
+| Category | Note | Target |
+|----------|------|--------|
+```
+
+If no hardware lessons were found, omit this section.
 
 ## How to write steering rules
 
@@ -114,11 +154,55 @@ After reviewing all inputs:
 | Lesson (summary) | Source | Reason kept local |
 |------------------|--------|-------------------|
 
+### Fed back to mdc
+| Card | Engine | Note | Source |
+|------|--------|------|--------|
+
+### Fed back to gpu-infra
+| Category | Note | Target |
+|----------|------|--------|
+
 ### No action needed
 List any lessons already captured in steering files.
 ```
 
 3. If you find lessons.md entries that are vague, contradictory, or superseded by a later entry, note them in the summary under a "Lessons to clean up" section — but do not modify `lessons.md` yourself. Leave that for the human to review.
+
+## Feedback to Model Deployment Cards (mdc)
+
+After elevating lessons to steering files, feed model-specific operational knowledge back to `mdc`. This closes the loop so the next deployment of the same model starts with better knowledge.
+
+### What to feed back
+
+Lessons that are **model-specific** (not elevated to steering) but would help future deployments of the same model on the same engine. Examples:
+- Cold start times, required Docker image tags
+- Hardware-specific bugs (e.g., NCCL on Blackwell PCIe)
+- HiCache/KV cache sizing rules for specific models
+- Tool-call parser flags, speculative decoding configs that work
+- Incompatible feature combinations (e.g., LMCache + NSA)
+
+### How to feed back
+
+1. Identify the model name and engine from the blueprint spec (e.g., `glm-4.5`, `sglang`).
+2. For each model-specific lesson kept local, run:
+   ```bash
+   mdc learn <model> <engine> "<lesson summary>"
+   ```
+3. Alternatively, import the full lessons file:
+   ```bash
+   mdc learn <model> <engine> --from <blueprint-dir>/lessons.md
+   ```
+4. Record in the compound summary which lessons were fed back to mdc.
+
+### Compound summary addition
+
+Add a `### Fed back to mdc` section to the compound summary:
+
+```
+### Fed back to mdc
+| Card | Engine | Note | Source |
+|------|--------|------|--------|
+```
 
 ## What not to do
 
