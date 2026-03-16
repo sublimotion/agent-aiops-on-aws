@@ -52,7 +52,7 @@ Fix rate = generated a diff. Edit rate = called `edit_file` at least once.
 | SWE-agent | ACI (Agent-Computer Interface) | Blocked (`togetherunidiff` dep broken) |
 | OpenHands | CodeAct, Jupyter + bash sandbox | Blocked (`e2b` dep conflict) |
 | Claude Code | CLI agent, auto-compaction | Blocked (needs Anthropic API key) |
-| OpenCode | Minimal CLI agent | Blocked (Go binary N/A) |
+| OpenCode | Vercel AI SDK (@ai-sdk/openai-compatible), built-in tools | Tested |
 
 ### Phase 2a Results (Verified Pass Rate)
 
@@ -64,15 +64,18 @@ Pass rate verified by applying agent patches + gold `test_patch` from SWE-bench,
 | 2 | **LangGraph** | **7/50 (14%)** | 31/50 (62%) | 32/50 (64%) | 19.7 | 28.4 | 50.2s |
 | 3 | Aider | 0/50 (0%) | 0/50 (0%) | 0/50 (0%) | n/a | n/a | 5.9s |
 
-### Phase 2b Results: Hashline vs str_replace
+### Phase 2b Results: Hashline vs str_replace + OpenCode
 
-**Goal**: Test the "harness problem" hypothesis — does hash-anchored line editing (LINE:HASH format from oh-my-pi) outperform str_replace for Devstral Small 2 24B?
+**Goal**: Test the "harness problem" hypothesis — does hash-anchored line editing (LINE:HASH format from oh-my-pi) outperform str_replace for Devstral Small 2 24B? Also test OpenCode (Vercel AI SDK) as a full-featured CLI agent harness.
 
-| Rank | Harness | Pass Rate | Patches | Precision | Edit Format |
-|------|---------|-----------|---------|-----------|-------------|
-| 1 | **PiAgent** (str_replace) | **8/50 (16%)** | 39 | 20.5% | str_replace |
-| 2 | **Hashline** (ohmypi) | **7/50 (14%)** | 38 | 18.4% | LINE:HASH |
-| - | DeepAgents | DNF | - | - | (recursion limit) |
+| Rank | Harness | Pass Rate | Fix Rate | Patches | Precision | Edit Format |
+|------|---------|-----------|----------|---------|-----------|-------------|
+| 1 | **OpenCode** | **11/50 (22%)** | 44/50 (88%) | 44 | 25.0% | str_replace (built-in) |
+| 2 | **PiAgent** (str_replace) | **8/50 (16%)** | 39/50 (78%) | 39 | 20.5% | str_replace |
+| 3 | **Hashline** (ohmypi) | **7/50 (14%)** | 38/50 (76%) | 38 | 18.4% | LINE:HASH |
+| - | DeepAgents | DNF | - | - | - | (recursion limit) |
+
+**OpenCode**: CLI agent using Vercel AI SDK with `@ai-sdk/openai-compatible` custom provider pointing at local vLLM. Uses its own built-in tool set (glob, read, edit, bash, grep, write) rather than custom tools. Required 64K context (vs 32K for other harnesses) due to ~11K system prompt + ~20 built-in tool definitions. Connected via `opencode.json` config: `{"provider":{"vllm":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":"http://localhost:8080/v1"}}}}`.
 
 **Hashline format**: `read_file` returns lines as `42:a3|def method(self):` — 2-char content hash per line. `edit_file` takes `start_hash="42:a3"` and `end_hash="45:f1"` instead of exact text match. Eliminates str_replace failures from whitespace/quoting mismatches.
 
@@ -80,11 +83,12 @@ Pass rate verified by applying agent patches + gold `test_patch` from SWE-bench,
 
 **DeepAgents**: langchain-ai/deepagents with SummarizationMiddleware + sub-agents. Failed — `create_deep_agent` hits LangGraph recursion limit (60) before completing even one issue. Sub-agent spawning consumes recursion budget too quickly.
 
-### Ensemble (All 4 Harnesses)
+### Ensemble (All 5 Harnesses)
 
 | Metric | Value |
 |--------|-------|
 | **Union pass rate** | **14/50 (28%)** |
+| **OpenCode** | **11/50 (22%)** |
 | SERA | 8/50 (16%) |
 | PiAgent (str_replace) | 8/50 (16%) |
 | LangGraph | 7/50 (14%) |
@@ -92,46 +96,46 @@ Pass rate verified by applying agent patches + gold `test_patch` from SWE-bench,
 
 **Per-issue breakdown** (issues where at least one harness passes):
 
-| Instance | SERA | LangGraph | Hashline | PiAgent |
-|----------|------|-----------|----------|---------|
-| django-11039 | PASS | - | fail | fail |
-| django-11620 | PASS | - | fail | - |
-| django-11815 | PASS | - | - | - |
-| django-12286 | - | PASS | fail | PASS |
-| django-12453 | PASS | PASS | PASS | PASS |
-| django-12497 | - | PASS | fail | PASS |
-| django-14238 | - | - | PASS | PASS |
-| django-14608 | - | PASS | PASS | PASS |
-| django-14672 | PASS | - | fail | PASS |
-| django-14855 | PASS | PASS | PASS | PASS |
-| pytest-11143 | PASS | PASS | - | - |
-| sympy-17022 | - | - | PASS | fail |
-| sympy-18835 | - | fail | PASS | fail |
-| sympy-24152 | PASS | PASS | PASS | PASS |
+| Instance | SERA | LangGraph | Hashline | PiAgent | OpenCode |
+|----------|------|-----------|----------|---------|----------|
+| django-11039 | PASS | - | fail | fail | PASS |
+| django-11620 | PASS | - | fail | - | PASS |
+| django-11815 | PASS | - | - | - | PASS |
+| django-12286 | - | PASS | fail | PASS | PASS |
+| django-12453 | PASS | PASS | PASS | PASS | PASS |
+| django-12497 | - | PASS | fail | PASS | - |
+| django-14238 | - | - | PASS | PASS | PASS |
+| django-14608 | - | PASS | PASS | PASS | PASS |
+| django-14672 | PASS | - | fail | PASS | PASS |
+| django-14855 | PASS | PASS | PASS | PASS | - |
+| pytest-11143 | PASS | PASS | - | - | PASS |
+| sympy-17022 | - | - | PASS | fail | PASS |
+| sympy-18835 | - | fail | PASS | fail | - |
+| sympy-24152 | PASS | PASS | PASS | PASS | PASS |
 
 **Unique passes** (solved by only one harness):
-- SERA: django-11039, django-11620, django-11815 (3)
-- Hashline: sympy-17022, sympy-18835 (2)
-- LangGraph: none unique
-- PiAgent: none unique
+- Hashline: sympy-18835 (1)
+- All others: none unique
 
-Running all 4 harnesses lifts pass rate from 14-16% to **28%** (75% improvement over best individual).
+Adding OpenCode doesn't increase the ensemble from 14/50 — it covers the same issues as existing harnesses. But as a single harness, OpenCode's 22% matches the 4-harness ensemble.
 
 ### Key Findings
+
+**OpenCode is the best single harness** at 22% pass rate with 88% fix rate. Its built-in tool set (glob, read, edit, bash, grep, write) + structured system prompt produces more and better fixes than any custom adapter. The 88% fix rate is 42% higher than LangGraph (62%) and nearly double SERA (46%). OpenCode's 25% precision (11/44) also beats LangGraph (23%) though trails SERA (35%).
+
+**OpenCode needs 64K context**. Its ~11K system prompt + ~20 tool definitions consume a third of a 32K context window, causing token-limit errors. Running with 64K `max_model_len` (single GPU) resolves this but limits throughput to sequential evaluation.
+
+**OpenCode reformats aggressively**. Patches include quote-style changes (`'` → `"`) and line-wrapping reformats alongside the functional fix. This noise doesn't break correctness but inflates patch size. A post-processing step to strip formatting changes could improve patch clarity.
 
 **SERA has best precision, LangGraph has better recall**. SERA converts 35% of its fixes to passes (8/23) vs LangGraph's 23% (7/31). SERA generates fewer but higher-quality fixes.
 
 **Hashline does NOT beat str_replace for weak models**. 14% vs 14-16% — statistically identical. The hashline format that produced 10x gains for Grok (6.7% → 68.3%) provides no advantage for Devstral Small 2 24B. The bottleneck is fix correctness, not edit addressing.
 
-**Hashline solves DIFFERENT issues**. Despite identical pass rates, hashline uniquely solves sympy-17022 and sympy-18835 — issues where precise line identification helps with multi-site edits. str_replace uniquely solves other issues where exact text matching works better.
+**Hashline solves DIFFERENT issues**. sympy-18835 is the only issue uniquely solved by hashline (the sole unique pass across all 5 harnesses).
 
-**Hashline is token-expensive**. Average 191K tokens/issue vs ~10K for LangGraph str_replace (~19x overhead). The `LINE:HASH|` prefix on every line inflates context significantly, causing more 502 errors from vLLM context overflow.
+**Hashline is token-expensive**. Average 191K tokens/issue vs ~10K for LangGraph str_replace (~19x overhead). The `LINE:HASH|` prefix on every line inflates context significantly.
 
-**Hashline has lowest precision**. 18.4% of patches pass vs SERA's 34.8%. Generates lots of patches (38/50) but fewer are correct — the format makes editing easier but doesn't improve fix quality.
-
-**Ensemble is the largest optimization**. 28% union vs 14-16% individual (+75%). Each harness contributes unique passes. The 4-harness ensemble is 2x better than the best individual.
-
-**LangGraph generates more fixes, faster**. 62% fix rate vs 46%, at 42% lower latency (50.2s vs 87.6s). LangChain's structured tool calling produces fewer malformed tool calls.
+**Ensemble ceiling is 28%**. 5-harness union = 14/50, identical to 4-harness union. OpenCode doesn't add unique passes — every issue it solves is also solved by at least one other harness. The marginal value of additional harnesses is diminishing.
 
 **Aider cannot drive Devstral Small 2**. The `--edit-format diff` mode produces zero fixes — the model cannot produce valid unified diffs in Aider's expected format.
 
@@ -164,7 +168,7 @@ This is a trainable error class — a LoRA finetuned on successful fix trajector
 
 - **Pass rate is a lower bound**: Only Django/pytest/sympy could be evaluated without Docker. Other repos (sphinx, scikit-learn, matplotlib, astropy, seaborn, requests, pylint) have version-specific dependencies that conflict with Python 3.11.
 - **50-issue subset**: Introduces ~5% sampling variance. Results may not generalize to the full 300-issue set.
-- **4 of 7 Phase 2a harnesses blocked**: SWE-agent, OpenHands, Claude Code, and OpenCode could not be tested due to dependency/platform issues.
+- **3 of 7 Phase 2a harnesses blocked**: SWE-agent, OpenHands, and Claude Code could not be tested due to dependency/platform issues. OpenCode was unblocked by configuring a custom `@ai-sdk/openai-compatible` provider in `opencode.json`.
 - **DeepAgents incompatible**: Recursion limit issue prevents evaluation.
 - **Letta Code not tested**: Requires Docker Letta server setup, deferred.
 - **Django dominance**: Most verifiable passes are Django issues due to evaluation constraints.
@@ -174,11 +178,11 @@ This is a trainable error class — a LoRA finetuned on successful fix trajector
 
 ## Conclusions
 
-1. **30 turns baseline is optimal** — compaction and restart strategies hurt or are neutral.
-2. **Harness ensemble is the largest single optimization**: 28% union vs 14-16% individual (+75% with 4 harnesses).
-3. **Fix rate is not pass rate** — the correlation is weak (~18-35% conversion).
-4. **Individual harness scaffolding has converged at 14-16%** for this model size.
-5. **Hashline helps strong models, not weak ones** — the edit format that produced 10x gains for Grok provides no advantage for Devstral Small 2, but solves different issues (ensemble value).
+1. **OpenCode is the best single harness** at 22% pass rate — matching the previous 4-harness ensemble from a single agent. Its built-in tool set and structured prompting produce 88% fix rate (2x SERA, 1.4x LangGraph).
+2. **30 turns baseline is optimal** — compaction and restart strategies hurt or are neutral.
+3. **Ensemble ceiling is 28%** with 5 harnesses. Adding OpenCode (5th) didn't increase the union beyond the 4-harness result. Marginal returns from additional harnesses are diminishing.
+4. **Fix rate is not pass rate** — the correlation is weak (~25-35% conversion). OpenCode's 88% fix rate converts to only 22% pass rate.
+5. **Hashline helps strong models, not weak ones** — the edit format that produced 10x gains for Grok provides no advantage for Devstral Small 2, but provides the only unique pass (sympy-18835).
 6. **Phase 3 (finetuning) is now the right next step** — 42% of failures are "wrong fix" (trainable errors).
 7. **Full SWE-bench evaluation requires Docker** — bare-metal eval is a lower bound covering ~50% of patches.
 
@@ -188,7 +192,7 @@ This is a trainable error class — a LoRA finetuned on successful fix trajector
 
 - `results/phase1_{A-F}.jsonl` — 50 lines each, per-issue metrics with turn-level breakdown
 - `results/phase2_{langgraph,sera,aider}.jsonl` — 50 lines each, per-issue harness metrics
-- `results/phase2b_{ohmypi,piagent,deepagents}.jsonl` — Phase 2b per-issue metrics
-- `results/eval_{ohmypi,piagent}.jsonl` — Gold test evaluation results for Phase 2b
+- `results/phase2b_{ohmypi,piagent,deepagents,opencode}.jsonl` — Phase 2b per-issue metrics
+- `results/eval_{ohmypi,piagent,opencode}.jsonl` — Gold test evaluation results for Phase 2b
 - `results-report.html` — Interactive Chart.js visualization
 - `lessons.md` — Operational lessons and debugging notes

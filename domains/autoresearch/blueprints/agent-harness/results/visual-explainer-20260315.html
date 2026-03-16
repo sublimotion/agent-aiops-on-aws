@@ -171,14 +171,14 @@
 <!-- Top-level stats -->
 <div class="stats">
   <div class="stat">
-    <div class="val" style="color:var(--green)">28%</div>
-    <div class="label">Best Pass Rate</div>
-    <div class="delta" style="color:var(--green)">4-Harness Ensemble</div>
+    <div class="val" style="color:var(--green)">22%</div>
+    <div class="label">Best Individual</div>
+    <div class="delta" style="color:var(--green)">OpenCode (28% ensemble)</div>
   </div>
   <div class="stat">
-    <div class="val" style="color:var(--accent)">60%</div>
-    <div class="label">Best Fix Rate (Phase 1)</div>
-    <div class="delta" style="color:var(--text-muted)">Config D, 30 turns baseline</div>
+    <div class="val" style="color:var(--accent)">88%</div>
+    <div class="label">Best Fix Rate</div>
+    <div class="delta" style="color:var(--text-muted)">OpenCode (44/50)</div>
   </div>
   <div class="stat">
     <div class="val" style="color:var(--purple)">35%</div>
@@ -304,8 +304,8 @@
 
 <!-- ==================== PHASE 2b ==================== -->
 <div class="section">
-  <h2>Phase 2b: Hashline vs str_replace</h2>
-  <p class="desc">Testing the "harness problem" hypothesis: does hash-anchored line editing (LINE:HASH format from oh-my-pi) outperform str_replace for Devstral Small 2?</p>
+  <h2>Phase 2b: Edit Format + OpenCode</h2>
+  <p class="desc">Testing the "harness problem" hypothesis and OpenCode as a full-featured CLI agent with built-in tools and Vercel AI SDK.</p>
 
   <div class="grid-2">
     <div class="chart-wrap"><canvas id="p2bBars"></canvas></div>
@@ -314,43 +314,50 @@
 
   <table>
     <thead>
-      <tr><th>Harness</th><th>Pass Rate</th><th>Patches</th><th>Precision</th><th>Avg Tokens/Issue</th><th>Edit Format</th></tr>
+      <tr><th>Harness</th><th>Pass Rate</th><th>Fix Rate</th><th>Patches</th><th>Precision</th><th>Edit Format</th></tr>
     </thead>
     <tbody>
-      <tr><td><b>PiAgent</b> (control)</td><td class="hi">16% (8/50)</td><td>39</td><td>20.5%</td><td>~10K</td><td>str_replace</td></tr>
-      <tr><td><b>Hashline</b> (ohmypi)</td><td>14% (7/50)</td><td>38</td><td>18.4%</td><td>~191K</td><td>LINE:HASH</td></tr>
+      <tr><td><b>OpenCode</b></td><td class="hi">22% (11/50)</td><td class="hi">88% (44/50)</td><td>44</td><td>25.0%</td><td>built-in str_replace</td></tr>
+      <tr><td><b>PiAgent</b> (control)</td><td>16% (8/50)</td><td>78% (39/50)</td><td>39</td><td>20.5%</td><td>str_replace</td></tr>
+      <tr><td><b>Hashline</b> (ohmypi)</td><td>14% (7/50)</td><td>76% (38/50)</td><td>38</td><td>18.4%</td><td>LINE:HASH</td></tr>
       <tr><td><b>DeepAgents</b></td><td class="lo">DNF</td><td>--</td><td>--</td><td>--</td><td>recursion limit</td></tr>
     </tbody>
   </table>
 
-  <div class="insight" style="border-left-color:var(--orange);margin-top:1rem;">
+  <div class="insight" style="border-left-color:var(--green);margin-top:1rem;">
+    <h4>OpenCode: Best Single Harness</h4>
+    <p>22% pass rate with 88% fix rate &mdash; the highest of any harness. Connected to vLLM via custom <code>@ai-sdk/openai-compatible</code> provider in <code>opencode.json</code>. Required 64K context (vs 32K for others) due to ~11K system prompt + ~20 built-in tool definitions. Its structured tool set (glob, read, edit, bash, grep, write) produces more and better fixes than custom adapters.</p>
+  </div>
+
+  <div class="insight" style="border-left-color:var(--orange);margin-top:0.8rem;">
     <h4>Hashline: Same Rate, Different Issues</h4>
-    <p>The LINE:HASH format that gave Grok a 10x improvement (6.7% &rarr; 68.3%) provides no advantage for Devstral Small 2 24B. But it uniquely solves sympy-17022 and sympy-18835 that no other harness solves &mdash; valuable in an ensemble.</p>
+    <p>The LINE:HASH format that gave Grok a 10x improvement (6.7% &rarr; 68.3%) provides no advantage for Devstral Small 2 24B. But it uniquely solves sympy-18835 &mdash; the only unique pass across all 5 harnesses.</p>
   </div>
 
   <div class="insight" style="border-left-color:var(--red);margin-top:0.8rem;">
     <h4>19x Token Overhead</h4>
-    <p>Hashline averages 191K tokens/issue vs ~10K for str_replace. The LINE:HASH prefix on every line inflates context by ~19x, causing more vLLM 502 errors from context overflow. For weak models, the bottleneck is fix correctness, not edit addressing.</p>
+    <p>Hashline averages 191K tokens/issue vs ~10K for str_replace. The LINE:HASH prefix on every line inflates context by ~19x. For weak models, the bottleneck is fix correctness, not edit addressing.</p>
   </div>
 </div>
 
-<!-- ==================== 4-HARNESS ENSEMBLE ==================== -->
+<!-- ==================== 5-HARNESS ENSEMBLE ==================== -->
 <div class="section">
-  <h2>4-Harness Ensemble</h2>
-  <p class="desc">Running all 4 harnesses and taking the union reaches 28% &mdash; 75% above the best individual harness.</p>
+  <h2>5-Harness Ensemble</h2>
+  <p class="desc">Running all 5 harnesses and taking the union reaches 28%. OpenCode alone matches the previous 4-harness ensemble at 22%.</p>
 
   <div class="chart-wrap"><canvas id="ensembleBars"></canvas></div>
 
   <table>
     <thead>
-      <tr><th>Harness</th><th>Pass Rate</th><th>Unique Passes</th></tr>
+      <tr><th>Harness</th><th>Pass Rate</th><th>Fix Rate</th><th>Unique Passes</th></tr>
     </thead>
     <tbody>
-      <tr><td><b>SERA</b></td><td>16% (8/50)</td><td>3 (django-11039, -11620, -11815)</td></tr>
-      <tr><td><b>PiAgent</b></td><td>16% (8/50)</td><td>0</td></tr>
-      <tr><td><b>LangGraph</b></td><td>14% (7/50)</td><td>0</td></tr>
-      <tr><td><b>Hashline</b></td><td>14% (7/50)</td><td>2 (sympy-17022, sympy-18835)</td></tr>
-      <tr><td class="hi"><b>Union</b></td><td class="hi"><b>28% (14/50)</b></td><td>--</td></tr>
+      <tr><td><b>OpenCode</b></td><td class="hi">22% (11/50)</td><td>88% (44/50)</td><td>0</td></tr>
+      <tr><td><b>SERA</b></td><td>16% (8/50)</td><td>46% (23/50)</td><td>0</td></tr>
+      <tr><td><b>PiAgent</b></td><td>16% (8/50)</td><td>78% (39/50)</td><td>0</td></tr>
+      <tr><td><b>LangGraph</b></td><td>14% (7/50)</td><td>62% (31/50)</td><td>0</td></tr>
+      <tr><td><b>Hashline</b></td><td>14% (7/50)</td><td>76% (38/50)</td><td>1 (sympy-18835)</td></tr>
+      <tr><td class="hi"><b>Union</b></td><td class="hi"><b>28% (14/50)</b></td><td>--</td><td>--</td></tr>
     </tbody>
   </table>
 </div>
@@ -358,49 +365,52 @@
 <!-- ==================== ENSEMBLE BREAKDOWN ==================== -->
 <div class="section">
   <h2>Ensemble Complementarity</h2>
-  <p class="desc">Each harness contributes unique passes. Only 3 of 14 issues are solved by all 4 harnesses. The union is the biggest single optimization lever.</p>
+  <p class="desc">OpenCode covers the broadest range (11/14 issues), but hashline provides the only unique pass. All 14 issues are solved by at least 2 harnesses.</p>
 
   <div class="grid-2">
     <div>
       <table style="font-size:0.82rem;">
-        <thead><tr><th>Instance</th><th>SERA</th><th>LG</th><th>HL</th><th>Pi</th></tr></thead>
+        <thead><tr><th>Instance</th><th>SERA</th><th>LG</th><th>HL</th><th>Pi</th><th>OC</th></tr></thead>
         <tbody>
-          <tr><td>django-11039</td><td class="hi">PASS</td><td>-</td><td class="lo">fail</td><td class="lo">fail</td></tr>
-          <tr><td>django-11620</td><td class="hi">PASS</td><td>-</td><td class="lo">fail</td><td>-</td></tr>
-          <tr><td>django-11815</td><td class="hi">PASS</td><td>-</td><td>-</td><td>-</td></tr>
-          <tr><td>django-12286</td><td>-</td><td class="hi">PASS</td><td class="lo">fail</td><td class="hi">PASS</td></tr>
-          <tr><td>django-12453</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
-          <tr><td>django-12497</td><td>-</td><td class="hi">PASS</td><td class="lo">fail</td><td class="hi">PASS</td></tr>
-          <tr><td>django-14238</td><td>-</td><td>-</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
-          <tr><td>django-14608</td><td>-</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
-          <tr><td>django-14672</td><td class="hi">PASS</td><td>-</td><td class="lo">fail</td><td class="hi">PASS</td></tr>
-          <tr><td>django-14855</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
-          <tr><td>pytest-11143</td><td class="hi">PASS</td><td class="hi">PASS</td><td>-</td><td>-</td></tr>
-          <tr><td>sympy-17022</td><td>-</td><td>-</td><td class="hi">PASS</td><td class="lo">fail</td></tr>
-          <tr><td>sympy-18835</td><td>-</td><td class="lo">fail</td><td class="hi">PASS</td><td class="lo">fail</td></tr>
-          <tr><td>sympy-24152</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
+          <tr><td>django-11039</td><td class="hi">PASS</td><td>-</td><td class="lo">fail</td><td class="lo">fail</td><td class="hi">PASS</td></tr>
+          <tr><td>django-11620</td><td class="hi">PASS</td><td>-</td><td class="lo">fail</td><td>-</td><td class="hi">PASS</td></tr>
+          <tr><td>django-11815</td><td class="hi">PASS</td><td>-</td><td>-</td><td>-</td><td class="hi">PASS</td></tr>
+          <tr><td>django-12286</td><td>-</td><td class="hi">PASS</td><td class="lo">fail</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
+          <tr><td>django-12453</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
+          <tr><td>django-12497</td><td>-</td><td class="hi">PASS</td><td class="lo">fail</td><td class="hi">PASS</td><td>-</td></tr>
+          <tr><td>django-14238</td><td>-</td><td>-</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
+          <tr><td>django-14608</td><td>-</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
+          <tr><td>django-14672</td><td class="hi">PASS</td><td>-</td><td class="lo">fail</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
+          <tr><td>django-14855</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td>-</td></tr>
+          <tr><td>pytest-11143</td><td class="hi">PASS</td><td class="hi">PASS</td><td>-</td><td>-</td><td class="hi">PASS</td></tr>
+          <tr><td>sympy-17022</td><td>-</td><td>-</td><td class="hi">PASS</td><td class="lo">fail</td><td class="hi">PASS</td></tr>
+          <tr><td>sympy-18835</td><td>-</td><td class="lo">fail</td><td class="hi">PASS</td><td class="lo">fail</td><td>-</td></tr>
+          <tr><td>sympy-24152</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
         </tbody>
       </table>
     </div>
 
     <div>
-      <p style="font-size:0.85rem;margin-bottom:0.5rem;font-weight:600;color:var(--purple)">SERA only (3)</p>
+      <p style="font-size:0.85rem;margin-bottom:0.5rem;font-weight:600;color:var(--orange)">Hashline only (1)</p>
       <div class="tags">
-        <span class="tag sera">django-11039</span><span class="tag sera">django-11620</span>
-        <span class="tag sera">django-11815</span>
-      </div>
-      <p style="font-size:0.85rem;margin-bottom:0.5rem;font-weight:600;color:var(--orange)">Hashline only (2)</p>
-      <div class="tags">
-        <span class="tag" style="border-color:var(--orange);color:var(--orange)">sympy-17022</span>
         <span class="tag" style="border-color:var(--orange);color:var(--orange)">sympy-18835</span>
       </div>
-      <p style="font-size:0.85rem;margin-bottom:0.5rem;font-weight:600;color:var(--green)">All 4 pass (3)</p>
+      <p style="font-size:0.85rem;margin-bottom:0.5rem;font-weight:600;color:var(--green)">All 5 pass (2)</p>
       <div class="tags">
-        <span class="tag both">django-12453</span><span class="tag both">django-14855</span>
+        <span class="tag both">django-12453</span>
         <span class="tag both">sympy-24152</span>
       </div>
+      <p style="font-size:0.85rem;margin-bottom:0.5rem;font-weight:600;color:var(--cyan)">OpenCode covers (11/14)</p>
+      <div class="tags">
+        <span class="tag lg">django-11039</span><span class="tag lg">django-11620</span>
+        <span class="tag lg">django-11815</span><span class="tag lg">django-12286</span>
+        <span class="tag lg">django-12453</span><span class="tag lg">django-14238</span>
+        <span class="tag lg">django-14608</span><span class="tag lg">django-14672</span>
+        <span class="tag lg">pytest-11143</span><span class="tag lg">sympy-17022</span>
+        <span class="tag lg">sympy-24152</span>
+      </div>
       <div style="margin-top:1.2rem;padding:0.8rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:0.82rem;">
-        <b>Why so complementary?</b> SERA's turn pressure forces early edits. LangGraph explores longer. Hashline's line-hash addressing helps with multi-site sympy edits. Each strategy produces different patches that succeed on different issues.
+        <b>OpenCode dominates individually</b> but doesn't add unique passes. Its built-in tool set (glob, read, edit, bash, grep, write) and structured system prompt produce 88% fix rate — nearly double any custom adapter. The ensemble ceiling of 28% suggests diminishing returns from additional harnesses.
       </div>
     </div>
   </div>
@@ -556,14 +566,14 @@
     }
   });
 
-  // Phase 2b bars — hashline vs str_replace
+  // Phase 2b bars — all harnesses pass rate + fix rate
   new Chart(document.getElementById('p2bBars'), {
     type: 'bar',
     data: {
-      labels: ['PiAgent\n(str_replace)', 'Hashline\n(LINE:HASH)'],
+      labels: ['OpenCode', 'PiAgent\n(str_replace)', 'Hashline\n(LINE:HASH)'],
       datasets: [
-        { label: 'Pass Rate', data: [16,14], backgroundColor: ['rgba(57,210,192,0.8)','rgba(210,153,34,0.8)'], borderColor: ['#39d2c0','#d29922'], borderWidth: 1, borderRadius: 5 },
-        { label: 'Precision', data: [20.5,18.4], backgroundColor: ['rgba(57,210,192,0.3)','rgba(210,153,34,0.3)'], borderColor: ['#39d2c0','#d29922'], borderWidth: 1, borderRadius: 5 }
+        { label: 'Pass Rate', data: [22,16,14], backgroundColor: ['rgba(63,185,80,0.8)','rgba(57,210,192,0.8)','rgba(210,153,34,0.8)'], borderColor: ['#3fb950','#39d2c0','#d29922'], borderWidth: 1, borderRadius: 5 },
+        { label: 'Fix Rate', data: [88,78,76], backgroundColor: ['rgba(63,185,80,0.3)','rgba(57,210,192,0.3)','rgba(210,153,34,0.3)'], borderColor: ['#3fb950','#39d2c0','#d29922'], borderWidth: 1, borderRadius: 5 }
       ]
     },
     options: chartOpts(1.5)
@@ -595,16 +605,16 @@
     }
   });
 
-  // 4-harness ensemble bar
+  // 5-harness ensemble bar
   new Chart(document.getElementById('ensembleBars'), {
     type: 'bar',
     data: {
-      labels: ['SERA', 'PiAgent', 'LangGraph', 'Hashline', 'Ensemble'],
+      labels: ['OpenCode', 'SERA', 'PiAgent', 'LangGraph', 'Hashline', 'Ensemble'],
       datasets: [{
         label: 'Pass Rate',
-        data: [16, 16, 14, 14, 28],
-        backgroundColor: ['rgba(188,140,255,0.7)', 'rgba(57,210,192,0.7)', 'rgba(88,166,255,0.7)', 'rgba(210,153,34,0.7)', 'rgba(63,185,80,0.85)'],
-        borderColor: ['#bc8cff', '#39d2c0', '#58a6ff', '#d29922', '#3fb950'],
+        data: [22, 16, 16, 14, 14, 28],
+        backgroundColor: ['rgba(247,120,186,0.7)', 'rgba(188,140,255,0.7)', 'rgba(57,210,192,0.7)', 'rgba(88,166,255,0.7)', 'rgba(210,153,34,0.7)', 'rgba(63,185,80,0.85)'],
+        borderColor: ['#f778ba', '#bc8cff', '#39d2c0', '#58a6ff', '#d29922', '#3fb950'],
         borderWidth: 2, borderRadius: 5
       }]
     },
