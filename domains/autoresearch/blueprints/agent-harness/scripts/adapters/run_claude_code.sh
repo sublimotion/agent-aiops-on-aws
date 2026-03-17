@@ -1,61 +1,102 @@
 #!/usr/bin/env bash
-# Adapter: Claude Code
-# Runs Claude Code CLI against a single SWE-bench issue.
+# Adapter: Claude Code with vLLM via patched Anthropic Messages API
+# Uses temporary env vars to point Claude Code at local vLLM.
+# Requires vLLM v0.16.0 with 3 patches (tool_use_id, streaming args, id remap).
+# System prompt ~22K tokens — needs 64K context.
 #
-# Env vars (set by multi_harness_eval.py):
-#   WORKSPACE, ENDPOINT, MODEL, ISSUE_ID, PROBLEM_STATEMENT, TEST_CMD, REPO
-#
-# Output: JSON on last line: {"pass": bool, "turns": int, "tokens": int, "fix_generated": bool}
+# Env vars: WORKSPACE, ENDPOINT, MODEL, ISSUE_ID, PROBLEM_STATEMENT, TEST_CMD, REPO
+# Output: JSON on last line
 
 set -euo pipefail
 
-cd "$WORKSPACE"
+PROMPT="Fix this bug in the repository at ${WORKSPACE}.
 
-# Claude Code uses ANTHROPIC_API_KEY by default. For Bedrock:
-#   export CLAUDE_CODE_USE_BEDROCK=1
-# For local vLLM via OpenAI-compatible:
-#   export OPENAI_BASE_URL="$ENDPOINT/v1"
-#   export OPENAI_API_KEY="dummy"
-
-PROMPT="You are working in repository ${REPO}, checked out at the correct commit.
-
-Fix this issue:
 ${PROBLEM_STATEMENT}
 
-After fixing, verify with: ${TEST_CMD}
+IMPORTANT: Read the relevant source file, then use the Edit tool to fix the bug. Do not read more than 3 files before making your edit. Be precise — change only what is needed."
 
-Use edit_file for targeted changes. Do not add unrelated changes."
+# Run Claude Code with vLLM backend via temporary env vars
+OUTPUT_FILE="/tmp/claude_code_${ISSUE_ID}.json"
 
-# Run Claude Code in non-interactive mode with the prompt
-# Capture output to parse turn count
-OUTPUT_FILE=$(mktemp)
-
-claude --print \
-    --model "$MODEL" \
+ANTHROPIC_BASE_URL="${ENDPOINT}" \
+ANTHROPIC_API_KEY=dummy \
+ANTHROPIC_AUTH_TOKEN=dummy \
+ANTHROPIC_DEFAULT_OPUS_MODEL="${MODEL}" \
+ANTHROPIC_DEFAULT_SONNET_MODEL="${MODEL}" \
+ANTHROPIC_DEFAULT_HAIKU_MODEL="${MODEL}" \
+timeout 540 claude \
+    --print \
+    --output-format json \
+    --dangerously-skip-permissions \
     --max-turns 30 \
-    --prompt "$PROMPT" \
-    > "$OUTPUT_FILE" 2>&1 || true
+    -p "$WORKSPACE" \
+    "$PROMPT" > "$OUTPUT_FILE" 2>/tmp/claude_code_stderr_${ISSUE_ID}.log || true
 
-# Check if tests pass
-TEST_OUTPUT=$(bash -c "cd $WORKSPACE && $TEST_CMD" 2>&1 || true)
+# Parse Claude Code JSON output for metrics
+python3 << 'PYEOF'
+import json, sys, os, subprocess
 
-PASS=false
-if echo "$TEST_OUTPUT" | grep -q "passed" && ! echo "$TEST_OUTPUT" | grep -q "failed"; then
-    PASS=true
-fi
-if echo "$TEST_OUTPUT" | grep -qE "^OK$|^OK " && ! echo "$TEST_OUTPUT" | grep -qi "fail"; then
-    PASS=true
-fi
+issue_id = os.environ.get("ISSUE_ID", "unknown")
+output_file = f"/tmp/claude_code_{issue_id}.json"
+workspace = os.environ.get("WORKSPACE", "")
 
-# Check for fix
-FIX_GENERATED=false
-if [ -n "$(git diff)" ]; then
-    FIX_GENERATED=true
-fi
+turns = 0
+input_tokens = 0
+output_tokens = 0
+tool_calls = 0
+has_edit = False
+has_error = False
+error_msg = ""
+stop_reason = ""
 
-# Count turns (approximate: count tool use blocks in output)
-TURNS=$(grep -c "tool_use\|Tool:" "$OUTPUT_FILE" 2>/dev/null || echo "0")
+try:
+    with open(output_file) as f:
+        data = json.load(f)
 
-rm -f "$OUTPUT_FILE"
+    turns = data.get("num_turns", 0)
+    stop_reason = data.get("stop_reason", "")
+    usage = data.get("usage", {})
+    input_tokens = usage.get("input_tokens", 0)
+    output_tokens = usage.get("output_tokens", 0)
 
-echo "{\"pass\": $PASS, \"turns\": $TURNS, \"tokens\": 0, \"fix_generated\": $FIX_GENERATED}"
+    # Check for errors
+    if data.get("is_error"):
+        has_error = True
+        errors = data.get("errors", [])
+        error_msg = errors[0] if errors else data.get("subtype", "unknown")
+
+    # Approximate tool_calls from cost — each turn is roughly one API call
+    tool_calls = max(0, turns - 1)  # first turn is usually text, rest are tool calls
+
+except (FileNotFoundError, json.JSONDecodeError) as e:
+    has_error = True
+    error_msg = str(e)
+    # Try to read stderr
+    try:
+        with open(f"/tmp/claude_code_stderr_{issue_id}.log") as f:
+            stderr = f.read().strip()[-200:]
+            if stderr:
+                error_msg = stderr
+    except:
+        pass
+
+# Check if a diff was generated
+diff_result = subprocess.run(["git", "diff"], capture_output=True, text=True, cwd=workspace)
+fix_generated = len(diff_result.stdout.strip()) > 0
+
+result = {
+    "pass": False,
+    "turns": turns,
+    "tokens": input_tokens + output_tokens,
+    "input_tokens": input_tokens,
+    "output_tokens": output_tokens,
+    "tool_calls": tool_calls,
+    "fix_generated": fix_generated,
+    "has_edit": fix_generated,  # if there's a diff, an edit was made
+    "stop_reason": stop_reason,
+}
+if has_error:
+    result["error"] = error_msg
+
+print(json.dumps(result))
+PYEOF

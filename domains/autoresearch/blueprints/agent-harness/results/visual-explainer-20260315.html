@@ -172,8 +172,8 @@
 <div class="stats">
   <div class="stat">
     <div class="val" style="color:var(--green)">22%</div>
-    <div class="label">Best Individual</div>
-    <div class="delta" style="color:var(--green)">OpenCode (28% ensemble)</div>
+    <div class="label">Best Pass Rate</div>
+    <div class="delta" style="color:var(--green)">OpenCode (30% ensemble)</div>
   </div>
   <div class="stat">
     <div class="val" style="color:var(--accent)">88%</div>
@@ -181,9 +181,9 @@
     <div class="delta" style="color:var(--text-muted)">OpenCode (44/50)</div>
   </div>
   <div class="stat">
-    <div class="val" style="color:var(--purple)">35%</div>
+    <div class="val" style="color:var(--purple)">53%</div>
     <div class="label">Best Precision</div>
-    <div class="delta" style="color:var(--text-muted)">SERA pass/fix ratio</div>
+    <div class="delta" style="color:var(--text-muted)">Claude Code pass/fix</div>
   </div>
   <div class="stat">
     <div class="val" style="color:var(--orange)">42%</div>
@@ -304,8 +304,8 @@
 
 <!-- ==================== PHASE 2b ==================== -->
 <div class="section">
-  <h2>Phase 2b: Edit Format + OpenCode</h2>
-  <p class="desc">Testing the "harness problem" hypothesis and OpenCode as a full-featured CLI agent with built-in tools and Vercel AI SDK.</p>
+  <h2>Phase 2b: Edit Format + CLI Agents</h2>
+  <p class="desc">Testing the "harness problem" hypothesis, OpenCode (Vercel AI SDK), and Claude Code (Anthropic SDK via patched vLLM) as full-featured CLI agent harnesses.</p>
 
   <div class="grid-2">
     <div class="chart-wrap"><canvas id="p2bBars"></canvas></div>
@@ -318,6 +318,7 @@
     </thead>
     <tbody>
       <tr><td><b>OpenCode</b></td><td class="hi">22% (11/50)</td><td class="hi">88% (44/50)</td><td>44</td><td>25.0%</td><td>built-in str_replace</td></tr>
+      <tr><td><b>Claude Code</b></td><td>20% (10/50)</td><td>38% (19/50)</td><td>26</td><td class="hi">52.6%</td><td>built-in str_replace</td></tr>
       <tr><td><b>PiAgent</b> (control)</td><td>16% (8/50)</td><td>78% (39/50)</td><td>39</td><td>20.5%</td><td>str_replace</td></tr>
       <tr><td><b>Hashline</b> (ohmypi)</td><td>14% (7/50)</td><td>76% (38/50)</td><td>38</td><td>18.4%</td><td>LINE:HASH</td></tr>
       <tr><td><b>DeepAgents</b></td><td class="lo">DNF</td><td>--</td><td>--</td><td>--</td><td>recursion limit</td></tr>
@@ -325,13 +326,18 @@
   </table>
 
   <div class="insight" style="border-left-color:var(--green);margin-top:1rem;">
-    <h4>OpenCode: Best Single Harness</h4>
-    <p>22% pass rate with 88% fix rate &mdash; the highest of any harness. Connected to vLLM via custom <code>@ai-sdk/openai-compatible</code> provider in <code>opencode.json</code>. Required 64K context (vs 32K for others) due to ~11K system prompt + ~20 built-in tool definitions. Its structured tool set (glob, read, edit, bash, grep, write) produces more and better fixes than custom adapters.</p>
+    <h4>OpenCode: Best Pass Rate (22%)</h4>
+    <p>Highest pass rate with 88% fix rate. Connected to vLLM via custom <code>@ai-sdk/openai-compatible</code> provider. Required 64K context due to ~11K system prompt + ~20 built-in tool definitions.</p>
+  </div>
+
+  <div class="insight" style="border-left-color:var(--purple);margin-top:0.8rem;">
+    <h4>Claude Code: Best Precision (53%)</h4>
+    <p>20% pass rate with only 38% fix rate &mdash; but 53% of its fixes pass (10/19), double OpenCode's 25%. Required patching 3 bugs in vLLM's Anthropic Messages API (<code>/v1/messages</code>): tool_use_id parsing, streaming argument drop, and Mistral ID format. Needs 131K context (TP2) due to 32K max_tokens + ~22K system prompt.</p>
   </div>
 
   <div class="insight" style="border-left-color:var(--orange);margin-top:0.8rem;">
     <h4>Hashline: Same Rate, Different Issues</h4>
-    <p>The LINE:HASH format that gave Grok a 10x improvement (6.7% &rarr; 68.3%) provides no advantage for Devstral Small 2 24B. But it uniquely solves sympy-18835 &mdash; the only unique pass across all 5 harnesses.</p>
+    <p>The LINE:HASH format that gave Grok a 10x improvement (6.7% &rarr; 68.3%) provides no advantage for Devstral Small 2 24B. But it uniquely solves sympy-18835.</p>
   </div>
 
   <div class="insight" style="border-left-color:var(--red);margin-top:0.8rem;">
@@ -342,22 +348,23 @@
 
 <!-- ==================== 5-HARNESS ENSEMBLE ==================== -->
 <div class="section">
-  <h2>5-Harness Ensemble</h2>
-  <p class="desc">Running all 5 harnesses and taking the union reaches 28%. OpenCode alone matches the previous 4-harness ensemble at 22%.</p>
+  <h2>6-Harness Ensemble</h2>
+  <p class="desc">Running all 6 harnesses and taking the union reaches 30%. Claude Code adds 1 unique pass (django-15400) over the 5-harness result.</p>
 
   <div class="chart-wrap"><canvas id="ensembleBars"></canvas></div>
 
   <table>
     <thead>
-      <tr><th>Harness</th><th>Pass Rate</th><th>Fix Rate</th><th>Unique Passes</th></tr>
+      <tr><th>Harness</th><th>Pass Rate</th><th>Fix Rate</th><th>Precision</th><th>Unique Passes</th></tr>
     </thead>
     <tbody>
-      <tr><td><b>OpenCode</b></td><td class="hi">22% (11/50)</td><td>88% (44/50)</td><td>0</td></tr>
-      <tr><td><b>SERA</b></td><td>16% (8/50)</td><td>46% (23/50)</td><td>0</td></tr>
-      <tr><td><b>PiAgent</b></td><td>16% (8/50)</td><td>78% (39/50)</td><td>0</td></tr>
-      <tr><td><b>LangGraph</b></td><td>14% (7/50)</td><td>62% (31/50)</td><td>0</td></tr>
-      <tr><td><b>Hashline</b></td><td>14% (7/50)</td><td>76% (38/50)</td><td>1 (sympy-18835)</td></tr>
-      <tr><td class="hi"><b>Union</b></td><td class="hi"><b>28% (14/50)</b></td><td>--</td><td>--</td></tr>
+      <tr><td><b>OpenCode</b></td><td class="hi">22% (11/50)</td><td>88% (44/50)</td><td>25%</td><td>2</td></tr>
+      <tr><td><b>Claude Code</b></td><td>20% (10/50)</td><td>38% (19/50)</td><td class="hi">53%</td><td>1 (django-15400)</td></tr>
+      <tr><td><b>SERA</b></td><td>16% (8/50)</td><td>46% (23/50)</td><td>35%</td><td>0</td></tr>
+      <tr><td><b>PiAgent</b></td><td>16% (8/50)</td><td>78% (39/50)</td><td>21%</td><td>0</td></tr>
+      <tr><td><b>LangGraph</b></td><td>14% (7/50)</td><td>62% (31/50)</td><td>23%</td><td>0</td></tr>
+      <tr><td><b>Hashline</b></td><td>14% (7/50)</td><td>76% (38/50)</td><td>18%</td><td>1 (sympy-18835)</td></tr>
+      <tr><td class="hi"><b>Union</b></td><td class="hi"><b>30% (15/50)</b></td><td>--</td><td>--</td><td>--</td></tr>
     </tbody>
   </table>
 </div>
@@ -365,42 +372,44 @@
 <!-- ==================== ENSEMBLE BREAKDOWN ==================== -->
 <div class="section">
   <h2>Ensemble Complementarity</h2>
-  <p class="desc">OpenCode covers the broadest range (11/14 issues), but hashline provides the only unique pass. All 14 issues are solved by at least 2 harnesses.</p>
+  <p class="desc">OpenCode covers the broadest range (11/15 issues). Claude Code and Hashline each provide 1 unique pass. 15 issues solved by the 6-harness union.</p>
 
   <div class="grid-2">
     <div>
       <table style="font-size:0.82rem;">
-        <thead><tr><th>Instance</th><th>SERA</th><th>LG</th><th>HL</th><th>Pi</th><th>OC</th></tr></thead>
+        <thead><tr><th>Instance</th><th>SERA</th><th>LG</th><th>HL</th><th>Pi</th><th>OC</th><th>CC</th></tr></thead>
         <tbody>
-          <tr><td>django-11039</td><td class="hi">PASS</td><td>-</td><td class="lo">fail</td><td class="lo">fail</td><td class="hi">PASS</td></tr>
-          <tr><td>django-11620</td><td class="hi">PASS</td><td>-</td><td class="lo">fail</td><td>-</td><td class="hi">PASS</td></tr>
-          <tr><td>django-11815</td><td class="hi">PASS</td><td>-</td><td>-</td><td>-</td><td class="hi">PASS</td></tr>
-          <tr><td>django-12286</td><td>-</td><td class="hi">PASS</td><td class="lo">fail</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
-          <tr><td>django-12453</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
-          <tr><td>django-12497</td><td>-</td><td class="hi">PASS</td><td class="lo">fail</td><td class="hi">PASS</td><td>-</td></tr>
-          <tr><td>django-14238</td><td>-</td><td>-</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
-          <tr><td>django-14608</td><td>-</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
-          <tr><td>django-14672</td><td class="hi">PASS</td><td>-</td><td class="lo">fail</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
-          <tr><td>django-14855</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td>-</td></tr>
-          <tr><td>pytest-11143</td><td class="hi">PASS</td><td class="hi">PASS</td><td>-</td><td>-</td><td class="hi">PASS</td></tr>
-          <tr><td>sympy-17022</td><td>-</td><td>-</td><td class="hi">PASS</td><td class="lo">fail</td><td class="hi">PASS</td></tr>
-          <tr><td>sympy-18835</td><td>-</td><td class="lo">fail</td><td class="hi">PASS</td><td class="lo">fail</td><td>-</td></tr>
-          <tr><td>sympy-24152</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
+          <tr><td>django-11039</td><td class="hi">PASS</td><td>-</td><td class="lo">fail</td><td class="lo">fail</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
+          <tr><td>django-11620</td><td class="hi">PASS</td><td>-</td><td class="lo">fail</td><td>-</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
+          <tr><td>django-11815</td><td class="hi">PASS</td><td>-</td><td>-</td><td>-</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
+          <tr><td>django-12286</td><td>-</td><td class="hi">PASS</td><td class="lo">fail</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
+          <tr><td>django-12453</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
+          <tr><td>django-12497</td><td>-</td><td class="hi">PASS</td><td class="lo">fail</td><td class="hi">PASS</td><td>-</td><td>-</td></tr>
+          <tr><td>django-14238</td><td>-</td><td>-</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
+          <tr><td>django-14608</td><td>-</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td>-</td></tr>
+          <tr><td>django-14672</td><td class="hi">PASS</td><td>-</td><td class="lo">fail</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
+          <tr><td>django-14855</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td>-</td><td>-</td></tr>
+          <tr><td>django-15400</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td class="hi">PASS</td></tr>
+          <tr><td>pytest-11143</td><td class="hi">PASS</td><td class="hi">PASS</td><td>-</td><td>-</td><td class="hi">PASS</td><td>-</td></tr>
+          <tr><td>sympy-17022</td><td>-</td><td>-</td><td class="hi">PASS</td><td class="lo">fail</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
+          <tr><td>sympy-18835</td><td>-</td><td class="lo">fail</td><td class="hi">PASS</td><td class="lo">fail</td><td>-</td><td>-</td></tr>
+          <tr><td>sympy-24152</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
         </tbody>
       </table>
     </div>
 
     <div>
-      <p style="font-size:0.85rem;margin-bottom:0.5rem;font-weight:600;color:var(--orange)">Hashline only (1)</p>
+      <p style="font-size:0.85rem;margin-bottom:0.5rem;font-weight:600;color:var(--orange)">Unique passes (2)</p>
       <div class="tags">
-        <span class="tag" style="border-color:var(--orange);color:var(--orange)">sympy-18835</span>
+        <span class="tag" style="border-color:var(--orange);color:var(--orange)">sympy-18835 (Hashline)</span>
+        <span class="tag" style="border-color:var(--purple);color:var(--purple)">django-15400 (Claude Code)</span>
       </div>
-      <p style="font-size:0.85rem;margin-bottom:0.5rem;font-weight:600;color:var(--green)">All 5 pass (2)</p>
+      <p style="font-size:0.85rem;margin-bottom:0.5rem;margin-top:0.8rem;font-weight:600;color:var(--green)">All 6 pass (2)</p>
       <div class="tags">
         <span class="tag both">django-12453</span>
         <span class="tag both">sympy-24152</span>
       </div>
-      <p style="font-size:0.85rem;margin-bottom:0.5rem;font-weight:600;color:var(--cyan)">OpenCode covers (11/14)</p>
+      <p style="font-size:0.85rem;margin-bottom:0.5rem;margin-top:0.8rem;font-weight:600;color:var(--cyan)">OpenCode covers (11/15)</p>
       <div class="tags">
         <span class="tag lg">django-11039</span><span class="tag lg">django-11620</span>
         <span class="tag lg">django-11815</span><span class="tag lg">django-12286</span>
@@ -410,7 +419,7 @@
         <span class="tag lg">sympy-24152</span>
       </div>
       <div style="margin-top:1.2rem;padding:0.8rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:0.82rem;">
-        <b>OpenCode dominates individually</b> but doesn't add unique passes. Its built-in tool set (glob, read, edit, bash, grep, write) and structured system prompt produce 88% fix rate — nearly double any custom adapter. The ensemble ceiling of 28% suggests diminishing returns from additional harnesses.
+        <b>Precision vs recall tradeoff:</b> OpenCode generates 2.3x more fixes (44 vs 19) but Claude Code converts at 2x the rate (53% vs 25%). The ensemble ceiling of 30% with diminishing returns (+1 pass per new harness) suggests model-level improvements are now needed.
       </div>
     </div>
   </div>
@@ -465,19 +474,19 @@
   </div>
   <div class="insight" style="border-left-color:var(--green)">
     <h4>Ensemble Is the Biggest Single Win</h4>
-    <p>Running all 4 harnesses lifts pass rate from 14-16% to 28% &mdash; a 75% improvement. Larger than any turn strategy, prompt, or tool optimization.</p>
+    <p>Running all 6 harnesses lifts pass rate from 14-22% to 30%. Larger than any turn strategy, prompt, or tool optimization.</p>
+  </div>
+  <div class="insight" style="border-left-color:var(--purple)">
+    <h4>Precision vs Recall: Claude Code vs OpenCode</h4>
+    <p>OpenCode: 88% fix rate, 25% precision. Claude Code: 38% fix rate, 53% precision. Claude Code's massive system prompt (~22K tokens) makes the model conservative &mdash; fewer but better fixes. Harness design affects quality distribution, not just quantity.</p>
   </div>
   <div class="insight" style="border-left-color:var(--orange)">
     <h4>Hashline Helps Strong Models, Not Weak Ones</h4>
-    <p>The LINE:HASH edit format that gave Grok 10x gains provides no advantage for Devstral Small 2 (14% vs 14-16%). Uses 19x more tokens. But uniquely solves 2 sympy issues &mdash; valuable in ensemble.</p>
-  </div>
-  <div class="insight" style="border-left-color:var(--purple)">
-    <h4>Fix Generation is a Poor Proxy for Quality</h4>
-    <p>LangGraph generates 62% fixes but only 14% pass (23% conversion). SERA generates 46% fixes but 16% pass (35% conversion). Optimizing for fix count is misleading.</p>
+    <p>The LINE:HASH edit format that gave Grok 10x gains provides no advantage for Devstral Small 2 (14% vs 14-16%). Uses 19x more tokens. But uniquely solves sympy-18835.</p>
   </div>
   <div class="insight" style="border-left-color:var(--cyan)">
-    <h4>Scaffolding Converges at 14-16%</h4>
-    <p>No single harness exceeds 16%. Further gains require either ensemble (28%) or model-level improvements (Phase 3 finetuning targeting wrong-fix errors).</p>
+    <h4>CLI Agents Push the Frontier to 20-22%</h4>
+    <p>OpenCode (22%) and Claude Code (20%) both use built-in tool sets rather than custom adapters. The structured system prompts of production CLI agents extract more capability than bespoke harnesses (14-16%). Ensemble ceiling of 30% suggests finetuning is the next lever.</p>
   </div>
 </div>
 
@@ -486,17 +495,17 @@
   <h2>Conclusions</h2>
   <ol style="font-size:0.9rem;line-height:2;padding-left:1.2rem;">
     <li><b>30 turns baseline is optimal</b> &mdash; compaction and restart strategies hurt or are neutral.</li>
-    <li><b>4-harness ensemble is the largest optimization</b>: 28% vs 14-16% (+75%).</li>
-    <li><b>Fix rate &#x2260; pass rate</b> &mdash; weak correlation (~18-35% conversion).</li>
-    <li><b>Individual scaffolding converges at 14-16%</b> for this model size.</li>
-    <li><b>Hashline helps strong models, not weak ones</b> &mdash; same rate but different issues (ensemble value).</li>
+    <li><b>6-harness ensemble reaches 30%</b> (15/50) vs 14-22% individual. Each new harness adds ~1 pass.</li>
+    <li><b>OpenCode best pass rate (22%), Claude Code best precision (53%)</b> &mdash; CLI agents beat custom adapters.</li>
+    <li><b>Fix rate &#x2260; pass rate</b> &mdash; conversion ranges from 18% to 53% depending on harness design.</li>
+    <li><b>Hashline helps strong models, not weak ones</b> &mdash; same rate but unique issues (ensemble value).</li>
     <li><b>Phase 3 (finetuning) is now relevant</b> &mdash; 42% wrong-fix failures are trainable.</li>
     <li><b>Full evaluation requires Docker</b> &mdash; bare-metal eval covers ~50% of patches.</li>
   </ol>
 </div>
 
 <footer>
-  Agent Harness Autoresearch &middot; Devstral Small 2 24B FP8 &middot; SWE-bench Lite 50-issue subset &middot; Phase 2b: 2026-03-15
+  Agent Harness Autoresearch &middot; Devstral Small 2 24B FP8 &middot; SWE-bench Lite 50-issue subset &middot; Phase 2b: 2026-03-17
 </footer>
 
 </div><!-- /page -->
@@ -570,10 +579,10 @@
   new Chart(document.getElementById('p2bBars'), {
     type: 'bar',
     data: {
-      labels: ['OpenCode', 'PiAgent\n(str_replace)', 'Hashline\n(LINE:HASH)'],
+      labels: ['OpenCode', 'Claude Code', 'PiAgent\n(str_replace)', 'Hashline\n(LINE:HASH)'],
       datasets: [
-        { label: 'Pass Rate', data: [22,16,14], backgroundColor: ['rgba(63,185,80,0.8)','rgba(57,210,192,0.8)','rgba(210,153,34,0.8)'], borderColor: ['#3fb950','#39d2c0','#d29922'], borderWidth: 1, borderRadius: 5 },
-        { label: 'Fix Rate', data: [88,78,76], backgroundColor: ['rgba(63,185,80,0.3)','rgba(57,210,192,0.3)','rgba(210,153,34,0.3)'], borderColor: ['#3fb950','#39d2c0','#d29922'], borderWidth: 1, borderRadius: 5 }
+        { label: 'Pass Rate', data: [22,20,16,14], backgroundColor: ['rgba(63,185,80,0.8)','rgba(188,140,255,0.8)','rgba(57,210,192,0.8)','rgba(210,153,34,0.8)'], borderColor: ['#3fb950','#bc8cff','#39d2c0','#d29922'], borderWidth: 1, borderRadius: 5 },
+        { label: 'Fix Rate', data: [88,38,78,76], backgroundColor: ['rgba(63,185,80,0.3)','rgba(188,140,255,0.3)','rgba(57,210,192,0.3)','rgba(210,153,34,0.3)'], borderColor: ['#3fb950','#bc8cff','#39d2c0','#d29922'], borderWidth: 1, borderRadius: 5 }
       ]
     },
     options: chartOpts(1.5)
@@ -605,16 +614,16 @@
     }
   });
 
-  // 5-harness ensemble bar
+  // 6-harness ensemble bar
   new Chart(document.getElementById('ensembleBars'), {
     type: 'bar',
     data: {
-      labels: ['OpenCode', 'SERA', 'PiAgent', 'LangGraph', 'Hashline', 'Ensemble'],
+      labels: ['OpenCode', 'Claude Code', 'SERA', 'PiAgent', 'LangGraph', 'Hashline', 'Ensemble'],
       datasets: [{
         label: 'Pass Rate',
-        data: [22, 16, 16, 14, 14, 28],
-        backgroundColor: ['rgba(247,120,186,0.7)', 'rgba(188,140,255,0.7)', 'rgba(57,210,192,0.7)', 'rgba(88,166,255,0.7)', 'rgba(210,153,34,0.7)', 'rgba(63,185,80,0.85)'],
-        borderColor: ['#f778ba', '#bc8cff', '#39d2c0', '#58a6ff', '#d29922', '#3fb950'],
+        data: [22, 20, 16, 16, 14, 14, 30],
+        backgroundColor: ['rgba(247,120,186,0.7)', 'rgba(188,140,255,0.7)', 'rgba(139,148,158,0.5)', 'rgba(57,210,192,0.7)', 'rgba(88,166,255,0.7)', 'rgba(210,153,34,0.7)', 'rgba(63,185,80,0.85)'],
+        borderColor: ['#f778ba', '#bc8cff', '#8b949e', '#39d2c0', '#58a6ff', '#d29922', '#3fb950'],
         borderWidth: 2, borderRadius: 5
       }]
     },

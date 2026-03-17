@@ -51,7 +51,7 @@ Fix rate = generated a diff. Edit rate = called `edit_file` at least once.
 | Aider | Edit-focused, `--edit-format diff`, single-turn | Tested |
 | SWE-agent | ACI (Agent-Computer Interface) | Blocked (`togetherunidiff` dep broken) |
 | OpenHands | CodeAct, Jupyter + bash sandbox | Blocked (`e2b` dep conflict) |
-| Claude Code | CLI agent, auto-compaction | Blocked (needs Anthropic API key) |
+| Claude Code | CLI agent (Anthropic SDK), auto-compaction, ~22K system prompt | Tested (via patched vLLM Anthropic API) |
 | OpenCode | Vercel AI SDK (@ai-sdk/openai-compatible), built-in tools | Tested |
 
 ### Phase 2a Results (Verified Pass Rate)
@@ -71,8 +71,9 @@ Pass rate verified by applying agent patches + gold `test_patch` from SWE-bench,
 | Rank | Harness | Pass Rate | Fix Rate | Patches | Precision | Edit Format |
 |------|---------|-----------|----------|---------|-----------|-------------|
 | 1 | **OpenCode** | **11/50 (22%)** | 44/50 (88%) | 44 | 25.0% | str_replace (built-in) |
-| 2 | **PiAgent** (str_replace) | **8/50 (16%)** | 39/50 (78%) | 39 | 20.5% | str_replace |
-| 3 | **Hashline** (ohmypi) | **7/50 (14%)** | 38/50 (76%) | 38 | 18.4% | LINE:HASH |
+| 2 | **Claude Code** | **10/50 (20%)** | 19/50 (38%) | 26 | **52.6%** | str_replace (built-in) |
+| 3 | **PiAgent** (str_replace) | **8/50 (16%)** | 39/50 (78%) | 39 | 20.5% | str_replace |
+| 4 | **Hashline** (ohmypi) | **7/50 (14%)** | 38/50 (76%) | 38 | 18.4% | LINE:HASH |
 | - | DeepAgents | DNF | - | - | - | (recursion limit) |
 
 **OpenCode**: CLI agent using Vercel AI SDK with `@ai-sdk/openai-compatible` custom provider pointing at local vLLM. Uses its own built-in tool set (glob, read, edit, bash, grep, write) rather than custom tools. Required 64K context (vs 32K for other harnesses) due to ~11K system prompt + ~20 built-in tool definitions. Connected via `opencode.json` config: `{"provider":{"vllm":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":"http://localhost:8080/v1"}}}}`.
@@ -81,14 +82,17 @@ Pass rate verified by applying agent patches + gold `test_patch` from SWE-bench,
 
 **PiAgent**: Control for hashline — identical LangGraph ReAct agent with standard str_replace editing. Replicates Phase 2a LangGraph result as expected.
 
+**Claude Code**: CLI agent using Anthropic SDK, pointed at vLLM via patched Anthropic Messages API (`/v1/messages`). Three bugs in vLLM v0.16.0 had to be fixed: (1) `tool_use_id` field not parsed from `tool_result` blocks; (2) streaming first chunk drops tool arguments (opening `{"`); (3) Mistral requires 9-char alnum tool_call_ids vs Anthropic `toolu_*` format. Required 131K context (TP2) — Claude Code requests 32K `max_tokens` + ~22K system prompt + conversation. Best precision at 52.6% (10/19 fixes pass) but lowest fix rate (38%) — Claude Code's system prompt makes Devstral conservative, generating fewer but higher-quality patches.
+
 **DeepAgents**: langchain-ai/deepagents with SummarizationMiddleware + sub-agents. Failed — `create_deep_agent` hits LangGraph recursion limit (60) before completing even one issue. Sub-agent spawning consumes recursion budget too quickly.
 
-### Ensemble (All 5 Harnesses)
+### Ensemble (All 6 Harnesses)
 
 | Metric | Value |
 |--------|-------|
-| **Union pass rate** | **14/50 (28%)** |
+| **Union pass rate** | **15/50 (30%)** |
 | **OpenCode** | **11/50 (22%)** |
+| **Claude Code** | **10/50 (20%)** |
 | SERA | 8/50 (16%) |
 | PiAgent (str_replace) | 8/50 (16%) |
 | LangGraph | 7/50 (14%) |
@@ -96,38 +100,43 @@ Pass rate verified by applying agent patches + gold `test_patch` from SWE-bench,
 
 **Per-issue breakdown** (issues where at least one harness passes):
 
-| Instance | SERA | LangGraph | Hashline | PiAgent | OpenCode |
-|----------|------|-----------|----------|---------|----------|
-| django-11039 | PASS | - | fail | fail | PASS |
-| django-11620 | PASS | - | fail | - | PASS |
-| django-11815 | PASS | - | - | - | PASS |
-| django-12286 | - | PASS | fail | PASS | PASS |
-| django-12453 | PASS | PASS | PASS | PASS | PASS |
-| django-12497 | - | PASS | fail | PASS | - |
-| django-14238 | - | - | PASS | PASS | PASS |
-| django-14608 | - | PASS | PASS | PASS | PASS |
-| django-14672 | PASS | - | fail | PASS | PASS |
-| django-14855 | PASS | PASS | PASS | PASS | - |
-| pytest-11143 | PASS | PASS | - | - | PASS |
-| sympy-17022 | - | - | PASS | fail | PASS |
-| sympy-18835 | - | fail | PASS | fail | - |
-| sympy-24152 | PASS | PASS | PASS | PASS | PASS |
+| Instance | SERA | LangGraph | Hashline | PiAgent | OpenCode | Claude Code |
+|----------|------|-----------|----------|---------|----------|-------------|
+| django-11039 | PASS | - | fail | fail | PASS | PASS |
+| django-11620 | PASS | - | fail | - | PASS | PASS |
+| django-11815 | PASS | - | - | - | PASS | PASS |
+| django-12286 | - | PASS | fail | PASS | PASS | PASS |
+| django-12453 | PASS | PASS | PASS | PASS | PASS | PASS |
+| django-12497 | - | PASS | fail | PASS | - | - |
+| django-14238 | - | - | PASS | PASS | PASS | PASS |
+| django-14608 | - | PASS | PASS | PASS | PASS | - |
+| django-14672 | PASS | - | fail | PASS | PASS | PASS |
+| django-14855 | PASS | PASS | PASS | PASS | - | - |
+| django-15400 | - | - | - | - | - | PASS |
+| pytest-11143 | PASS | PASS | - | - | PASS | - |
+| sympy-17022 | - | - | PASS | fail | PASS | PASS |
+| sympy-18835 | - | fail | PASS | fail | - | - |
+| sympy-24152 | PASS | PASS | PASS | PASS | PASS | PASS |
 
 **Unique passes** (solved by only one harness):
 - Hashline: sympy-18835 (1)
-- All others: none unique
+- Claude Code: django-15400 (1)
 
-Adding OpenCode doesn't increase the ensemble from 14/50 — it covers the same issues as existing harnesses. But as a single harness, OpenCode's 22% matches the 4-harness ensemble.
+Claude Code adds 1 new pass (django-15400) to bring the ensemble from 14/50 to 15/50 (30%).
 
 ### Key Findings
 
-**OpenCode is the best single harness** at 22% pass rate with 88% fix rate. Its built-in tool set (glob, read, edit, bash, grep, write) + structured system prompt produces more and better fixes than any custom adapter. The 88% fix rate is 42% higher than LangGraph (62%) and nearly double SERA (46%). OpenCode's 25% precision (11/44) also beats LangGraph (23%) though trails SERA (35%).
+**OpenCode is the best single harness by pass rate** at 22% with 88% fix rate. Its built-in tool set (glob, read, edit, bash, grep, write) + structured system prompt produces the most fixes. The 88% fix rate is 42% higher than LangGraph (62%) and nearly double SERA (46%).
+
+**Claude Code has the best precision** at 52.6% (10/19 fixes pass) — double OpenCode's 25% and far ahead of SERA's 35%. Claude Code's ~22K system prompt makes Devstral conservative: it generates fewer patches (38% fix rate, lowest of all working harnesses) but those patches are much more likely to be correct.
+
+**Claude Code requires 131K context (TP2)**. Claude Code requests 32K `max_tokens` by default (not configurable). Combined with its ~22K system prompt + growing conversation, 65K context overflows after ~5 turns. Running with TP2 and 131K `max_model_len` resolves this but halves throughput.
+
+**Claude Code needs 3 vLLM patches**. vLLM v0.16.0's Anthropic Messages API (`/v1/messages`) has bugs: (1) `tool_use_id` not parsed; (2) streaming drops first tool arguments chunk; (3) Mistral 9-char tool_call_id mismatch. All fixable with ~30 lines of patches.
 
 **OpenCode needs 64K context**. Its ~11K system prompt + ~20 tool definitions consume a third of a 32K context window, causing token-limit errors. Running with 64K `max_model_len` (single GPU) resolves this but limits throughput to sequential evaluation.
 
-**OpenCode reformats aggressively**. Patches include quote-style changes (`'` → `"`) and line-wrapping reformats alongside the functional fix. This noise doesn't break correctness but inflates patch size. A post-processing step to strip formatting changes could improve patch clarity.
-
-**SERA has best precision, LangGraph has better recall**. SERA converts 35% of its fixes to passes (8/23) vs LangGraph's 23% (7/31). SERA generates fewer but higher-quality fixes.
+**OpenCode reformats aggressively**. Patches include quote-style changes (`'` → `"`) and line-wrapping reformats alongside the functional fix. This noise doesn't break correctness but inflates patch size.
 
 **Hashline does NOT beat str_replace for weak models**. 14% vs 14-16% — statistically identical. The hashline format that produced 10x gains for Grok (6.7% → 68.3%) provides no advantage for Devstral Small 2 24B. The bottleneck is fix correctness, not edit addressing.
 
@@ -135,7 +144,7 @@ Adding OpenCode doesn't increase the ensemble from 14/50 — it covers the same 
 
 **Hashline is token-expensive**. Average 191K tokens/issue vs ~10K for LangGraph str_replace (~19x overhead). The `LINE:HASH|` prefix on every line inflates context significantly.
 
-**Ensemble ceiling is 28%**. 5-harness union = 14/50, identical to 4-harness union. OpenCode doesn't add unique passes — every issue it solves is also solved by at least one other harness. The marginal value of additional harnesses is diminishing.
+**Ensemble ceiling is 30%**. 6-harness union = 15/50. Claude Code adds 1 unique pass (django-15400) over the 5-harness ensemble (14/50). Diminishing returns persist — each new harness adds at most 1 pass.
 
 **Aider cannot drive Devstral Small 2**. The `--edit-format diff` mode produces zero fixes — the model cannot produce valid unified diffs in Aider's expected format.
 
@@ -168,7 +177,7 @@ This is a trainable error class — a LoRA finetuned on successful fix trajector
 
 - **Pass rate is a lower bound**: Only Django/pytest/sympy could be evaluated without Docker. Other repos (sphinx, scikit-learn, matplotlib, astropy, seaborn, requests, pylint) have version-specific dependencies that conflict with Python 3.11.
 - **50-issue subset**: Introduces ~5% sampling variance. Results may not generalize to the full 300-issue set.
-- **3 of 7 Phase 2a harnesses blocked**: SWE-agent, OpenHands, and Claude Code could not be tested due to dependency/platform issues. OpenCode was unblocked by configuring a custom `@ai-sdk/openai-compatible` provider in `opencode.json`.
+- **2 of 7 Phase 2a harnesses blocked**: SWE-agent and OpenHands could not be tested due to dependency/platform issues. OpenCode was unblocked via custom `@ai-sdk/openai-compatible` provider. Claude Code was unblocked by patching vLLM's Anthropic Messages API.
 - **DeepAgents incompatible**: Recursion limit issue prevents evaluation.
 - **Letta Code not tested**: Requires Docker Letta server setup, deferred.
 - **Django dominance**: Most verifiable passes are Django issues due to evaluation constraints.
@@ -178,13 +187,14 @@ This is a trainable error class — a LoRA finetuned on successful fix trajector
 
 ## Conclusions
 
-1. **OpenCode is the best single harness** at 22% pass rate — matching the previous 4-harness ensemble from a single agent. Its built-in tool set and structured prompting produce 88% fix rate (2x SERA, 1.4x LangGraph).
-2. **30 turns baseline is optimal** — compaction and restart strategies hurt or are neutral.
-3. **Ensemble ceiling is 28%** with 5 harnesses. Adding OpenCode (5th) didn't increase the union beyond the 4-harness result. Marginal returns from additional harnesses are diminishing.
-4. **Fix rate is not pass rate** — the correlation is weak (~25-35% conversion). OpenCode's 88% fix rate converts to only 22% pass rate.
-5. **Hashline helps strong models, not weak ones** — the edit format that produced 10x gains for Grok provides no advantage for Devstral Small 2, but provides the only unique pass (sympy-18835).
-6. **Phase 3 (finetuning) is now the right next step** — 42% of failures are "wrong fix" (trainable errors).
-7. **Full SWE-bench evaluation requires Docker** — bare-metal eval is a lower bound covering ~50% of patches.
+1. **OpenCode is the best single harness by pass rate** at 22% — Claude Code is 2nd at 20%. Both use built-in tool sets rather than custom adapters.
+2. **Claude Code has the best precision** at 52.6% — its conservative approach (38% fix rate) produces the highest-quality patches. The precision/recall tradeoff is stark: OpenCode generates 2.3x more fixes but only 10% more passes.
+3. **30 turns baseline is optimal** — compaction and restart strategies hurt or are neutral.
+4. **Ensemble ceiling is 30%** with 6 harnesses (15/50). Each additional harness adds at most 1 new pass. Diminishing returns are clear.
+5. **Fix rate is not pass rate** — conversion ranges from 25% (OpenCode) to 53% (Claude Code). Harness design affects precision as much as recall.
+6. **Hashline helps strong models, not weak ones** — the edit format that produced 10x gains for Grok provides no advantage for Devstral Small 2.
+7. **Phase 3 (finetuning) is now the right next step** — 42% of failures are "wrong fix" (trainable errors).
+8. **Full SWE-bench evaluation requires Docker** — bare-metal eval is a lower bound covering ~50% of patches.
 
 ---
 
@@ -192,7 +202,7 @@ This is a trainable error class — a LoRA finetuned on successful fix trajector
 
 - `results/phase1_{A-F}.jsonl` — 50 lines each, per-issue metrics with turn-level breakdown
 - `results/phase2_{langgraph,sera,aider}.jsonl` — 50 lines each, per-issue harness metrics
-- `results/phase2b_{ohmypi,piagent,deepagents,opencode}.jsonl` — Phase 2b per-issue metrics
-- `results/eval_{ohmypi,piagent,opencode}.jsonl` — Gold test evaluation results for Phase 2b
+- `results/phase2b_{ohmypi,piagent,deepagents,opencode,claude_code}.jsonl` — Phase 2b per-issue metrics
+- `results/eval_{ohmypi,piagent,opencode,claude_code}.jsonl` — Gold test evaluation results for Phase 2b
 - `results-report.html` — Interactive Chart.js visualization
 - `lessons.md` — Operational lessons and debugging notes

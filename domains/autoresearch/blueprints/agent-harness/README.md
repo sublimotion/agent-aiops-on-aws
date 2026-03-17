@@ -18,7 +18,7 @@ Run 6 turn-budget configurations (10/15/20/30 turns + restart + compaction) on t
 ### Phase 2: Multi-Harness Comparison
 **Question**: Which scaffolding architecture extracts the most capability?
 
-Run multiple harnesses against the same 50-issue subset. Phase 2a tested SERA, LangGraph, Aider. Phase 2b added hashline editing (oh-my-pi style), PiAgent (str_replace control), DeepAgents, and OpenCode (via custom vLLM provider).
+Run multiple harnesses against the same 50-issue subset. Phase 2a tested SERA, LangGraph, Aider. Phase 2b added hashline editing (oh-my-pi style), PiAgent (str_replace control), DeepAgents, OpenCode (via custom vLLM provider), and Claude Code (via patched vLLM Anthropic Messages API).
 
 ### Phase 3: Model Finetuning (future, not executing)
 **Question**: After harness optimization plateaus, can targeted LoRA finetuning compound further?
@@ -38,7 +38,7 @@ See **[RESULTS.md](RESULTS.md)** for the full experiment results, including:
 - Phase 1 turn degradation table (6 configs)
 - Phase 2a multi-harness leaderboard (verified pass rates)
 - Phase 2b hashline vs str_replace comparison
-- Ensemble analysis (28% union pass rate with 5 harnesses, OpenCode best individual at 22%)
+- Ensemble analysis (30% union pass rate with 6 harnesses, OpenCode best pass rate at 22%, Claude Code best precision at 53%)
 - Failure analysis and Phase 3 finetuning recommendations
 
 ## Key Files
