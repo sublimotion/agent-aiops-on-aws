@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# SGLang TP=8 baseline for Qwen3-Next FP8 on g7e.48xlarge (8x RTX PRO 6000, NVLink)
+# SGLang TP=8 baseline for Qwen3-Next FP8 on g7e.48xlarge (8x RTX PRO 6000, PCIe)
 # Config: S1-48xl — full 8-GPU, single replica
-# g7e.48xlarge has NVLink interconnect (vs PCIe on g7e.24xl)
+# g7e.48xlarge uses PCIe interconnect (same as g7e.24xl — RTX PRO 6000 has no NVLink)
 set -euo pipefail
 CTR="${CONTAINER_RUNTIME:-nerdctl}"
 IMAGE="${SGLANG_IMAGE:-lmsysorg/sglang:nightly-dev-cu13-20260303-145ae518}"

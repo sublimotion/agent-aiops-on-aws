@@ -4,9 +4,9 @@
 
 ### Instance Selection
 - **g7e.24xlarge** ($16.57/hr): 4x RTX PRO 6000 (96 GB GDDR7), PCIe interconnect. Cost-optimized for TP=4.
-- **g7e.48xlarge** ($110.30/hr): 8x RTX PRO 6000 (96 GB GDDR7), NVLink interconnect. For TP=8 or 2x TP=4 replicas.
-- Neither has EFA or GDS support — HiCache L3 uses standard file I/O to NVMe.
-- For GDS + EFA KV offloading (FSx-backed L3/L4), use p5en.48xlarge instead.
+- **g7e.48xlarge** ($110.30/hr): 8x RTX PRO 6000 (96 GB GDDR7), PCIe interconnect (same as 24xl). For TP=8 or 2x TP=4 replicas.
+- Both support EFA (24xl: 2, 48xl: 4 interfaces) but not GDS — HiCache L3 uses standard file I/O to NVMe.
+- For GDS-backed KV offloading (FSx L3/L4), use p5en.48xlarge instead.
 
 ### SGLang HiCache + Hybrid Attention
 - PR #19663 (HiCache for MambaRadixCache) adds KV cache L2 offload for hybrid attention models.

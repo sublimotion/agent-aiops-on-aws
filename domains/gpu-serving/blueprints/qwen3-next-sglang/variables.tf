@@ -49,7 +49,7 @@ variable "eks_cluster_version" {
 }
 
 variable "gpu_instance_types" {
-  description = "GPU instance type. g7e.24xlarge (4x B200 PCIe, $16.57/hr) or g7e.48xlarge (8x B200 NVLink, $110.30/hr)"
+  description = "GPU instance type. g7e.24xlarge (4x RTX PRO 6000 PCIe, $16.57/hr) or g7e.48xlarge (8x RTX PRO 6000 PCIe, $110.30/hr)"
   type        = list(string)
   default     = ["g7e.24xlarge"]
 }

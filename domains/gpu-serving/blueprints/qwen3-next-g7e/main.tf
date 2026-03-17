@@ -538,7 +538,7 @@ resource "kubernetes_deployment" "vllm_qwen3" {
             value = "1"
           }
 
-          # No EFA env vars — g7e uses NVLink natively
+          # No EFA env vars — g7e uses PCIe interconnect (EFA is for inter-node, not intra-node)
 
           env {
             name = "HUGGING_FACE_HUB_TOKEN"
@@ -900,7 +900,7 @@ resource "helm_release" "prometheus" {
   depends_on = [module.eks]
 }
 
-# No EFA device plugin — g7e uses NVLink natively
+# No EFA device plugin — g7e uses PCIe interconnect (EFA is for inter-node, not needed for intra-node TP)
 
 # NVIDIA DCGM Exporter (GPU telemetry)
 resource "helm_release" "dcgm_exporter" {

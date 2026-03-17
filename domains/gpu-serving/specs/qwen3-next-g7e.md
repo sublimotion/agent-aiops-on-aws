@@ -49,7 +49,7 @@ No SGLang, dp8-ep, MTP, or cpu-offload testing. Those can be added in a follow-u
 - **Separate blueprint**: `domains/gpu-serving/blueprints/qwen3-next-g7e/` (own Terraform state)
 - **Reuse existing S3 model bucket**: No new model upload needed; FSx DRA points to same bucket
 - **FSx**: SCRATCH_2 at 1200 GiB (sufficient for benchmarks, cheaper than PERSISTENT_2)
-- **EFA disabled**: g7e uses NVLink natively
+- **EFA available** but not needed for intra-node TP (g7e is PCIe, not NVLink)
 - **`max_model_len`**: Start at 131072, reduce to 65536 if 96 GB VRAM is insufficient
 
 ---

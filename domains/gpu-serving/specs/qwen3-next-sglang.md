@@ -51,11 +51,11 @@ Two instance options, switchable via `gpu_instance_types` variable:
 | Region / AZ | us-east-2a | us-east-2a |
 | TP configs | TP=4 (single replica) | TP=8 or 2× TP=4 replicas |
 
-**Start on g7e.24xlarge** for cost-efficient validation (S0-S4). Scale to g7e.48xlarge for 2-replica and NVLink benchmarks.
+**Start on g7e.24xlarge** for cost-efficient validation (S0-S4). Scale to g7e.48xlarge for 2-replica benchmarks (still PCIe — RTX PRO 6000 has no NVLink).
 
 ### GDS / EFA Considerations
 
-**Neither g7e instance supports EFA or GDS.** This affects HiCache L3 storage backends:
+**g7e instances support EFA but not GDS.** This affects HiCache L3 storage backends:
 - L3 NVMe (file backend): Uses standard kernel I/O. Still fast (~3-5 GB/s read on NVMe RAID0), but not GPU-direct.
 - L3 FSx: Would require GDS for zero-copy GPU→FSx transfers. Without GDS, FSx-backed L3 falls back to CPU bounce buffer — viable but slower.
 - **For GDS + EFA KV offloading to FSx**, use p5en.48xlarge ($71.47/hr on-demand, ~$41.61/hr capacity block). This is a production-path follow-up, not needed for initial validation.

@@ -20,7 +20,7 @@
 2. **AMI Type**: AL2023_x86_64_NVIDIA (Blackwell-compatible)
 3. **GPU AZ**: us-east-2a (g7e availability)
 4. **FSx**: SCRATCH_2 at 1200 GiB (cost-optimized for benchmarks)
-5. **No EFA**: g7e uses NVLink natively
+5. **EFA available**: g7e supports EFA (for inter-node); intra-node is PCIe (no NVLink)
 6. **Post-bootstrap**: NVMe RAID0 + FSx mount with Lustre tuning
 
 ## Stage 2: Pre-flight Checks
