@@ -204,9 +204,50 @@ Add a `### Fed back to mdc` section to the compound summary:
 |------|--------|------|--------|
 ```
 
+## Field Note Frontmatter (final step)
+
+After completing all steering elevations and mdc/gpu-infra feedback, generate the structured YAML frontmatter for `lessons.md`. This is the last thing you do.
+
+If `lessons.md` already has a frontmatter block (starts with `---`), update it in place. If it has no frontmatter, prepend it.
+
+Use the schema from `docs/card-format.md`. Fill in every field you can determine from the blueprint context:
+
+```yaml
+---
+model: ""               # from spec or blueprint context
+engine: ""              # vllm | sglang | trt-llm | llmd
+hardware: ""            # instance type from deployment log or spec
+gpu_arch: ""            # sm_120 | sm_90 | sm_80
+deployment_date: ""     # YYYY-MM-DD from deployment log
+
+outcome: ""             # success | partial | failure
+failure_categories: []  # from failure_categories enum in docs/card-format.md
+
+cards_used:
+  mdc: []               # which mdc cards were consulted
+  gpu_infra: []         # which gpu-infra cards were consulted
+
+card_helped: null       # true | false | partial — did the cards prevent a known failure?
+
+benchmark:
+  throughput_toks_s: null
+  ttft_p50_ms: null
+  ttft_p99_ms: null
+  concurrent_users: null
+  gpu_util_pct: null
+
+ralph_iterations: null  # count iterations from deployment log
+
+mdc_learn_commands: []  # ready-to-run commands you've identified above
+gpu_infra_learn_commands: []  # ready-to-run commands you've identified above
+---
+```
+
+For `mdc_learn_commands` and `gpu_infra_learn_commands`: populate these with the exact commands from the "Fed back to mdc" and "Fed back to gpu-infra" sections of your compound summary. This lets `scripts/fe.sh learn` run them automatically without the operator needing to copy them manually.
+
 ## What not to do
 
 - Do not delete or rewrite existing steering rules.
-- Do not modify `lessons.md` — it is an append-only operational log.
+- Do not add lessons.md prose — only update the YAML frontmatter block.
 - Do not elevate lessons that reference specific model weights, HuggingFace repo paths, or benchmark workload parameters.
 - Do not create new steering files. Only append to the three existing ones.

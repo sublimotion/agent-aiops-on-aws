@@ -9,8 +9,10 @@ Template for autonomous infrastructure deployment using Claude Code, spec-driven
 3. Run `/ralph-loop:ralph-loop Deploy <spec-path>`
 4. Claude selects the deployer agent automatically based on spec path (see Domain Routing)
 5. Claude iterates until deployment succeeds
-6. Capture lessons in the blueprint's `lessons.md`
-7. Run compound step: invoke `compound-learner` agent with the blueprint path to elevate cross-cutting lessons to `.claude/steering/*.md` and feed model-specific lessons back to `mdc learn`
+6. Capture lessons in the blueprint's `lessons.md` using the field note schema (see `docs/card-format.md` and `domains/gpu-serving/blueprints/LESSONS-TEMPLATE.md`)
+7. Run compound step: invoke `compound-learner` agent — it elevates cross-cutting lessons to `.claude/steering/*.md` **and generates the YAML frontmatter** for `lessons.md` (model, engine, hardware, outcome, failure_categories, mdc_learn_commands, gpu_infra_learn_commands)
+8. Run `scripts/fe.sh learn <blueprint-path>` to apply the learn commands from the frontmatter
+9. Optionally run `scripts/fe.sh contribute <blueprint-path>` to open a community contribution issue
 
 ## Context Loading
 
@@ -25,7 +27,7 @@ Read these files **on demand** based on what you're doing:
 | Deploying or modifying a GPU-serving blueprint | `domains/gpu-serving/specs/<matching-spec>.md` |
 | Deploying an agent-runtime blueprint | `domains/agent-runtime/specs/<name>.md` |
 | Running an autoresearch experiment | `domains/autoresearch/specs/<name>.md` |
-| Running the compound step after deployment | `domains/<domain>/blueprints/<name>/lessons.md` + `.claude/steering/*.md` + `mdc learn` to feed back |
+| Running the compound step after deployment | `domains/<domain>/blueprints/<name>/lessons.md` + `.claude/steering/*.md`; compound-learner must generate YAML frontmatter (see `docs/card-format.md`) as its final step, then run `scripts/fe.sh learn <path>` |
 | Running pre-flight or post-deploy checks | Use the `deployment-orchestrator` skill |
 | Validating GPU hardware before serving (Stage 4a) | Use `gpu-infra` MCP tools: `discover_cluster`, `check_gpu_health`, `run_nccl_test` |
 | Diagnosing GPU hardware issues | Use `gpu-infra` MCP tools: `explain_xid`, `get_gpu_metrics`, `check_gpu_health` |
@@ -74,16 +76,32 @@ Examples:
 
 ## External Tools
 
+### fe CLI
+
+Unified entry point for card lookup, field note lifecycle, and community contribution. Wraps `mdc` and `gpu-infra`.
+
+```bash
+# Before deploying — look up cards
+fe card <model> --engine <engine>    # e.g. fe card glm-5 --engine sglang
+fe card --hardware <instance>        # e.g. fe card --hardware p6-b200
+
+# After compound step — apply learn commands from lessons.md frontmatter
+fe learn domains/gpu-serving/blueprints/<name>/
+
+# Contribute field note to community (opens GitHub Issue template)
+fe contribute domains/gpu-serving/blueprints/<name>/
+```
+
 ### Model Deployment Cards (mdc)
 
 Curated deployment recipes with upstream PR tracking and tribal knowledge. Repo: `../model-deployment-card/`
 
 ```bash
-# Before deploying — load the deployment card
+# Before deploying — load the deployment card (also via: fe card)
 mdc get <model> --engine <engine>   # e.g. mdc get glm-4.5 --engine sglang
 mdc prs <model>                     # check recent upstream PRs
 
-# After deploying — feed lessons back
+# After deploying — feed lessons back (also via: fe learn)
 mdc learn <model> <engine> "<note>"
 mdc learn <model> <engine> --from domains/gpu-serving/blueprints/<name>/lessons.md
 ```

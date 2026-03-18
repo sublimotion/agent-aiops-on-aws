@@ -1,3 +1,39 @@
+---
+model: devstral-small-2
+engine: vllm
+hardware: g7e.24xlarge
+gpu_arch: sm_120
+deployment_date: "2026-03-04"
+
+outcome: success
+failure_categories:
+  - nccl
+  - tool_timeout
+
+cards_used:
+  mdc: [devstral-2-vllm]
+  gpu_infra: [g7e]
+
+card_helped: partial
+
+benchmark:
+  throughput_toks_s: 52.9
+  ttft_p50_ms: null
+  ttft_p99_ms: null
+  concurrent_users: 1
+  gpu_util_pct: null
+
+ralph_iterations: 4
+
+mdc_learn_commands:
+  - 'mdc learn devstral-2 vllm "--tool-call-parser mistral --enable-auto-tool-choice required for correct tool call parsing"'
+  - 'mdc learn devstral-2 vllm "model_type=mistral3, must import Mistral3ForConditionalGeneration directly"'
+
+gpu_infra_learn_commands:
+  - 'gpu-infra learn -c nccl "NCCL 2.25.1 broken on Blackwell sm_120 PCIe — ALL collective ops fail with Cuda failure 1. Fixed in 2.26.2 (NGC 25.03+). vLLM inference unaffected (uses custom allreduce)."'
+  - 'gpu-infra learn -c platform "g7e containers need --network host (no CNI plugin on bare metal)"'
+---
+
 # Lessons Learned: Devstral Small 2 SERA Fine-Tuning
 
 ## Baseline (from qwen3-next-sglang benchmarks, 2026-03-03)
