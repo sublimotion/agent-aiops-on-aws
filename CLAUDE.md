@@ -52,6 +52,7 @@ Read these files **on demand** based on what you're doing:
 | `domains/autoresearch/blueprints/training-recipes/` | `domains/autoresearch/specs/training-recipes.md` |
 | `domains/autoresearch/blueprints/agent-harness/` | `domains/autoresearch/specs/agent-harness.md` |
 | `domains/autoresearch/blueprints/finetuning-recipes/` | `domains/autoresearch/specs/finetuning-recipes.md` |
+| `domains/autoresearch/blueprints/agent-swarm/` | `domains/autoresearch/specs/agent-swarm.md` |
 
 **Blueprint-local context** — for operational details (lessons, results, plans), look inside the blueprint directory itself rather than in specs.
 
