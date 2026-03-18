@@ -12,7 +12,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Strip private dependencies
+        run: python3 scripts/strip-private.py
+
+      - name: Commit stripped version
+        run: |
+          git config user.email "github-actions@github.com"
+          git config user.name "GitHub Actions"
+          git add -A
+          git diff --staged --quiet || git commit -m "OSS: strip private tool dependencies"
+
       - name: Push to sublimotion/agent-aiops-on-aws
         run: |
           git remote add public https://x-access-token:${{ secrets.OSS_REPO_TOKEN }}@github.com/sublimotion/agent-aiops-on-aws.git
-          git push public main
+          git push public HEAD:main --force
