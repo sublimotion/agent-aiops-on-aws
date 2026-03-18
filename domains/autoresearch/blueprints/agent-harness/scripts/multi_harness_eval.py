@@ -123,6 +123,13 @@ HARNESSES = {
         "check_cmd": "node -e \"require('@letta-ai/letta-code-sdk')\" 2>/dev/null || letta --version",
         "description": "Memory-first agent with persistent memory, skill learning, sleeptime (self-hosted)",
     },
+    "codex": {
+        "name": "Codex CLI",
+        "type": "cli",
+        "install_cmd": "npm install -g @openai/codex",
+        "check_cmd": "codex --version",
+        "description": "OpenAI coding agent using Responses API, sandboxed shell + file tools",
+    },
 }
 
 

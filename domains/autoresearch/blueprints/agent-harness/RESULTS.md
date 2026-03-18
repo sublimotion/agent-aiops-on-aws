@@ -1,6 +1,6 @@
 # Agent Harness Experiment Results
 
-**Date**: 2026-03-14
+**Date**: 2026-03-18
 **Model**: Devstral Small 2 24B FP8
 **Infrastructure**: 4x RTX PRO 6000 Blackwell (g7e.24xlarge), vLLM v0.16.0
 **Benchmark**: SWE-bench Lite, 50-issue subset (seed 42, stratified by 11 repos)
@@ -53,6 +53,7 @@ Fix rate = generated a diff. Edit rate = called `edit_file` at least once.
 | OpenHands | CodeAct, Jupyter + bash sandbox | Blocked (`e2b` dep conflict) |
 | Claude Code | CLI agent (Anthropic SDK), auto-compaction, ~22K system prompt | Tested (via patched vLLM Anthropic API) |
 | OpenCode | Vercel AI SDK (@ai-sdk/openai-compatible), built-in tools | Tested |
+| Codex CLI | OpenAI Responses API, sandboxed shell + file tools | Tested (via streaming proxy + 4 vLLM patches) |
 
 ### Phase 2a Results (Verified Pass Rate)
 
@@ -74,6 +75,7 @@ Pass rate verified by applying agent patches + gold `test_patch` from SWE-bench,
 | 2 | **Claude Code** | **10/50 (20%)** | 19/50 (38%) | 26 | **52.6%** | str_replace (built-in) |
 | 3 | **PiAgent** (str_replace) | **8/50 (16%)** | 39/50 (78%) | 39 | 20.5% | str_replace |
 | 4 | **Hashline** (ohmypi) | **7/50 (14%)** | 38/50 (76%) | 38 | 18.4% | LINE:HASH |
+| 5 | **Codex CLI** | **9/50 (18%)** | 48/50 (96%) | 48 | 18.8% | shell commands |
 | - | DeepAgents | DNF | - | - | - | (recursion limit) |
 
 **OpenCode**: CLI agent using Vercel AI SDK with `@ai-sdk/openai-compatible` custom provider pointing at local vLLM. Uses its own built-in tool set (glob, read, edit, bash, grep, write) rather than custom tools. Required 64K context (vs 32K for other harnesses) due to ~11K system prompt + ~20 built-in tool definitions. Connected via `opencode.json` config: `{"provider":{"vllm":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":"http://localhost:8080/v1"}}}}`.
@@ -84,15 +86,18 @@ Pass rate verified by applying agent patches + gold `test_patch` from SWE-bench,
 
 **Claude Code**: CLI agent using Anthropic SDK, pointed at vLLM via patched Anthropic Messages API (`/v1/messages`). Three bugs in vLLM v0.16.0 had to be fixed: (1) `tool_use_id` field not parsed from `tool_result` blocks; (2) streaming first chunk drops tool arguments (opening `{"`); (3) Mistral requires 9-char alnum tool_call_ids vs Anthropic `toolu_*` format. Required 131K context (TP2) — Claude Code requests 32K `max_tokens` + ~22K system prompt + conversation. Best precision at 52.6% (10/19 fixes pass) but lowest fix rate (38%) — Claude Code's system prompt makes Devstral conservative, generating fewer but higher-quality patches.
 
+**Codex CLI**: OpenAI's coding agent using the Responses API (`/v1/responses`). Connected to vLLM via a streaming-to-non-streaming proxy (vLLM v0.16.0's Responses API streaming path doesn't parse Mistral tool calls). Required 4 vLLM patches: (1) `developer` role → `system` in mistral_common; (2) `input_text` content arrays → plain strings; (3) strip extra `type: "message"` fields; (4) filter non-function tools (Codex sends `web_search` type). The proxy also normalizes multi-turn input items for vLLM compatibility. Codex uses `exec_command` (shell), `write_stdin`, `update_plan`, `spawn_agent` tools — edits are done via shell commands (`cat >`, `sed`, heredocs) rather than structured edit tools. Highest fix rate (96%) but lowest precision (19%) and highest token consumption (1.4M avg/issue, ~140x more than OpenCode).
+
 **DeepAgents**: langchain-ai/deepagents with SummarizationMiddleware + sub-agents. Failed — `create_deep_agent` hits LangGraph recursion limit (60) before completing even one issue. Sub-agent spawning consumes recursion budget too quickly.
 
-### Ensemble (All 6 Harnesses)
+### Ensemble (All 7 Harnesses)
 
 | Metric | Value |
 |--------|-------|
-| **Union pass rate** | **15/50 (30%)** |
+| **Union pass rate** | **16/50 (32%)** |
 | **OpenCode** | **11/50 (22%)** |
 | **Claude Code** | **10/50 (20%)** |
+| **Codex CLI** | **9/50 (18%)** |
 | SERA | 8/50 (16%) |
 | PiAgent (str_replace) | 8/50 (16%) |
 | LangGraph | 7/50 (14%) |
@@ -100,33 +105,38 @@ Pass rate verified by applying agent patches + gold `test_patch` from SWE-bench,
 
 **Per-issue breakdown** (issues where at least one harness passes):
 
-| Instance | SERA | LangGraph | Hashline | PiAgent | OpenCode | Claude Code |
-|----------|------|-----------|----------|---------|----------|-------------|
-| django-11039 | PASS | - | fail | fail | PASS | PASS |
-| django-11620 | PASS | - | fail | - | PASS | PASS |
-| django-11815 | PASS | - | - | - | PASS | PASS |
-| django-12286 | - | PASS | fail | PASS | PASS | PASS |
-| django-12453 | PASS | PASS | PASS | PASS | PASS | PASS |
-| django-12497 | - | PASS | fail | PASS | - | - |
-| django-14238 | - | - | PASS | PASS | PASS | PASS |
-| django-14608 | - | PASS | PASS | PASS | PASS | - |
-| django-14672 | PASS | - | fail | PASS | PASS | PASS |
-| django-14855 | PASS | PASS | PASS | PASS | - | - |
-| django-15400 | - | - | - | - | - | PASS |
-| pytest-11143 | PASS | PASS | - | - | PASS | - |
-| sympy-17022 | - | - | PASS | fail | PASS | PASS |
-| sympy-18835 | - | fail | PASS | fail | - | - |
-| sympy-24152 | PASS | PASS | PASS | PASS | PASS | PASS |
+| Instance | SERA | LangGraph | Hashline | PiAgent | OpenCode | Claude Code | Codex |
+|----------|------|-----------|----------|---------|----------|-------------|-------|
+| django-11039 | PASS | - | fail | fail | PASS | PASS | fail |
+| django-11620 | PASS | - | fail | - | PASS | PASS | PASS |
+| django-11630 | - | - | - | - | - | - | **PASS** |
+| django-11815 | PASS | - | - | - | PASS | PASS | fail |
+| django-12286 | - | PASS | fail | PASS | PASS | PASS | PASS |
+| django-12453 | PASS | PASS | PASS | PASS | PASS | PASS | PASS |
+| django-12497 | - | PASS | fail | PASS | - | - | PASS |
+| django-12747 | - | - | - | - | - | - | **PASS** |
+| django-14238 | - | - | PASS | PASS | PASS | PASS | fail |
+| django-14608 | - | PASS | PASS | PASS | PASS | - | PASS |
+| django-14672 | PASS | - | fail | PASS | PASS | PASS | PASS |
+| django-14855 | PASS | PASS | PASS | PASS | - | - | PASS |
+| django-15400 | - | - | - | - | - | PASS | fail |
+| pytest-11143 | PASS | PASS | - | - | PASS | - | fail |
+| sympy-17022 | - | - | PASS | fail | PASS | PASS | fail |
+| sympy-18835 | - | fail | PASS | fail | - | - | fail |
+| sympy-24152 | PASS | PASS | PASS | PASS | PASS | PASS | fail |
 
 **Unique passes** (solved by only one harness):
 - Hashline: sympy-18835 (1)
 - Claude Code: django-15400 (1)
+- Codex CLI: django-11630, django-12747 (2)
 
-Claude Code adds 1 new pass (django-15400) to bring the ensemble from 14/50 to 15/50 (30%).
+Codex adds 2 new passes to bring the 7-harness ensemble from 14/50 to 16/50 (32%).
 
 ### Key Findings
 
 **OpenCode is the best single harness by pass rate** at 22% with 88% fix rate. Its built-in tool set (glob, read, edit, bash, grep, write) + structured system prompt produces the most fixes. The 88% fix rate is 42% higher than LangGraph (62%) and nearly double SERA (46%).
+
+**Codex CLI has the highest fix rate** at 96% (48/50) but only 18% pass rate (9/50). Codex uses shell commands (`cat >`, `sed`, heredocs) for edits rather than structured edit tools. Its Responses API format is stateless — the full conversation resends each turn, consuming ~1.4M tokens/issue (140x more than OpenCode). Despite the low precision (19%), Codex contributes 2 unique passes (django-11630, django-12747) not solved by any other harness.
 
 **Claude Code has the best precision** at 52.6% (10/19 fixes pass) — double OpenCode's 25% and far ahead of SERA's 35%. Claude Code's ~22K system prompt makes Devstral conservative: it generates fewer patches (38% fix rate, lowest of all working harnesses) but those patches are much more likely to be correct.
 
@@ -144,7 +154,7 @@ Claude Code adds 1 new pass (django-15400) to bring the ensemble from 14/50 to 1
 
 **Hashline is token-expensive**. Average 191K tokens/issue vs ~10K for LangGraph str_replace (~19x overhead). The `LINE:HASH|` prefix on every line inflates context significantly.
 
-**Ensemble ceiling is 30%**. 6-harness union = 15/50. Claude Code adds 1 unique pass (django-15400) over the 5-harness ensemble (14/50). Diminishing returns persist — each new harness adds at most 1 pass.
+**Ensemble ceiling is 32%**. 7-harness union = 16/50. Codex adds 2 unique passes (django-11630, django-12747) over the 6-harness ensemble (14/50). Diminishing returns persist but Codex's unique passes show shell-based editing can solve issues that structured edit tools miss.
 
 **Aider cannot drive Devstral Small 2**. The `--edit-format diff` mode produces zero fixes — the model cannot produce valid unified diffs in Aider's expected format.
 
@@ -187,14 +197,15 @@ This is a trainable error class — a LoRA finetuned on successful fix trajector
 
 ## Conclusions
 
-1. **OpenCode is the best single harness by pass rate** at 22% — Claude Code is 2nd at 20%. Both use built-in tool sets rather than custom adapters.
-2. **Claude Code has the best precision** at 52.6% — its conservative approach (38% fix rate) produces the highest-quality patches. The precision/recall tradeoff is stark: OpenCode generates 2.3x more fixes but only 10% more passes.
+1. **OpenCode is the best single harness by pass rate** at 22% — Claude Code is 2nd at 20%, Codex CLI 3rd at 18%. All three use built-in tool sets rather than custom adapters.
+2. **Claude Code has the best precision** at 52.6% — its conservative approach (38% fix rate) produces the highest-quality patches. Codex has the highest fix rate (96%) but lowest precision (19%).
 3. **30 turns baseline is optimal** — compaction and restart strategies hurt or are neutral.
-4. **Ensemble ceiling is 30%** with 6 harnesses (15/50). Each additional harness adds at most 1 new pass. Diminishing returns are clear.
-5. **Fix rate is not pass rate** — conversion ranges from 25% (OpenCode) to 53% (Claude Code). Harness design affects precision as much as recall.
-6. **Hashline helps strong models, not weak ones** — the edit format that produced 10x gains for Grok provides no advantage for Devstral Small 2.
-7. **Phase 3 (finetuning) is now the right next step** — 42% of failures are "wrong fix" (trainable errors).
-8. **Full SWE-bench evaluation requires Docker** — bare-metal eval is a lower bound covering ~50% of patches.
+4. **Ensemble ceiling is 32%** with 7 harnesses (16/50). Each additional harness adds 1-2 new passes. Diminishing returns are clear.
+5. **Fix rate is not pass rate** — conversion ranges from 19% (Codex) to 53% (Claude Code). Harness design affects precision as much as recall.
+6. **Shell-based editing (Codex) solves different issues** — Codex's 2 unique passes (django-11630, django-12747) are not covered by any structured edit tool harness.
+7. **Hashline helps strong models, not weak ones** — the edit format that produced 10x gains for Grok provides no advantage for Devstral Small 2.
+8. **Phase 3 (finetuning) is now the right next step** — 42% of failures are "wrong fix" (trainable errors).
+9. **Full SWE-bench evaluation requires Docker** — bare-metal eval is a lower bound covering ~50% of patches.
 
 ---
 
@@ -202,7 +213,7 @@ This is a trainable error class — a LoRA finetuned on successful fix trajector
 
 - `results/phase1_{A-F}.jsonl` — 50 lines each, per-issue metrics with turn-level breakdown
 - `results/phase2_{langgraph,sera,aider}.jsonl` — 50 lines each, per-issue harness metrics
-- `results/phase2b_{ohmypi,piagent,deepagents,opencode,claude_code}.jsonl` — Phase 2b per-issue metrics
-- `results/eval_{ohmypi,piagent,opencode,claude_code}.jsonl` — Gold test evaluation results for Phase 2b
+- `results/phase2b_{ohmypi,piagent,deepagents,opencode,claude_code,codex}.jsonl` — Phase 2b per-issue metrics
+- `results/eval_{ohmypi,piagent,opencode,claude_code,codex}.jsonl` — Gold test evaluation results for Phase 2b
 - `results-report.html` — Interactive Chart.js visualization
 - `lessons.md` — Operational lessons and debugging notes
