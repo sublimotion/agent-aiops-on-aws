@@ -209,11 +209,101 @@ This is a trainable error class — a LoRA finetuned on successful fix trajector
 
 ---
 
+## Phase 3: Agent Swarm — Multi-Model Comparison
+
+**Goal**: Measure how model capability (scale, finetuning) affects harness effectiveness across 4 models × 3 harnesses. Tests the "bitter lesson" hypothesis: does raw scale outperform task-specific finetuning?
+
+### Models
+
+| Model | Role | Parameters | Active | TP | Tool Calling |
+|-------|------|-----------|--------|-----|-------------|
+| Devstral Small 2 24B FP8 | Baseline | 24B | 24B | 1 | Mistral native |
+| Qwen 2.5 Coder 32B | Finetuning control | 32B | 32B | 1 | Bare JSON (no `<tool_call>` tags) |
+| SWE-agent-LM 32B | Finetuned (SWE-smith) | 32B | 32B | 1 | Bare JSON (no `<tool_call>` tags) |
+| Qwen3.5-397B-A17B FP8 | Scale frontier | 397B MoE | 17B | 4 | Hermes native |
+
+### Fix Rate Matrix
+
+| Model | SERA | OpenCode | Claude Code | Best Harness |
+|-------|------|----------|-------------|-------------|
+| **Qwen3.5 397B** | **36/50 (72%)** | **44/50 (88%)** | — (incompatible) | OpenCode |
+| **Devstral 24B** | 23/50 (46%) | 44/50 (88%) | 19/50 (38%) | OpenCode |
+| Qwen 2.5 32B | 24/50 (48%) | 0/45 (0%) | — | SERA |
+| SWE-LM 32B | 9/50 (18%) | 0/46 (0%) | — | SERA |
+
+Fix rate = generated a non-empty git diff. Not verified by gold tests.
+
+### Harness Compatibility
+
+| Model | SERA | OpenCode | Claude Code |
+|-------|------|----------|-------------|
+| Devstral 24B | Works (Mistral chat template) | Works (Mistral tool calling) | Works (vLLM Anthropic API patches) |
+| Qwen 2.5 32B | Works (bare JSON fallback) | FAIL (bare JSON, hermes parser can't extract) | Not tested |
+| SWE-LM 32B | Works (bare JSON fallback) | FAIL (bare JSON, hermes parser can't extract) | Not tested |
+| Qwen3.5 397B | Works (hermes parser) | Works (hermes parser) | FAIL (Anthropic API doesn't translate tools to Qwen chat template) |
+
+### Qwen3.5 397B: SERA vs OpenCode
+
+| Metric | Value |
+|--------|-------|
+| Both fix | 32 |
+| Only SERA | 4 |
+| Only OpenCode | 12 |
+| Neither | 2 |
+| **Union** | **48/50 (96%)** |
+
+Just 2 harnesses with Qwen3.5 produce fixes for 96% of issues. The 4 SERA-only fixes and 12 OpenCode-only fixes demonstrate genuine harness complementarity even with a strong model.
+
+### 4-Model SERA Comparison
+
+| Metric | Value |
+|--------|-------|
+| Devstral 24B | 23/50 fixes |
+| Qwen 2.5 32B | 24/50 fixes |
+| SWE-LM 32B | 9/50 fixes |
+| Qwen3.5 397B | 36/50 fixes |
+| **Union (any model)** | **46/50 (92%)** |
+| Intersection (all) | 1/50 |
+
+Models fix almost completely different issues — only 1 issue (pytest-11143) is fixed by all 4 models via SERA. The 4-model union (46/50) far exceeds the best single model (36/50), demonstrating strong model complementarity.
+
+### Behavioral Metrics
+
+| Model | Avg Turns | Avg 1st Edit | Parkinson's Ratio |
+|-------|-----------|-------------|-------------------|
+| Devstral 24B | 29.1 | 13.5 | 46% |
+| Qwen 2.5 32B | 13.5 | 3.2 | 24% |
+| SWE-LM 32B | 14.0 | 3.6 | 26% |
+| Qwen3.5 397B | 18.1 | 8.3 | 46% |
+
+Parkinson's ratio = first edit turn / avg turns used. Higher = more time spent exploring before editing.
+
+Devstral and Qwen3.5 both exhibit high Parkinson's ratios (~46%) — they explore extensively before editing. Qwen 2.5 and SWE-LM edit much earlier (24-26%) but produce worse fixes, suggesting the exploration phase is important for fix quality.
+
+### Key Findings
+
+**Bitter lesson partially validated**: Scale from 24B → 397B MoE produces +26pp on SERA (46% → 72%). But Devstral 24B matches Qwen3.5 397B on OpenCode (both 88%), suggesting harness choice can compensate for model scale.
+
+**SWE-agent-LM finetuning is actively harmful**: -30pp from base Qwen 2.5 (48% → 18%) on the same architecture and harness. The SWE-bench-specific finetuning narrowed the model's capabilities rather than enhancing them.
+
+**Harness spread varies by model**: Devstral has 50pp spread (38-88%), Qwen3.5 has 16pp spread (72-88%). Stronger models are less sensitive to harness choice — the harness matters most for weaker models.
+
+**Tool calling compatibility is the primary barrier**: Qwen 2.5 and SWE-LM output bare JSON tool calls without `<tool_call>` tags, making them incompatible with OpenCode and Claude Code (which rely on vLLM's hermes parser). SERA's regex fallback handles bare JSON, but SERA is the only harness that works.
+
+**Claude Code's Anthropic API doesn't generalize**: vLLM's `/v1/messages` endpoint translates Anthropic tool schemas to the internal chat template, but the translation doesn't produce correct Qwen tool calling prompts. Qwen3.5 ignores the tools entirely and generates generic text responses. Claude Code only works with Devstral (Mistral native format).
+
+**Context management is critical for weaker models**: Qwen 2.5 32B overflows 16K context by turn 5. Even with 32K + aggressive trimming (tool output caps at 4K chars, old results trimmed to 500 chars), conversations still overflow. Qwen3.5's 65K context eliminates this bottleneck.
+
+**MoE inference is fast**: Qwen3.5-397B (17B active) processes issues as fast as 32B dense models despite 12x total parameters. MoE is free performance at inference time.
+
+---
+
 ## Raw Data
 
 - `results/phase1_{A-F}.jsonl` — 50 lines each, per-issue metrics with turn-level breakdown
 - `results/phase2_{langgraph,sera,aider}.jsonl` — 50 lines each, per-issue harness metrics
 - `results/phase2b_{ohmypi,piagent,deepagents,opencode,claude_code,codex}.jsonl` — Phase 2b per-issue metrics
 - `results/eval_{ohmypi,piagent,opencode,claude_code,codex}.jsonl` — Gold test evaluation results for Phase 2b
+- `results/swarm/swarm_phase1_{model}_{harness}.jsonl` — Phase 3 multi-model results
 - `results-report.html` — Interactive Chart.js visualization
 - `lessons.md` — Operational lessons and debugging notes

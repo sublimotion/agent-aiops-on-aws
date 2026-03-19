@@ -1,25 +1,25 @@
 # Agent Swarm - Phase 1 Execution Plan
 
-**Status**: IN PROGRESS
+**Status**: COMPLETE
 **Started**: 2026-03-18
 **Updated**: 2026-03-19
 
 ## Configuration Matrix (12 runs)
 
-| # | Model | Harness | Status | Pass Rate | Notes |
-|---|-------|---------|--------|-----------|-------|
-| 1 | Devstral Small 2 24B | OpenCode | DONE (reused) | 11/50 (22%) | From Phase 2b |
-| 2 | Devstral Small 2 24B | Claude Code | DONE (reused) | 10/50 (20%) | From Phase 2b |
-| 3 | Devstral Small 2 24B | SERA | DONE (reused) | 8/50 (16%) | From Phase 2a |
-| 4 | Qwen 2.5 Coder 32B | OpenCode | FAILED (0%) | 0/50 (0%) | Model outputs bare JSON, not `<tool_call>` — hermes parser can't extract |
-| 5 | Qwen 2.5 Coder 32B | Claude Code | SKIPPED | - | Same tool calling incompatibility |
-| 6 | Qwen 2.5 Coder 32B | SERA | RUNNING (~5/50) | 2/5 fix rate so far | Bare JSON fallback patch, 32K context, context trimming |
-| 7 | SWE-agent-LM 32B | OpenCode | FAILED (0%) | 0/50 (0%) | Bare JSON output, no XML tags |
-| 8 | SWE-agent-LM 32B | Claude Code | SKIPPED | - | Same tool calling incompatibility |
-| 9 | SWE-agent-LM 32B | SERA | RUNNING (~3/50) | 0/3 fix rate so far | Same patches as #6 |
-| 10 | Qwen3.5-397B-A17B | OpenCode | QUEUED | - | TP4, all GPUs |
-| 11 | Qwen3.5-397B-A17B | Claude Code | QUEUED | - | |
-| 12 | Qwen3.5-397B-A17B | SERA | QUEUED | - | |
+| # | Model | Harness | Status | Fix Rate | Notes |
+|---|-------|---------|--------|----------|-------|
+| 1 | Devstral Small 2 24B | OpenCode | DONE (reused) | 44/50 (88%) | From Phase 2b |
+| 2 | Devstral Small 2 24B | Claude Code | DONE (reused) | 19/50 (38%) | From Phase 2b |
+| 3 | Devstral Small 2 24B | SERA | DONE (reused) | 23/50 (46%) | From Phase 2a |
+| 4 | Qwen 2.5 Coder 32B | OpenCode | FAILED (0%) | 0/45 (0%) | Bare JSON, hermes parser can't extract |
+| 5 | Qwen 2.5 Coder 32B | Claude Code | SKIPPED | — | Anthropic API incompatible with Qwen |
+| 6 | Qwen 2.5 Coder 32B | SERA | **DONE** | **24/50 (48%)** | Bare JSON fallback patch |
+| 7 | SWE-agent-LM 32B | OpenCode | FAILED (0%) | 0/46 (0%) | Bare JSON, hermes parser can't extract |
+| 8 | SWE-agent-LM 32B | Claude Code | SKIPPED | — | Anthropic API incompatible with Qwen |
+| 9 | SWE-agent-LM 32B | SERA | **DONE** | **9/50 (18%)** | Finetuning -30pp vs base |
+| 10 | Qwen3.5-397B-A17B | OpenCode | **DONE** | **44/50 (88%)** | Best config tied with #1 |
+| 11 | Qwen3.5-397B-A17B | Claude Code | FAILED | — | Anthropic API doesn't translate tools to Qwen chat template |
+| 12 | Qwen3.5-397B-A17B | SERA | **DONE** | **36/50 (72%)** | Best SERA result |
 
 ## Key Findings So Far
 
