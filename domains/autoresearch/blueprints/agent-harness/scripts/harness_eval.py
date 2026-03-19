@@ -106,6 +106,9 @@ class EvalResult:
     turn_metrics: list = field(default_factory=list)
     # Error
     error: Optional[str] = None
+    # Trajectory data (for verifier training)
+    patch_diff: Optional[str] = None  # git diff of generated fix
+    transcript: Optional[list] = None  # full conversation messages
 
 
 # ---------------------------------------------------------------------------
@@ -403,6 +406,81 @@ def _get_git_diff(workspace: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Trajectory Capture (for verifier training)
+# ---------------------------------------------------------------------------
+
+# Max chars per tool result in saved transcripts (keeps files manageable)
+_TRANSCRIPT_TOOL_OUTPUT_MAX = 8000
+
+
+def _sanitize_transcript(messages: list[dict]) -> list[dict]:
+    """
+    Create a copy of the conversation suitable for saving.
+    Truncates large tool outputs but preserves all assistant reasoning,
+    tool call arguments, and structure.
+    """
+    sanitized = []
+    for msg in messages:
+        m = dict(msg)
+        if m.get("role") == "tool":
+            content = m.get("content", "")
+            if len(content) > _TRANSCRIPT_TOOL_OUTPUT_MAX:
+                m = dict(m)
+                m["content"] = content[:_TRANSCRIPT_TOOL_OUTPUT_MAX] + f"\n... [truncated from {len(content)} chars]"
+        sanitized.append(m)
+    return sanitized
+
+
+def save_trajectory(
+    result: EvalResult,
+    messages: list[dict],
+    workspace: str,
+    output_dir: str,
+):
+    """
+    Save full trajectory data for verifier training.
+    Writes a separate .trajectory.jsonl file alongside the metrics file.
+
+    Each line contains:
+    - instance_id, config, model info
+    - patch_diff: the actual code change
+    - transcript: full conversation (tool outputs truncated)
+    - tests_pass, fix_generated: labels for verifier training
+    - turn_metrics: per-turn instrumentation
+    """
+    # Capture patch diff
+    patch_diff = _get_git_diff(workspace)
+    result.patch_diff = patch_diff if patch_diff else None
+
+    # Capture sanitized transcript
+    result.transcript = _sanitize_transcript(messages)
+
+    # Write to dedicated trajectory file
+    traj_dir = os.path.join(output_dir, "trajectories")
+    os.makedirs(traj_dir, exist_ok=True)
+
+    traj_file = os.path.join(
+        traj_dir,
+        f"{result.config}_{result.instance_id}.json",
+    )
+    traj_data = {
+        "instance_id": result.instance_id,
+        "config": result.config,
+        "tests_pass": result.tests_pass,
+        "fix_generated": result.fix_generated,
+        "turns_used": result.turns_used,
+        "total_latency_ms": result.total_latency_ms,
+        "patch_diff": patch_diff,
+        "transcript": _sanitize_transcript(messages),
+        "turn_metrics": result.turn_metrics,
+    }
+    with open(traj_file, "w") as f:
+        json.dump(traj_data, f)
+
+    log.info(f"  Trajectory saved: {traj_file} ({len(messages)} messages, {len(patch_diff)} diff chars)")
+
+
+# ---------------------------------------------------------------------------
 # Context Compaction
 # ---------------------------------------------------------------------------
 
@@ -662,6 +740,11 @@ async def run_instrumented_loop(
     result.fix_generated = bool(_get_git_diff(workspace))
     result.total_latency_ms = (time.monotonic() - start) * 1000
 
+    # Save trajectory for verifier training (if output_dir provided via config)
+    traj_output_dir = config.get("_output_dir")
+    if traj_output_dir:
+        save_trajectory(result, messages, workspace, traj_output_dir)
+
     status = "PASS" if result.tests_pass else "FAIL"
     log.info(
         f"[{issue.instance_id}] Config {config_name}: {status} "
@@ -891,15 +974,21 @@ async def run_config(
                 if os.path.exists(workspace):
                     shutil.rmtree(workspace, ignore_errors=True)
 
+    # Pass output_dir to config so run_instrumented_loop can save trajectories
+    config = dict(config)  # don't mutate original
+    config["_output_dir"] = os.path.dirname(output_path) or "results"
+
     log.info(f"=== Config {config_name}: max_turns={config['max_turns']}, strategy={config['strategy']} ===")
     tasks = [process_one(issue) for issue in issues]
     await asyncio.gather(*tasks)
 
-    # Write results
+    # Write results (metrics only — transcripts saved separately in trajectories/)
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w") as f:
         for r in results:
-            f.write(json.dumps(asdict(r)) + "\n")
+            d = asdict(r)
+            d.pop("transcript", None)  # full transcript in trajectories/ dir
+            f.write(json.dumps(d) + "\n")
 
     # Summary
     n_pass = sum(1 for r in results if r.tests_pass)
