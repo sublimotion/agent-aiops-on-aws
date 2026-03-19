@@ -232,6 +232,27 @@ import re
 
 _TOOL_CALL_RE = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.DOTALL)
 
+# Fallback: bare JSON tool calls (Qwen 2.5 Coder / SWE-agent-LM output format)
+_BARE_JSON_TOOL_RE = re.compile(r'\{"name"\s*:\s*"(\w+)"\s*,\s*"arguments"\s*:\s*(\{.*?\})\s*\}', re.DOTALL)
+
+
+def _trim_context(messages: list, max_chars: int = 20000) -> list:
+    """Trim oldest tool results to fit within approximate token budget."""
+    total = sum(len(str(m.get("content", ""))) for m in messages)
+    if total <= max_chars:
+        return messages
+    trimmed = list(messages)
+    i = 2  # start after system + user
+    while total > max_chars and i < len(trimmed) - 4:
+        if trimmed[i].get("role") == "tool":
+            old_content = str(trimmed[i].get("content", ""))
+            if len(old_content) > 500:
+                trimmed[i] = dict(trimmed[i])
+                trimmed[i]["content"] = old_content[:500] + "... (trimmed)"
+                total -= (len(old_content) - 500)
+        i += 1
+    return trimmed
+
 
 # ---------------------------------------------------------------------------
 # Tool Execution (from sera-datagen.py)
@@ -272,6 +293,20 @@ def extract_tool_calls_from_msg(msg: dict) -> list[dict]:
             })
         except (json.JSONDecodeError, TypeError):
             continue
+
+    # Fallback: try bare JSON tool calls (Qwen-family models)
+    if not results:
+        bare_matches = _BARE_JSON_TOOL_RE.findall(content)
+        for i, (name, args_str) in enumerate(bare_matches):
+            try:
+                arguments = json.loads(args_str)
+                results.append({
+                    "id": f"call_{i}",
+                    "function": {"name": name, "arguments": arguments},
+                })
+            except (json.JSONDecodeError, TypeError):
+                pass
+
     return results
 
 
