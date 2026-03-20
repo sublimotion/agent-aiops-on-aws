@@ -426,10 +426,12 @@ Extract from each (issue, patch) pair:
 - Turns used
 - First edit turn / Parkinson's ratio
 - Tokens consumed
-- Action distribution (% search vs read vs edit vs run_command)
-- Repeat rate (repeated_action count)
-- Context growth rate (tokens at turn N vs turn 1)
+- Action distribution (% search vs read vs edit vs run_command) — **novel: not in Critic Rubrics**
+- Repeat rate (repeated_action count) — maps to Critic Rubrics `loop_behavior` (AUC 0.94, strongest)
+- Context growth rate (tokens at turn N vs turn 1) — **novel: not in Critic Rubrics**
 - Edit success rate (edit_applied / total edit attempts)
+
+Note: Critic Rubrics' most predictive features are `incomplete_implementation` (-0.21), `misunderstood_intention` (-0.25), `loop_behavior` (-0.20). Our action_distribution and context_growth_rate are novel signals they don't capture.
 
 **Consensus features** (from SVG pipeline):
 - Line-recall between original and reproduced patch
@@ -478,6 +480,7 @@ Only attempt if Models A/B show clear signal above baselines:
 | **Top-3 pass rate** | Fraction where at least one of top-3 passes | Shows ranking quality beyond top pick |
 | **NDCG@N** | Normalized discounted cumulative gain | Standard ranking metric |
 | **Precision-at-threshold** | If P(pass) > 0.5, predict pass | Binary classification quality |
+| **ECE (Expected Calibration Error)** | |accuracy(bin) - confidence(bin)| across bins | **Critical for RL integration.** SWE-RM showed two verifiers with identical TTS diverged under RL due to calibration gap (ECE 0.541 caused collapse). Measure from Phase 2. |
 | **Feature importance** | SHAP values for top features | Interpretability — what did the model learn? |
 | **Confounder check** | Accuracy when model/harness features are ablated | Does the model rely on patch features or metadata? |
 | **Verification tier analysis** | Compare: behavioral-only vs patch-only vs combined | Which soft verifier tier carries the most signal? |
