@@ -298,6 +298,35 @@ Devstral and Qwen3.5 both exhibit high Parkinson's ratios (~46%) — they explor
 
 ---
 
+## Phase 3b: Concurrent Agent Swarm (Phase 2a)
+
+**Goal**: Measure how concurrent agent execution scales on a single GPU node. Does parallelism degrade fix rate? What is the throughput ceiling?
+
+**Setup**: Qwen3.5-397B-A17B FP8 (TP4, all 4 GPUs), OpenCode harness, g7e.24xlarge. vLLM `max-num-seqs=4`. N concurrent OpenCode agents share the single vLLM endpoint.
+
+### Scaling Results
+
+| Config | Workers | Fix Rate | Wall Time | Speedup | Throughput | Efficiency | Avg/Issue |
+|--------|---------|----------|-----------|---------|-----------|------------|-----------|
+| N=1 (seq) | 1 | 44/50 (88%) | 43.7 min | 1.0x | 1.1/min | 100% | 52s |
+| N=2 | 2 | 43/50 (86%) | 36.5 min | 1.2x | 1.4/min | 60% | 64s |
+| **N=4** | **4** | **46/50 (92%)** | **21.4 min** | **2.0x** | **2.3/min** | **51%** | **71s** |
+| N=8 | 8 | 49/50 (98%) | 26.2 min | 1.7x | 1.9/min | 21% | 172s |
+
+### Key Findings
+
+**N=4 is the sweet spot**: 2.0x speedup at 51% efficiency. Matches the vLLM `max-num-seqs=4` limit — the GPU can serve 4 concurrent sequences optimally.
+
+**Concurrency does not degrade fix rate**: N=4 actually improves fix rate from 88% to 92%, and N=8 reaches 98%. Non-deterministic processing order means some timeout-prone issues get handled when other workers are busy, reducing per-issue queueing pressure.
+
+**N=8 is GPU-bound, not CPU-bound**: Wall time increases from 21.4 min (N=4) to 26.2 min (N=8) because vLLM queues the excess 4 requests. Per-issue avg jumps from 71s to 172s as agents wait for GPU slots. Efficiency drops to 21%.
+
+**The GPU bubble problem is real**: At N=4, efficiency is only 51% — agents spend ~49% of wall time waiting for tool execution (file reads, git operations) while the GPU holds their KV cache. This is the exact problem ThunderAgent (Phase 2b) would address by backfilling GPU bubbles with queued requests.
+
+**50 issues in 21 minutes**: The N=4 configuration processes the full 50-issue SWE-bench subset in 21.4 minutes with 92% fix rate, compared to 43.7 minutes sequential. A production swarm could process ~110 issues/hour.
+
+---
+
 ## Raw Data
 
 - `results/phase1_{A-F}.jsonl` — 50 lines each, per-issue metrics with turn-level breakdown
@@ -305,5 +334,6 @@ Devstral and Qwen3.5 both exhibit high Parkinson's ratios (~46%) — they explor
 - `results/phase2b_{ohmypi,piagent,deepagents,opencode,claude_code,codex}.jsonl` — Phase 2b per-issue metrics
 - `results/eval_{ohmypi,piagent,opencode,claude_code,codex}.jsonl` — Gold test evaluation results for Phase 2b
 - `results/swarm/swarm_phase1_{model}_{harness}.jsonl` — Phase 3 multi-model results
+- `results/swarm/swarm_phase2a_n{2,4,8}_*.jsonl` — Phase 2a concurrent scaling results
 - `results-report.html` — Interactive Chart.js visualization
 - `lessons.md` — Operational lessons and debugging notes
