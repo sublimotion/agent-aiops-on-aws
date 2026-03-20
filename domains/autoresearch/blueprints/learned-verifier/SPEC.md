@@ -497,10 +497,11 @@ Only attempt if Models A/B show clear signal above baselines:
 **Only if Phase 3 succeeds.**
 
 ### If Signal Exists (Phase 3 positive):
-1. **Collect data on full SWE-bench Lite** (300 issues) or SWE-bench Verified (500 issues)
-2. Re-run Phase 3 models on larger dataset — does the signal hold?
-3. If yes at 300+ issues: NOW consider LLM fine-tuning (embedding-based or full)
-4. If yes at 500+ issues: Implement verifier-in-loop agent (Phase 5)
+1. **Use CoderForge dataset** (258K trajectories, 51K tasks) instead of collecting more data ourselves
+2. Extract behavioral features from CoderForge OpenHands trajectories; compare to SERA features
+3. Train verifier at scale: XGBoost → embedding-based → LLM fine-tuning (now viable at 51K unique tasks)
+4. Compare to published baselines: SWE-RM (+10.4pp), Critic Rubrics (+15.9 Best@8), R4P (72.2% accuracy)
+5. If competitive: implement verifier-in-loop agent (Phase 5)
 
 ### If No Signal (Phase 3 negative):
 1. The fix-to-pass gap is not patchable by learned verification at this data scale
@@ -584,7 +585,50 @@ Integrate the trained verifier as a tool in the agent loop (Leanstral pattern fo
 
 ---
 
-## Relationship to Other Blueprints and Research
+## Prior Art and Related Work
+
+### Learned Verifiers / Reward Models
+
+| Paper | Date | Approach | Scale | Key Result |
+|-------|------|----------|-------|------------|
+| **SWE-RM** (arXiv:2512.21919) | Dec 2025 | Execution-free RM, Qwen3-30B-A3B, 256K context | 100K trajectories | +10.4pp (Qwen3-Coder-Flash 51.6% → 62.0%) |
+| **R4P** (arXiv:2510.22775) | Oct 2025 | Patch reasoning via group-wise RL | — | 72.2% accuracy, 50x faster than test execution |
+| **Critic Rubrics** (arXiv:2603.03800) | Mar 2026 | 24 behavioral features, semi-supervised | Sparse labels | +15.9 Best@8, +17.7 with early stopping |
+| **Agentic Rubrics** (arXiv:2601.04171) | Jan 2026 | LLM-generated context-grounded checklists | Zero-shot | +3.5pp over strongest baseline |
+
+**Critic Rubrics is the closest published work to our approach.** Their 24 behavioral features from agent traces map to SERA's turn_metrics. Semi-supervised training on sparse outcomes may work at our N=50 scale.
+
+**SWE-RM confirms N=50 is insufficient for LLM fine-tuning** — they needed 100K trajectories. Their calibration finding (ECE matters more than ranking accuracy) is critical for RL integration.
+
+### Non-Learned Verification
+
+| Paper | Date | Approach | Key Result |
+|-------|------|----------|------------|
+| **Agentless** (arXiv:2407.01489) | Jul 2024 | Reproduction tests + AST-normalized majority voting | +18.5% in ablation |
+| **SERA SVG** (Ai2/Tim Dettmers) | Jan 2026 | Describe-reproduce-score line-recall consensus | 54.2% SWE-Bench Verified |
+
+Agentless's AST-normalized majority voting maps to our SVG consensus baseline. Both leverage generation agreement as quality signal.
+
+### Training Data at Scale
+
+| Dataset | Source | Size | Verification |
+|---------|--------|------|-------------|
+| **CoderForge** (Together AI) | Qwen3-Coder-480B + OpenHands | 258K trajectories (155K pass, 103K fail), 51K tasks, 1,655 repos | Docker test execution |
+| **SWE-Gym / SWE-rebench / SWE-smith** | Various | Used by SWE-RM (400K raw → 100K usable) | Test execution |
+
+**CoderForge solves the scale problem for Phase 4.** 103K labeled fail trajectories are the negative examples for verifier training. If our pilot (N=50) shows signal, CoderForge enables scaling to production-grade verifier without collecting our own data.
+
+### Self-Evolving Harnesses
+
+| System | Approach | Relevance |
+|--------|----------|-----------|
+| **Cursor Composer 2** | Compaction-in-the-loop RL — model learns to summarize its own context mid-trajectory | Leapfrog dynamic: model absorbs harness trick (context management) into weights via RL |
+| **Phoenix AI Engineering Loop** (Arize) | Observability-as-verification — agents consume their own traces | Validates SERA-as-soft-verifier: behavioral telemetry is the verification signal |
+| **OpenAI Harness Engineering** | 1,500 commits, self-evolving skills | Scale of harness engineering effort; skills fire 52% (Vercel benchmark) |
+
+Composer 2's self-summarization reduces compaction error by 50% vs prompt-based baselines. This is the bitter lesson in action: model capability absorbs harness features.
+
+## Relationship to Other Blueprints
 
 - **agent-harness**: Provides Phase 1/2 results, harness_eval.py infrastructure, eval framework
 - **agent-swarm**: Provides Phase 1 model x harness matrix, swarm_eval.py, concurrent runner
@@ -592,5 +636,3 @@ Integrate the trained verifier as a tool in the agent loop (Leanstral pattern fo
 - **bitter-lesson-time-horizon** (blog): Verifier strength as the third axis in the time horizon equation; the soft verifier taxonomy maps to different autonomy ceilings
 - **Leanstral clipping**: Template pattern (sparse specialist + perfect verifier + MCP) — hard verification end of the spectrum
 - **RALPH Loop**: Production example of verifier-in-loop (terraform toolchain = strong verifier)
-- **Phoenix AI Engineering Loop clipping**: Observability-as-verification pattern; "agent behavior documented by telemetry, not code" supports SERA-as-soft-verifier framing
-- **SERA (Ai2/Tim Dettmers)**: Published methodology — soft verification on partially correct data; SVG pipeline as consensus verifier; 54.2% SWE-Bench Verified with SFT only
