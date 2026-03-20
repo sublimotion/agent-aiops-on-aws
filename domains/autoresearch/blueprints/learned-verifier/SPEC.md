@@ -2,6 +2,7 @@
 
 **Status**: DRAFT — pending data collection
 **Created**: 2026-03-19
+**Updated**: 2026-03-19 (v2 — soft verifier framing, SERA SVG integration)
 **Depends on**: agent-harness (Phase 1/2 complete), agent-swarm (Phase 1 complete)
 
 ## Executive Summary
@@ -9,6 +10,76 @@
 Train a model to predict whether a coding agent's patch will pass tests, then use it to select the best patch from N candidates. This is the coding-agent instantiation of Best-of-N with a learned reward model.
 
 **The core bet**: the binding constraint on coding agent performance is verification quality, not model scale, harness design, or finetuning.
+
+## The Verification Spectrum
+
+Verification is not binary (have/don't have). It's a spectrum of signal strength:
+
+```
+Hard verifier     Lean compiler, terraform validate       100% precision, deterministic
+                  ↑
+Strong verifier   Test suite (SWE-bench gold tests)       50-80% precision, expensive (Docker)
+                  ↑
+Soft verifier     SERA SVG consensus, behavioral          Probabilistic, cheap
+                  telemetry, Phoenix trace analysis
+                  ↑
+Learned verifier  Model trained on soft verifier signals   Approximates strong verifier
+                  ↑
+No verifier       Blind submission                         19% precision (Codex)
+```
+
+**Key insight**: SERA's instrumented agent loop is already a soft verifier. It collects behavioral signals every turn — action types, context growth, repetition patterns, edit timing. These signals correlate with patch quality but aren't currently used for selection. The Phoenix AI engineering loop (Arize) does the same thing at the observability layer — traces as verification signal.
+
+The learned verifier doesn't need to be built from scratch. It needs to make SERA's existing soft signals **predictive**.
+
+### SERA as Soft Verifier
+
+SERA's harness captures per-turn telemetry that encodes agent confidence and competence:
+
+| Signal | What It Measures | Verification Intuition |
+|--------|-----------------|----------------------|
+| `action_type` distribution | % search vs read vs edit vs run | Confident agent edits early; confused agent keeps searching |
+| `repeated_action` | Same tool call made twice | Agent is stuck / looping — low-quality trajectory |
+| `first_edit_turn` / Parkinson's ratio | When first edit happens relative to budget | Late edits = low confidence, correlates with failure |
+| `context_tokens` growth rate | Per-turn context size | Runaway context = lost focus, information overload |
+| `diff_size` | Size of generated patch | Oversized patches = shotgun approach |
+| `edit_count` | Number of edit operations | Too many edits = thrashing, not converging |
+| `turns_used` / `total_turns` | Budget consumption | 30/30 turns used = likely didn't converge |
+
+**These signals are already collected in 6,599 turn-level rows** from Phase 1 (configs A-F). They have never been used as predictive features.
+
+### SERA's SVG Pipeline as Consensus Verifier
+
+The full SERA methodology (Tim Dettmers, Ai2 — "Soft-Verified Efficient Repository Agents") includes a 7-stage Soft-Verified Generation pipeline in `sera-datagen.py`:
+
+1. **GENERATE**: Model fixes a bug via multi-turn tool use → `patch_1`
+2. **VERIFY**: Run repo test suite (hard verification)
+3. **DESCRIBE**: Convert `patch_1` to a PR description (natural language)
+4. **REPRODUCE**: Model generates a second fix from PR description alone → `patch_2`
+5. **SCORE**: Compute line-level recall between `patch_1` and `patch_2`
+6. **FILTER**: Accept if tests_pass AND recall ≥ 0.8
+7. **FORMAT**: Save as training pairs
+
+Stage 5 (`stage_score`) is a **consensus verifier**: if two independent generations converge on the same code changes, confidence is higher. The scoring function computes set intersection of non-header diff lines:
+
+```python
+def stage_score(original_patch, repro_patch):
+    original_lines = {line.strip() for line in original_patch.split("\n")
+                      if line.strip() and not line.startswith(("---","+++","@@","diff","index"))}
+    repro_lines = {line.strip() for line in repro_patch.split("\n")
+                   if line.strip() and not line.startswith(("---","+++","@@","diff","index"))}
+    return len(repro_lines & original_lines) / len(original_lines)
+```
+
+**The `harness_eval.py` fork only uses stages 1-2, discarding the SVG consensus signal.** The full pipeline stores both patches AND both conversation transcripts (`fix_messages`, `repro_messages`). This is existing infrastructure we can leverage.
+
+### Connection to Phoenix / Observability-as-Verification
+
+The Phoenix AI engineering loop (Arize) demonstrates the same pattern at a different layer: give the agent programmatic access to its own traces → agent analyzes patterns → agent hypothesizes root causes → agent experiments. Their finding: "agent behavior is documented by telemetry, not code" — traces are the real verification signal for agent systems.
+
+This validates our approach: SERA's turn-level telemetry IS the agent's trace data. Training a verifier on it is automating what the Phoenix demo does manually.
+
+---
 
 ## Reality Check: What We Actually Have
 
@@ -18,24 +89,27 @@ A thorough audit (2026-03-19) of all existing experiment data revealed a signifi
 
 | Source | Files | Rows | patch_diff | transcript | tests_pass | turn_metrics |
 |--------|------:|-----:|:----------:|:----------:|:----------:|:------------:|
-| Harness Phase 1 (A-F) | 6 | 300 | NONE | NONE | NONE | YES (6,599 turn rows) |
+| Harness Phase 1 (A-F) | 6+6 | 300+6,599 | NONE | NONE | NONE | YES (6,599 turn rows) |
 | Harness Phase 2 (sera, langgraph, aider) | 3 | 150 | NONE | NONE | NONE | partial |
 | Harness Phase 2b (6 harnesses) | 6 | 270 | NONE | NONE | always false* | partial |
 | Harness Eval (7 harnesses) | 7 | 248 | NONE | NONE | YES (60 pass) | NONE |
 | Swarm Phase 1 (9 configs) | 9 | 491 | NONE | NONE | partial (12 pass) | NONE |
 | Recovered diffs | 1 | 1 | 1 file | NONE | N/A | N/A |
-| **TOTAL** | **32** | **~1,459** | **1** | **0** | **~72 pass** | **6,599 turns** |
+| SERA datagen (`sera-datagen.py`) | — | — | YES (both patches) | YES (both transcripts) | YES | — |
+| **TOTAL** | **32+** | **~1,459** | **1** | **0** | **~72 pass** | **6,599 turns** |
 
 *Phase 2b `pass` field is a pre-eval placeholder (always false). Actual test results are only in eval_* files.
 
+**Key discovery**: The original `sera-datagen.py` in `gpu-serving/blueprints/devstral-sera/scripts/` stores BOTH patches, BOTH full conversation transcripts, PR descriptions, line-level recall scores, AND test results. If any SVG pipeline runs were completed previously, that data contains exactly the training signal we need. Check `/mnt/nvme/sera-data/` on g7e for completed SVG runs.
+
 ### What This Means
 
-1. **Zero patch diffs exist.** The instrumentation was deployed to g7e but has never been run. We cannot train any patch-level model without collecting new data.
-2. **Zero transcripts exist.** No conversation logs from any run. Trajectory-level verifier is not possible with current data.
-3. **50 unique issues is the real sample size**, not 1,459. Each issue appears across multiple configs, but they are repeated measurements of the same 50 underlying problems.
+1. **Zero patch diffs in the harness/swarm results.** The instrumentation was deployed to g7e but has never been run.
+2. **Zero transcripts in harness/swarm results.** Transcript capture only works through the SERA path.
+3. **50 unique issues is the real sample size**, not 1,459. Repeated measurements of 50 underlying problems.
 4. **Only 72 positives (tests_pass=true)** across all eval files. Class imbalance is ~1:8.
-5. **Devstral swarm files lack tests_pass entirely** — different schema from qwen/swesmith runs.
-6. **OpenCode + Claude Code adapters cannot capture transcripts** — they are bash scripts that return JSON on stdout. Only the SERA path (which calls `run_instrumented_loop`) can save conversation history.
+5. **BUT: 6,599 turn-level rows exist** from Phase 1 with behavioral features. These are soft verifier signals that have never been used as predictive features.
+6. **AND: `sera-datagen.py` already captures exactly what we need** — both patches, both transcripts, line-recall scores. We may have existing SVG data on g7e.
 
 ### Instrumentation Status
 
@@ -45,6 +119,7 @@ A thorough audit (2026-03-19) of all existing experiment data revealed a signifi
 | `harness_eval.py` — transcript capture | YES | YES | NO |
 | `swarm_eval.py` — patch_diff capture | YES | YES | NO |
 | `swarm_eval.py` — transcript (SERA only) | YES | YES | NO |
+| `sera-datagen.py` — full SVG pipeline | YES | ON g7e | CHECK `/mnt/nvme/sera-data/` |
 | OpenCode adapter — transcript capture | NO (not possible) | N/A | N/A |
 | Claude Code adapter — transcript capture | NO (not possible) | N/A | N/A |
 
@@ -71,13 +146,13 @@ These constraints are non-negotiable and shape every design decision:
 | Model complexity ceiling | Low (XGBoost, logistic regression, small MLP) | LLM fine-tuning is not viable at N=50 |
 | Confidence intervals | Wide (~+/-15pp for proportions over 50 trials) | This is a pilot study, not a definitive experiment |
 
-**Why not fine-tune an LLM?** With 50 unique issues, each appearing ~12x with different patches, an LLM will memorize `problem_statement → pass_probability` rather than learning general patch quality assessment. The model sees the same problem statement ~12 times during training — it learns issue difficulty, not patch quality. Fine-tuning requires 10K-100K+ unique inputs for the (problem, patch) → quality mapping.
+**Why not fine-tune an LLM?** With 50 unique issues, each appearing ~12x with different patches, an LLM will memorize `problem_statement -> pass_probability` rather than learning general patch quality assessment. The model sees the same problem statement ~12 times during training — it learns issue difficulty, not patch quality. Fine-tuning requires 10K-100K+ unique inputs for the (problem, patch) -> quality mapping.
 
-**The right framing**: this experiment answers "Is there learnable signal in patch features that predicts test outcomes, separable from issue difficulty and harness artifacts?" If yes, collect more data (SWE-bench full: 2,294 issues) and scale up. If no, LLM fine-tuning won't help.
+**The right framing**: this experiment answers "Is there learnable signal in patch features and behavioral telemetry that predicts test outcomes, separable from issue difficulty and harness artifacts?" If yes, collect more data (SWE-bench full: 2,294 issues) and scale up. If no, LLM fine-tuning won't help.
 
 ### Confounders to Control
 
-The label `tests_pass` encodes: `f(issue_difficulty, model_capability, harness_quality, patch_quality)`. The verifier only sees (problem_statement, patch_diff). Three confounders must be addressed:
+The label `tests_pass` encodes: `f(issue_difficulty, model_capability, harness_quality, patch_quality)`. The verifier only sees (problem_statement, patch_diff, behavioral_features). Three confounders must be addressed:
 
 1. **Issue difficulty** — easy issues pass more often regardless of patch quality. Control: pairwise training within each issue (compare passing vs failing patches for the same issue).
 2. **Harness bias** — a harness bug causing spurious failures looks like "bad patch" to the verifier. Control: train within-harness, test cross-harness.
@@ -85,7 +160,7 @@ The label `tests_pass` encodes: `f(issue_difficulty, model_capability, harness_q
 
 ### Scope and Non-Goals
 
-**In scope**: Proof-of-concept on SWE-bench Lite 50 showing that patch features predict test outcomes better than random selection.
+**In scope**: Proof-of-concept on SWE-bench Lite 50 showing that soft verifier signals and/or patch features predict test outcomes better than random selection.
 
 **Not in scope** (requires more data):
 - Generalizing to unseen repos or languages
@@ -95,9 +170,45 @@ The label `tests_pass` encodes: `f(issue_difficulty, model_capability, harness_q
 
 ---
 
-## Phase 1: Data Collection (PREREQUISITE)
+## Phase 0: Recover Existing Data
 
-**Goal**: Collect patch diffs and transcripts for all SERA-path runs. Collect patch diffs only for adapter-path runs (OpenCode, Claude Code).
+**Goal**: Before collecting anything new, determine what usable data already exists.
+
+### 0.1 Check for SVG Pipeline Output on g7e
+
+The `sera-datagen.py` pipeline writes results to `/mnt/nvme/sera-data/`. Each completed run produces:
+- `fix_patch` and `repro_patch` (both diffs)
+- `fix_messages` and `repro_messages` (both full transcripts)
+- `line_recall` (consensus score)
+- `tests_pass` (hard verification)
+- `accepted` (soft verification: tests_pass AND recall >= 0.8)
+
+```bash
+ssh g7e "ls -la /mnt/nvme/sera-data/ && wc -l /mnt/nvme/sera-data/*.jsonl 2>/dev/null"
+```
+
+If SVG data exists, it contains EXACTLY the training signal for a patch-level verifier + the consensus baseline. This could shortcut Phase 1 entirely.
+
+### 0.2 Behavioral Baseline with Existing Turn Data
+
+We already have 6,599 turn-level rows (Phase 1 configs A-F, all SERA × Devstral 24B). These contain soft verifier signals but lack `tests_pass` labels.
+
+**The join problem**: Phase 1 summary files have `fix_generated` but not `tests_pass`. The `eval_sera.jsonl` file has `tests_pass` for 23 instances. If we join Phase 1 turn data with eval_sera labels, we get 23 labeled examples with full behavioral features.
+
+23 examples is thin, but sufficient for a quick signal check: do behavioral features (turns_used, first_edit_turn, repeat_count, context_growth_rate) separate passes from failures? A simple logistic regression on 23 examples with 5 features can answer this in minutes on a laptop.
+
+### 0.3 Exit Criteria for Phase 0
+
+- [ ] Inventory of `/mnt/nvme/sera-data/` contents (SVG pipeline output)
+- [ ] Join Phase 1 turn data with eval_sera.jsonl to get labeled behavioral features
+- [ ] Quick signal check: logistic regression on behavioral features vs tests_pass (23 examples)
+- [ ] Decision: does SVG data exist in quantity? If yes, skip to Phase 2 baselines
+
+---
+
+## Phase 1: Data Collection
+
+**Goal**: Collect patch diffs, transcripts, and behavioral telemetry with tests_pass labels.
 
 ### 1.1 Fix Known Code Issues Before Running
 
@@ -121,7 +232,17 @@ These produce: patch_diff + full transcript + turn_metrics + tests_pass.
 
 **Total: 200 trajectories with full signal. ~20 GPU-hours.**
 
-### 1.3 Adapter Runs — Patch Diff Only
+### 1.3 SVG Consensus Runs (Soft Verification Signal)
+
+Run the full `sera-datagen.py` SVG pipeline to get consensus scores. Each issue gets TWO patches and a line-recall score.
+
+| Run | Model | Issues | Output | Priority |
+|-----|-------|--------|--------|----------|
+| SVG-1 | Devstral 24B | 50 | 50 × (patch_1, patch_2, recall, both transcripts) | HIGH |
+
+**This doubles our patch diversity** (100 patches for 50 issues) and provides a consensus baseline for free.
+
+### 1.4 Adapter Runs — Patch Diff Only
 
 OpenCode and Claude Code adapters cannot return transcripts (bash subprocess, JSON on stdout). We can only capture `git diff HEAD` after the adapter completes.
 
@@ -133,21 +254,21 @@ OpenCode and Claude Code adapters cannot return transcripts (bash subprocess, JS
 
 **Total: 150 additional patch diffs (no transcripts). ~12 GPU-hours.**
 
-### 1.4 Generate N=16 Candidate Patches (for Best-of-N Evaluation)
+### 1.5 Generate N=16 Candidate Patches (for Best-of-N Evaluation)
 
-For the verifier to be useful, we need multiple candidate patches per issue. Run the cheapest high-fix-rate config 16 times per issue with different random seeds.
+For the verifier to be useful, we need multiple candidate patches per issue. Run the cheapest high-fix-rate config 16 times per issue with different random seeds (temperature > 0).
 
 | Generator | Config | Issues | Candidates/Issue | Total Patches |
 |-----------|--------|--------|-----------------|---------------|
-| Devstral 24B × SERA | Phase 1 Config D (30 turns) | 50 | 16 | 800 |
+| Devstral 24B x SERA | Phase 1 Config D (30 turns) | 50 | 16 | 800 |
 
-**Each patch needs**: patch_diff (captured), tests_pass (run gold tests), problem_statement (from SWE-bench).
+**Each patch needs**: patch_diff (captured), tests_pass (run gold tests), behavioral features (turn_metrics), problem_statement (from SWE-bench).
 
-**This is the most expensive step: ~64 GPU-hours** (800 runs × ~5 min each on 1x B200). Can be parallelized across 2 GPUs.
+**This is the most expensive step: ~64 GPU-hours** (800 runs x ~5 min each on 1x B200). Can be parallelized across 2 GPUs.
 
 **Alternative (cheaper)**: Generate N=4 per issue (200 runs, ~16 GPU-hours). Lower statistical power for best-of-N but sufficient to establish whether ranking signal exists.
 
-### 1.5 Data Manifest
+### 1.6 Data Manifest
 
 After collection, produce a single manifest file:
 
@@ -167,6 +288,7 @@ After collection, produce a single manifest file:
       "has_patch_diff": true,
       "has_transcript": true,
       "has_turn_metrics": true,
+      "has_svg_recall": false,
       "tests_pass": false,
       "fix_generated": true
     }
@@ -174,11 +296,12 @@ After collection, produce a single manifest file:
 }
 ```
 
-### 1.6 Exit Criteria for Phase 1
+### 1.7 Exit Criteria for Phase 1
 
 Phase 1 is complete when:
 - [ ] At least 200 trajectories with patch_diff (from SERA runs)
 - [ ] At least 100 trajectories with full transcript (SERA only)
+- [ ] At least 50 SVG consensus scores (from sera-datagen.py pipeline)
 - [ ] N=16 (or N=4) candidate patches per issue for at least 40 issues, each with tests_pass label
 - [ ] Manifest file validates: no missing fields, no null patch_diffs where fix_generated=true
 - [ ] `_get_git_diff` confirmed to use `git diff HEAD` (not just `git diff`)
@@ -190,6 +313,18 @@ Phase 1 is complete when:
 
 **Goal**: Establish performance baselines before training anything. If baselines are strong, training may not be needed.
 
+### 2.0 Behavioral Signal Check (Existing Data)
+
+**Can run immediately with existing data** — no new collection needed.
+
+Join Phase 1 turn data (6,599 rows, configs A-F) with eval_sera.jsonl (23 labeled examples):
+- Aggregate per-issue behavioral features: avg turns, first_edit_turn, repeat_count, context growth rate, action distribution
+- Fit logistic regression: behavioral features -> tests_pass
+- Report: AUC, accuracy, feature coefficients
+- If AUC > 0.65 on 23 examples: strong signal exists in behavioral data
+
+**This takes 30 minutes on a laptop and costs nothing.** It answers the most basic question: do SERA's soft verifier signals predict test outcomes at all?
+
 ### 2.1 Random Baseline
 
 For each issue with N candidates:
@@ -199,15 +334,30 @@ For each issue with N candidates:
 
 ### 2.2 Simple Heuristics
 
+**Behavioral heuristics (from SERA soft verifier signals):**
+
+| Heuristic | Input | Verification Intuition |
+|-----------|-------|----------------------|
+| Fewest turns used | turn_metrics | Agent converged quickly = higher confidence |
+| Earliest first_edit_turn | turn_metrics | Didn't waste turns exploring — knew what to do |
+| Lowest repeat_count | turn_metrics | No looping = clean trajectory |
+| Lowest context growth rate | turn_metrics | Stayed focused, didn't bloat context |
+| Highest edit-to-search ratio | turn_metrics | More editing than searching = decisive |
+
+**Patch heuristics:**
+
 | Heuristic | Input | Rationale |
 |-----------|-------|-----------|
-| Shortest patch (fewest diff lines) | patch_diff | Minimal changes less likely to introduce bugs. Strong baseline in program repair literature. |
-| Smallest diff bytes | patch_diff | Variant of above |
+| Shortest patch (fewest diff lines) | patch_diff | Minimal changes less likely to introduce bugs |
 | Fewest files touched | patch_diff | Single-file fixes more likely correct |
-| Fewest turns used | turn_metrics | Agent found fix quickly = higher confidence |
-| Lowest token count | turn_metrics | Less exploration = more decisive |
-| Earliest first_edit_turn | turn_metrics | Didn't waste turns exploring — knew what to do |
 | No test file modifications | patch_diff | Patches that modify test files are suspicious |
+
+**Consensus heuristic (from SERA SVG pipeline):**
+
+| Heuristic | Input | Rationale |
+|-----------|-------|-----------|
+| Highest SVG line-recall | sera-datagen output | Two independent generations agree = higher quality (SERA's core insight) |
+| Majority vote among N candidates | N patch_diffs | Cluster patches by similarity, pick largest cluster |
 
 Evaluate each heuristic: given N candidates, rank by heuristic, measure top-1 and top-3 pass rate via LOIO-CV.
 
@@ -231,14 +381,27 @@ Test with:
 
 Evaluate: rank N candidates by P(YES), measure top-1 pass rate. Compare to heuristics and random.
 
-**Cost estimate**: 50 issues × 16 candidates × ~$0.01/call = ~$8 for Sonnet, ~$40 for Opus.
+**Cost estimate**: 50 issues x 16 candidates x ~$0.01/call = ~$8 for Sonnet, ~$40 for Opus.
 
-### 2.4 Exit Criteria for Phase 2
+### 2.4 SVG Consensus Baseline
 
-- [ ] All baselines computed with LOIO-CV
+Use SERA's describe-reproduce-score pipeline as a standalone verifier:
+- For each candidate patch, run stages 3-5 (describe -> reproduce -> score)
+- Rank candidates by line-recall score
+- Measure top-1 pass rate
+
+This uses SERA's own soft verification as a baseline. If it works well, we don't need to train anything — just integrate the SVG scoring step into the selection pipeline.
+
+**Cost**: ~2 extra inference calls per candidate (describe + reproduce). For N=16 x 50 issues = 1,600 extra calls. Cheap on self-hosted Devstral.
+
+### 2.5 Exit Criteria for Phase 2
+
+- [ ] Behavioral signal check completed (logistic regression on 23 examples)
+- [ ] All baselines computed with LOIO-CV on N-candidate data
 - [ ] Results table with 95% confidence intervals
 - [ ] Decision: does any baseline already meet or exceed the 7-harness ensemble ceiling (32%)?
 - [ ] If LLM-as-judge > 40% top-1, reconsider whether training is needed at all
+- [ ] If SVG consensus > 40% top-1, integrate it directly without training
 
 ---
 
@@ -259,13 +422,19 @@ Extract from each (issue, patch) pair:
 - AST-level: number of function/class changes, scope depth
 - Similarity to other candidates for same issue (diversity signal)
 
-**Behavioral features** (from turn_metrics, SERA only):
+**Behavioral features** (from SERA soft verifier — turn_metrics):
 - Turns used
 - First edit turn / Parkinson's ratio
 - Tokens consumed
-- Action distribution (% search vs read vs edit)
+- Action distribution (% search vs read vs edit vs run_command)
 - Repeat rate (repeated_action count)
-- Context growth rate
+- Context growth rate (tokens at turn N vs turn 1)
+- Edit success rate (edit_applied / total edit attempts)
+
+**Consensus features** (from SVG pipeline):
+- Line-recall between original and reproduced patch
+- Whether reproduction also passes tests
+- PR description length / quality
 
 **Issue features** (from problem_statement):
 - Repo name (categorical)
@@ -281,7 +450,7 @@ Extract from each (issue, patch) pair:
 - **Hyperparameter tuning**: 5-fold inner CV within each LOIO fold (nested CV)
 - **Class imbalance**: Use `scale_pos_weight` or SMOTE
 - **Feature importance**: SHAP values to identify which features carry signal
-- **Key question**: Do patch features dominate, or do issue/harness features dominate? If the latter, the verifier is learning issue difficulty, not patch quality.
+- **Key question**: Do patch features dominate, behavioral features dominate, or do issue/harness features dominate? This tells us which verification tier carries the most signal.
 
 ### 3.3 Model B: Pairwise Ranking (Within-Issue)
 
@@ -311,12 +480,14 @@ Only attempt if Models A/B show clear signal above baselines:
 | **Precision-at-threshold** | If P(pass) > 0.5, predict pass | Binary classification quality |
 | **Feature importance** | SHAP values for top features | Interpretability — what did the model learn? |
 | **Confounder check** | Accuracy when model/harness features are ablated | Does the model rely on patch features or metadata? |
+| **Verification tier analysis** | Compare: behavioral-only vs patch-only vs combined | Which soft verifier tier carries the most signal? |
 
 ### 3.6 Exit Criteria for Phase 3
 
 - [ ] At least one trained model beats best Phase 2 baseline by >5pp on top-1 pass rate (outside CI overlap)
-- [ ] Feature importance shows patch features (not issue/harness metadata) in top-5
+- [ ] Feature importance shows patch or behavioral features (not issue/harness metadata) in top-5
 - [ ] Confounder check: performance doesn't collapse when model_name and harness_name are removed
+- [ ] Verification tier analysis: clear winner between behavioral, patch, and consensus features
 - [ ] Results reproducible: LOIO-CV variance reported, no cherry-picked folds
 
 ---
@@ -339,10 +510,11 @@ Only attempt if Models A/B show clear signal above baselines:
 ### Phase 5: Verifier-in-Loop Agent (Contingent)
 
 Integrate the trained verifier as a tool in the agent loop (Leanstral pattern for general code):
-- Agent generates patch → verifier scores → agent iterates or submits
+- Agent generates patch -> verifier scores -> agent iterates or submits
 - Measure: does early rejection signal break the Parkinson's pattern?
 - Measure: wall-clock time and cost vs. unverified agent
 - Compare to: LLM-as-judge in-loop (no training, just API calls)
+- Compare to: SVG consensus in-loop (describe-reproduce-score as verification step)
 
 ---
 
@@ -352,15 +524,18 @@ Integrate the trained verifier as a tool in the agent loop (Leanstral pattern fo
 
 | Phase | GPU-hours | Wall-clock (est.) | Cost @ $10.20/hr |
 |-------|----------:|-------------------:|------------------:|
+| Phase 0: Check existing data | 0 | 1h (laptop) | $0 |
 | Phase 1: SERA instrumented runs | 20h | 10h (2 GPU parallel) | $102 |
+| Phase 1: SVG consensus runs | 8h | 4h (2 GPU parallel) | $41 |
 | Phase 1: Adapter patch-diff runs | 12h | 6h (2 GPU parallel) | $61 |
 | Phase 1: N=16 candidate generation | 64h | 32h (2 GPU parallel) | $326 |
 | Phase 1: N=4 alternative | 16h | 8h (2 GPU parallel) | $82 |
-| Phase 2: LLM-as-judge | 0 (API) | <1h | ~$48 (API costs) |
+| Phase 2: Baselines + LLM-as-judge | 0 (API) | <1h | ~$48 (API costs) |
+| Phase 2: SVG consensus baseline | 4h | 2h | $20 |
 | Phase 3: XGBoost/ranking | 0 (CPU) | <1h | $0 |
 | Phase 3: Embedding extraction | 2h | 1h | $10 |
-| **Total (N=16 path)** | **~98h** | **~50h** | **~$547** |
-| **Total (N=4 path)** | **~50h** | **~25h** | **~$303** |
+| **Total (N=16 path)** | **~110h** | **~57h** | **~$608** |
+| **Total (N=4 path)** | **~62h** | **~33h** | **~$364** |
 
 ### Software
 
@@ -368,6 +543,7 @@ Integrate the trained verifier as a tool in the agent loop (Leanstral pattern fo
 - XGBoost, scikit-learn, SHAP
 - SWE-bench dataset (pin version in manifest)
 - Anthropic API access (for LLM-as-judge baseline)
+- `sera-datagen.py` (for SVG consensus runs)
 
 ---
 
@@ -378,7 +554,9 @@ Integrate the trained verifier as a tool in the agent loop (Leanstral pattern fo
 | No learnable signal in patches at N=50 | HIGH | Experiment is negative | Frame as pilot; define scale-up criteria |
 | git diff returns empty for committed changes | HIGH | Missing patch diffs | Fix `_get_git_diff` to use `git diff HEAD` before any data collection |
 | LLM-as-judge beats all trained models | MEDIUM | Training is wasted effort | Run Phase 2 fully before Phase 3; this outcome is still useful |
+| SVG consensus baseline is already sufficient | MEDIUM | No training needed | This is a GOOD outcome — integrate SVG scoring directly |
 | Verifier learns issue difficulty, not patch quality | MEDIUM | False positive — model appears good but doesn't generalize | Pairwise within-issue training; feature ablation tests |
+| Behavioral features alone predict as well as patch features | MEDIUM | Patch diffs unnecessary for verifier | Good news — cheaper verification; still needs validation at scale |
 | SWE-bench Lite subset changes silently | LOW | Results not reproducible | Pin instance_ids in manifest file |
 | g7e instance terminated mid-collection | LOW | Lost partial data | Incremental writes (already implemented); sync regularly |
 | Class imbalance defeats classifier | MEDIUM | All predictions = "fail" | Pairwise ranking (avoids classification); weighted loss |
@@ -388,26 +566,31 @@ Integrate the trained verifier as a tool in the agent loop (Leanstral pattern fo
 ## Success Criteria
 
 ### Minimum Viable Result (pilot success)
-- Top-1 pass rate of any trained model > best heuristic baseline + 5pp
-- Feature importance shows patch_diff features in top-3
-- Written analysis of what patch features predict test passage
+- Top-1 pass rate of any method (trained or baseline) > random selection + 5pp
+- Clear identification of which verification tier (behavioral, patch, consensus) carries signal
+- Written analysis connecting results to the verification spectrum framework
 
 ### Strong Result (justifies scale-up)
 - Top-1 pass rate > 7-harness ensemble ceiling (32%)
-- Cross-harness generalization: model trained on SERA data predicts OpenCode/Claude Code outcomes
-- Clear evidence that patch complexity features (not issue identity) drive predictions
+- Cross-harness generalization: verifier trained on SERA data predicts OpenCode/Claude Code outcomes
+- Verification tier analysis shows patch or behavioral features dominate over issue identity
+- SVG consensus as a practical zero-training verifier for Best-of-N selection
 
 ### Negative Result (still publishable)
-- Documented evidence that at N=50, patch features do not predict test outcomes above baseline
+- Documented evidence that at N=50, neither patch features nor behavioral telemetry predict test outcomes above baseline
 - Analysis of why (issue difficulty dominates? harness artifacts? insufficient variation?)
 - Recommendation: minimum data scale needed for signal detection
+- Contribution: the verification spectrum framework and soft verifier taxonomy
 
 ---
 
-## Relationship to Other Blueprints
+## Relationship to Other Blueprints and Research
 
 - **agent-harness**: Provides Phase 1/2 results, harness_eval.py infrastructure, eval framework
-- **agent-swarm**: Provides Phase 1 model×harness matrix, swarm_eval.py, concurrent runner
-- **bitter-lesson-time-horizon** (blog): Verifier strength as the third axis in the time horizon equation
-- **Leanstral clipping**: Template pattern (sparse specialist + perfect verifier + MCP)
+- **agent-swarm**: Provides Phase 1 model x harness matrix, swarm_eval.py, concurrent runner
+- **devstral-sera** (gpu-serving): Contains the full SVG pipeline (`sera-datagen.py`) — verification infrastructure we haven't been using
+- **bitter-lesson-time-horizon** (blog): Verifier strength as the third axis in the time horizon equation; the soft verifier taxonomy maps to different autonomy ceilings
+- **Leanstral clipping**: Template pattern (sparse specialist + perfect verifier + MCP) — hard verification end of the spectrum
 - **RALPH Loop**: Production example of verifier-in-loop (terraform toolchain = strong verifier)
+- **Phoenix AI Engineering Loop clipping**: Observability-as-verification pattern; "agent behavior documented by telemetry, not code" supports SERA-as-soft-verifier framing
+- **SERA (Ai2/Tim Dettmers)**: Published methodology — soft verification on partially correct data; SVG pipeline as consensus verifier; 54.2% SWE-Bench Verified with SFT only
