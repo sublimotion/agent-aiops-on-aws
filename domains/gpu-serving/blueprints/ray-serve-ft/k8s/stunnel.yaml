@@ -1,0 +1,27 @@
+###############################################################################
+# stunnel ConfigMap — TLS proxy for ElastiCache Serverless
+# Lets Ray connect to plain redis://localhost:6379 while stunnel handles TLS
+# to ElastiCache Serverless endpoint.
+#
+# Why: Ray's C++ Redis client does not support TLS (rediss://).
+#      ElastiCache Serverless enforces TLS. stunnel bridges the gap.
+###############################################################################
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stunnel-config
+  namespace: ray-ft
+data:
+  stunnel.conf: |
+    foreground = yes
+    pid =
+    syslog = no
+    output = /dev/stderr
+
+    [redis]
+    client = yes
+    accept = 127.0.0.1:6380
+    connect = ray-ft-gcs-9pcmog.serverless.usw2.cache.amazonaws.com:6379
+    TIMEOUTconnect = 10
+    TIMEOUTclose = 0
+    retry = yes

@@ -1,0 +1,189 @@
+###############################################################################
+# RayService: YOLOv8 Object Detection with GCS Fault Tolerance
+#
+# Prerequisites:
+#   - KubeRay operator v1.3.0+ installed
+#   - ElastiCache Serverless Redis (via Terraform)
+#   - stunnel ConfigMap deployed (k8s/stunnel.yaml)
+#   - GPU nodegroup with g5.xlarge (A10G) nodes
+#
+# Redis connectivity: stunnel sidecar on each pod handles TLS termination
+# to ElastiCache Serverless. Ray connects to localhost:6379 (plain TCP).
+#
+# Dependencies (ultralytics, etc.) are installed via runtime_env pip.
+# Head needs extra ephemeral-storage for the pip install build step.
+###############################################################################
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ray-ft
+---
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: yolo-ft
+  namespace: ray-ft
+  annotations:
+    ray.io/ft-enabled: "true"
+spec:
+  serveConfigV2: |
+    applications:
+      - name: yolo
+        route_prefix: /
+        import_path: yolo_serve:app
+        runtime_env:
+          pip:
+            - ultralytics>=8.0.0
+            - "numpy<2"
+            - pillow
+            - opencv-python-headless
+            - python-multipart
+          env_vars:
+            PIP_NO_CACHE_DIR: "1"
+        deployments:
+          - name: YOLODetector
+            num_replicas: 2
+            max_replicas_per_node: 1
+            health_check_period_s: 10
+            health_check_timeout_s: 30
+            ray_actor_options:
+              num_gpus: 1
+  rayClusterConfig:
+    rayVersion: "2.44.1"
+    headGroupSpec:
+      rayStartParams:
+        dashboard-host: "0.0.0.0"
+        num-cpus: "0"
+        redis-password: ""
+      template:
+        metadata:
+          labels:
+            ray-node: head
+        spec:
+          nodeSelector:
+            role: system
+          containers:
+            - name: ray-head
+              image: rayproject/ray:2.44.1-py312-cpu
+              ports:
+                - containerPort: 6379
+                  name: gcs
+                - containerPort: 8265
+                  name: dashboard
+                - containerPort: 8000
+                  name: serve
+              env:
+                - name: RAY_REDIS_ADDRESS
+                  value: "127.0.0.1:6380"
+                - name: RAY_gcs_rpc_server_reconnect_timeout_s
+                  value: "60"
+                - name: RAY_RUNTIME_ENV_SETUP_TIMEOUT_S
+                  value: "600"
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: "8Gi"
+                  ephemeral-storage: "20Gi"
+                limits:
+                  cpu: "4"
+                  memory: "12Gi"
+                  ephemeral-storage: "30Gi"
+              volumeMounts:
+                - name: serve-app
+                  mountPath: /home/ray/yolo_serve.py
+                  subPath: yolo_serve.py
+            - name: stunnel
+              image: alpine:3.20
+              command: ["sh", "-c", "apk add --no-cache stunnel > /dev/null 2>&1 && exec stunnel /stunnel-conf/stunnel.conf"]
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "64Mi"
+                limits:
+                  cpu: "200m"
+                  memory: "128Mi"
+              volumeMounts:
+                - name: stunnel-config
+                  mountPath: /stunnel-conf
+          volumes:
+            - name: serve-app
+              configMap:
+                name: yolo-serve-app
+            - name: stunnel-config
+              configMap:
+                name: stunnel-config
+    workerGroupSpecs:
+      - groupName: gpu-workers
+        replicas: 2
+        minReplicas: 2
+        maxReplicas: 2
+        rayStartParams:
+          num-gpus: "1"
+        template:
+          metadata:
+            labels:
+              ray-node: worker
+          spec:
+            nodeSelector:
+              role: gpu
+              nvidia.com/gpu.present: "true"
+            tolerations:
+              - key: nvidia.com/gpu
+                operator: Exists
+                effect: NoSchedule
+            initContainers:
+              - name: install-libgl
+                image: debian:bookworm-slim
+                securityContext:
+                  runAsUser: 0
+                command: ["sh", "-c", "apt-get update -qq && apt-get install -y -qq libgl1-mesa-glx libglib2.0-0 > /dev/null 2>&1 && cp -aL /usr/lib/x86_64-linux-gnu/libGL.so* /shared-libs/ && cp -aL /usr/lib/x86_64-linux-gnu/libGLX.so* /shared-libs/ && cp -aL /usr/lib/x86_64-linux-gnu/libGLdispatch.so* /shared-libs/ && cp -aL /usr/lib/x86_64-linux-gnu/libgthread* /shared-libs/ && cp -aL /usr/lib/x86_64-linux-gnu/libglib* /shared-libs/"]
+                volumeMounts:
+                  - name: shared-libs
+                    mountPath: /shared-libs
+            containers:
+              - name: ray-worker
+                image: rayproject/ray:2.44.1-py312-cu125
+                env:
+                  - name: RAY_REDIS_ADDRESS
+                    value: "127.0.0.1:6380"
+                  - name: RAY_gcs_rpc_server_reconnect_timeout_s
+                    value: "600"
+                  - name: LD_LIBRARY_PATH
+                    value: "/shared-libs:/usr/local/nvidia/lib64"
+                resources:
+                  requests:
+                    cpu: "2"
+                    memory: "8Gi"
+                    nvidia.com/gpu: "1"
+                  limits:
+                    cpu: "4"
+                    memory: "16Gi"
+                    nvidia.com/gpu: "1"
+                volumeMounts:
+                  - name: serve-app
+                    mountPath: /home/ray/yolo_serve.py
+                    subPath: yolo_serve.py
+                  - name: shared-libs
+                    mountPath: /shared-libs
+              - name: stunnel
+                image: alpine:3.20
+                command: ["sh", "-c", "apk add --no-cache stunnel > /dev/null 2>&1 && exec stunnel /stunnel-conf/stunnel.conf"]
+                resources:
+                  requests:
+                    cpu: "100m"
+                    memory: "64Mi"
+                  limits:
+                    cpu: "200m"
+                    memory: "128Mi"
+                volumeMounts:
+                  - name: stunnel-config
+                    mountPath: /stunnel-conf
+            volumes:
+              - name: serve-app
+                configMap:
+                  name: yolo-serve-app
+              - name: shared-libs
+                emptyDir: {}
+              - name: stunnel-config
+                configMap:
+                  name: stunnel-config

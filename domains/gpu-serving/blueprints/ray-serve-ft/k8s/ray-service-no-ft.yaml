@@ -1,0 +1,118 @@
+###############################################################################
+# RayService: YOLOv8 WITHOUT GCS Fault Tolerance (Control for T4)
+# Identical to ray-service.yaml except:
+#   - ray.io/ft-enabled: "false"
+#   - No RAY_REDIS_ADDRESS env vars
+###############################################################################
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: yolo-no-ft
+  namespace: ray-ft
+  annotations:
+    ray.io/ft-enabled: "false"
+spec:
+  serveConfigV2: |
+    applications:
+      - name: yolo
+        route_prefix: /
+        import_path: yolo_serve:app
+        runtime_env:
+          pip:
+            - ultralytics>=8.0.0
+            - "numpy<2"
+            - pillow
+            - fastapi
+            - opencv-python-headless
+          env_vars:
+            PIP_NO_CACHE_DIR: "1"
+        deployments:
+          - name: YOLODetector
+            num_replicas: 2
+            max_replicas_per_node: 1
+            health_check_period_s: 10
+            health_check_timeout_s: 30
+            ray_actor_options:
+              num_gpus: 1
+  rayClusterConfig:
+    rayVersion: "2.44.1"
+    headGroupSpec:
+      rayStartParams:
+        dashboard-host: "0.0.0.0"
+        num-cpus: "0"
+      template:
+        metadata:
+          labels:
+            ray-node: head
+        spec:
+          nodeSelector:
+            role: system
+          containers:
+            - name: ray-head
+              image: rayproject/ray:2.44.1-py312-cpu
+              ports:
+                - containerPort: 6379
+                  name: gcs
+                - containerPort: 8265
+                  name: dashboard
+                - containerPort: 8000
+                  name: serve
+              env:
+                - name: RAY_RUNTIME_ENV_SETUP_TIMEOUT_S
+                  value: "600"
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: "8Gi"
+                  ephemeral-storage: "20Gi"
+                limits:
+                  cpu: "4"
+                  memory: "12Gi"
+                  ephemeral-storage: "30Gi"
+              volumeMounts:
+                - name: serve-app
+                  mountPath: /home/ray/yolo_serve.py
+                  subPath: yolo_serve.py
+          volumes:
+            - name: serve-app
+              configMap:
+                name: yolo-serve-app
+    workerGroupSpecs:
+      - groupName: gpu-workers
+        replicas: 2
+        minReplicas: 2
+        maxReplicas: 2
+        rayStartParams:
+          num-gpus: "1"
+        template:
+          metadata:
+            labels:
+              ray-node: worker
+          spec:
+            nodeSelector:
+              role: gpu
+              nvidia.com/gpu.present: "true"
+            tolerations:
+              - key: nvidia.com/gpu
+                operator: Exists
+                effect: NoSchedule
+            containers:
+              - name: ray-worker
+                image: rayproject/ray:2.44.1-py312-cu125
+                resources:
+                  requests:
+                    cpu: "2"
+                    memory: "4Gi"
+                    nvidia.com/gpu: "1"
+                  limits:
+                    cpu: "4"
+                    memory: "8Gi"
+                    nvidia.com/gpu: "1"
+                volumeMounts:
+                  - name: serve-app
+                    mountPath: /home/ray/yolo_serve.py
+                    subPath: yolo_serve.py
+            volumes:
+              - name: serve-app
+                configMap:
+                  name: yolo-serve-app
