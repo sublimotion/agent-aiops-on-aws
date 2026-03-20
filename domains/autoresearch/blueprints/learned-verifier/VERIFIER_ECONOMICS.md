@@ -307,6 +307,64 @@ Tier 3: Patch features (retrain per codebase)
 
 **Tier 3 is where the investment lives** — and also where the marginal gain is smallest. The question is whether Tier 1 + Tier 2 are "good enough." For most teams, SVG precision=1.0 is sufficient; the Tier 3 investment only makes sense if you need higher recall (catching more correct patches that SVG misses).
 
+## The Bitter Lesson Applied to Verification
+
+The bitter lesson (Sutton, 2019): methods that leverage computation scale better than methods that leverage human knowledge. The verification spectrum is this lesson playing out in real time.
+
+### The Progression
+
+```
+Human code review                       ← Pure human knowledge. Doesn't scale.
+  → Patch features per repo             ← Human knowledge encoded as features.
+                                           Scales poorly (retrain per codebase).
+    → SVG consensus                     ← Compute-based. Two generations agree.
+                                           Scales with inference budget.
+      → Learned verifier on SVG signal  ← Compute + learning. Scales with data.
+        → Agent absorbs verifier via RL ← Pure compute. Scales indefinitely.
+```
+
+Each step replaces human knowledge with computation:
+
+| Stage | Human Knowledge Required | Compute Required | Scales? |
+|-------|:---:|:---:|:---:|
+| Human code review | Expert reviewer per patch | None | No — bottlenecked on people |
+| Patch features (Tier 3) | Feature engineering per repo, labeled data | Training | Poorly — new repo = new features |
+| SVG consensus (Tier 2) | Threshold calibration (one-time) | 2 inference calls/patch | Yes — more compute = more patches |
+| Learned verifier (Tier 2→1) | Initial training set | 1 inference call/patch | Yes — more data = better verifier |
+| RL-absorbed verification | None | Training + inference | Yes — indefinitely |
+
+The final stage is what Cursor Composer 2 demonstrated: compaction-in-the-loop RL where the model learns its own context management through training. No explicit verifier — the agent absorbs verification into its weights. Their 50% reduction in compaction error wasn't engineered; it was learned. The harness trick becomes a weight update.
+
+### Connection to the Time Horizon Equation
+
+The bitter lesson time horizon equation for coding agents:
+
+```
+Model capability × Harness sophistication × Verifier strength = Autonomous horizon
+```
+
+Each variable in this equation has a bitter lesson trajectory:
+
+**Model capability**: Scaling laws. More compute → more capable model. This is the original bitter lesson.
+
+**Harness sophistication**: Currently hand-engineered (tool definitions, prompts, scaffolds). Cursor Composer 2 shows the model can absorb harness features via RL. The harness simplifies as the model improves.
+
+**Verifier strength**: Currently the bottleneck. Moving from human review → SVG consensus → learned verifier → RL-absorbed verification follows the same curve. Each step trades human knowledge for computation.
+
+The verification spectrum IS the bitter lesson applied to the third axis. And our Phase 0 finding — SVG consensus achieving AUC 0.981 with zero human knowledge beyond a threshold — is empirical evidence that compute-based verification already works.
+
+### What This Predicts
+
+If the bitter lesson holds for verification (and the evidence says it does):
+
+1. **Patch feature engineering will be obsoleted.** Just as hand-crafted features lost to neural nets in vision, hand-crafted code features will lose to learned representations. Investing in Tier 3 is a short-term play.
+
+2. **SVG consensus (or equivalent compute-based verification) will be the standard.** It's already at precision=1.0 with zero domain knowledge. The only question is efficiency — can we get the same signal with fewer inference calls?
+
+3. **Verification will be absorbed into the model.** The Leanstral pattern (external verifier in loop) is a stepping stone. The endpoint is an agent that knows when its own patches are wrong — no external verification needed. Cursor's RL results suggest this is already happening.
+
+4. **The enterprise moat is compute infrastructure, not domain expertise.** The team that can run N=16 candidates with SVG verification fastest wins — not the team with the best hand-crafted features for their specific codebase. This is Together AI's thesis (90% cache hit rate on 452B tokens for CoderForge) and it applies to verification too.
+
 ## Key Assumptions and Risks
 
 | Assumption | Risk | Mitigation |
