@@ -220,6 +220,93 @@ A learned verifier trained on SVG consensus makes RL feasible on any codebase:
 
 **Nobody has published RL training with SVG-derived rewards yet.** This is an open research direction.
 
+## Generalization: Which Features Transfer to New Codebases?
+
+A verifier trained on SWE-bench won't automatically work on your private Java monolith. But some features are about the *agent's process*, not the *code's content* — and those transfer.
+
+### Features That Generalize (Agent Process)
+
+These measure how the agent behaves, not what the code looks like:
+
+| Feature | Why It's Generic | Published Evidence |
+|---------|-----------------|-------------------|
+| `loop_behavior` / `repeat_rate` | Agent stuck in a loop = bad, regardless of repo | Critic Rubrics: AUC 0.94, strongest learnable feature. Works on both SWE-bench and real-world data. |
+| `action_pct_search` vs `action_pct_edit` | Ratio of exploration to exploitation is universal. Agent searching endlessly without editing is lost. | Our data: r=+0.412, consistent across configs A-F |
+| `context_growth_rate` | Context bloat = lost focus. About the agent's cognitive process, not the codebase. | Novel signal not in Critic Rubrics — mechanism is codebase-independent |
+| `first_edit_turn` / Parkinson's ratio | Late edits = wasted budget exploring. Same dynamic in Python or Java. | Our Phase 1 data: consistent across 6 configs |
+| `misunderstood_intention` | Agent misread the task. Detectable from trace regardless of language. | Critic Rubrics: -0.25 delta, strongest single predictor |
+| `insufficient_testing` | Agent skipping validation = lower quality. Universal. | Critic Rubrics: -0.21 delta on SWE-bench |
+
+**These are about the agent, not the code.** A model that learns "looping agents produce bad patches" transfers to any codebase.
+
+### Features That Partially Generalize (SVG Consensus)
+
+SVG consensus is structural, not learned — two independent generations converge means the patch is likely correct. This principle is language-agnostic and repo-agnostic. Same insight as Agentless's majority voting (+18.5% on SWE-bench).
+
+**What transfers:** The mechanism (generation agreement = quality signal).
+
+**What doesn't transfer:** The threshold. Our 0.8 recall threshold gave precision=1.0 on SWE-bench repos. On a private codebase:
+- Harder problems → lower base recall even for correct patches → threshold should drop
+- Different coding styles → line-level matching may be noisier
+- Monorepos with many files → reproductions may diverge more
+
+Calibrate on a small labeled set (50-100 issues) from the target codebase.
+
+### Features That Do NOT Generalize (Patch Content)
+
+| Feature | Why It's Repo-Specific |
+|---------|----------------------|
+| `diff_size` (lines changed) | A typical Django fix is 5-15 lines. A data pipeline fix might be 200. "Small patch = good" is repo-dependent. |
+| `files_touched` | Some architectures require touching many files for any change (microservices, generated code). |
+| `test_file_modified` | Only meaningful if tests exist and follow naming conventions. |
+| AST-level features | Language-specific. Python AST ≠ Java AST ≠ TypeScript AST. |
+| `import changes` | Framework-specific. |
+| Patch embedding similarity | Trained on one distribution of code, won't match another. |
+
+These features encode "what correct code looks like" for a specific codebase. They overfit by design.
+
+### Published Evidence on Generalization
+
+Critic Rubrics has the clearest finding:
+
+> "Benchmark-only critics fail on real-world data: AUC 0.48 for PR merge, 0.45 for code survival. **Below random.**"
+
+Critics trained only on SWE-bench data actively *hurt* on real-world code. But:
+
+> "Rubric-supervised critics generalize across LLM backbones (Sonnet 4.5 vs Opus 4.5). Success-Only critics overfit to one backbone."
+
+Behavioral rubrics (process features) transfer. Outcome predictions (success-only) don't.
+
+### Practical Deployment: Tiered Verifier
+
+For a private codebase, deploy in tiers by generalization strength:
+
+```
+Tier 1: Process features (transfer directly, no labeled data needed)
+  → loop detection, action distribution, context growth, Parkinson's ratio
+  → Train once on any codebase, deploy everywhere
+  → Expected: modest signal (AUC 0.6-0.7)
+  → Cost: $0 (uses existing agent telemetry)
+
+Tier 2: SVG consensus (mechanism transfers, calibrate threshold)
+  → Run on 50-100 issues from target repo
+  → Human reviews ~50 patches to calibrate precision/recall threshold
+  → Expected: high precision, moderate recall
+  → Cost: ~$50 inference + 1 day of engineer time for calibration
+
+Tier 3: Patch features (retrain per codebase)
+  → Use SVG-accepted patches as positive examples (no test suite needed)
+  → Train XGBoost or LLM verifier on repo-specific patterns
+  → Expected: additive to Tier 1+2, marginal gains
+  → Cost: ~200+ labeled examples needed, ongoing retraining
+```
+
+**Tier 1 is free** — just observe the agent's behavior. An agent that loops, bloats context, and edits late is producing bad patches regardless of the codebase.
+
+**Tier 2 is cheap** — 50 issues with human review is feasible for any team. Our SVG data shows precision=1.0 at this tier alone.
+
+**Tier 3 is where the investment lives** — and also where the marginal gain is smallest. The question is whether Tier 1 + Tier 2 are "good enough." For most teams, SVG precision=1.0 is sufficient; the Tier 3 investment only makes sense if you need higher recall (catching more correct patches that SVG misses).
+
 ## Key Assumptions and Risks
 
 | Assumption | Risk | Mitigation |
