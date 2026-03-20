@@ -41,7 +41,7 @@ ${PROBLEM_STATEMENT}
 IMPORTANT: Edit the file immediately after reading the relevant code. Do not read more than 2 files before making your edit. Use the edit tool, not bash, to modify files."
 
 # Run opencode with timeout, capture JSON events
-OPENCODE_API_KEY=dummy timeout 540 opencode run \
+OPENCODE_API_KEY="${OPENCODE_API_KEY:-dummy}" timeout 540 opencode run \
     --model "vllm/${MODEL}" \
     --format json \
     --dir "$WORKSPACE" \

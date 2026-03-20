@@ -327,6 +327,56 @@ Devstral and Qwen3.5 both exhibit high Parkinson's ratios (~46%) — they explor
 
 ---
 
+## Phase 3c: ThunderAgent Scheduling (Phase 2b)
+
+**Goal**: Add program-aware scheduling to the agent swarm. ThunderAgent proxy sits between agents and vLLM, tracks agent state (REASONING on GPU vs ACTING executing tools), and backfills GPU slots during tool execution.
+
+### Architecture
+
+```
+Agents (N=4 or 8) → :9000 (ThunderAgent proxy) → :8000 (vLLM, Qwen3.5 TP4, max-num-seqs=4)
+```
+
+ThunderAgent admission control:
+1. `reasoning_count < max_active` → **direct admit**
+2. `reasoning_count >= max_active` but acting programs exist → **backfill admit** (uses reclaimable slot)
+3. All slots full → **queue** (wait for slot release)
+
+### Results
+
+| Config | N | tc | Fixes | Fix Rate | Wall Time | Throughput | Speedup | Backfill Rate |
+|--------|---|-----|-------|----------|-----------|------------|---------|---------------|
+| Phase 2a N=4 (naive) | 4 | — | 46/50 | 92% | 21.4 min | 2.3/min | 2.0x | — |
+| **Phase 2b D** (Thunder N=4) | 4 | 1.5 | 43/50 | 86% | 25.9 min | 1.93/min | 2.75x | 0.5% |
+| Phase 2a N=8 (naive) | 8 | — | 49/50 | 98% | 26.2 min | 1.9/min | 1.7x | — |
+| **Phase 2b E** (Thunder N=8) | 8 | 2.0 | 40/50 | 80% | **16.1 min** | **3.11/min** | **3.36x** | **18.5%** |
+
+tc = `tool_coefficient` (oversubscription factor). Backfill rate = % of requests admitted to reclaimable slots.
+
+### ThunderAgent Proxy Metrics
+
+**Config D** (N=4, tc=1.5): 1330 requests, 1323 direct, 7 backfill, 0 queued. At N=4 the proxy is effectively transparent — always enough slots available. Avg GPU util: 51%.
+
+**Config E** (N=8, tc=2.0): 1136 requests, 926 direct (81.5%), **210 backfill (18.5%)**, 0 queued. Backfilling actively used — when 4+ agents are reasoning simultaneously, the proxy fills reclaimable slots from agents in tool execution. No requests ever queued.
+
+### Key Findings
+
+**ThunderAgent improves throughput at N=8 by 63%**: From 1.9 issues/min (naive) to 3.11 issues/min (scheduled). The 18.5% backfill rate means ~1 in 5 inference requests used a slot freed by an agent executing tools.
+
+**Fix rate trades off against throughput at high concurrency**: Config E achieves 80% fix rate (vs 98% naive), likely because vLLM handles 8 concurrent inference requests less gracefully when backfill admits push `reasoning_count` above `max_active=4`. Some requests may get slightly degraded generation quality due to memory pressure.
+
+**Proxy overhead is measurable**: Config D (N=4) is 21% slower than naive N=4 (25.9 vs 21.4 min). The proxy adds per-request latency from the extra HTTP hop + async admission control. For N=4, the proxy provides no benefit since there's no contention.
+
+**Zero queue depth**: Even at N=8 with tc=2.0, no requests were ever queued. The backfill mechanism completely eliminated queueing — every request was either directly admitted or backfilled immediately.
+
+**Pipe deadlock discovery**: Initial implementation used `subprocess.PIPE` for the proxy subprocess, causing the pipe buffer to fill and deadlock the proxy's event loop after ~64KB of logs. Redirecting to a file fixed this — the proxy processed all 50 issues correctly.
+
+**Program tracking via message hash is imperfect**: The first user message changes across issues, creating many program IDs per worker (57 programs for 50 issues). This doesn't affect correctness but means acting-state tracking is per-issue rather than per-worker.
+
+**Best single-node throughput**: 3.11 issues/min on 4x RTX PRO 6000. A full SWE-bench Lite (300 issues) would take ~96 min. At scale, the bottleneck shifts from GPU to workspace setup (git clone, pip install).
+
+---
+
 ## Raw Data
 
 - `results/phase1_{A-F}.jsonl` — 50 lines each, per-issue metrics with turn-level breakdown
@@ -335,5 +385,7 @@ Devstral and Qwen3.5 both exhibit high Parkinson's ratios (~46%) — they explor
 - `results/eval_{ohmypi,piagent,opencode,claude_code,codex}.jsonl` — Gold test evaluation results for Phase 2b
 - `results/swarm/swarm_phase1_{model}_{harness}.jsonl` — Phase 3 multi-model results
 - `results/swarm/swarm_phase2a_n{2,4,8}_*.jsonl` — Phase 2a concurrent scaling results
+- `results/swarm/swarm_phase2b_n{4,8}_*.jsonl` — Phase 2b ThunderAgent scheduling results
+- `results/swarm/swarm_phase2b_*_proxy.log` — ThunderAgent proxy logs with per-request state transitions
 - `results-report.html` — Interactive Chart.js visualization
 - `lessons.md` — Operational lessons and debugging notes
