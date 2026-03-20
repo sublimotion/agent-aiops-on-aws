@@ -2,7 +2,7 @@
 
 **Status**: DRAFT — pending data collection
 **Created**: 2026-03-19
-**Updated**: 2026-03-19 (v2 — soft verifier framing, SERA SVG integration)
+**Updated**: 2026-03-20 (v3 — RL vs SFT landscape analysis, prior art, CoderForge scale-up path)
 **Depends on**: agent-harness (Phase 1/2 complete), agent-swarm (Phase 1 complete)
 
 ## Executive Summary
@@ -627,6 +627,38 @@ Agentless's AST-normalized majority voting maps to our SVG consensus baseline. B
 | **OpenAI Harness Engineering** | 1,500 commits, self-evolving skills | Scale of harness engineering effort; skills fire 52% (Vercel benchmark) |
 
 Composer 2's self-summarization reduces compaction error by 50% vs prompt-based baselines. This is the bitter lesson in action: model capability absorbs harness features.
+
+### RL vs SFT Landscape (Why Our Design Is Sound)
+
+The field has two active debates: (1) RL vs SFT for training coding **agents**, and (2) how to train **verifiers/reward models**. Our experiment is firmly in category (2).
+
+**Agent training context (not our task, but relevant background):**
+
+| System | Method | SWE-Bench Verified | Data Scale |
+|--------|--------|-------------------|------------|
+| SERA (Ai2) | SFT-only, soft-verified | 54.2% | 25K trajectories |
+| CoderForge (Together) | SFT-only, test-verified | 59.4% pass@1 | 155K trajectories |
+| DeepSWE (Together) | Pure RL (GRPO++) | 42.2% pass@1, 71% pass@16 | 4,500 tasks |
+| DeepCoder | RL (GRPO+) | 60.6% (LiveCodeBench) | 24K problems |
+| Kimi K2 (Moonshot) | SFT + joint RL | 65.8% | MoE 1T total |
+
+Standard pipeline: SFT → RL. CoderForge → DeepSWE-style RL is Together's predicted next step.
+
+**Why our experiment isn't an RL vs SFT experiment:**
+1. We're training a **verifier** (classifier/ranker), not a **generator** (coding agent)
+2. At N=50, classical ML (XGBoost, logistic regression) is appropriate — not LLM fine-tuning or RL
+3. Our features come from SERA's behavioral telemetry — a signal type nobody else has tested for verification
+4. At CoderForge scale (Phase 4), LLM fine-tuning becomes viable for the verifier
+5. The verifier would then be *used as* the reward model in an RL loop (Phase 5) — but that's downstream
+
+**Methodological validation:**
+- Critic Rubrics validates feature-based verification at small scale (+15.9 Best@8 from 24 behavioral features)
+- SWE-RM confirms that LLM fine-tuning needs 100K+ trajectories — validates our Phase 0-3 → Phase 4 sequencing
+- R4P's group-wise RL validates pairwise ranking over pointwise classification — informs our Model B design
+- DeepSWE's 42.2% pass@1 → 71% pass@16 gap proves verification quality is the bottleneck (our core hypothesis)
+- SERA's SFT-only approach at 54.2% shows that even without RL, the model generates enough good patches — the problem is *selecting* the right one
+
+**Open research direction:** Nobody has trained a reward model on CoderForge's 103K fail trajectories. This is our Phase 4 opportunity.
 
 ## Relationship to Other Blueprints
 
