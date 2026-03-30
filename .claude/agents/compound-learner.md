@@ -23,6 +23,43 @@ Then collect:
 4. `<blueprint-dir>/results/benchmark-report.md` — if it exists, the executive summary and key findings sections.
 5. Current steering files — read all of `.claude/steering/*.md` so you don't duplicate rules that already exist.
 
+## Version refresh protocol
+
+When a stack component has a new version (e.g., "vLLM 0.19 is out", "Ray 2.45 released"), run a staleness scan before the next deployment that uses that component.
+
+### Trigger
+
+The refresh is triggered implicitly when:
+- A user mentions a new version of a stack component
+- A spec or blueprint references a version newer than what's tagged in steering rules
+- A deployment fails and the root cause traces to a version change
+
+### Process
+
+1. **Scan**: Grep `tech-stack.md` for `<!-- stack:.*<component>=` to find all rules tagged with that component.
+2. **Triage**: For each match, check if the rule's version is older than the new version. Flag as `STALE` if it is.
+3. **Validate**: For each stale rule, determine:
+   - **Still valid**: The behavior hasn't changed. Update the version tag and `validated` date.
+   - **Changed**: The behavior has changed. Update the rule body and version tag.
+   - **Obsolete**: The issue has been fixed upstream. Remove the rule (or mark as historical with a note).
+4. **Report**: List all rules reviewed and their disposition in the compound summary under `### Version refresh`.
+
+### Output format
+
+Add to the compound summary:
+
+```
+### Version refresh: <component> <old_version> → <new_version>
+| Rule | Old version | Disposition | Notes |
+|------|-------------|-------------|-------|
+| Pin protobuf<5 for TF on Ray | ray=2.44.1 | STILL VALID | protobuf conflict persists in ray 2.45 |
+| cuDNN 9.3.0 pin for TF | tensorflow=2.16.2 | CHANGED | TF 2.17 ships cuDNN 9.4, update pin |
+```
+
+### Staleness without refresh
+
+If no refresh has been run and a steering rule is older than 90 days, flag it in the compound summary as "due for review" — do not silently rely on it during deployment.
+
 ## What to extract from readiness audits
 
 Readiness audits are structured pre-flight checks. Mine them for:
@@ -120,8 +157,17 @@ If no hardware lessons were found, omit this section.
 
 - Write rules as **imperative statements**, not observations. "Always copy model to NVMe before serving" not "NVMe is faster than FSx."
 - Include the **why** in a parenthetical when it's non-obvious. "Always copy model to NVMe before serving (17x faster than FSx for model loading)."
+- **Dedup check**: Before appending a new rule, grep the target steering file for the key terms (component name, error message, flag name). If a similar rule already exists, update it in place rather than appending a duplicate. If the existing rule covers a narrower case, widen it.
+- **Version tag**: If the rule references specific versions or version-dependent behavior, add a `<!-- stack: component=version | validated: YYYY-MM-DD -->` comment immediately after the heading. See the "Version Tagging Convention" section at the top of `tech-stack.md`.
 - Append to the relevant section in the steering file. Do not rewrite or reorder existing content.
 - If no suitable section exists, add a new `##` heading at the bottom of the file.
+
+### What NOT to elevate
+
+- Version-pinned workarounds that are likely to change with the next release AND are already captured in the blueprint's `lessons.md` with a version tag. Only elevate if the workaround applies across multiple blueprints.
+- File paths derivable from `project-structure.md`.
+- Patterns already documented in an existing steering rule (dedup check above).
+- Operational details specific to one model or one instance type that wouldn't help other blueprints.
 
 ## Output
 

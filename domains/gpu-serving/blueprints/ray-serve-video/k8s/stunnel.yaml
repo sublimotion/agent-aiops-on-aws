@@ -1,0 +1,24 @@
+###############################################################################
+# stunnel ConfigMap — TLS proxy for ElastiCache Serverless
+# Copy of ray-serve-ft/k8s/stunnel.yaml with namespace changed to ray-video.
+# The connect endpoint is patched by deploy-video.sh from terraform output.
+###############################################################################
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stunnel-config
+  namespace: ray-video
+data:
+  stunnel.conf: |
+    foreground = yes
+    pid =
+    syslog = no
+    output = /dev/stderr
+
+    [redis]
+    client = yes
+    accept = 127.0.0.1:6380
+    connect = ray-ft-gcs-9pcmog.serverless.usw2.cache.amazonaws.com:6379
+    TIMEOUTconnect = 10
+    TIMEOUTclose = 0
+    retry = yes

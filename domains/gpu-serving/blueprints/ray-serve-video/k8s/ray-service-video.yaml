@@ -1,0 +1,236 @@
+###############################################################################
+# RayService: Video Pipeline with Multi-Framework Model Composition
+#
+# 5-deployment pipeline: KafkaIngress → FrameDecode → PTDetector → TFClassifier → ResultWriter
+# PT (YOLOv8n) and TF (MobileNetV2) in same cluster via runtime_env isolation.
+# Data flows in-memory via DeploymentHandle (Ray object store).
+#
+# Prerequisites:
+#   - KubeRay operator v1.3.0+ installed
+#   - ElastiCache Serverless Redis (via Terraform, shared with ray-ft)
+#   - stunnel ConfigMap deployed (k8s/stunnel.yaml)
+#   - Kafka broker deployed (k8s/kafka.yaml)
+#   - GPU nodegroup with g5.xlarge (A10G) nodes — 2 GPUs needed (1 PT, 1 TF)
+###############################################################################
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ray-video
+---
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: video-pipeline
+  namespace: ray-video
+  annotations:
+    ray.io/ft-enabled: "true"
+spec:
+  serveConfigV2: |
+    applications:
+      - name: video
+        route_prefix: /
+        import_path: video_pipeline:app
+        runtime_env:
+          pip:
+            - "numpy<2"
+            - pillow
+            - opencv-python-headless
+            - boto3
+            - aiokafka
+            - python-multipart
+          env_vars:
+            PIP_NO_CACHE_DIR: "1"
+        deployments:
+          - name: KafkaIngress
+            num_replicas: 1
+            health_check_period_s: 10
+            health_check_timeout_s: 30
+            ray_actor_options:
+              num_cpus: 1
+          - name: FrameDecode
+            num_replicas: 1
+            ray_actor_options:
+              num_cpus: 1
+          - name: PTDetector
+            num_replicas: 1
+            max_replicas_per_node: 1
+            health_check_period_s: 10
+            health_check_timeout_s: 120
+            ray_actor_options:
+              num_gpus: 1
+              runtime_env:
+                pip:
+                  - "numpy<2"
+                  - pillow
+                  - opencv-python-headless
+                  - boto3
+                  - torch
+                  - torchvision
+                  - ultralytics
+                env_vars:
+                  PIP_NO_CACHE_DIR: "1"
+          - name: TFClassifier
+            num_replicas: 1
+            max_replicas_per_node: 1
+            health_check_period_s: 10
+            health_check_timeout_s: 120
+            ray_actor_options:
+              num_gpus: 1
+              runtime_env:
+                pip:
+                  - "numpy<2"
+                  - pillow
+                  - opencv-python-headless
+                  - boto3
+                  - "protobuf<5"
+                  - "nvidia-cudnn-cu12==9.3.0.75"
+                  - "tensorflow==2.16.2"
+                env_vars:
+                  PIP_NO_CACHE_DIR: "1"
+                  TF_FORCE_GPU_ALLOW_GROWTH: "true"
+                  TF_CPP_MIN_LOG_LEVEL: "2"
+          - name: ResultWriter
+            num_replicas: 1
+            ray_actor_options:
+              num_cpus: 0.5
+  rayClusterConfig:
+    rayVersion: "2.44.1"
+    headGroupSpec:
+      rayStartParams:
+        dashboard-host: "0.0.0.0"
+        num-cpus: "0"
+        redis-password: ""
+      template:
+        metadata:
+          labels:
+            ray-node: head
+        spec:
+          nodeSelector:
+            role: system
+          containers:
+            - name: ray-head
+              image: rayproject/ray:2.44.1-py312-cpu
+              ports:
+                - containerPort: 6379
+                  name: gcs
+                - containerPort: 8265
+                  name: dashboard
+                - containerPort: 8000
+                  name: serve
+              env:
+                - name: RAY_REDIS_ADDRESS
+                  value: "127.0.0.1:6380"
+                - name: RAY_gcs_rpc_server_reconnect_timeout_s
+                  value: "60"
+                - name: RAY_RUNTIME_ENV_SETUP_TIMEOUT_S
+                  value: "900"
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: "8Gi"
+                  ephemeral-storage: "20Gi"
+                limits:
+                  cpu: "4"
+                  memory: "12Gi"
+                  ephemeral-storage: "30Gi"
+              volumeMounts:
+                - name: serve-app
+                  mountPath: /home/ray/video_pipeline.py
+                  subPath: video_pipeline.py
+            - name: stunnel
+              image: alpine:3.20
+              command: ["sh", "-c", "apk add --no-cache stunnel > /dev/null 2>&1 && exec stunnel /stunnel-conf/stunnel.conf"]
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "64Mi"
+                limits:
+                  cpu: "200m"
+                  memory: "128Mi"
+              volumeMounts:
+                - name: stunnel-config
+                  mountPath: /stunnel-conf
+          volumes:
+            - name: serve-app
+              configMap:
+                name: video-pipeline-app
+            - name: stunnel-config
+              configMap:
+                name: stunnel-config
+    workerGroupSpecs:
+      - groupName: gpu-workers
+        replicas: 2
+        minReplicas: 2
+        maxReplicas: 2
+        rayStartParams:
+          num-gpus: "1"
+        template:
+          metadata:
+            labels:
+              ray-node: worker
+          spec:
+            nodeSelector:
+              role: gpu
+              nvidia.com/gpu.present: "true"
+            tolerations:
+              - key: nvidia.com/gpu
+                operator: Exists
+                effect: NoSchedule
+            initContainers:
+              - name: install-libgl
+                image: debian:bookworm-slim
+                securityContext:
+                  runAsUser: 0
+                command: ["sh", "-c", "apt-get update -qq && apt-get install -y -qq libgl1-mesa-glx libglib2.0-0 > /dev/null 2>&1 && cp -aL /usr/lib/x86_64-linux-gnu/libGL.so* /shared-libs/ && cp -aL /usr/lib/x86_64-linux-gnu/libGLX.so* /shared-libs/ && cp -aL /usr/lib/x86_64-linux-gnu/libGLdispatch.so* /shared-libs/ && cp -aL /usr/lib/x86_64-linux-gnu/libgthread* /shared-libs/ && cp -aL /usr/lib/x86_64-linux-gnu/libglib* /shared-libs/"]
+                volumeMounts:
+                  - name: shared-libs
+                    mountPath: /shared-libs
+            containers:
+              - name: ray-worker
+                image: rayproject/ray:2.44.1-py312-cu125
+                env:
+                  - name: RAY_REDIS_ADDRESS
+                    value: "127.0.0.1:6380"
+                  - name: RAY_gcs_rpc_server_reconnect_timeout_s
+                    value: "600"
+                  - name: RAY_RUNTIME_ENV_SETUP_TIMEOUT_S
+                    value: "900"
+                  - name: LD_LIBRARY_PATH
+                    value: "/shared-libs:/usr/local/nvidia/lib64"
+                resources:
+                  requests:
+                    cpu: "2"
+                    memory: "8Gi"
+                    nvidia.com/gpu: "1"
+                  limits:
+                    cpu: "4"
+                    memory: "16Gi"
+                    nvidia.com/gpu: "1"
+                volumeMounts:
+                  - name: serve-app
+                    mountPath: /home/ray/video_pipeline.py
+                    subPath: video_pipeline.py
+                  - name: shared-libs
+                    mountPath: /shared-libs
+              - name: stunnel
+                image: alpine:3.20
+                command: ["sh", "-c", "apk add --no-cache stunnel > /dev/null 2>&1 && exec stunnel /stunnel-conf/stunnel.conf"]
+                resources:
+                  requests:
+                    cpu: "100m"
+                    memory: "64Mi"
+                  limits:
+                    cpu: "200m"
+                    memory: "128Mi"
+                volumeMounts:
+                  - name: stunnel-config
+                    mountPath: /stunnel-conf
+            volumes:
+              - name: serve-app
+                configMap:
+                  name: video-pipeline-app
+              - name: shared-libs
+                emptyDir: {}
+              - name: stunnel-config
+                configMap:
+                  name: stunnel-config

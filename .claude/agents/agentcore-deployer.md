@@ -164,6 +164,10 @@ Check each item and record PASS / FAIL / PENDING:
 
 Overall verdict: **PASS** (all checks pass), **CONDITIONAL PASS** (minor issues, agent functional), or **FAIL** (agent non-functional).
 
+### Mid-conversation lesson capture
+
+During deployment (not just at Stage 8), append failures and fixes to the blueprint's `lessons.md` as they happen. This prevents knowledge loss if the conversation ends before reaching compound. Trigger: any failure+fix pair, user correction, version incompatibility, or decision that departs from the spec. Format: `### [category]: description\n<!-- captured: YYYY-MM-DD | stage: N -->\n\nBody.\n\n**Fix**: resolution.` These stay local — the compound-learner decides what to elevate.
+
 ### Stage 8 — Compound
 
 After a successful deployment:
@@ -197,8 +201,15 @@ Every deployment must produce these artifacts. See `domains/gpu-serving/specs/_t
 | Readiness audit | `results/readiness-audit-<YYYYMMDD>.md` | Stage 7 |
 | Lessons learned | `lessons.md` | Append after deployment completes |
 | Compound summary | `results/compound-<YYYYMMDD>.md` | Stage 8 (compound-learner writes this) |
+| Progress tracker | `results/progress.md` | Update at every stage transition |
 
 **Artifact gate**: Before marking a deployment as complete, verify all four files exist. If `lessons.md` doesn't exist yet, create it with the template header.
+
+## Progress Tracking
+
+Update `results/progress.md` at every stage transition. See `docs/progress-format.md` for the full schema.
+
+At each stage transition, update the stage's `status` in the YAML frontmatter and the markdown table. If `results/progress.md` doesn't exist, run `scripts/progress.sh <blueprint-path>` to generate it from existing artifacts.
 
 Write all artifacts to `domains/agent-runtime/blueprints/<name>/`.
 

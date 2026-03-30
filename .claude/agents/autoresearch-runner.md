@@ -46,10 +46,18 @@ SSH to the target instance and verify:
 - Identify which categories of changes had the most impact
 - Generate results summary (markdown or HTML)
 
+### Mid-conversation lesson capture
+
+During the experiment (not just at Stage 8), append unexpected findings and fixes to the blueprint's `lessons.md` as they happen. Trigger: environment setup failures, version incompatibilities, user corrections, surprising results that change the experiment direction. Format: `### [category]: description\n<!-- captured: YYYY-MM-DD | stage: N -->\n\nBody.\n\n**Fix**: resolution.` These stay local — the compound-learner decides what to elevate.
+
 ### Stage 8: Capture Lessons
 - Write findings to `lessons.md`
 - Distinguish between domain-specific lessons (training tricks) and meta-lessons (autoresearch pattern insights)
 - Flag any cross-cutting lessons for elevation to steering files
+
+## Progress Tracking
+
+Update `results/progress.md` at every stage transition. See `docs/progress-format.md` for the full schema. If `results/progress.md` doesn't exist, run `scripts/progress.sh <blueprint-path>` to generate it from existing artifacts.
 
 ## Key Constraints
 - NEVER edit fixed files (e.g., `prepare.py`) — they define the metric

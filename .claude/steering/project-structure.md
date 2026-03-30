@@ -39,14 +39,18 @@ agent-aiops-on-aws/
 │   │   │   ├── kimi-k2.5/     # Kimi K2.5 MoE on p5e (8x H200)
 │   │   │   ├── qwen3-next/    # Qwen3-Next MoE on p5en (8x H200)
 │   │   │   ├── qwen3-next-custbench/ # Customer A/B benchmark + KV offloading
-│   │   │   └── qwen3-next-sglang/ # SGLang + HiCache on g7e (coding agent feasibility)
+│   │   │   ├── qwen3-next-sglang/ # SGLang + HiCache on g7e (coding agent feasibility)
+│   │   │   ├── ray-serve-ft/     # Ray Serve fault tolerance with ElastiCache GCS FT
+│   │   │   └── ray-serve-video/ # Multi-framework video pipeline (PT + TF, Kafka, in-memory)
 │   │   └── specs/              # GPU Serving specs
 │   │       ├── _template.md    # Template for new specs
 │   │       ├── ministral-3b.md # Ministral-3B requirements
 │   │       ├── kimi-k2.5.md   # KV cache benchmark requirements
 │   │       ├── qwen3-next.md  # Qwen3-Next KV cache benchmark
 │   │       ├── qwen3-next-custbench.md # Customer A/B benchmark spec
-│   │       └── qwen3-next-sglang.md # SGLang + HiCache coding agent feasibility
+│   │       ├── qwen3-next-sglang.md # SGLang + HiCache coding agent feasibility
+│   │       ├── ray-serve-ft.md    # Ray Serve fault tolerance with ElastiCache
+│   │       └── ray-serve-video.md # Multi-framework video pipeline with Kafka
 │   ├── agent-runtime/          # Bedrock AgentCore Runtime domain
 │   │   ├── modules/            # Reusable Terraform modules for agent runtime
 │   │   │   ├── agentcore-runtime/  # Bedrock AgentCore Runtime resource
@@ -142,6 +146,7 @@ blueprints/<name>/
 │   ├── Dockerfile
 │   └── requirements.txt
 └── results/            # Benchmark reports, architecture diagrams
+    ├── progress.md                     # Lifecycle progress tracker (live + reconstructable)
     ├── readiness-audit-<YYYYMMDD>.md   # Pre-flight checklist (Stage 7)
     ├── deployment-log-<YYYYMMDD>.md    # Timestamped deployment log
     ├── compound-<YYYYMMDD>.md          # Compound learner summary (Stage 8)
@@ -149,7 +154,7 @@ blueprints/<name>/
     └── <visual>-<YYYYMMDD>.html        # Interactive HTML reports
 ```
 
-**Required artifacts**: Every deployment must produce `lessons.md`, `results/readiness-audit-*.md`, `results/deployment-log-*.md`, and `results/compound-*.md`. See `domains/gpu-serving/specs/_template-artifacts.md` for templates.
+**Required artifacts**: Every deployment must produce `lessons.md`, `results/readiness-audit-*.md`, `results/deployment-log-*.md`, `results/compound-*.md`, and `results/progress.md`. See `domains/gpu-serving/specs/_template-artifacts.md` for templates and `docs/progress-format.md` for the progress schema.
 
 ## Spec Structure
 

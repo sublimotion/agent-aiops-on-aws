@@ -2,6 +2,26 @@
 
 > This file covers conventions for all domains. See section headers to find the right section for your domain.
 
+## Version Tagging Convention
+
+Every version-specific steering rule must include a `<!-- stack: ... | validated: ... -->` HTML comment immediately after the heading. This enables automated staleness detection when stack components upgrade.
+
+Format:
+```
+#### Rule title
+<!-- stack: component=version, component=version | validated: YYYY-MM-DD -->
+```
+
+Example:
+```
+#### Pin protobuf<5 in any TensorFlow runtime_env on Ray Serve
+<!-- stack: ray=2.44.1, tensorflow=2.16.2 | validated: 2026-03-27 -->
+```
+
+**When to tag**: Any rule that references a specific version, version constraint, or version-dependent behavior. Rules about general AWS/K8s constraints (e.g., "IMDS hop limit") don't need tags.
+
+**When to refresh**: When you learn a stack component has a new version (e.g., "vLLM 0.19 is out"), grep this file for rules tagged with the old version and validate each one still holds. See the refresh protocol in `compound-learner.md`.
+
 ## GPU Serving Conventions
 
 ### Infrastructure
@@ -57,6 +77,7 @@ SGLang's DeepGEMM JIT compilation on Blackwell sm_120 GPUs compiles 9 kernel con
 vLLM's DeepGEMM JIT compilation on B200 sm_100f GPUs takes approximately 16 minutes on first startup: 77s model load, 200s JIT (117 kernels), 200s warmup (2259 kernels), 509s torch.compile, 245s CUDA graph capture (51 graphs). Kernels are cached at `/root/.cache/vllm/deep_gemm/cache/` and AOT functions at `/root/.cache/vllm/torch_aot_compile/`. Subsequent restarts with a warm cache reduce startup to under 5 minutes. Set Kubernetes readiness probe `initialDelaySeconds` to at least 900 seconds (15 minutes) for cold starts. Consider pre-compiling kernels or mounting a persistent cache volume for production deployments to eliminate this overhead. This applies to all B200 FP8 serving deployments using vLLM DeepGEMM.
 
 #### LMCache v0.3.15 incompatible with SGLang NSA/MLA attention (as of 2026-03-07) — blocks KV offloading for GLM-5, DeepSeek V3, and similar MLA models
+<!-- stack: lmcache=0.3.15, sglang=nightly-2026-03-07 | validated: 2026-03-07 -->
 
 LMCache's SGLang adapter (`lmc_radix_cache.py` line 96) expects separate `k_buffer` and `v_buffer` attributes in the KV pool. Models using NSA (Native Sparse Attention) or MLA (Multi-Head Latent Attention), such as GLM-5 (`glm_moe_dsa`) and DeepSeek V3, use `NSATokenToKVPool` which inherits from `MLATokenToKVPool` and uses a fused `kv_buffer` instead. LMCache crashes with `AttributeError: 'NSATokenToKVPool' object has no attribute 'k_buffer'` when `--enable-lmcache` is set. LMCache PR #2629 (MLA layerwise support) is open but NOT merged as of 2026-03-07. Both SGLang-side and LMCache-side changes are needed. Do not reserve GPU capacity for LMCache KV offloading (CPU, GDS, POSIX) with MLA models until PR #2629 merges. SGLang's built-in RadixAttention prefix caching works fine as a baseline. Verify PR merge status before planning capacity blocks for MLA models with external KV cache offloading.
 
@@ -97,10 +118,12 @@ EKS-optimized AL2023 AMIs use nerdctl/containerd, not Docker. When launching bar
 Speculative decoding with MTP (e.g., Qwen3-Next's `qwen3_next_mtp` method) adds inter-GPU communication overhead for speculative head computation and verification. On PCIe-interconnected GPUs (e.g., g7e.24xlarge, g7e.48xlarge), this overhead exceeds the speculative decoding benefit, causing throughput degradation of 2-41% across QPS levels. MTP is designed for NVLink-interconnected GPUs (H200, A100) where inter-GPU bandwidth is 10-20x higher. Always test MTP on the target hardware before enabling in production; default to baseline (no MTP) for PCIe platforms.
 
 #### vLLM MTP speculative decode with FlashMLASparse uses PIECEWISE CUDA graph mode and forces KV cache block size to 64
+<!-- stack: vllm=0.18.0 | validated: 2026-03-20 -->
 
 vLLM's Multi-Token Prediction speculative decoding (`--speculative-config.method mtp --speculative-config.num_speculative_tokens N`) with FlashMLASparse attention uses PIECEWISE CUDA graph mode instead of FULL_AND_PIECEWISE. FULL_AND_PIECEWISE mode is not supported with speculative decoding for models using `DeepseekV32IndexerBackend` (e.g., GLM-5, DeepSeek V3). Additionally, FlashMLASparse forces the KV cache block size to 64 regardless of the `--block-size` flag. This applies to all MLA models using vLLM MTP speculative decode. Expect different CUDA graph capture and memory behavior compared to standard attention backends.
 
 #### Mamba hybrid architectures have different caching and speculative decoding constraints
+<!-- stack: vllm=0.15.0 | validated: 2026-02-25 -->
 
 Models using hybrid attention+mamba architectures (e.g., Qwen3-Next with `Qwen3NextForCausalLM`) trigger mamba cache mode in vLLM. Prefix caching works but enables experimental mamba 'align' mode. MTP speculative decoding conflicts with mamba 'align' mode in vLLM 0.15.0, requiring `--no-enable-prefix-caching` to work at all, which further degrades performance. Verify model architecture (`transformers.AutoConfig.from_pretrained(...)` → check `architectures` field) before assuming transformer-only optimizations apply.
 
@@ -121,6 +144,7 @@ Terraform state locks are stored in a local `.terraform.tfstate.lock.info` file 
 When importing existing AWS resources into Terraform, attribute mismatches (e.g., `bootstrap_self_managed_addons=true` in state vs. `false` in config) force resource destruction on the next apply. Before destroying and recreating infrastructure, use `terraform state pull > state.json`, edit the JSON directly to align the attribute values, and `terraform state push state.json` to restore the corrected state. This avoids expensive infrastructure churn. Validate with `terraform plan` before and after to confirm the mismatch is resolved.
 
 #### SGLang on Blackwell requires cutlass FP8 backend for non-ue8m0 scale formats
+<!-- stack: sglang=0.5.9 | validated: 2026-03-01 -->
 
 DeepGemm FP8 backend crashes with "Unknown recipe" on Blackwell GPUs (sm_120) when loading models with non-ue8m0 scale formats. Use `--fp8-gemm-backend cutlass` (available in SGLang nightly, not v0.5.9 stable). This flag is required for models like Qwen3-Next FP8 on g7e instances. vLLM users should set `VLLM_USE_DEEP_GEMM=0` for equivalent behavior.
 
@@ -133,10 +157,12 @@ Models with hybrid attention architectures (Mamba + DeltaNet + GQA, e.g., Qwen3-
 When serving hybrid attention models (e.g., Qwen3-Next with DeltaNet+GQA) with HiCache KV offloading, use `--disable-cuda-graph`. CUDA graph compilation conflicts with HiCache's dynamic memory management for hybrid models. This constraint applies only to hybrid architectures; standard transformer models can use CUDA graphs with HiCache.
 
 #### vLLM Mistral tool-call parser generates non-compliant tool_call IDs
+<!-- stack: vllm=0.15.0 | validated: 2026-02-20 -->
 
 The Mistral parser in vLLM (through v0.15.0) generates `call_0`, `call_1`, etc. as tool_call IDs instead of the OpenAI-spec 9-character alphanumeric format required by BFCL and most downstream tools. This causes multi-turn tool-use failures where the second turn's tool_result is rejected due to ID format validation. Workaround: patch the eval script to accept short IDs or use `--tool-call-parser hermes` if the model supports it. Track vLLM issue #23180 for upstream fix.
 
 #### SGLang qwen3_coder parser outputs tool calls as XML in content field
+<!-- stack: sglang=0.5.9 | validated: 2026-03-01 -->
 
 SGLang's `qwen3_coder` parser correctly sets `finish_reason: "tool_calls"` but places tool calls in the `content` field as `<tool_call>{"name": ..., "arguments": ...}</tool_call>` XML tags instead of the standard OpenAI `tool_calls` array. Downstream applications must parse both formats. Add XML fallback parsing to any tool-use evaluation or agent framework that consumes SGLang responses.
 
@@ -169,6 +195,7 @@ Isolated single-GPU replicas behind a round-robin proxy (e.g., 4x vLLM TP=1 on g
 HiCache L2 offloading for hybrid attention models (PR #19663) was not merged into SGLang nightly builds as of 2026-03-03. Always check the target nightly build's commit log against the feature PR before reserving GPU capacity for HiCache testing. If the feature is not merged, S3-level benchmarks (HiCache L2) will fail with "HiRadixCache only supports MHA and MLA" errors. Baseline KV cache configs work without HiCache for initial feasibility testing.
 
 #### SGLang HiCache works with NSA/MLA attention where LMCache fails — use --enable-hierarchical-cache for MLA models
+<!-- stack: sglang=nightly-2026-03-07, lmcache=0.3.15 | validated: 2026-03-10 -->
 
 For models using NSA (Native Sparse Attention) or MLA (Multi-Head Latent Attention) architectures such as GLM-5 (`glm_moe_dsa`) and DeepSeek V3, use SGLang's built-in HiCache (`--enable-hierarchical-cache`) instead of LMCache for KV cache offloading. HiCache has native `NSATokenToKVPoolHost` support that understands the fused `kv_buffer` layout used by MLA models, while LMCache expects separate `k_buffer`/`v_buffer` attributes and crashes on MLA. HiCache is integrated into SGLang and evolves with the attention backend, eliminating external compatibility issues. This applies to all MLA/NSA models on SGLang until LMCache PR #2629 merges.
 
@@ -184,11 +211,37 @@ When model weights consume most GPU VRAM (e.g., GLM-5 FP8 using 175 GB / 183 GB 
 
 System nodes (e.g., m5.xlarge) often lack sufficient CPU or memory for auxiliary services like Redis. Adding `tolerations: [{key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}]` to Redis (or other non-GPU workloads) allows them to schedule on GPU nodes, which typically have abundant CPU and RAM beyond what serving workloads use. For example, on p6-b200.48xlarge nodes running vLLM, 80% of CPU and 90% of memory remain free. This pattern applies to any Kubernetes cluster where auxiliary services need more resources than the system node pool provides. Use resource requests/limits to ensure the auxiliary service does not starve the GPU workload.
 
+### Ray Serve Multi-Framework Conventions
+
+#### Pin protobuf<5 in any TensorFlow runtime_env on Ray Serve
+<!-- stack: ray=2.44.1, tensorflow=2.16.2, protobuf=3.20.3 | validated: 2026-03-27 -->
+
+TensorFlow 2.16+ installs protobuf 7.x, which breaks Ray's `ServeDeploySchema` construction with `AttributeError: 'google._upb._message.FieldDescriptor' object has no attribute 'label'`. The error surfaces on the head node during deployment config parsing, not inside the TF actor. Always add `protobuf<5` to the TF deployment's `runtime_env.pip` list. This applies to all Ray Serve deployments using TensorFlow, not just specific models. See Ray GitHub issue #45351.
+
+#### Pin nvidia-cudnn-cu12 version to match TensorFlow's compiled cuDNN requirement
+<!-- stack: ray=2.44.1, tensorflow=2.16.2, cudnn=9.3.0 | validated: 2026-03-27 -->
+
+Ray's CUDA images (e.g., `rayproject/ray:*-cu125`) ship cuDNN 9.2.1, but TensorFlow 2.16.2 requires cuDNN 9.3.0. The mismatch causes TF to fall back to CPU silently or crash with `Loaded runtime CuDNN library: 9.2.1 but source was compiled with: 9.3.0`. Fix by adding `nvidia-cudnn-cu12==9.3.0.75` to the TF deployment's `runtime_env.pip` list. The pip-installed cuDNN libraries override the system version within the deployment's virtualenv. Verify the required cuDNN version from TF release notes before pinning.
+
+#### Set IMDS hop limit to 2 on all EKS nodes for pod IAM credential access
+
+EKS nodes default to `HttpPutResponseHopLimit=1`, which blocks pods from reaching the instance metadata service (IMDS) for IAM credentials. Any Ray Serve deployment accessing AWS services (S3, DynamoDB) from pods will get `NoCredentialsError`. Fix with `aws ec2 modify-instance-metadata-options --http-put-response-hop-limit 2` on all cluster instances. Add this to deployment scripts as a pre-flight step.
+
+#### runtime_env creates isolated virtualenvs per unique pip spec — not per deployment
+<!-- stack: ray=2.44.1 | validated: 2026-03-27 -->
+
+Ray `runtime_env` with `pip` creates a virtualenv at `/tmp/ray/session_*/runtime_resources/pip/<hash>/virtualenv/`. Two deployments with identical `pip` lists share the same virtualenv. This is why PyTorch and TensorFlow can coexist in a single RayService — each gets its own virtualenv with its own dependencies, as separate Ray actors (processes). System-level libraries (CUDA, cuDNN) are NOT isolated; both frameworks must be compatible with the base container image's CUDA version.
+
+#### serveConfigV2 YAML overrides Python decorator — put per-deployment runtime_env in YAML
+
+When using KubeRay `serveConfigV2`, the YAML deployment overrides replace the Python `@serve.deployment()` decorator arguments. Per-deployment `runtime_env` (including `ray_actor_options.runtime_env.pip`) must be specified in the YAML, not just in Python code. The Python code serves as the default; the YAML is authoritative at deploy time.
+
 ### llm-d Infrastructure
 
 llm-d is the reference inference scheduler architecture: InferencePool (GA v1 API) + EPP (Endpoint Policy Picker) + Envoy Gateway. This section captures deployment patterns for llm-d components.
 
 #### InferencePool v1 GA API has different schema than v1alpha2 experimental API
+<!-- stack: epp=1.3.1, gateway-api=1.2.0 | validated: 2026-03-15 -->
 
 InferencePool v1 (`inference.networking.k8s.io/v1`) uses different field names compared to the experimental v1alpha2 API (`x-k8s.io/v1alpha2`):
 - v1: `endpointPickerRef` (not `extensionRef`)
@@ -198,6 +251,7 @@ InferencePool v1 (`inference.networking.k8s.io/v1`) uses different field names c
 EPP v1.3.1 watches the GA group `inference.networking.k8s.io`, not the experimental group. Always use v1 InferencePool manifests with EPP v1.3.1+. Do not mix v1alpha2 manifests with GA-aware controllers — the CRDs are incompatible and will cause silent routing failures.
 
 #### EPP v1.3.1 requires explicit configuration and uses kebab-case flags
+<!-- stack: epp=1.3.1 | validated: 2026-03-15 -->
 
 EPP (Endpoint Policy Picker) v1.3.1 has no implicit defaults. Always provide `--config-file` or `--config-text` when deploying EPP. Flags use kebab-case: `--pool-name` (not `--poolName`), `--grpc-port` (not `--grpcPort`), `--secure-serving` (not `--secureServing`).
 

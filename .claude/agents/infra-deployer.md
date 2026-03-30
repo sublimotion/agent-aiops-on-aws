@@ -114,6 +114,39 @@ End the audit with:
 
 Previous audits are stored in `results/readiness-audit-*.md` — read them to track what changed between sessions.
 
+## Mid-conversation lesson capture
+
+During deployment (not just at the compound step), capture failures and fixes to the blueprint's `lessons.md` as they happen. This prevents knowledge loss if the conversation ends before reaching Stage 8.
+
+### Trigger
+
+Append to `lessons.md` immediately when:
+- A deployment step fails and you discover the fix (failure + fix pair)
+- The user corrects your approach or provides a non-obvious workaround
+- You discover a version incompatibility, dependency conflict, or platform constraint
+- You make a decision that departs from the spec or the deployment card recommendation
+
+### Format
+
+Append to the end of `lessons.md` using this format:
+
+```markdown
+### [category]: Short description
+<!-- captured: YYYY-MM-DD | stage: N -->
+
+What happened and why. Include the error message or symptom.
+
+**Fix**: What resolved it. Include the exact command, config change, or version pin.
+```
+
+These entries are raw field notes — they stay local to the blueprint. The compound-learner (Stage 8) later decides which ones to elevate to steering rules, with proper version tags.
+
+### What NOT to capture mid-conversation
+
+- Operational steps that went smoothly (those go in the deployment log, not lessons)
+- Speculative ideas that weren't tested
+- Information already in the deployment card or spec
+
 ## Important operational lessons
 
 These are hard-won lessons from previous deployments. Apply them proactively:
@@ -147,8 +180,22 @@ Every deployment must produce these artifacts. See `domains/gpu-serving/specs/_t
 | Readiness audit | `results/readiness-audit-<YYYYMMDD>.md` | Stage 7 |
 | Lessons learned | `lessons.md` | Append after deployment completes |
 | Compound summary | `results/compound-<YYYYMMDD>.md` | Stage 8 (compound-learner writes this) |
+| Progress tracker | `results/progress.md` | Update at every stage transition |
 
 **Artifact gate**: Before marking a deployment as complete, verify all four files exist. If `lessons.md` doesn't exist yet, create it with the template header from `_template-artifacts.md`.
+
+## Progress Tracking
+
+Update `results/progress.md` at every stage transition. This is the single source of truth for where the blueprint stands. See `docs/progress-format.md` for the full schema.
+
+At each stage transition:
+1. Update the stage's `status` in the YAML frontmatter (`not_started` → `in_progress` → `complete`/`blocked`/`skipped`)
+2. Update `last_stage` to the current stage ID
+3. Update `last_updated` to the current ISO 8601 timestamp
+4. Update the overall `status` field (`in_progress`, `blocked`, or `complete`)
+5. Update the markdown table row for the stage
+
+If `results/progress.md` doesn't exist, run `scripts/progress.sh <blueprint-path>` to generate it from existing artifacts, then continue updating it live.
 
 ## Output
 

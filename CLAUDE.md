@@ -8,11 +8,14 @@ Template for autonomous infrastructure deployment using Claude Code, spec-driven
 2. Run `mdc get <model> --engine <engine>` to load the deployment card before deploying
 3. Run `/ralph-loop:ralph-loop Deploy <spec-path>`
 4. Claude selects the deployer agent automatically based on spec path (see Domain Routing)
-5. Claude iterates until deployment succeeds
-6. Capture lessons in the blueprint's `lessons.md` using the field note schema (see `docs/card-format.md` and `domains/gpu-serving/blueprints/LESSONS-TEMPLATE.md`)
-7. Run compound step: invoke `compound-learner` agent — it elevates cross-cutting lessons to `.claude/steering/*.md` **and generates the YAML frontmatter** for `lessons.md` (model, engine, hardware, outcome, failure_categories, mdc_learn_commands, gpu_infra_learn_commands)
-8. Run `scripts/fe.sh learn <blueprint-path>` to apply the learn commands from the frontmatter
-9. Optionally run `scripts/fe.sh contribute <blueprint-path>` to open a community contribution issue
+5. Claude iterates until deployment succeeds — **capture failures and fixes to `lessons.md` as they happen** (mid-conversation lesson capture, see infra-deployer agent)
+6. Run compound step: invoke `compound-learner` agent — it elevates cross-cutting lessons to `.claude/steering/*.md` **and generates the YAML frontmatter** for `lessons.md` (model, engine, hardware, outcome, failure_categories, mdc_learn_commands, gpu_infra_learn_commands)
+7. Run `scripts/fe.sh learn <blueprint-path>` to apply the learn commands from the frontmatter
+8. Optionally run `scripts/fe.sh contribute <blueprint-path>` to open a community contribution issue
+
+### Version Refresh
+
+When a stack component upgrades (new vLLM, SGLang, Ray, etc.), run the version refresh protocol before the next deployment that uses it. This scans `tech-stack.md` for rules tagged with the old version and validates each one. See `compound-learner.md` for the full protocol. Steering rules older than 90 days without a refresh are flagged as stale.
 
 ## Context Loading
 
@@ -48,11 +51,16 @@ Read these files **on demand** based on what you're doing:
 | `domains/gpu-serving/blueprints/glm5-lmcache/` | `domains/gpu-serving/specs/glm5-lmcache.md` |
 | `domains/gpu-serving/blueprints/glm5-llmd/` | `domains/gpu-serving/specs/glm5-llmd.md` |
 | `domains/gpu-serving/blueprints/nemotron-super/` | `domains/gpu-serving/specs/nemotron-super.md` |
+| `domains/gpu-serving/blueprints/ray-serve-ft/` | `domains/gpu-serving/specs/ray-serve-ft.md` |
+| `domains/gpu-serving/blueprints/ray-serve-video/` | `domains/gpu-serving/specs/ray-serve-video.md` |
 | `domains/agent-runtime/blueprints/research-agent/` | `domains/agent-runtime/specs/research-agent.md` |
 | `domains/autoresearch/blueprints/training-recipes/` | `domains/autoresearch/specs/training-recipes.md` |
 | `domains/autoresearch/blueprints/agent-harness/` | `domains/autoresearch/specs/agent-harness.md` |
 | `domains/autoresearch/blueprints/finetuning-recipes/` | `domains/autoresearch/specs/finetuning-recipes.md` |
 | `domains/autoresearch/blueprints/agent-swarm/` | `domains/autoresearch/specs/agent-swarm.md` |
+| `domains/autoresearch/blueprints/verifier-reward/` | `domains/autoresearch/specs/verifier-reward.md` |
+| `domains/autoresearch/blueprints/coderforge-eval/` | `domains/autoresearch/specs/coderforge-eval.md` |
+| `domains/autoresearch/blueprints/verification-primitives/` | `domains/autoresearch/specs/verification-primitives.md` |
 
 **Blueprint-local context** — for operational details (lessons, results, plans), look inside the blueprint directory itself rather than in specs.
 
