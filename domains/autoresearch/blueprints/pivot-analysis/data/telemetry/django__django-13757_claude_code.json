@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 138.5,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 137221,
+    "duration_api_ms": 122204,
+    "num_turns": 23,
+    "result": "The fix is verified as `likely_correct` with a score of 0.89.\n\n## Summary\n\n**Problem:** On SQLite and Oracle, `key__isnull=True` was incorrectly matching JSON objects where the key exists with a `null` value (e.g., `{\"j\": null}`), instead of only matching objects that don't have the key at all.\n\n**Root cause:** `KeyTransformIsNull.as_sqlite()` and `as_oracle()` fell through to `super().as_sql()` for `isnull=True`, which generates standard SQL `IS NULL` checks. This matches both \"key doesn't exist\" and \"key exists with JSON null value\".\n\n**Fix** (`django/db/models/fields/json.py:366-385`): For `isnull=True` on SQLite and Oracle, negate the `HasKey` logic with `NOT (has_key_sql)`. This correctly returns only objects where the key is absent, since `HasKey` checks for key existence regardless of value.\n\n- SQLite: `NOT (JSON_TYPE(%s, %s) IS NOT NULL)` \u2192 only matches missing keys\n- Oracle: `NOT (JSON_EXISTS(%s, '%s'))` \u2192 only matches missing keys\n\n**Test update** (`tests/model_fields/test_jsonfield.py:589-592`): Added assertion for `value__j__isnull=True` which uses a key with JSON null value (`{\"j\": null}`), catching the previously undetected bug.",
+    "stop_reason": "end_turn",
+    "session_id": "fa776b75-6d00-4f28-b70e-2d5426e4c5a3",
+    "total_cost_usd": 0.30465734999999994,
+    "usage": {
+      "input_tokens": 89,
+      "cache_creation_input_tokens": 20625,
+      "cache_read_input_tokens": 493572,
+      "output_tokens": 5265,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 20625
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 89,
+        "outputTokens": 5265,
+        "cacheReadInputTokens": 493572,
+        "cacheCreationInputTokens": 20625,
+        "webSearchRequests": 0,
+        "costUSD": 0.30465734999999994,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "0e2d9612-b8a9-448c-9c15-af4a3a0e737e"
+  },
+  "stderr": ""
+}

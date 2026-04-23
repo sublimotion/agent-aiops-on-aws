@@ -1,0 +1,107 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b899..a437eaf6 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -991,6 +991,102 @@ warn_explicit(
+         outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
+         return res, outer_expl
+ 
++    def _is_builtin_name(self, call, name):
++        """Return True if call.func refers to the builtin *name*."""
++        func = call.func
++        if isinstance(func, ast.Name) and func.id == name:
++            return True
++        if (
++            isinstance(func, ast.Attribute)
++            and func.attr == name
++            and isinstance(func.value, ast.Name)
++            and func.value.id in ("builtins", "__builtin__")
++        ):
++            return True
++        return False
++
++    def _call_with_iter(self, call):
++        """If call is all(...) or any(...) with a single generator/listcomp
++        argument and no other args/kwargs, return (funcname, comprehension).
++        Otherwise return None."""
++        if len(call.args) != 1 or call.keywords:
++            return None
++        if not (self._is_builtin_name(call, "all") or self._is_builtin_name(call, "any")):
++            return None
++        arg = call.args[0]
++        if not isinstance(arg, (ast.GeneratorExp, ast.ListComp)):
++            return None
++        func_name = call.func.id if isinstance(call.func, ast.Name) else call.func.attr
++        return func_name, arg
++
++    def _unroll_all_any(self, call, is_any):
++        """Rewrite all(elt for x in iterable) / any(elt for x in iterable)
++        into a for-loop with an inner assert so the rewriter produces a good
++        failure message.
++
++        Returns (result_name_node, explanation_string).
++        """
++        # The single argument is a GeneratorExp or ListComp.
++        comp = call.args[0]
++        # We produce:
++        #   @py_result = True   (for all) / False (for any)
++        #   for <target> in <iter>:
++        #       @py_result = <elt>
++        #       if (@py_result == False for all) / (@py_result for any): break
++        # Then the outer `if not @py_result` triggers the failure message.
++        # Actually simpler: just evaluate inline using the existing
++        # statements machinery with a temp variable + for loop.
++        #
++        # Strategy: assign True/False, then loop and assign elt, break on
++        # first mismatch.  The inner elt expression will be visited so its
++        # intermediate values are available in the explanation.
++
++        save_stmts = self.statements
++        save_on_failure = self.on_failure
++
++        res_var = self.variable()
++        result_name = ast.Name(res_var, ast.Load())
++
++        # Initialise result variable
++        init_val = _NameConstant(not is_any)  # True for all, False for any
++        self.statements.append(
++            ast.Assign([ast.Name(res_var, ast.Store())], init_val)
++        )
++
++        # Build the for-loop body.
++        # We need to visit the element expression inside a new statement
++        # context so the sub-expression assignments land inside the loop body.
++        loop_body = []
++        self.statements = loop_body
++        # Visit the element expression to get a rewritten version + expl.
++        iter_res, iter_expl = self.visit(comp.elt)
++        # Assign result
++        loop_body.append(
++            ast.Assign([ast.Name(res_var, ast.Store())], iter_res)
++        )
++        # Break condition:
++        #   for all:  if not result: break
++        #   for any:  if result: break
++        if is_any:
++            break_cond = ast.Name(res_var, ast.Load())
++        else:
++            break_cond = ast.UnaryOp(ast.Not(), ast.Name(res_var, ast.Load()))
++        loop_body.append(ast.If(break_cond, [ast.Break()], []))
++
++        # Restore statement list
++        self.statements = save_stmts
++
++        # Emit the for loop (handle multiple generators in the comprehension)
++        # We only handle a single generator here; multiple generators are left
++        # for the default handler.
++        assert len(comp.generators) == 1
++        gen = comp.generators[0]
++        for_node = ast.For(gen.target, gen.iter, loop_body, [])
++        self.statements.append(for_node)
++
++        expl = iter_expl
++        return result_name, expl
++
+     def visit_Starred(self, starred):
+         # From Python 3.5, a Starred node can appear in a function call
+         res, expl = self.visit(starred.value)

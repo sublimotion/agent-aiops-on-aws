@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 140.7,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 139514,
+    "duration_api_ms": 115329,
+    "num_turns": 23,
+    "result": "The fix is working correctly. The 32 substitutions are now directly the matrix element accesses (e.g., `x0 = a[0,0]`) instead of the previous broken behavior of `(x0, a), (x1, x0[0,0])`.\n\n## Summary\n\nThe bug was in `sympy/simplify/cse_main.py`. When `cse()` processes a `MatrixElement` like `a[0,0]`, it traverses the `args` of that expression, which includes the `MatrixSymbol` `a` itself. Since `MatrixSymbol` is not an `Atom`, it was being added to `seen_subexp`. When `a` appeared in multiple `MatrixElement` expressions (`a[0,0]`, `a[0,1]`, etc.), it was added to `to_eliminate` and extracted as a CSE \u2014 creating the nonsensical `(x0, a), (x1, x0[0,0])` pattern.\n\n**Fix**: Treat `MatrixSymbol` as an atomic/leaf node in both `_find_repeated` (skip it, add to `excluded_symbols`) and `_rebuild` (return it unchanged). This mirrors how `Symbol` is treated in the existing code.",
+    "stop_reason": "end_turn",
+    "session_id": "490ad05a-345e-4e72-8bdf-43213991f1c2",
+    "total_cost_usd": 0.35919645000000006,
+    "usage": {
+      "input_tokens": 25,
+      "cache_creation_input_tokens": 24683,
+      "cache_read_input_tokens": 568484,
+      "output_tokens": 6401,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 24683
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 25,
+        "outputTokens": 6401,
+        "cacheReadInputTokens": 568484,
+        "cacheCreationInputTokens": 24683,
+        "webSearchRequests": 0,
+        "costUSD": 0.35919645000000006,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "6a6144b3-5a41-4064-850f-f412ba6e9dcd"
+  },
+  "stderr": ""
+}

@@ -1,0 +1,13 @@
+diff --git a/django/db/migrations/operations/models.py b/django/db/migrations/operations/models.py
+index 75a3b8b030..8af9b061a7 100644
+--- a/django/db/migrations/operations/models.py
++++ b/django/db/migrations/operations/models.py
+@@ -563,7 +563,7 @@ class AlterTogetherOptionOperation(ModelOptionOperation):
+             old_model = from_state.apps.get_model(app_label, self.name)
+             alter_together = getattr(schema_editor, "alter_%s" % self.option_name)
+             alter_together(
+-                new_model,
++                old_model,
+                 getattr(old_model._meta, self.option_name, set()),
+                 getattr(new_model._meta, self.option_name, set()),
+             )

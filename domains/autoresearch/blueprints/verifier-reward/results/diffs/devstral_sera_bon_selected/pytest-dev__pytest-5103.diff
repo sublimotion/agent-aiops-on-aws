@@ -1,0 +1,97 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b899..ab12b888 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -968,6 +968,13 @@ warn_explicit(
+         """
+         visit `ast.Call` nodes on Python3.5 and after
+         """
++        # Check if this is an all() or any() call
++        if isinstance(call.func, ast.Attribute):
++            if isinstance(call.func.value, ast.Name) and call.func.value.id == "@py_builtins":
++                func_name = call.func.attr
++                if func_name in ("all", "any"):
++                    return self.visit_all_any_call(func_name, call)
++        
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []
+@@ -1001,6 +1008,13 @@ warn_explicit(
+         """
+         visit `ast.Call nodes on 3.4 and below`
+         """
++        # Check if this is an all() or any() call
++        if isinstance(call.func, ast.Attribute):
++            if isinstance(call.func.value, ast.Name) and call.func.value.id == "@py_builtins":
++                func_name = call.func.attr
++                if func_name in ("all", "any"):
++                    return self.visit_all_any_call(func_name, call)
++        
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []
+@@ -1045,6 +1059,64 @@ warn_explicit(
+         expl = pat % (res_expl, res_expl, value_expl, attr.attr)
+         return res, expl
+ 
++    def visit_all_any_call(self, func_name, call):
++        """Handle all() and any() calls by unrolling the iterable."""
++        if len(call.args) != 1:
++            # Only handle the simple case with one argument
++            return self.generic_visit(call)
++        
++        iterable, iterable_expl = self.visit(call.args[0])
++        
++        # Create a for loop that will check each element
++        loop_var = self.variable()
++        
++        # Create the test expression for each element
++        test_expr = ast.Compare(
++            iterable,
++            [ast.Eq()],
++            [ast.NameConstant(True)] if func_name == "all" else [ast.NameConstant(False)]
++        )
++        
++        # Create the body of the for loop - an assertion
++        assert_stmt = ast.Assert(
++            test_expr,
++            msg=ast.Str(""),
++            lineno=call.lineno,
++            col_offset=call.col_offset
++        )
++        
++        # Create the for loop
++        for_loop = ast.For(
++            [ast.Name(loop_var, ast.Store())],
++            iterable,
++            [assert_stmt],
++            [],
++            lineno=call.lineno,
++            col_offset=call.col_offset
++        )
++        
++        # Assign the result to a variable
++        result_var = self.variable()
++        assign = ast.Assign(
++            [ast.Name(result_var, ast.Store())],
++            ast.NameConstant(True),
++            lineno=call.lineno,
++            col_offset=call.col_offset
++        )
++        
++        # Create the final expression that combines everything
++        final_expr = ast.Name(result_var, ast.Load())
++        
++        # Build the statements list
++        statements = [assign, for_loop, final_expr]
++        
++        # Add all statements to our statements list
++        for stmt in statements:
++            self.statements.append(stmt)
++        
++        # Return the result variable and explanation
++        return ast.Name(result_var, ast.Load()), iterable_expl
++
+     def visit_Compare(self, comp):
+         self.push_format_context()
+         left_res, left_expl = self.visit(comp.left)

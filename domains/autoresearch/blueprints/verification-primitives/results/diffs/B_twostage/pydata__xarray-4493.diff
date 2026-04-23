@@ -1,0 +1,15 @@
+diff --git a/xarray/core/variable.py b/xarray/core/variable.py
+index 64c1895d..1e38971d 100644
+--- a/xarray/core/variable.py
++++ b/xarray/core/variable.py
+@@ -120,6 +120,10 @@ def as_variable(obj, name=None) -> "Union[Variable, IndexVariable]":
+     if isinstance(obj, Variable):
+         obj = obj.copy(deep=False)
+     elif isinstance(obj, tuple):
++        if isinstance(obj[1], DataArray):
++            # convert DataArray to Variable to avoid eagerly computing values
++            # when creating a Variable from a (dims, DataArray) tuple
++            obj = (obj[0], obj[1].variable) + obj[2:]
+         try:
+             obj = Variable(*obj)
+         except (TypeError, ValueError) as error:

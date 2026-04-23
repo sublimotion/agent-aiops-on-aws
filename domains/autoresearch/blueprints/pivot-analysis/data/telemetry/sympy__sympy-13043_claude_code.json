@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 152.0,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 150554,
+    "duration_api_ms": 118558,
+    "num_turns": 23,
+    "result": "The fix is clean and correct. Here's the summary:\n\n**Problem**: `decompose(expr, separate=True)` returned `[monom[1] for monom in degrees]` where `degrees` is derived from `expr.args`, whose order is arbitrary in SymPy.\n\n**Fix**: Changed to `sorted(degrees, key=lambda x: (x[0], str(x[1])))` \u2014 sorts by total degree first, then by string representation of the monomial as a tiebreaker, ensuring fully deterministic output.\n\n**Docstring**: Updated the example to show the now-sorted output `[x, y, x**2, x*y, x**3*y**2, y**5]` (sorted by degree 1, 1, 2, 2, 5, 5).",
+    "stop_reason": "end_turn",
+    "session_id": "61e05d8a-a315-4b1b-8927-8c448b1c2b25",
+    "total_cost_usd": 0.2780433,
+    "usage": {
+      "input_tokens": 89,
+      "cache_creation_input_tokens": 18854,
+      "cache_read_input_tokens": 446246,
+      "output_tokens": 4880,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 18854
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 89,
+        "outputTokens": 4880,
+        "cacheReadInputTokens": 446246,
+        "cacheCreationInputTokens": 18854,
+        "webSearchRequests": 0,
+        "costUSD": 0.2780433,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "fa5c1511-9fee-4425-8334-36c4e7fb7533"
+  },
+  "stderr": ""
+}

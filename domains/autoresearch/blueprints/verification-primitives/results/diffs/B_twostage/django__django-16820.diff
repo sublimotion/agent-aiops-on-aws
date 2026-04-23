@@ -1,0 +1,35 @@
+diff --git a/django/db/migrations/operations/models.py b/django/db/migrations/operations/models.py
+index b89b6b511b..54a63a5edb 100644
+--- a/django/db/migrations/operations/models.py
++++ b/django/db/migrations/operations/models.py
+@@ -647,6 +647,30 @@ class AlterIndexTogether(AlterTogetherOptionOperation):
+     def __init__(self, name, index_together):
+         super().__init__(name, index_together)
+ 
++    def reduce(self, operation, app_label):
++        if (
++            isinstance(operation, RenameIndex)
++            and self.name_lower == operation.model_name_lower
++            and operation.old_fields
++            and self.option_value
++            and tuple(operation.old_fields) in self.option_value
++        ):
++            # A RenameIndex with old_fields transitions index_together entries
++            # to named indexes. Reduce AlterIndexTogether so the remaining
++            # index_together entries (if any) are preserved.
++            remaining = self.option_value - {tuple(operation.old_fields)}
++            if remaining:
++                return [
++                    AlterIndexTogether(
++                        self.name,
++                        index_together=remaining,
++                    ),
++                    operation,
++                ]
++            else:
++                return [operation]
++        return super().reduce(operation, app_label)
++
+ 
+ class AlterOrderWithRespectTo(ModelOptionOperation):
+     """Represent a change with the order_with_respect_to option."""

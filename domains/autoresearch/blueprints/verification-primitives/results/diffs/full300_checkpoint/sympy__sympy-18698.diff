@@ -1,0 +1,33 @@
+diff --git a/sympy/polys/polytools.py b/sympy/polys/polytools.py
+index c9e77a901f..c18838b77c 100644
+--- a/sympy/polys/polytools.py
++++ b/sympy/polys/polytools.py
+@@ -5874,6 +5874,17 @@ def sqf_part(f, *gens, **args):
+         return result
+ 
+ 
++def _merge_factors(factors):
++    """Merge factors with the same multiplicity in a square-free decomposition."""
++    merged = {}
++    for f, k in factors:
++        if k in merged:
++            merged[k] = merged[k] * f
++        else:
++            merged[k] = f
++    return [(f, k) for k, f in merged.items()]
++
++
+ def _sorted_factors(factors, method):
+     """Sort a list of ``(expr, exp)`` pairs. """
+     if method == 'sqf':
+@@ -5995,6 +6006,10 @@ def _generic_factor_list(expr, gens, args, method):
+                     f, _ = _poly_from_expr(f, _opt)
+                     factors[i] = (f, k)
+ 
++        if method == 'sqf':
++            fp = _merge_factors(fp)
++            fq = _merge_factors(fq)
++
+         fp = _sorted_factors(fp, method)
+         fq = _sorted_factors(fq, method)
+ 

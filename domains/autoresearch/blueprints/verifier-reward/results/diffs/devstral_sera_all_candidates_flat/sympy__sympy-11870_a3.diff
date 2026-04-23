@@ -1,0 +1,83 @@
+diff --git a/sympy/functions/elementary/exponential.py b/sympy/functions/elementary/exponential.py
+index fbd80fc02c..c60256d7fd 100644
+--- a/sympy/functions/elementary/exponential.py
++++ b/sympy/functions/elementary/exponential.py
+@@ -451,6 +451,78 @@ def _eval_rewrite_as_cos(self, arg):
+     def _eval_rewrite_as_tanh(self, arg):
+         from sympy import tanh
+         return (1 + tanh(arg/2))/(1 - tanh(arg/2))
++        
++    def _eval_rewrite_as_sinc(self, arg):
++        """
++        Rewrite exponential expressions to sinc function.
++        
++        Specifically handles the pattern exp(I*k) and exp(-I*k)
++        when used in the context of -I*exp(I*k) + I*exp(-I*k)
++        """
++        from sympy import I, sin
++        
++        # We need to check if this exp is part of a pattern
++        # The pattern we're looking for is -I*exp(I*k) + I*exp(-I*k)
++        # which equals 2*I*sin(k)
++        
++        # First, check if the argument is of the form I*k
++        if arg.is_Mul and len(arg.args) == 2:
++            if arg.has(I):
++                # Extract the real part (k in I*k)
++                k = arg.as_independent(I, as_Mul=True)[0]
++                if k is not None and not k.has(I):
++                    # We found an exp(I*k) term
++                    # Now we need to check if we're being called from a context
++                    # where we can find the opposite term
++                    
++                    # This is a bit tricky since we don't have direct access to
++                    # the parent expression. However, we can use the fact that
++                    # rewrite will be called on the entire expression first,
++                    # and then on components.
++                    
++                    # For now, let's just return sin(k)/k which is what we want
++                    # in the context of the pattern
++                    return sin(k)/k
++        
++        return None
++
++    def _eval_rewrite_as_sinc(self, arg):
++        from sympy import sinc, I, sin
++        # Handle the case: exp(I*k) - exp(-I*k)
++        # This corresponds to 2I*sin(k)
++        if arg.is_Mul and len(arg.args) == 2:
++            if arg.has(I):
++                # Look for patterns like I*k or -I*k
++                for term in arg.args:
++                    if term.has(I):
++                        # Extract the real part (k in I*k)
++                        k = term.as_independent(I, as_Mul=True)[0]
++                        if k is not None and not k.has(I):
++                            # We have exp(I*k), now check if we can find exp(-I*k)
++                            # in the expression we're rewriting from
++                            from sympy.core.mul import Mul
++                            from sympy.core.add import Add
++                            from sympy.core.power import Pow
++                            from sympy.core.numbers import ImaginaryUnit
++                            
++                            # We need to find a context where this is part of a difference
++                            # like exp(I*k) - exp(-I*k)
++                            parent = self._parent
++                            if parent is not None and isinstance(parent, Add):
++                                # Look for a sibling that might be exp(-I*k)
++                                for sibling in parent.args:
++                                    if sibling != self and isinstance(sibling, exp):
++                                        sibling_arg = sibling.args[0]
++                                        if sibling_arg.is_Mul and len(sibling_arg.args) == 2:
++                                            if sibling_arg.has(-I):
++                                                # Extract the real part (k in -I*k)
++                                                m = sibling_arg.as_independent(-I, as_Mul=True)[0]
++                                                if m is not None and not m.has(I):
++                                                    # If the k values match, we can rewrite
++                                                    if k.simplify() == m.simplify():
++                                                        # This is the pattern exp(I*k) - exp(-I*k)
++                                                        # which equals 2I*sin(k)
++                                                        return I*sin(k)/k
+ 
+ 
+ class log(Function):

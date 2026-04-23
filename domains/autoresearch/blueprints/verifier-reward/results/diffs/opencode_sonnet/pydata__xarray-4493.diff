@@ -1,0 +1,63 @@
+diff --git a/xarray/core/variable.py b/xarray/core/variable.py
+index 64c1895d..6866e499 100644
+--- a/xarray/core/variable.py
++++ b/xarray/core/variable.py
+@@ -197,6 +197,8 @@ def as_compatible_data(data, fastpath=False):
+ 
+     Finally, wrap it up with an adapter if necessary.
+     """
++    from .dataarray import DataArray
++
+     if fastpath and getattr(data, "ndim", 0) > 0:
+         # can't use fastpath (yet) for scalars
+         return _maybe_wrap_data(data)
+@@ -204,6 +206,9 @@ def as_compatible_data(data, fastpath=False):
+     if isinstance(data, Variable):
+         return data.data
+ 
++    if isinstance(data, DataArray):
++        return data.variable.data
++
+     if isinstance(data, NON_NUMPY_SUPPORTED_ARRAY_TYPES):
+         return _maybe_wrap_data(data)
+ 
+@@ -667,7 +672,7 @@ class Variable(
+         return dims, BasicIndexer(key), None
+ 
+     def _validate_indexers(self, key):
+-        """ Make sanity checks """
++        """Make sanity checks"""
+         for dim, k in zip(self.dims, key):
+             if isinstance(k, BASIC_INDEXING_TYPES):
+                 pass
+@@ -687,8 +692,9 @@ class Variable(
+                         )
+                     if k.ndim > 1:
+                         raise IndexError(
+-                            "{}-dimensional boolean indexing is "
+-                            "not supported. ".format(k.ndim)
++                            "{}-dimensional boolean indexing is not supported. ".format(
++                                k.ndim
++                            )
+                         )
+                     if getattr(k, "dims", (dim,)) != (dim,):
+                         raise IndexError(
+@@ -722,7 +728,7 @@ class Variable(
+         return dims, OuterIndexer(tuple(new_key)), None
+ 
+     def _nonzero(self):
+-        """ Equivalent numpy's nonzero but returns a tuple of Varibles. """
++        """Equivalent numpy's nonzero but returns a tuple of Varibles."""
+         # TODO we should replace dask's native nonzero
+         # after https://github.com/dask/dask/issues/1076 is implemented.
+         nonzeros = np.nonzero(self.data)
+@@ -2711,8 +2717,7 @@ def _unified_dims(variables):
+         var_dims = var.dims
+         if len(set(var_dims)) < len(var_dims):
+             raise ValueError(
+-                "broadcasting cannot handle duplicate "
+-                "dimensions: %r" % list(var_dims)
++                "broadcasting cannot handle duplicate dimensions: %r" % list(var_dims)
+             )
+         for d, s in zip(var_dims, var.shape):
+             if d not in all_dims:

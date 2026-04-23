@@ -1,0 +1,19 @@
+catalog_id: rag-long-context
+use_case: rag
+description: RAG with retrieved documents. Tests shared-prefix caching and long prefill.
+
+dataset:
+  type: generated-shared-prefix
+  input_tokens: {mean: 16384, std_dev: 0}
+  output_tokens: {mean: 256, std_dev: 0}
+
+load:
+  type: constant
+  request_rate: 1.0
+  num_prompts: 100
+
+slo:
+  ttft_p99_ms: 2000
+  tpot_p99_ms: 50
+  e2e_p99_ms: 20000
+  error_rate_max: 0.001

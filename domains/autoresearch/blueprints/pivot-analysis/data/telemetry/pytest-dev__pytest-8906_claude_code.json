@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 149.8,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 148520,
+    "duration_api_ms": 104383,
+    "num_turns": 29,
+    "result": "The fix is complete. Here's a summary of the changes:\n\n1. **`src/_pytest/outcomes.py`**: Added `skip_module(reason)` \u2014 a convenience function that calls `skip(reason, allow_module_level=True)`. This is the new API suggested in the issue.\n\n2. **`src/_pytest/python.py`**: Updated the error message when `pytest.skip()` is used outside a test to mention both `pytest.skip_module(reason)` and `pytest.skip(reason, allow_module_level=True)` as valid approaches, instead of only suggesting `pytestmark`.\n\n3. **`src/pytest/__init__.py`**: Exported `skip_module` as part of the public `pytest` API (both import and `__all__`).\n\nUsers can now write:\n```python\nimport pytest, sys\nif sys.version_info < (3, 8):\n    pytest.skip_module(\"Requires Python >= 3.8\")\n```",
+    "stop_reason": "end_turn",
+    "session_id": "18e4f0de-ad12-430d-9e72-68c8cfb83900",
+    "total_cost_usd": 0.37132155000000006,
+    "usage": {
+      "input_tokens": 92,
+      "cache_creation_input_tokens": 28701,
+      "cache_read_input_tokens": 651606,
+      "output_tokens": 4529,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 28701
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 92,
+        "outputTokens": 4529,
+        "cacheReadInputTokens": 651606,
+        "cacheCreationInputTokens": 28701,
+        "webSearchRequests": 0,
+        "costUSD": 0.37132155000000006,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "a48a1d00-13db-4c6e-bfea-c190db8d95d7"
+  },
+  "stderr": ""
+}

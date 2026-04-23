@@ -1,0 +1,59 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index b657a35cf7..bc8645e874 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -148,9 +148,54 @@ def __getattr__(name):
+         else:  # Get the version from the _version.py setuptools_scm file.
+             __version__ = _version.version
+         return __version__
++    if name == "version_info":
++        global version_info  # cache it.
++        version_info = _parse_to_version_info(__getattr__("__version__"))
++        return version_info
+     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+ 
+ 
++def _parse_to_version_info(version_str):
++    """
++    Parse a version string into a namedtuple with the same structure as
++    `sys.version_info`: (major, minor, micro, releaselevel, serial).
++
++    Parameters
++    ----------
++    version_str : str
++        A version string such as ``'3.5.0'``, ``'3.5.0rc2'``,
++        ``'3.5.0.dev820+g6768ef8c4c'``, or ``'3.5.0.post820+g6768ef8c4c'``.
++
++    Returns
++    -------
++    tuple
++        A named tuple with fields ``major``, ``minor``, ``micro``,
++        ``releaselevel``, and ``serial``.
++    """
++    v = parse_version(version_str)
++    if v.dev is not None:
++        return _VersionInfo(v.major, v.minor, v.micro, 'alpha', v.dev)
++    elif v.pre is not None:
++        pre_type, pre_num = v.pre
++        if pre_type == 'a':
++            releaselevel = 'alpha'
++        elif pre_type == 'b':
++            releaselevel = 'beta'
++        elif pre_type == 'rc':
++            releaselevel = 'candidate'
++        else:
++            releaselevel = 'alpha'
++        return _VersionInfo(v.major, v.minor, v.micro, releaselevel, pre_num)
++    elif v.post is not None:
++        return _VersionInfo(v.major, v.minor, v.micro + 1, 'alpha', v.post)
++    else:
++        return _VersionInfo(v.major, v.minor, v.micro, 'final', 0)
++
++
++_VersionInfo = namedtuple('_VersionInfo',
++                          'major, minor, micro, releaselevel, serial')
++
++
+ def _check_versions():
+ 
+     # Quickfix to ensure Microsoft Visual C++ redistributable

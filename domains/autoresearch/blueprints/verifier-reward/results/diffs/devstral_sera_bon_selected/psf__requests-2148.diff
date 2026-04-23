@@ -1,0 +1,126 @@
+diff --git a/requests/cookies.py b/requests/cookies.py
+index 831c49c6..b0182cf1 100644
+--- a/requests/cookies.py
++++ b/requests/cookies.py
+@@ -8,6 +8,7 @@ requests.utils imports from here, so be careful with imports.
+ 
+ import time
+ import collections
++from collections.abc import MutableMapping
+ from .compat import cookielib, urlparse, urlunparse, Morsel
+ 
+ try:
+@@ -156,7 +157,7 @@ class CookieConflictError(RuntimeError):
+     Use .get and .set and include domain and path args in order to be more specific."""
+ 
+ 
+-class RequestsCookieJar(cookielib.CookieJar, collections.MutableMapping):
++class RequestsCookieJar(cookielib.CookieJar, MutableMapping):
+     """Compatibility class; is a cookielib.CookieJar, but exposes a dict interface.
+ 
+     This is the CookieJar we create by default for requests and sessions that
+diff --git a/requests/models.py b/requests/models.py
+index 0dc55568..2e30333d 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -9,6 +9,7 @@ This module contains the primary objects that power Requests.
+ 
+ import collections
+ import datetime
++import socket
+ 
+ from io import BytesIO, UnsupportedOperation
+ from .hooks import default_hooks
+@@ -22,7 +23,7 @@ from .packages.urllib3.util import parse_url
+ from .packages.urllib3.exceptions import DecodeError
+ from .exceptions import (
+     HTTPError, RequestException, MissingSchema, InvalidURL,
+-    ChunkedEncodingError, ContentDecodingError)
++    ChunkedEncodingError, ContentDecodingError, ConnectionError)
+ from .utils import (
+     guess_filename, get_auth_from_url, requote_uri,
+     stream_decode_response_unicode, to_key_val_list, parse_header_links,
+@@ -640,13 +641,18 @@ class Response(object):
+                     raise ChunkedEncodingError(e)
+                 except DecodeError as e:
+                     raise ContentDecodingError(e)
++                except socket.error as e:
++                    raise ConnectionError(e)
+             except AttributeError:
+                 # Standard file-like object.
+-                while True:
+-                    chunk = self.raw.read(chunk_size)
+-                    if not chunk:
+-                        break
+-                    yield chunk
++                try:
++                    while True:
++                        chunk = self.raw.read(chunk_size)
++                        if not chunk:
++                            break
++                        yield chunk
++                except socket.error as e:
++                    raise ConnectionError(e)
+ 
+             self._content_consumed = True
+ 
+diff --git a/requests/packages/urllib3/_collections.py b/requests/packages/urllib3/_collections.py
+index d77ebb8d..b82d9c59 100644
+--- a/requests/packages/urllib3/_collections.py
++++ b/requests/packages/urllib3/_collections.py
+@@ -1,4 +1,4 @@
+-from collections import Mapping, MutableMapping
++from collections.abc import Mapping, MutableMapping
+ try:
+     from threading import RLock
+ except ImportError: # Platform-specific: No threads available
+diff --git a/requests/sessions.py b/requests/sessions.py
+index 4c6fa2f2..8afae677 100644
+--- a/requests/sessions.py
++++ b/requests/sessions.py
+@@ -9,7 +9,7 @@ requests (cookies, auth, proxies).
+ 
+ """
+ import os
+-from collections import Mapping
++from collections.abc import Mapping
+ from datetime import datetime
+ 
+ from .auth import _basic_auth_str
+diff --git a/requests/structures.py b/requests/structures.py
+index 66cdad86..93015a94 100644
+--- a/requests/structures.py
++++ b/requests/structures.py
+@@ -9,9 +9,10 @@ Data structures that power Requests.
+ """
+ 
+ import collections
++from collections.abc import MutableMapping
+ 
+ 
+-class CaseInsensitiveDict(collections.MutableMapping):
++class CaseInsensitiveDict(MutableMapping):
+     """
+     A case-insensitive ``dict``-like object.
+ 
+diff --git a/requests/utils.py b/requests/utils.py
+index 68e50cf0..3fbcc533 100644
+--- a/requests/utils.py
++++ b/requests/utils.py
+@@ -12,6 +12,7 @@ that are also useful for external consumption.
+ import cgi
+ import codecs
+ import collections
++from collections.abc import Mapping
+ import io
+ import os
+ import platform
+@@ -160,7 +161,7 @@ def to_key_val_list(value):
+     if isinstance(value, (str, bytes, bool, int)):
+         raise ValueError('cannot encode objects that are not 2-tuples')
+ 
+-    if isinstance(value, collections.Mapping):
++    if isinstance(value, Mapping):
+         value = value.items()
+ 
+     return list(value)

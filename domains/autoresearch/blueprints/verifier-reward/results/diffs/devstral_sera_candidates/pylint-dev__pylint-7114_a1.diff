@@ -1,0 +1,70 @@
+diff --git a/pylint/lint/expand_modules.py b/pylint/lint/expand_modules.py
+index 289e1afc..611cae31 100644
+--- a/pylint/lint/expand_modules.py
++++ b/pylint/lint/expand_modules.py
+@@ -24,17 +24,60 @@ def _modpath_from_file(filename: str, is_namespace: bool, path: list[str]) -> li
+ 
+ 
+ def get_python_path(filepath: str) -> str:
+-    """TODO This get the python path with the (bad) assumption that there is always
+-    an __init__.py.
+-
+-    This is not true since python 3.3 and is causing problem.
++    """Get the python path for a given file path.
++    
++    Handles both regular files and directories, including namespace packages.
++    For directories, returns the most specific path that contains Python files.
++    For files, returns their parent directory.
+     """
+     dirname = os.path.realpath(os.path.expanduser(filepath))
+     if not os.path.isdir(dirname):
+         dirname = os.path.dirname(dirname)
++    
++    # Special case: if we have a directory ending with /__init__.py or just __init__.py,
++    # we want to use its parent directory
++    if os.path.basename(dirname) == "__init__.py":
++        return os.path.dirname(dirname)
++    
++    # Special case: if we're in a subdirectory that has __init__.py,
++    # use its parent directory instead
++    if os.path.exists(os.path.join(dirname, "__init__.py")):
++        parent = os.path.dirname(dirname)
++        # If parent has __init__.py or any Python files, prefer parent
++        for item in os.listdir(parent):
++            if item == "__init__.py" or (not item.startswith("_") and item.endswith(".py")):
++                return parent
++    
++    # Start from the given directory and move up until we find Python files
+     while True:
+-        if not os.path.exists(os.path.join(dirname, "__init__.py")):
++        # Check if this directory contains Python files
++        has_python_files = False
++        has_init = False
++        for item in os.listdir(dirname):
++            if item == "__init__.py":
++                has_init = True
++                has_python_files = True
++            elif not item.startswith("_") and item.endswith(".py"):
++                has_python_files = True
++            if has_python_files:
++                break
++        
++        if has_python_files:
++            # If this is a subdirectory and parent has Python files,
++            # use parent to match Python's namespace package behavior
++            parent = os.path.dirname(dirname)
++            if parent != dirname:  # Not at root
++                # Special case: if we're in a subdirectory with __init__.py
++                # and parent has __init__.py, use parent
++                if (os.path.exists(os.path.join(dirname, "__init__.py")) and
++                    os.path.exists(os.path.join(parent, "__init__.py"))):
++                    return parent
++                # Otherwise check for any Python files in parent
++                for item in os.listdir(parent):
++                    if item == "__init__.py" or (not item.startswith("_") and item.endswith(".py")):
++                        return parent
+             return dirname
++        
+         old_dirname = dirname
+         dirname = os.path.dirname(dirname)
+         if old_dirname == dirname:

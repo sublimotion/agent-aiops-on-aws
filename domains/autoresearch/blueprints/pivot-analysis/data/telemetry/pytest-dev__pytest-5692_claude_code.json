@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 107.2,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 105854,
+    "duration_api_ms": 73645,
+    "num_turns": 20,
+    "result": "The fix is complete. Here's what was changed in `src/_pytest/junitxml.py`:\n\n1. **Added imports**: `import datetime` and `import platform` at the top.\n\n2. **Captured start timestamp** in `pytest_sessionstart`: `self.suite_start_timestamp = datetime.datetime.now().isoformat()` \u2014 records the ISO 8601 timestamp when the session begins.\n\n3. **Added `timestamp` and `hostname` attributes** to the `Junit.testsuite(...)` call in `pytest_sessionfinish`:\n   - `timestamp=self.suite_start_timestamp` \u2014 ISO format start time (e.g. `2019-04-22T10:32:27.123456`)\n   - `hostname=platform.node()` \u2014 the machine's hostname\n\nThis matches the JUnit XML format shown in the issue where the `testsuite` element includes both `timestamp` and `hostname` attributes.",
+    "stop_reason": "end_turn",
+    "session_id": "2dbd0538-c7f1-4891-85fc-ba8346fb7cea",
+    "total_cost_usd": 0.31140569999999995,
+    "usage": {
+      "input_tokens": 86,
+      "cache_creation_input_tokens": 28194,
+      "cache_read_input_tokens": 515934,
+      "output_tokens": 3376,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 28194
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 86,
+        "outputTokens": 3376,
+        "cacheReadInputTokens": 515934,
+        "cacheCreationInputTokens": 28194,
+        "webSearchRequests": 0,
+        "costUSD": 0.31140569999999995,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "e0660166-d212-4dcd-967c-9e3e133e5fe9"
+  },
+  "stderr": ""
+}

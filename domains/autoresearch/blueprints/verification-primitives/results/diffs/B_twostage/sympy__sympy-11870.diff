@@ -1,0 +1,25 @@
+diff --git a/sympy/simplify/trigsimp.py b/sympy/simplify/trigsimp.py
+index 34a3bab3fc..7c783e8b03 100644
+--- a/sympy/simplify/trigsimp.py
++++ b/sympy/simplify/trigsimp.py
+@@ -538,6 +538,10 @@ def exp_trig(e):
+         if e.has(*_trigs):
+             choices.append(e.rewrite(exp))
+         choices.append(e.rewrite(cos))
++        choices.append(e.rewrite(sin))
++        # also try expanded forms to catch e.g. I*(exp(I*k) - exp(-I*k))/2 -> sin(k)
++        choices.append(expand(e.rewrite(cos)))
++        choices.append(expand(e.rewrite(sin)))
+         return min(*choices, key=count_ops)
+     newexpr = bottom_up(expr, exp_trig)
+ 
+@@ -1101,6 +1105,9 @@ def futrig(e, **kwargs):
+         e, f = hyper_as_trig(e)
+         e = f(_futrig(e))
+ 
++    if e.has(exp, S.ImaginaryUnit):
++        e = exptrigsimp(e)
++
+     if e != old and e.is_Mul and e.args[0].is_Rational:
+         # redistribute leading coeff on 2-arg Add
+         e = Mul(*e.as_coeff_Mul())

@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 198.7,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 197398,
+    "duration_api_ms": 163916,
+    "num_turns": 29,
+    "result": "The fix works exactly as requested:\n\n- **With subdomains**: Shows a `Domain` column with full domain names (`admin.test.local`, `test.test.local`, `test.local` for routes without subdomain)\n- **Without subdomains**: Falls back to the original 3-column format (no `Domain` column shown)\n\nThe changes are in `src/flask/cli.py:1001` (`routes_command`):\n1. Builds a `rule_domains` list \u2014 using `rule.host` for host-matching apps, or constructing `subdomain.server_name` otherwise\n2. Shows the Domain column only when subdomain routing is actually in use (`any(rule.subdomain for rule in rules)`) or host-matching is enabled\n3. Correctly handles edge cases: `None`/empty `SERVER_NAME`, `None` hosts, and subdomain without SERVER_NAME",
+    "stop_reason": "end_turn",
+    "session_id": "4303cb4b-77ee-4f97-830c-6ef2ab34a8de",
+    "total_cost_usd": 0.47213415000000003,
+    "usage": {
+      "input_tokens": 96,
+      "cache_creation_input_tokens": 29969,
+      "cache_read_input_tokens": 751358,
+      "output_tokens": 8937,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 29969
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 96,
+        "outputTokens": 8937,
+        "cacheReadInputTokens": 751358,
+        "cacheCreationInputTokens": 29969,
+        "webSearchRequests": 0,
+        "costUSD": 0.47213415000000003,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "27a5752d-3b30-4d55-b795-c4cfeba874ff"
+  },
+  "stderr": ""
+}

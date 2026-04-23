@@ -1,0 +1,25 @@
+diff --git a/lib/matplotlib/colorbar.py b/lib/matplotlib/colorbar.py
+index 966eb0760b..8eda95dfe2 100644
+--- a/lib/matplotlib/colorbar.py
++++ b/lib/matplotlib/colorbar.py
+@@ -1102,13 +1102,15 @@ class Colorbar:
+ 
+         # transform from 0-1 to vmin-vmax:
+         if not self.norm.scaled():
+-            self.norm.vmin = 0
+-            self.norm.vmax = 1
+-        self.norm.vmin, self.norm.vmax = mtransforms.nonsingular(
+-            self.norm.vmin, self.norm.vmax, expander=0.1)
++            vmin, vmax = 0, 1
++        else:
++            vmin, vmax = self.norm.vmin, self.norm.vmax
++        vmin, vmax = mtransforms.nonsingular(vmin, vmax, expander=0.1)
+         if (not isinstance(self.norm, colors.BoundaryNorm) and
+                 (self.boundaries is None)):
+-            b = self.norm.inverse(b)
++            with self.norm.callbacks.blocked(), \
++                    cbook._setattr_cm(self.norm, vmin=vmin, vmax=vmax):
++                b = self.norm.inverse(b)
+ 
+         self._boundaries = np.asarray(b, dtype=float)
+         self._values = 0.5 * (self._boundaries[:-1] + self._boundaries[1:])

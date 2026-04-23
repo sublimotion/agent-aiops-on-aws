@@ -1,0 +1,28 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index d4ca323e0d..099b074cb6 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,10 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping, defaultdict
++try:
++    from collections.abc import Mapping
++except ImportError:
++    from collections import Mapping
++from collections import defaultdict
+ from itertools import chain
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+diff --git a/sympy/core/containers.py b/sympy/core/containers.py
+index 15abd93e3a..5eb90b2e3b 100644
+--- a/sympy/core/containers.py
++++ b/sympy/core/containers.py
+@@ -14,6 +14,7 @@
+ from sympy.utilities.iterables import iterable
+ 
+ import collections
++import collections.abc
+ 
+ 
+ class Tuple(Basic):

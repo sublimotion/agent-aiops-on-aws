@@ -1,0 +1,14 @@
+diff --git a/lib/matplotlib/colorbar.py b/lib/matplotlib/colorbar.py
+index d3d53e3d98..d87e692fcb 100644
+--- a/lib/matplotlib/colorbar.py
++++ b/lib/matplotlib/colorbar.py
+@@ -511,6 +511,9 @@ class Colorbar:
+             self.norm = mappable.norm
+             self._reset_locator_formatter_scale()
+ 
++        self.norm.autoscale_None(mappable.get_array())
++
++
+         self._draw_all()
+         if isinstance(self.mappable, contour.ContourSet):
+             CS = self.mappable

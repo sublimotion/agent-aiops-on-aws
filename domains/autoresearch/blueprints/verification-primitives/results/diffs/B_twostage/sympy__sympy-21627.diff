@@ -1,0 +1,22 @@
+diff --git a/sympy/functions/elementary/hyperbolic.py b/sympy/functions/elementary/hyperbolic.py
+index 892e19cabb..770d826a1b 100644
+--- a/sympy/functions/elementary/hyperbolic.py
++++ b/sympy/functions/elementary/hyperbolic.py
+@@ -446,6 +446,8 @@ def _eval_is_positive(self):
+         z = self.args[0]
+ 
+         x, y = z.as_real_imag()
++        if x.is_zero is False and y.is_real is False:
++            return None
+         ymod = y % (2*pi)
+ 
+         yzero = ymod.is_zero
+@@ -473,6 +475,8 @@ def _eval_is_nonnegative(self):
+         z = self.args[0]
+ 
+         x, y = z.as_real_imag()
++        if x.is_zero is False and y.is_real is False:
++            return None
+         ymod = y % (2*pi)
+ 
+         yzero = ymod.is_zero

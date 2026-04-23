@@ -1,0 +1,23 @@
+diff --git a/lib/matplotlib/cbook.py b/lib/matplotlib/cbook.py
+index c9699b2e21..1aa3c331c8 100644
+--- a/lib/matplotlib/cbook.py
++++ b/lib/matplotlib/cbook.py
+@@ -846,6 +846,18 @@ class Grouper:
+         siblings = self._mapping.get(weakref.ref(a), [weakref.ref(a)])
+         return [x() for x in siblings]
+ 
++    def __getstate__(self):
++        return {'_groupings': [[x() for x in group if x() is not None]
++                               for group in {id(v): v
++                                             for v in self._mapping.values()
++                                             }.values()]}
++
++    def __setstate__(self, state):
++        self._mapping = {}
++        for group in state['_groupings']:
++            if group:
++                self.join(*group)
++
+ 
+ class GrouperView:
+     """Immutable view over a `.Grouper`."""

@@ -1,0 +1,15 @@
+diff --git a/sympy/simplify/trigsimp.py b/sympy/simplify/trigsimp.py
+index 34a3bab3fc..0056c90978 100644
+--- a/sympy/simplify/trigsimp.py
++++ b/sympy/simplify/trigsimp.py
+@@ -540,6 +540,10 @@ def exp_trig(e):
+         choices.append(e.rewrite(cos))
+         return min(*choices, key=count_ops)
+     newexpr = bottom_up(expr, exp_trig)
++    choices = [newexpr]
++    choices.append(newexpr.rewrite(cos))
++    choices.append(expand_mul(newexpr.rewrite(cos)))
++    newexpr = min(*choices, key=count_ops)
+ 
+     def f(rv):
+         if not rv.is_Mul:

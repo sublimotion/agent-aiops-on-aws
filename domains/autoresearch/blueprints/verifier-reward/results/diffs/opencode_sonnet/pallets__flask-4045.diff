@@ -1,0 +1,27 @@
+diff --git a/src/flask/blueprints.py b/src/flask/blueprints.py
+index 5fb84d86..85b54fb3 100644
+--- a/src/flask/blueprints.py
++++ b/src/flask/blueprints.py
+@@ -181,6 +181,9 @@ class Blueprint(Scaffold):
+         root_path: t.Optional[str] = None,
+         cli_group: t.Optional[str] = _sentinel,  # type: ignore
+     ):
++        if "." in name:
++            raise ValueError("'name' may not contain a dot '.' character.")
++
+         super().__init__(
+             import_name=import_name,
+             static_folder=static_folder,
+@@ -363,9 +366,9 @@ class Blueprint(Scaffold):
+         if endpoint:
+             assert "." not in endpoint, "Blueprint endpoints should not contain dots"
+         if view_func and hasattr(view_func, "__name__"):
+-            assert (
+-                "." not in view_func.__name__
+-            ), "Blueprint view function name should not contain dots"
++            assert "." not in view_func.__name__, (
++                "Blueprint view function name should not contain dots"
++            )
+         self.record(lambda s: s.add_url_rule(rule, endpoint, view_func, **options))
+ 
+     def app_template_filter(self, name: t.Optional[str] = None) -> t.Callable:

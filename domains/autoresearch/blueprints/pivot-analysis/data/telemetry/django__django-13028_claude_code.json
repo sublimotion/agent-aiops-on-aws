@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 129.3,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 128018,
+    "duration_api_ms": 105359,
+    "num_turns": 21,
+    "result": "All 386 existing query tests pass. The fix is correct:\n\n**Root cause**: `check_filterable` used `getattr(expression, 'filterable', True)` which reads instance attributes. When filtering with a model instance (e.g., `metadata_type=self.brand_metadata`), and that model has a field named `filterable` with value `False`, it was incorrectly triggering the `NotSupportedError`.\n\n**Fix**: Changed to `getattr(expression.__class__, 'filterable', True)` \u2014 this reads the class-level attribute. For Django expressions like `Window`, `filterable = False` is a class attribute (correctly raises error). For model instances, `filterable` at the class level is a `BooleanField` descriptor object (truthy), so no false positive error is raised.",
+    "stop_reason": "end_turn",
+    "session_id": "8c68c07d-49dd-4216-bb45-66b522d844f8",
+    "total_cost_usd": 0.3001284,
+    "usage": {
+      "input_tokens": 23,
+      "cache_creation_input_tokens": 20202,
+      "cache_read_input_tokens": 454423,
+      "output_tokens": 5865,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 20202
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 23,
+        "outputTokens": 5865,
+        "cacheReadInputTokens": 454423,
+        "cacheCreationInputTokens": 20202,
+        "webSearchRequests": 0,
+        "costUSD": 0.3001284,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "29f718e4-034b-478d-a6fd-d043dccca7b7"
+  },
+  "stderr": ""
+}

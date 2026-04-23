@@ -1,0 +1,23 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index c268a56724..6dd0647d7b 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -674,7 +674,17 @@ class RcParams(MutableMapping, dict):
+             val = dict.__getitem__(self, key)
+             if val is rcsetup._auto_backend_sentinel:
+                 from matplotlib import pyplot as plt
+-                plt.switch_backend(rcsetup._auto_backend_sentinel)
++                if plt._backend_mod is None:
++                    # If pyplot hasn't set up a backend yet, resolve it now.
++                    plt.switch_backend(rcsetup._auto_backend_sentinel)
++                else:
++                    # A backend was already set up (e.g. a figure was created
++                    # before rc_context() restored the sentinel).  Don't call
++                    # switch_backend again -- that would call close("all") and
++                    # destroy all existing figures.  Instead just return the
++                    # name of the already-active backend without triggering
++                    # backend resolution/switching.
++                    return dict.__getitem__(self, key)
+ 
+         return dict.__getitem__(self, key)
+ 

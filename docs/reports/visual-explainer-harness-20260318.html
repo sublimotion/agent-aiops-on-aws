@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Harness Visual Explainer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --surface2: #1c2128; --surface3: #21262d;
+    --border: #30363d; --text: #e6edf3; --text-muted: #8b949e; --text-dim: #6e7681;
+    --accent: #58a6ff; --green: #3fb950; --orange: #d29922; --red: #f85149;
+    --purple: #bc8cff; --pink: #f778ba; --cyan: #39d2c0; --yellow: #e3b341;
+  }
+  [data-theme="light"] {
+    --bg: #f6f8fa; --surface: #ffffff; --surface2: #f0f3f6; --surface3: #e6eaef;
+    --border: #d0d7de; --text: #1f2328; --text-muted: #656d76; --text-dim: #8b949e;
+    --accent: #0969da; --green: #1a7f37; --orange: #9a6700; --red: #cf222e;
+    --purple: #8250df; --pink: #bf3989; --cyan: #0e8a7e; --yellow: #9a6700;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+  }
+  .page { max-width: 1100px; margin: 0 auto; padding: 2.5rem 2rem 4rem; }
+
+  /* Theme toggle */
+  .theme-toggle {
+    position: fixed; top: 1rem; right: 1rem; z-index: 100;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.4rem 0.8rem; cursor: pointer; color: var(--text-muted); font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Header */
+  header { text-align: center; margin-bottom: 3rem; }
+  header h1 {
+    font-size: 2.4rem; font-weight: 800; letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--accent), var(--purple), var(--cyan));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; margin-bottom: 0.6rem;
+  }
+  header .subtitle { color: var(--text-muted); font-size: 1.05rem; max-width: 700px; margin: 0 auto; }
+  .meta-bar {
+    display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap;
+    margin-top: 1.2rem; font-size: 0.82rem; color: var(--text-dim);
+  }
+  .meta-bar span {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.25rem 0.7rem;
+  }
+
+  /* Stat cards */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2.5rem; }
+  .stat {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.2rem; text-align: center; transition: transform 0.15s, border-color 0.15s;
+  }
+  .stat:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .stat .val { font-size: 2rem; font-weight: 800; line-height: 1.2; }
+  .stat .label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.3rem; }
+  .stat .delta { font-size: 0.75rem; margin-top: 0.2rem; }
+
+  /* Sections */
+  .section {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 2rem; margin-bottom: 2rem;
+  }
+  .section h2 { font-size: 1.35rem; font-weight: 700; margin-bottom: 0.2rem; }
+  .section .desc { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.5rem; }
+  .section h3 { font-size: 1rem; font-weight: 600; color: var(--accent); margin: 1.5rem 0 0.8rem; }
+
+  /* Charts */
+  .chart-wrap { position: relative; width: 100%; margin-bottom: 1.5rem; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { padding: 0.55rem 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+  th {
+    background: var(--surface2); color: var(--text-muted); font-weight: 600;
+    font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  tr:hover td { background: rgba(88, 166, 255, 0.04); }
+  .hi { color: var(--green); font-weight: 700; }
+  .lo { color: var(--red); font-weight: 600; }
+  .mid { color: var(--orange); font-weight: 600; }
+
+  /* Grid */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+
+  /* Insight cards */
+  .insight {
+    background: var(--surface2); border-left: 3px solid var(--accent);
+    padding: 1rem 1.2rem; margin-bottom: 0.8rem; border-radius: 0 10px 10px 0;
+  }
+  .insight h4 { font-size: 0.92rem; font-weight: 700; margin-bottom: 0.25rem; }
+  .insight p { color: var(--text-muted); font-size: 0.85rem; }
+
+  /* Venn */
+  .venn-wrap { display: flex; flex-direction: column; align-items: center; }
+  .venn-svg { max-width: 400px; width: 100%; }
+
+  /* Tags */
+  .tags { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.8rem; }
+  .tag {
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 0.15rem 0.55rem; border-radius: 5px;
+    font-size: 0.75rem; font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .tag.sera { border-color: var(--purple); color: var(--purple); }
+  .tag.lg { border-color: var(--cyan); color: var(--cyan); }
+  .tag.both { border-color: var(--green); color: var(--green); }
+
+  /* Parkinson timeline */
+  .timeline-row {
+    display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.6rem; font-size: 0.85rem;
+  }
+  .timeline-label { width: 100px; text-align: right; font-weight: 600; flex-shrink: 0; }
+  .timeline-bar-bg {
+    flex: 1; height: 28px; background: var(--surface2); border-radius: 6px;
+    position: relative; overflow: hidden; border: 1px solid var(--border);
+  }
+  .timeline-explore {
+    position: absolute; left: 0; top: 0; height: 100%; border-radius: 5px 0 0 5px;
+    background: rgba(88, 166, 255, 0.25); border-right: 2px dashed var(--accent);
+  }
+  .timeline-edit {
+    position: absolute; top: 0; height: 100%; border-radius: 0 5px 5px 0;
+    background: rgba(63, 185, 80, 0.3);
+  }
+  .timeline-marker {
+    position: absolute; top: -2px; bottom: -2px; width: 3px; background: var(--orange);
+    border-radius: 2px; z-index: 2;
+  }
+  .timeline-text {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    font-size: 0.72rem; font-weight: 600; white-space: nowrap;
+  }
+  .timeline-pct { width: 55px; text-align: left; color: var(--orange); font-weight: 700; flex-shrink: 0; }
+
+  /* Footer */
+  footer { text-align: center; color: var(--text-dim); font-size: 0.78rem; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+
+  @media (max-width: 800px) {
+    .grid-2 { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .page { padding: 1.2rem; }
+    header h1 { font-size: 1.6rem; }
+  }
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="toggleTheme()">Toggle theme</button>
+
+<div class="page">
+
+<header>
+  <h1>Agent Harness Experiment</h1>
+  <p class="subtitle">How does scaffolding affect coding agent performance? A systematic study with fixed model, fixed benchmark, variable harness.</p>
+  <div class="meta-bar">
+    <span>Devstral Small 2 24B FP8</span>
+    <span>4x RTX PRO 6000 Blackwell</span>
+    <span>SWE-bench Lite (50 issues)</span>
+    <span>2026-03-18</span>
+  </div>
+</header>
+
+<!-- Top-level stats -->
+<div class="stats">
+  <div class="stat">
+    <div class="val" style="color:var(--green)">22%</div>
+    <div class="label">Best Pass Rate</div>
+    <div class="delta" style="color:var(--green)">OpenCode (32% ensemble)</div>
+  </div>
+  <div class="stat">
+    <div class="val" style="color:var(--accent)">96%</div>
+    <div class="label">Best Fix Rate</div>
+    <div class="delta" style="color:var(--text-muted)">Codex CLI (48/50)</div>
+  </div>
+  <div class="stat">
+    <div class="val" style="color:var(--purple)">53%</div>
+    <div class="label">Best Precision</div>
+    <div class="delta" style="color:var(--text-muted)">Claude Code pass/fix</div>
+  </div>
+  <div class="stat">
+    <div class="val" style="color:var(--orange)">42%</div>
+    <div class="label">Wrong Fix Failures</div>
+    <div class="delta" style="color:var(--text-muted)">Trainable error class</div>
+  </div>
+</div>
+
+<!-- ==================== PHASE 1 ==================== -->
+<div class="section">
+  <h2>Phase 1: Turn Degradation Analysis</h2>
+  <p class="desc">Does giving an agent more turns help or hurt? Six configurations from 10 to 30 turns, plus restart and compaction strategies.</p>
+
+  <div class="chart-wrap"><canvas id="p1Bars"></canvas></div>
+
+  <table>
+    <thead>
+      <tr><th>Config</th><th>Turns</th><th>Strategy</th><th>Fix Rate</th><th>Edit Rate</th><th>1st Edit</th><th>Repeat Rate</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><b>A</b></td><td>10</td><td>Baseline</td><td>36%</td><td>42%</td><td>6.5</td><td>15.7%</td></tr>
+      <tr><td><b>B</b></td><td>15</td><td>Baseline</td><td>48%</td><td>56%</td><td>9.4</td><td>23.6%</td></tr>
+      <tr><td><b>C</b></td><td>20</td><td>Baseline</td><td>52%</td><td>64%</td><td>11.9</td><td>29.3%</td></tr>
+      <tr><td><b>D</b></td><td>30</td><td>Baseline</td><td class="hi">60%</td><td class="hi">78%</td><td>17.5</td><td>37.3%</td></tr>
+      <tr><td><b>E</b></td><td>30</td><td>Restart @ 15</td><td>56%</td><td>76%</td><td>18.2</td><td>37.9%</td></tr>
+      <tr><td><b>F</b></td><td>30</td><td>Compact @ 15</td><td class="lo">40%</td><td>64%</td><td>16.5</td><td class="lo">41.3%</td></tr>
+    </tbody>
+  </table>
+
+  <!-- Parkinson's Law -->
+  <h3>Parkinson's Law for Agents</h3>
+  <p class="desc">The model delays its first edit to the final third of the turn budget, regardless of budget size. More turns = more procrastination.</p>
+
+  <div style="margin-bottom:1.5rem">
+    <div class="timeline-row">
+      <div class="timeline-label">A (10t)</div>
+      <div class="timeline-bar-bg">
+        <div class="timeline-explore" style="width:65%"></div>
+        <div class="timeline-edit" style="left:65%;width:35%"></div>
+        <div class="timeline-marker" style="left:65%"></div>
+        <span class="timeline-text" style="left:8px;color:var(--accent)">Exploring...</span>
+        <span class="timeline-text" style="right:8px;color:var(--green)">Edit</span>
+      </div>
+      <div class="timeline-pct">65%</div>
+    </div>
+    <div class="timeline-row">
+      <div class="timeline-label">B (15t)</div>
+      <div class="timeline-bar-bg">
+        <div class="timeline-explore" style="width:63%"></div>
+        <div class="timeline-edit" style="left:63%;width:37%"></div>
+        <div class="timeline-marker" style="left:63%"></div>
+        <span class="timeline-text" style="left:8px;color:var(--accent)">Exploring...</span>
+        <span class="timeline-text" style="right:8px;color:var(--green)">Edit</span>
+      </div>
+      <div class="timeline-pct">63%</div>
+    </div>
+    <div class="timeline-row">
+      <div class="timeline-label">C (20t)</div>
+      <div class="timeline-bar-bg">
+        <div class="timeline-explore" style="width:60%"></div>
+        <div class="timeline-edit" style="left:60%;width:40%"></div>
+        <div class="timeline-marker" style="left:60%"></div>
+        <span class="timeline-text" style="left:8px;color:var(--accent)">Exploring...</span>
+        <span class="timeline-text" style="right:8px;color:var(--green)">Edit</span>
+      </div>
+      <div class="timeline-pct">60%</div>
+    </div>
+    <div class="timeline-row">
+      <div class="timeline-label">D (30t)</div>
+      <div class="timeline-bar-bg">
+        <div class="timeline-explore" style="width:58%"></div>
+        <div class="timeline-edit" style="left:58%;width:42%"></div>
+        <div class="timeline-marker" style="left:58%"></div>
+        <span class="timeline-text" style="left:8px;color:var(--accent)">Exploring...</span>
+        <span class="timeline-text" style="right:8px;color:var(--green)">Edit</span>
+      </div>
+      <div class="timeline-pct">58%</div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:0.8rem;flex-wrap:wrap;margin-bottom:0.5rem;">
+    <div style="display:flex;align-items:center;gap:0.4rem;font-size:0.78rem;color:var(--text-muted)">
+      <span style="width:12px;height:12px;background:rgba(88,166,255,0.25);border-radius:3px;display:inline-block"></span> Exploring (read/search)
+    </div>
+    <div style="display:flex;align-items:center;gap:0.4rem;font-size:0.78rem;color:var(--text-muted)">
+      <span style="width:12px;height:12px;background:rgba(63,185,80,0.3);border-radius:3px;display:inline-block"></span> Editing phase
+    </div>
+    <div style="display:flex;align-items:center;gap:0.4rem;font-size:0.78rem;color:var(--text-muted)">
+      <span style="width:3px;height:12px;background:var(--orange);border-radius:2px;display:inline-block"></span> Avg 1st edit turn
+    </div>
+    <div style="display:flex;align-items:center;gap:0.4rem;font-size:0.78rem;color:var(--orange)">
+      <b>%</b> = fraction of budget spent before first edit
+    </div>
+  </div>
+</div>
+
+<!-- ==================== PHASE 2a ==================== -->
+<div class="section">
+  <h2>Phase 2a: Multi-Harness Comparison</h2>
+  <p class="desc">Same model, same 50 issues, different scaffolding. Pass rate verified with gold test patches from SWE-bench.</p>
+
+  <div class="grid-2">
+    <div class="chart-wrap"><canvas id="p2Bars"></canvas></div>
+    <div class="chart-wrap"><canvas id="p2Precision"></canvas></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Harness</th><th>Pass Rate</th><th>Fix Rate</th><th>Pass/Fix</th><th>Edit Rate</th><th>1st Edit</th><th>Avg Latency</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><b>SERA</b></td><td class="hi">16% (8/50)</td><td>46% (23/50)</td><td class="hi">35%</td><td>48%</td><td>13.5</td><td>87.6s</td></tr>
+      <tr><td><b>LangGraph</b></td><td>14% (7/50)</td><td class="hi">62% (31/50)</td><td>23%</td><td>64%</td><td>19.7</td><td>50.2s</td></tr>
+      <tr><td><b>Aider</b></td><td class="lo">0% (0/50)</td><td class="lo">0% (0/50)</td><td>--</td><td>0%</td><td>--</td><td>5.9s</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ==================== PHASE 2b ==================== -->
+<div class="section">
+  <h2>Phase 2b: Edit Format + CLI Agents</h2>
+  <p class="desc">Testing the "harness problem" hypothesis, OpenCode (Vercel AI SDK), Claude Code (Anthropic SDK via patched vLLM), and Codex CLI (OpenAI Responses API via streaming proxy) as full-featured CLI agent harnesses.</p>
+
+  <div class="grid-2">
+    <div class="chart-wrap"><canvas id="p2bBars"></canvas></div>
+    <div class="chart-wrap"><canvas id="p2bTokens"></canvas></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Harness</th><th>Pass Rate</th><th>Fix Rate</th><th>Patches</th><th>Precision</th><th>Edit Format</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><b>OpenCode</b></td><td class="hi">22% (11/50)</td><td class="hi">88% (44/50)</td><td>44</td><td>25.0%</td><td>built-in str_replace</td></tr>
+      <tr><td><b>Claude Code</b></td><td>20% (10/50)</td><td>38% (19/50)</td><td>26</td><td class="hi">52.6%</td><td>built-in str_replace</td></tr>
+      <tr><td><b>PiAgent</b> (control)</td><td>16% (8/50)</td><td>78% (39/50)</td><td>39</td><td>20.5%</td><td>str_replace</td></tr>
+      <tr><td><b>Codex CLI</b></td><td>18% (9/50)</td><td class="hi">96% (48/50)</td><td>48</td><td>18.8%</td><td>shell commands</td></tr>
+      <tr><td><b>Hashline</b> (ohmypi)</td><td>14% (7/50)</td><td>76% (38/50)</td><td>38</td><td>18.4%</td><td>LINE:HASH</td></tr>
+      <tr><td><b>DeepAgents</b></td><td class="lo">DNF</td><td>--</td><td>--</td><td>--</td><td>recursion limit</td></tr>
+    </tbody>
+  </table>
+
+  <div class="insight" style="border-left-color:var(--green);margin-top:1rem;">
+    <h4>OpenCode: Best Pass Rate (22%)</h4>
+    <p>Highest pass rate with 88% fix rate. Connected to vLLM via custom <code>@ai-sdk/openai-compatible</code> provider. Required 64K context due to ~11K system prompt + ~20 built-in tool definitions.</p>
+  </div>
+
+  <div class="insight" style="border-left-color:var(--purple);margin-top:0.8rem;">
+    <h4>Claude Code: Best Precision (53%)</h4>
+    <p>20% pass rate with only 38% fix rate &mdash; but 53% of its fixes pass (10/19), double OpenCode's 25%. Required patching 3 bugs in vLLM's Anthropic Messages API (<code>/v1/messages</code>): tool_use_id parsing, streaming argument drop, and Mistral ID format. Needs 131K context (TP2) due to 32K max_tokens + ~22K system prompt.</p>
+  </div>
+
+  <div class="insight" style="border-left-color:var(--pink);margin-top:0.8rem;">
+    <h4>Codex CLI: Highest Fix Rate (96%), Lowest Precision (19%)</h4>
+    <p>96% fix rate (48/50) but only 18% pass rate (9/50). Edits via shell commands (<code>cat &gt;</code>, <code>sed</code>, heredocs) rather than structured edit tools. Stateless Responses API resends full conversation each turn, consuming ~1.4M tokens/issue (140x more than OpenCode). Adds 2 unique passes (django-11630, django-12747). Required a streaming-to-non-streaming proxy + 4 vLLM patches.</p>
+  </div>
+
+  <div class="insight" style="border-left-color:var(--orange);margin-top:0.8rem;">
+    <h4>Hashline: Same Rate, Different Issues</h4>
+    <p>The LINE:HASH format that gave Grok a 10x improvement (6.7% &rarr; 68.3%) provides no advantage for Devstral Small 2 24B. But it uniquely solves sympy-18835.</p>
+  </div>
+
+  <div class="insight" style="border-left-color:var(--red);margin-top:0.8rem;">
+    <h4>19x Token Overhead</h4>
+    <p>Hashline averages 191K tokens/issue vs ~10K for str_replace. The LINE:HASH prefix on every line inflates context by ~19x. For weak models, the bottleneck is fix correctness, not edit addressing.</p>
+  </div>
+</div>
+
+<!-- ==================== 5-HARNESS ENSEMBLE ==================== -->
+<div class="section">
+  <h2>7-Harness Ensemble</h2>
+  <p class="desc">Running all 7 harnesses and taking the union reaches 32%. Codex CLI adds 2 unique passes (django-11630, django-12747) over the 6-harness result.</p>
+
+  <div class="chart-wrap"><canvas id="ensembleBars"></canvas></div>
+
+  <table>
+    <thead>
+      <tr><th>Harness</th><th>Pass Rate</th><th>Fix Rate</th><th>Precision</th><th>Unique Passes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><b>OpenCode</b></td><td class="hi">22% (11/50)</td><td>88% (44/50)</td><td>25%</td><td>0</td></tr>
+      <tr><td><b>Claude Code</b></td><td>20% (10/50)</td><td>38% (19/50)</td><td class="hi">53%</td><td>1 (django-15400)</td></tr>
+      <tr><td><b>Codex CLI</b></td><td>18% (9/50)</td><td class="hi">96% (48/50)</td><td>19%</td><td>2 (django-11630, django-12747)</td></tr>
+      <tr><td><b>SERA</b></td><td>16% (8/50)</td><td>46% (23/50)</td><td>35%</td><td>0</td></tr>
+      <tr><td><b>PiAgent</b></td><td>16% (8/50)</td><td>78% (39/50)</td><td>21%</td><td>0</td></tr>
+      <tr><td><b>LangGraph</b></td><td>14% (7/50)</td><td>62% (31/50)</td><td>23%</td><td>0</td></tr>
+      <tr><td><b>Hashline</b></td><td>14% (7/50)</td><td>76% (38/50)</td><td>18%</td><td>1 (sympy-18835)</td></tr>
+      <tr><td class="hi"><b>Union</b></td><td class="hi"><b>32% (16/50)</b></td><td>--</td><td>--</td><td>--</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ==================== ENSEMBLE BREAKDOWN ==================== -->
+<div class="section">
+  <h2>Ensemble Complementarity</h2>
+  <p class="desc">OpenCode covers the broadest range (11/16 issues). Codex CLI adds 2 unique passes. 16 issues solved by the 7-harness union.</p>
+
+  <div class="grid-2">
+    <div>
+      <table style="font-size:0.82rem;">
+        <thead><tr><th>Instance</th><th>SERA</th><th>LG</th><th>HL</th><th>Pi</th><th>OC</th><th>CC</th><th>Codex</th></tr></thead>
+        <tbody>
+          <tr><td>django-11039</td><td class="hi">PASS</td><td>-</td><td class="lo">fail</td><td class="lo">fail</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="lo">fail</td></tr>
+          <tr><td>django-11620</td><td class="hi">PASS</td><td>-</td><td class="lo">fail</td><td>-</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
+          <tr><td>django-11630</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td class="hi"><b>PASS</b></td></tr>
+          <tr><td>django-11815</td><td class="hi">PASS</td><td>-</td><td>-</td><td>-</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="lo">fail</td></tr>
+          <tr><td>django-12286</td><td>-</td><td class="hi">PASS</td><td class="lo">fail</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
+          <tr><td>django-12453</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
+          <tr><td>django-12497</td><td>-</td><td class="hi">PASS</td><td class="lo">fail</td><td class="hi">PASS</td><td>-</td><td>-</td><td class="hi">PASS</td></tr>
+          <tr><td>django-12747</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td class="hi"><b>PASS</b></td></tr>
+          <tr><td>django-14238</td><td>-</td><td>-</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="lo">fail</td></tr>
+          <tr><td>django-14608</td><td>-</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td>-</td><td class="hi">PASS</td></tr>
+          <tr><td>django-14672</td><td class="hi">PASS</td><td>-</td><td class="lo">fail</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td></tr>
+          <tr><td>django-14855</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td>-</td><td>-</td><td class="hi">PASS</td></tr>
+          <tr><td>django-15400</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td class="hi">PASS</td><td class="lo">fail</td></tr>
+          <tr><td>pytest-11143</td><td class="hi">PASS</td><td class="hi">PASS</td><td>-</td><td>-</td><td class="hi">PASS</td><td>-</td><td class="lo">fail</td></tr>
+          <tr><td>sympy-17022</td><td>-</td><td>-</td><td class="hi">PASS</td><td class="lo">fail</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="lo">fail</td></tr>
+          <tr><td>sympy-18835</td><td>-</td><td class="lo">fail</td><td class="hi">PASS</td><td class="lo">fail</td><td>-</td><td>-</td><td class="lo">fail</td></tr>
+          <tr><td>sympy-24152</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="hi">PASS</td><td class="lo">fail</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div>
+      <p style="font-size:0.85rem;margin-bottom:0.5rem;font-weight:600;color:var(--orange)">Unique passes (4)</p>
+      <div class="tags">
+        <span class="tag" style="border-color:var(--orange);color:var(--orange)">sympy-18835 (Hashline)</span>
+        <span class="tag" style="border-color:var(--purple);color:var(--purple)">django-15400 (Claude Code)</span>
+        <span class="tag" style="border-color:var(--pink);color:var(--pink)">django-11630 (Codex CLI)</span>
+        <span class="tag" style="border-color:var(--pink);color:var(--pink)">django-12747 (Codex CLI)</span>
+      </div>
+      <p style="font-size:0.85rem;margin-bottom:0.5rem;margin-top:0.8rem;font-weight:600;color:var(--green)">All 7 pass (1)</p>
+      <div class="tags">
+        <span class="tag both">django-12453</span>
+      </div>
+      <p style="font-size:0.85rem;margin-bottom:0.5rem;margin-top:0.8rem;font-weight:600;color:var(--cyan)">OpenCode covers (11/16)</p>
+      <div class="tags">
+        <span class="tag lg">django-11039</span><span class="tag lg">django-11620</span>
+        <span class="tag lg">django-11815</span><span class="tag lg">django-12286</span>
+        <span class="tag lg">django-12453</span><span class="tag lg">django-14238</span>
+        <span class="tag lg">django-14608</span><span class="tag lg">django-14672</span>
+        <span class="tag lg">pytest-11143</span><span class="tag lg">sympy-17022</span>
+        <span class="tag lg">sympy-24152</span>
+      </div>
+      <div style="margin-top:1.2rem;padding:0.8rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:0.82rem;">
+        <b>Precision vs recall tradeoff:</b> Codex generates the most fixes (48/50, 96%) but at the lowest precision (19%). Claude Code converts at 2.8x Codex's rate (53% vs 19%). The ensemble ceiling of 32% with diminishing returns (+1-2 passes per new harness) suggests model-level improvements are now needed.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== FAILURE ANALYSIS ==================== -->
+<div class="section">
+  <h2>Failure Analysis</h2>
+  <p class="desc">Of 24 LangGraph patches that failed verification, the dominant failure mode is "wrong fix" (42%) &mdash; the model finds the right file but applies incorrect logic.</p>
+
+  <div class="grid-2">
+    <div class="chart-wrap"><canvas id="failureChart"></canvas></div>
+    <div>
+      <table>
+        <thead><tr><th>Category</th><th>Count</th><th>%</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td class="mid"><b>wrong_fix</b></td><td>~10</td><td class="mid">42%</td><td>Correct file, wrong logic</td></tr>
+          <tr><td><b>dep_missing</b></td><td>8</td><td>33%</td><td>Can't evaluate without Docker</td></tr>
+          <tr><td class="lo"><b>broken_fix</b></td><td>3</td><td class="lo">12%</td><td>TypeError/AttributeError</td></tr>
+          <tr><td><b>other</b></td><td>3</td><td>12%</td><td>Ambiguous/truncated output</td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:1rem;">
+        <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.5rem;"><b>Wrong fix examples:</b></p>
+        <div style="font-size:0.8rem;color:var(--text-dim);line-height:1.8;">
+          django-12308: Returns <code>'a'</code> not <code>'"a"'</code> (quoting)<br>
+          django-13660: Returns <code>'False'</code> not <code>'True'</code> (inversion)<br>
+          django-14997: Missing <code>IntegrityError</code> raise<br>
+          django-12747: Extra dict entries in cascade
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="insight" style="border-left-color:var(--orange);margin-top:1.5rem;">
+    <h4>Phase 3 Implication</h4>
+    <p>42% of failures are "wrong fix" &mdash; the model understands the problem area but applies incorrect logic. This is a trainable error pattern. A LoRA finetuned on successful fix trajectories (especially the 4 both-pass issues) could target this class.</p>
+  </div>
+</div>
+
+<!-- ==================== KEY INSIGHTS ==================== -->
+<div class="section">
+  <h2>Key Insights</h2>
+
+  <div class="insight" style="border-left-color:var(--orange)">
+    <h4>Parkinson's Law for Agents</h4>
+    <p>The model fills available time with exploration. First edit occurs at 58-65% of the turn budget regardless of size. 10 turns or 30 turns &mdash; same proportional delay.</p>
+  </div>
+  <div class="insight" style="border-left-color:var(--red)">
+    <h4>Context Compaction Actively Hurts</h4>
+    <p>Config F (compact at turn 15) achieves 40% fix rate &mdash; the worst. Stripping context causes re-reads and loops. 41.3% repeat rate is highest across all configs. Don't compact; give more turns instead.</p>
+  </div>
+  <div class="insight" style="border-left-color:var(--green)">
+    <h4>Ensemble Is the Biggest Single Win</h4>
+    <p>Running all 7 harnesses lifts pass rate from 14-22% to 32%. Larger than any turn strategy, prompt, or tool optimization.</p>
+  </div>
+  <div class="insight" style="border-left-color:var(--purple)">
+    <h4>Precision vs Recall: Claude Code vs OpenCode</h4>
+    <p>OpenCode: 88% fix rate, 25% precision. Claude Code: 38% fix rate, 53% precision. Claude Code's massive system prompt (~22K tokens) makes the model conservative &mdash; fewer but better fixes. Harness design affects quality distribution, not just quantity.</p>
+  </div>
+  <div class="insight" style="border-left-color:var(--orange)">
+    <h4>Hashline Helps Strong Models, Not Weak Ones</h4>
+    <p>The LINE:HASH edit format that gave Grok 10x gains provides no advantage for Devstral Small 2 (14% vs 14-16%). Uses 19x more tokens. But uniquely solves sympy-18835.</p>
+  </div>
+  <div class="insight" style="border-left-color:var(--pink)">
+    <h4>Shell-Based Editing Solves Different Issues</h4>
+    <p>Codex CLI's shell commands (<code>cat &gt;</code>, <code>sed</code>, heredocs) solve 2 issues no structured edit tool handles (django-11630, django-12747). Highest fix rate (96%) at the cost of 140x token consumption (~1.4M tokens/issue).</p>
+  </div>
+  <div class="insight" style="border-left-color:var(--cyan)">
+    <h4>CLI Agents Push the Frontier to 18-22%</h4>
+    <p>OpenCode (22%), Claude Code (20%), and Codex CLI (18%) all use built-in tool sets rather than custom adapters. The structured system prompts of production CLI agents extract more capability than bespoke harnesses (14-16%). Ensemble ceiling of 32% suggests finetuning is the next lever.</p>
+  </div>
+</div>
+
+<!-- ==================== CONCLUSIONS ==================== -->
+<div class="section" style="background:linear-gradient(135deg, var(--surface), var(--surface2));">
+  <h2>Conclusions</h2>
+  <ol style="font-size:0.9rem;line-height:2;padding-left:1.2rem;">
+    <li><b>30 turns baseline is optimal</b> &mdash; compaction and restart strategies hurt or are neutral.</li>
+    <li><b>7-harness ensemble reaches 32%</b> (16/50) vs 14-22% individual. Each new harness adds 1-2 passes.</li>
+    <li><b>OpenCode best pass rate (22%), Claude Code best precision (53%)</b> &mdash; CLI agents beat custom adapters.</li>
+    <li><b>Codex CLI: highest fix rate (96%), lowest precision (19%)</b> &mdash; shell-based edits solve different issues.</li>
+    <li><b>Fix rate &#x2260; pass rate</b> &mdash; conversion ranges from 19% (Codex) to 53% (Claude Code) depending on harness design.</li>
+    <li><b>Hashline helps strong models, not weak ones</b> &mdash; same rate but unique issues (ensemble value).</li>
+    <li><b>Phase 3 (finetuning) is now relevant</b> &mdash; 42% wrong-fix failures are trainable.</li>
+    <li><b>Full evaluation requires Docker</b> &mdash; bare-metal eval covers ~50% of patches.</li>
+  </ol>
+</div>
+
+<footer>
+  Agent Harness Autoresearch &middot; Devstral Small 2 24B FP8 &middot; SWE-bench Lite 50-issue subset &middot; Phase 2b: 2026-03-18
+</footer>
+
+</div><!-- /page -->
+
+<script>
+  Chart.defaults.color = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8b949e';
+  Chart.defaults.borderColor = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || '#30363d';
+  Chart.defaults.font.family = "'Inter', sans-serif";
+
+  const chartOpts = (aspect = 2) => ({
+    responsive: true, maintainAspectRatio: true, aspectRatio: aspect,
+    plugins: {
+      legend: { position: 'top', labels: { usePointStyle: true, padding: 16, font: { size: 11 } } },
+      tooltip: {
+        backgroundColor: '#1c2128', borderColor: '#30363d', borderWidth: 1,
+        titleColor: '#e6edf3', bodyColor: '#8b949e', cornerRadius: 8,
+        callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}%` }
+      }
+    },
+    scales: {
+      y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' }, grid: { color: 'rgba(48,54,61,0.4)' } },
+      x: { grid: { display: false } }
+    }
+  });
+
+  // Phase 1
+  new Chart(document.getElementById('p1Bars'), {
+    type: 'bar',
+    data: {
+      labels: ['A (10t)', 'B (15t)', 'C (20t)', 'D (30t)', 'E (restart)', 'F (compact)'],
+      datasets: [
+        { label: 'Fix Rate', data: [36,48,52,60,56,40], backgroundColor: 'rgba(88,166,255,0.65)', borderColor: '#58a6ff', borderWidth: 1, borderRadius: 5, order: 2 },
+        { label: 'Edit Rate', data: [42,56,64,78,76,64], backgroundColor: 'rgba(63,185,80,0.45)', borderColor: '#3fb950', borderWidth: 1, borderRadius: 5, order: 3 },
+        { label: 'Repeat Rate', data: [15.7,23.6,29.3,37.3,37.9,41.3], type: 'line', borderColor: '#f85149', backgroundColor: 'rgba(248,81,73,0.08)', borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#f85149', tension: 0.3, fill: true, order: 1 }
+      ]
+    },
+    options: chartOpts(2.2)
+  });
+
+  // Phase 2a bars
+  new Chart(document.getElementById('p2Bars'), {
+    type: 'bar',
+    data: {
+      labels: ['SERA', 'LangGraph', 'Aider'],
+      datasets: [
+        { label: 'Pass Rate', data: [16,14,0], backgroundColor: ['rgba(188,140,255,0.8)','rgba(57,210,192,0.8)','rgba(248,81,73,0.3)'], borderColor: ['#bc8cff','#39d2c0','#f85149'], borderWidth: 1, borderRadius: 5 },
+        { label: 'Fix Rate', data: [46,62,0], backgroundColor: ['rgba(188,140,255,0.25)','rgba(57,210,192,0.25)','rgba(248,81,73,0.1)'], borderColor: ['#bc8cff','#39d2c0','#f85149'], borderWidth: 1, borderRadius: 5 }
+      ]
+    },
+    options: chartOpts(1.5)
+  });
+
+  // Phase 2a precision radar
+  new Chart(document.getElementById('p2Precision'), {
+    type: 'radar',
+    data: {
+      labels: ['Pass Rate', 'Fix Rate', 'Precision', 'Edit Rate', 'Speed'],
+      datasets: [
+        { label: 'SERA', data: [16,46,35,48,30], borderColor: '#bc8cff', backgroundColor: 'rgba(188,140,255,0.15)', borderWidth: 2, pointBackgroundColor: '#bc8cff' },
+        { label: 'LangGraph', data: [14,62,23,64,70], borderColor: '#39d2c0', backgroundColor: 'rgba(57,210,192,0.15)', borderWidth: 2, pointBackgroundColor: '#39d2c0' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true, aspectRatio: 1.5,
+      plugins: { legend: { position: 'top', labels: { usePointStyle: true, font: { size: 11 } } } },
+      scales: { r: { beginAtZero: true, max: 80, ticks: { display: false }, grid: { color: 'rgba(48,54,61,0.4)' }, pointLabels: { color: '#8b949e', font: { size: 11 } } } }
+    }
+  });
+
+  // Phase 2b bars — all harnesses pass rate + fix rate
+  new Chart(document.getElementById('p2bBars'), {
+    type: 'bar',
+    data: {
+      labels: ['OpenCode', 'Claude Code', 'Codex CLI', 'PiAgent\n(str_replace)', 'Hashline\n(LINE:HASH)'],
+      datasets: [
+        { label: 'Pass Rate', data: [22,20,18,16,14], backgroundColor: ['rgba(63,185,80,0.8)','rgba(188,140,255,0.8)','rgba(247,120,186,0.8)','rgba(57,210,192,0.8)','rgba(210,153,34,0.8)'], borderColor: ['#3fb950','#bc8cff','#f778ba','#39d2c0','#d29922'], borderWidth: 1, borderRadius: 5 },
+        { label: 'Fix Rate', data: [88,38,96,78,76], backgroundColor: ['rgba(63,185,80,0.3)','rgba(188,140,255,0.3)','rgba(247,120,186,0.3)','rgba(57,210,192,0.3)','rgba(210,153,34,0.3)'], borderColor: ['#3fb950','#bc8cff','#f778ba','#39d2c0','#d29922'], borderWidth: 1, borderRadius: 5 }
+      ]
+    },
+    options: chartOpts(1.5)
+  });
+
+  // Phase 2b token comparison
+  new Chart(document.getElementById('p2bTokens'), {
+    type: 'bar',
+    data: {
+      labels: ['str_replace', 'Hashline (LINE:HASH)', 'Codex CLI (shell)'],
+      datasets: [{
+        label: 'Avg Tokens per Issue (K)',
+        data: [10, 191, 1411],
+        backgroundColor: ['rgba(57,210,192,0.7)', 'rgba(210,153,34,0.7)', 'rgba(247,120,186,0.7)'],
+        borderColor: ['#39d2c0', '#d29922', '#f778ba'],
+        borderWidth: 1, borderRadius: 5
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true, aspectRatio: 1.5,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.parsed.y + 'K tokens' } }
+      },
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: 'Avg tokens (K)', color: '#8b949e' }, grid: { color: 'rgba(48,54,61,0.4)' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // 7-harness ensemble bar
+  new Chart(document.getElementById('ensembleBars'), {
+    type: 'bar',
+    data: {
+      labels: ['OpenCode', 'Claude Code', 'Codex CLI', 'SERA', 'PiAgent', 'LangGraph', 'Hashline', 'Ensemble'],
+      datasets: [{
+        label: 'Pass Rate',
+        data: [22, 20, 18, 16, 16, 14, 14, 32],
+        backgroundColor: ['rgba(247,120,186,0.7)', 'rgba(188,140,255,0.7)', 'rgba(227,179,65,0.7)', 'rgba(139,148,158,0.5)', 'rgba(57,210,192,0.7)', 'rgba(88,166,255,0.7)', 'rgba(210,153,34,0.7)', 'rgba(63,185,80,0.85)'],
+        borderColor: ['#f778ba', '#bc8cff', '#e3b341', '#8b949e', '#39d2c0', '#58a6ff', '#d29922', '#3fb950'],
+        borderWidth: 2, borderRadius: 5
+      }]
+    },
+    options: {
+      ...chartOpts(2.5),
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.y + '% pass rate' } } }
+    }
+  });
+
+  // Failure analysis doughnut
+  new Chart(document.getElementById('failureChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Wrong Fix (42%)', 'Dep Missing (33%)', 'Broken Fix (12%)', 'Other (12%)'],
+      datasets: [{
+        data: [42, 33, 12, 12],
+        backgroundColor: ['rgba(210,153,34,0.8)', 'rgba(139,148,158,0.5)', 'rgba(248,81,73,0.7)', 'rgba(88,166,255,0.4)'],
+        borderColor: ['#d29922', '#8b949e', '#f85149', '#58a6ff'],
+        borderWidth: 2, hoverOffset: 8
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true, aspectRatio: 1.3,
+      cutout: '55%',
+      plugins: {
+        legend: { position: 'bottom', labels: { usePointStyle: true, padding: 12, font: { size: 11 } } },
+        tooltip: { backgroundColor: '#1c2128', borderColor: '#30363d', borderWidth: 1, titleColor: '#e6edf3', bodyColor: '#8b949e', cornerRadius: 8 }
+      }
+    }
+  });
+
+  // Theme toggle
+  function toggleTheme() {
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme');
+    html.setAttribute('data-theme', current === 'light' ? '' : 'light');
+    if (current === 'light') html.removeAttribute('data-theme');
+  }
+</script>
+</body>
+</html>

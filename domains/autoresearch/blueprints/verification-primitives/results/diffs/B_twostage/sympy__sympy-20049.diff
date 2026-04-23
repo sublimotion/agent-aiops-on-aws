@@ -1,0 +1,47 @@
+diff --git a/sympy/physics/vector/point.py b/sympy/physics/vector/point.py
+index d4e3cfcc90..f1d7ba8a13 100644
+--- a/sympy/physics/vector/point.py
++++ b/sympy/physics/vector/point.py
+@@ -509,16 +509,42 @@ def vel(self, frame):
+         ========
+ 
+         >>> from sympy.physics.vector import Point, ReferenceFrame
++        >>> from sympy.physics.vector import dynamicsymbols
++        >>> from sympy.physics.vector import init_vprinting
++        >>> init_vprinting(pretty_print=False)
+         >>> N = ReferenceFrame('N')
+         >>> p1 = Point('p1')
+         >>> p1.set_vel(N, 10 * N.x)
+         >>> p1.vel(N)
+         10*N.x
+ 
++        Velocities will be automatically calculated if positions are defined
++        between points and the velocity of one of them is known in the frame.
++
++        >>> q = dynamicsymbols('q')
++        >>> p2 = Point('p2')
++        >>> p2.set_pos(p1, q * N.x)
++        >>> p2.vel(N)
++        q'*N.x
++
+         """
+ 
+         _check_frame(frame)
+         if not (frame in self._vel_dict):
++            # Try to find a point with a known velocity in this frame by
++            # traversing the position tree (BFS for shortest path).
++            visited = {self}
++            queue = [self]
++            while queue:
++                current = queue.pop(0)
++                for neighbor in current._pos_dict.keys():
++                    if neighbor in visited:
++                        continue
++                    if frame in neighbor._vel_dict:
++                        # Found a point with known velocity; compute via position chain
++                        return neighbor.vel(frame) + self.pos_from(neighbor).dt(frame)
++                    visited.add(neighbor)
++                    queue.append(neighbor)
+             raise ValueError('Velocity of point ' + self.name + ' has not been'
+                              ' defined in ReferenceFrame ' + frame.name)
+         return self._vel_dict[frame]

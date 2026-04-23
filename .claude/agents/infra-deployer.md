@@ -11,9 +11,16 @@ You are an infrastructure deployer for GPU inference blueprints on AWS. You hand
 
 Follow these stages in order. Do not proceed to the next stage until the current stage's validation passes.
 
-### Stage 0: Deployment card lookup
-Load the model deployment card, GPU architecture card, and check upstream PRs before touching any infrastructure.
+### Stage 0: Pre-deployment gate
+Load deployment cards AND run the blueprint-reviewer to catch structural issues before touching any infrastructure.
 
+**0a. Blueprint review (pre-deployment gate)**:
+1. Invoke the `blueprint-reviewer` agent against the target blueprint directory.
+2. The reviewer runs checks 1-4 and 6-7 (file references, spec alignment, cross-artifact consistency, steering accuracy, verification criteria, lint readiness).
+3. **Block deployment if any P0 issues are found** (missing spec, broken file references, missing verification criteria, unformatted Terraform).
+4. P1/P2 issues are logged but do not block.
+
+**0b. Deployment card lookup**:
 1. Run `mdc get <model> --engine <engine>` to load the curated model deployment card. This provides recommended launch flags, parallelism strategy, known issues, and field notes from previous deployments.
 2. Run `mdc prs <model>` to check for recently merged upstream PRs that may affect this deployment (bug fixes, regressions, new features).
 3. Run `gpu-infra card <instance>` to load the GPU architecture card for the target instance type. This provides NCCL thresholds, EFA details, AMI requirements, container runtime, and hardware-specific known issues.
@@ -93,6 +100,55 @@ Run integration checks before benchmarks.
 4. Check for known permission issues (UID mapping between containers and FSx — see lessons.md).
 
 **Validation**: The serving stack with the target config starts successfully and handles test requests.
+
+### Stage 6b: In-cluster benchmark
+
+Run the standard W1-W6 benchmark suite from inside the cluster to eliminate network latency from measurements.
+
+1. **Create the ConfigMap** from the shared benchmark script:
+   ```bash
+   kubectl create configmap benchmark-scripts --from-file=scripts/benchmark-serving.py
+   ```
+
+2. **Deploy the bench-runner pod** using `scripts/bench-runner-pod.yaml` as a template. Before applying, replace the `REPLACE_ME` values:
+   - `BENCHMARK_API_URL`: the ClusterIP service URL (e.g. `http://my-model-service:8000`)
+   - `BENCHMARK_MODEL`: the model name as registered in vLLM (check `GET /v1/models`)
+
+   ```bash
+   sed "s|BENCHMARK_API_URL.*|BENCHMARK_API_URL\n          value: \"http://<service-name>:8000\"|" scripts/bench-runner-pod.yaml | kubectl apply -f -
+   ```
+
+3. **Verify connectivity** from the runner pod:
+   ```bash
+   kubectl exec bench-runner -- python -c "import urllib.request; print(urllib.request.urlopen('http://<service>:8000/health').status)"
+   ```
+
+4. **Run benchmarks** for each serving config:
+   ```bash
+   kubectl exec bench-runner -- python /scripts/benchmark-serving.py \
+     --api-url http://<service>:8000 \
+     --model <model-name> \
+     --config <config-label> \
+     --workloads w1,w2,w3,w4,w5,w6 \
+     --platform eks \
+     --instance-type <instance-type> \
+     --gpu-count <N>
+   ```
+
+5. **Copy results** from the pod to the blueprint's `results/` directory:
+   ```bash
+   kubectl cp bench-runner:/results/ domains/gpu-serving/blueprints/<name>/results/benchmarks/<config>/
+   ```
+
+6. **Clean up** the runner pod and ConfigMap after all configs are benchmarked:
+   ```bash
+   kubectl delete pod bench-runner
+   kubectl delete configmap benchmark-scripts
+   ```
+
+**Validation**: JSON result files exist in `results/benchmarks/<config>/` for each config. All workloads show >0 successful requests. Invoke the benchmark-analyst agent to generate the report.
+
+**Important**: Always benchmark from inside the cluster (bench-runner pod → ClusterIP service), never via port-forward or external ingress. Port-forward adds 10-50ms of latency noise that corrupts TTFT measurements.
 
 ### Stage 7: Readiness audit
 Run a comprehensive readiness audit before each capacity block session and write results to `results/readiness-audit-<date>.md`.

@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 110.5,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 109021,
+    "duration_api_ms": 84537,
+    "num_turns": 22,
+    "result": "The review concerns are addressed by the fix: comparing actual `db_table` values handles both cases correctly \u2014 if `db_table` is explicitly set, both old and new models have the same value (noop); if auto-generated from model name, they differ after rename (proceed). All 119 existing tests pass.\n\nThe fix adds 3 lines to `database_forwards` in `models.py:322-324`: if `old_model._meta.db_table == new_model._meta.db_table`, return early \u2014 skipping the alter_db_table call, FK constraint recreation, and M2M table renaming that were incorrectly executing when the physical table name didn't change.",
+    "stop_reason": "end_turn",
+    "session_id": "d7db9711-d1b5-4db1-bb9c-ddba68fc6900",
+    "total_cost_usd": 0.24133350000000003,
+    "usage": {
+      "input_tokens": 23,
+      "cache_creation_input_tokens": 16378,
+      "cache_read_input_tokens": 437140,
+      "output_tokens": 3247,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 16378
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 23,
+        "outputTokens": 3247,
+        "cacheReadInputTokens": 437140,
+        "cacheCreationInputTokens": 16378,
+        "webSearchRequests": 0,
+        "costUSD": 0.24133350000000003,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "b5a40224-d798-496f-806e-ac4fd4fc0f13"
+  },
+  "stderr": ""
+}

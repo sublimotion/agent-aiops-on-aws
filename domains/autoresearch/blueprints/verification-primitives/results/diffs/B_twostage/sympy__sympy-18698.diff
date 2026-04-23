@@ -1,0 +1,42 @@
+diff --git a/sympy/polys/polytools.py b/sympy/polys/polytools.py
+index c9e77a901f..2656dd7a49 100644
+--- a/sympy/polys/polytools.py
++++ b/sympy/polys/polytools.py
+@@ -5895,6 +5895,26 @@ def _factors_product(factors):
+     return Mul(*[f.as_expr()**k for f, k in factors])
+ 
+ 
++def _merge_factors(factors, opt):
++    """Merge factors with the same multiplicity for sqf decomposition."""
++    from collections import defaultdict
++    groups = defaultdict(list)
++    for f, k in factors:
++        groups[k].append(f)
++    result = []
++    for k, fs in groups.items():
++        if len(fs) == 1:
++            result.append((fs[0], k))
++        else:
++            # Multiply all factors with the same multiplicity together
++            from sympy.polys.polytools import Poly
++            merged = fs[0]
++            for f in fs[1:]:
++                merged = merged.mul(f)
++            result.append((merged, k))
++    return result
++
++
+ def _symbolic_factor_list(expr, opt, method):
+     """Helper function for :func:`_symbolic_factor`. """
+     coeff, factors = S.One, []
+@@ -5995,6 +6015,10 @@ def _generic_factor_list(expr, gens, args, method):
+                     f, _ = _poly_from_expr(f, _opt)
+                     factors[i] = (f, k)
+ 
++        if method == 'sqf':
++            fp = _merge_factors(fp, _opt)
++            fq = _merge_factors(fq, _opt)
++
+         fp = _sorted_factors(fp, method)
+         fq = _sorted_factors(fq, method)
+ 

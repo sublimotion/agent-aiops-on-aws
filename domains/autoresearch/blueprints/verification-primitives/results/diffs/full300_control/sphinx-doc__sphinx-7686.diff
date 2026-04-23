@@ -1,0 +1,15 @@
+diff --git a/sphinx/ext/autosummary/generate.py b/sphinx/ext/autosummary/generate.py
+index a57c73fb7..c91f72a2c 100644
+--- a/sphinx/ext/autosummary/generate.py
++++ b/sphinx/ext/autosummary/generate.py
+@@ -255,6 +255,10 @@ def generate_autosummary_content(name: str, obj: Any, parent: Any,
+             get_members(obj, {'exception'}, imported=imported_members)
+         ns['attributes'], ns['all_attributes'] = \
+             get_module_attrs(ns['members'])
++        if not imported_members:
++            ns['members'] = [m for m in dir(obj)
++                             if getattr(safe_getattr(obj, m, None),
++                                        '__module__', None) == obj.__name__]
+         ispackage = hasattr(obj, '__path__')
+         if ispackage and recursive:
+             ns['modules'], ns['all_modules'] = get_modules(obj)

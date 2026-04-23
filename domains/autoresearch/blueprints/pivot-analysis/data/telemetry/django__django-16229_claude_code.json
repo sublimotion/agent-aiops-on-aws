@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 213.3,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 211992,
+    "duration_api_ms": 179590,
+    "num_turns": 38,
+    "result": "All tests pass. The fix is correct and complete.\n\n**Summary of the fix:**\n\n**Root cause:** In `BoundField.as_widget()`, when rendering the hidden initial widget (`only_initial=True`), it called `self.value()` which for bound forms returns the submitted data (via `bound_data()`). This caused the hidden initial input to be populated with the user's submitted value on re-render after an error.\n\nOn the second submission, `_has_changed()` compared the hidden initial value (which now held the submitted value) against the submitted data, found no change, and returned `False`. Since inline extra forms have `empty_permitted=True`, the form skipped validation entirely.\n\n**Fix:** In `as_widget()`, when `only_initial=True`, use `self.field.prepare_value(self.initial)` instead of `self.value()`. This ensures the hidden initial widget always stores the original initial value (from the callable default), not the user-submitted data, so change detection works correctly across form resubmissions.",
+    "stop_reason": "end_turn",
+    "session_id": "96278ef9-7f6a-4482-8d55-f43d8b634e43",
+    "total_cost_usd": 0.48621090000000006,
+    "usage": {
+      "input_tokens": 90,
+      "cache_creation_input_tokens": 29580,
+      "cache_read_input_tokens": 815103,
+      "output_tokens": 8699,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 29580
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 90,
+        "outputTokens": 8699,
+        "cacheReadInputTokens": 815103,
+        "cacheCreationInputTokens": 29580,
+        "webSearchRequests": 0,
+        "costUSD": 0.48621090000000006,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "5f98f736-68bf-41ce-b7c5-fa93cf767878"
+  },
+  "stderr": ""
+}

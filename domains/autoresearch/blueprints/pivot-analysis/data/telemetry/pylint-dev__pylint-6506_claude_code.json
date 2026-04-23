@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 120.7,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 119395,
+    "duration_api_ms": 91690,
+    "num_turns": 24,
+    "result": "All 8 tests pass. The fix is complete.\n\n**Summary of changes:**\n\n1. **`pylint/config/config_initialization.py`** (line 85): Replaced `raise _UnrecognizedOptionError(options=unrecognized_options)` with `sys.exit(32)`. The error message was already being added via `linter.add_message()` before this line, so the user still sees the friendly `E0015: Unrecognized option found: Q` message - just without a traceback.\n\n2. **`tests/config/test_config.py`**: Updated `test_unknown_option_name` and `test_unknown_short_option_name` to expect `SystemExit` instead of `_UnrecognizedOptionError`, and removed the now-unused import.",
+    "stop_reason": "end_turn",
+    "session_id": "ee7b9e6e-5d29-4d84-8996-a30ed432a9b9",
+    "total_cost_usd": 0.37760385,
+    "usage": {
+      "input_tokens": 24,
+      "cache_creation_input_tokens": 29555,
+      "cache_read_input_tokens": 650052,
+      "output_tokens": 4779,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 29555
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 24,
+        "outputTokens": 4779,
+        "cacheReadInputTokens": 650052,
+        "cacheCreationInputTokens": 29555,
+        "webSearchRequests": 0,
+        "costUSD": 0.37760385,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "54f2c211-2fa2-4683-8739-857b2ecb4dc7"
+  },
+  "stderr": ""
+}

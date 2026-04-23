@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vllm-qwen3-235b
+  namespace: default
+  labels:
+    app: vllm-qwen3-235b
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    node.kubernetes.io/instance-type: p6-b300.48xlarge
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  hostNetwork: true
+  containers:
+    - name: vllm
+      image: vllm/vllm-openai:v0.19.1-cu130
+      command:
+        - python3
+        - -m
+        - vllm.entrypoints.openai.api_server
+        - --model
+        - /mnt/nvme/models/qwen3-235b-fp8
+        - --served-model-name
+        - Qwen3-235B-A22B-FP8
+        - --tensor-parallel-size
+        - "4"
+        - --reasoning-parser
+        - deepseek_r1
+        - --tool-call-parser
+        - hermes
+        - --enable-auto-tool-choice
+        - --enable-prefix-caching
+        - --max-model-len
+        - "40960"
+        - --gpu-memory-utilization
+        - "0.92"
+        - --max-num-seqs
+        - "512"
+        - --host
+        - "0.0.0.0"
+        - --port
+        - "8000"
+      env:
+        - name: VLLM_TORCH_COMPILE_CACHE
+          value: /mnt/nvme/vllm-cache
+        - name: TRITON_CACHE_DIR
+          value: /mnt/nvme/triton-cache
+        - name: HF_HOME
+          value: /mnt/nvme/hf-cache
+      resources:
+        requests:
+          nvidia.com/gpu: "4"
+          cpu: "32"
+          memory: 128Gi
+        limits:
+          nvidia.com/gpu: "4"
+          cpu: "64"
+          memory: 256Gi
+      volumeMounts:
+        - name: nvme
+          mountPath: /mnt/nvme
+        - name: shm
+          mountPath: /dev/shm
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        initialDelaySeconds: 120
+        periodSeconds: 10
+        failureThreshold: 60
+  volumes:
+    - name: nvme
+      hostPath:
+        path: /mnt/nvme
+        type: Directory
+    - name: shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 64Gi

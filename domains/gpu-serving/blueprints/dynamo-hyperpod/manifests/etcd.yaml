@@ -1,0 +1,81 @@
+# etcd for Dynamo service discovery
+# Deployed on GPU node (abundant CPU/RAM) since system nodes have restrictive taints
+apiVersion: v1
+kind: Service
+metadata:
+  name: etcd
+  namespace: dynamo-validation
+spec:
+  ports:
+    - port: 2379
+      targetPort: 2379
+      name: client
+    - port: 2380
+      targetPort: 2380
+      name: peer
+  selector:
+    app: etcd
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: etcd
+  namespace: dynamo-validation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: etcd
+  template:
+    metadata:
+      labels:
+        app: etcd
+    spec:
+      nodeSelector:
+        sagemaker.amazonaws.com/instance-group-name: gpu-workers
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: etcd
+          image: quay.io/coreos/etcd:v3.5.17
+          command:
+            - etcd
+            - --name=etcd0
+            - --listen-client-urls=http://0.0.0.0:2379
+            - --advertise-client-urls=http://etcd.dynamo-validation.svc.cluster.local:2379
+            - --listen-peer-urls=http://0.0.0.0:2380
+            - --initial-advertise-peer-urls=http://etcd.dynamo-validation.svc.cluster.local:2380
+            - --initial-cluster=etcd0=http://etcd.dynamo-validation.svc.cluster.local:2380
+            - --data-dir=/var/lib/etcd
+          ports:
+            - containerPort: 2379
+              name: client
+            - containerPort: 2380
+              name: peer
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 2379
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 2379
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: etcd-data
+              mountPath: /var/lib/etcd
+      volumes:
+        - name: etcd-data
+          emptyDir: {}

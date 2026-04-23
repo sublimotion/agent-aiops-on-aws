@@ -1,0 +1,79 @@
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 02aa32b207..f2862b46df 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -70,11 +70,69 @@ class Media:
+ 
+     @property
+     def _js(self):
+-        js = self._js_lists[0]
+-        # filter(None, ...) avoids calling merge() with empty lists.
+-        for obj in filter(None, self._js_lists[1:]):
+-            js = self.merge(js, obj)
+-        return js
++        # filter(None, ...) avoids calling merge_all() with empty lists.
++        return self.merge_all([lst for lst in self._js_lists if lst])
++
++    @staticmethod
++    def merge_all(list_of_lists):
++        """
++        Merge multiple lists while trying to keep the relative order of the
++        elements. Warn only if there are genuine ordering conflicts (i.e. the
++        combined constraints form a cycle), rather than spurious conflicts
++        introduced by intermediate pairwise merge results.
++        """
++        dependency_graph = {}
++        all_elements = []
++        seen = set()
++
++        for lst in list_of_lists:
++            for item in lst:
++                if item not in seen:
++                    seen.add(item)
++                    all_elements.append(item)
++                    dependency_graph[item] = set()
++            # Add ordering constraints: for each consecutive pair (a, b),
++            # b must come after a.
++            for i in range(len(lst) - 1):
++                dependency_graph[lst[i + 1]].add(lst[i])
++
++        # Topological sort using Kahn's algorithm.
++        in_degree = {item: len(dependency_graph[item]) for item in all_elements}
++        # Build reverse: which items are "blocked" by each item.
++        dependents = {item: [] for item in all_elements}
++        for item, predecessors in dependency_graph.items():
++            for pred in predecessors:
++                dependents[pred].append(item)
++
++        # Start with items that have no prerequisites, in their original order.
++        queue = [item for item in all_elements if in_degree[item] == 0]
++        result = []
++        while queue:
++            item = queue.pop(0)
++            result.append(item)
++            for dependent in dependents[item]:
++                in_degree[dependent] -= 1
++                if in_degree[dependent] == 0:
++                    # Insert at the right position to maintain original order.
++                    # Find where in the queue to insert it.
++                    for i, queued in enumerate(queue):
++                        if all_elements.index(queued) > all_elements.index(dependent):
++                            queue.insert(i, dependent)
++                            break
++                    else:
++                        queue.append(dependent)
++
++        if len(result) != len(all_elements):
++            # Cycle detected - warn about conflicting files.
++            remaining = [item for item in all_elements if item not in result]
++            warnings.warn(
++                'Detected duplicate Media files in an opposite order:\n' +
++                '\n'.join(remaining),
++                MediaOrderConflictWarning,
++            )
++            result.extend(remaining)
++
++        return result
+ 
+     def render(self):
+         return mark_safe('\n'.join(chain.from_iterable(getattr(self, 'render_' + name)() for name in MEDIA_TYPES)))

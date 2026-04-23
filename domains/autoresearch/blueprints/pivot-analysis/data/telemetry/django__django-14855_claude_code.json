@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 94.0,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 92737,
+    "duration_api_ms": 66637,
+    "num_turns": 24,
+    "result": "Line 197 already calls `model_admin.get_empty_value_display()` unconditionally in `__init__`, meaning `model_admin` is always expected to be set when an `AdminReadonlyField` is created. So the `self.model_admin.admin_site.name` access in our fix is safe.\n\nThe fix is correct and minimal. The change adds `current_app=self.model_admin.admin_site.name` to the `reverse()` call in `get_admin_url`, which is exactly what the issue describes and matches the pattern used throughout the rest of the admin codebase.",
+    "stop_reason": "end_turn",
+    "session_id": "236c8a64-ba7b-4f26-8586-11062b99b28e",
+    "total_cost_usd": 0.23210084999999997,
+    "usage": {
+      "input_tokens": 90,
+      "cache_creation_input_tokens": 15481,
+      "cache_read_input_tokens": 444707,
+      "output_tokens": 2691,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 15481
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 90,
+        "outputTokens": 2691,
+        "cacheReadInputTokens": 444707,
+        "cacheCreationInputTokens": 15481,
+        "webSearchRequests": 0,
+        "costUSD": 0.23210084999999997,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "48ed2e25-57dd-4de6-ba0b-232960cc2f7d"
+  },
+  "stderr": ""
+}

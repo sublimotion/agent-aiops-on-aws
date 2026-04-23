@@ -1,0 +1,193 @@
+diff --git a/xarray/core/concat.py b/xarray/core/concat.py
+index ecae2566..0759e846 100644
+--- a/xarray/core/concat.py
++++ b/xarray/core/concat.py
+@@ -1,3 +1,4 @@
++import numpy as np
+ import pandas as pd
+ 
+ from . import dtypes, utils
+@@ -148,10 +149,10 @@ def _calc_concat_dim_coord(dim):
+         dim = dim_name
+     elif not isinstance(dim, DataArray):
+         coord = as_variable(dim).to_index_variable()
+-        dim, = coord.dims
++        (dim,) = coord.dims
+     else:
+         coord = dim
+-        dim, = coord.dims
++        (dim,) = coord.dims
+     return dim, coord
+ 
+ 
+@@ -240,7 +241,6 @@ def _calc_concat_over(datasets, dim, dim_names, data_vars, coords, compat):
+ 
+ # determine dimensional coordinate names and a dict mapping name to DataArray
+ def _parse_datasets(datasets):
+-
+     dims = set()
+     all_coord_names = set()
+     data_vars = set()  # list of data_vars
+@@ -309,23 +309,35 @@ def _dataset_concat(
+ 
+     result_vars = {}
+     if variables_to_merge:
+-        to_merge = {var: [] for var in variables_to_merge}
+-
+-        for ds in datasets:
+-            absent_merge_vars = variables_to_merge - set(ds.variables)
+-            if absent_merge_vars:
+-                raise ValueError(
+-                    "variables %r are present in some datasets but not others. "
+-                    % absent_merge_vars
+-                )
++        to_merge = {var: {} for var in variables_to_merge}
+ 
++        # Collect variables, tracking which dataset each one comes from
++        for ds_idx, ds in enumerate(datasets):
+             for var in variables_to_merge:
+-                to_merge[var].append(ds.variables[var])
++                if var in ds.variables:
++                    to_merge[var][ds_idx] = ds.variables[var]
+ 
+         for var in variables_to_merge:
+-            result_vars[var] = unique_variable(
+-                var, to_merge[var], compat=compat, equals=equals.get(var, None)
+-            )
++            # Get all valid variables (that exist)
++            valid_vars = [v for v in to_merge[var].values()]
++
++            if not valid_vars:
++                # Variable is absent from all datasets, skip it
++                continue
++
++            # Check if this variable is absent from some datasets
++            if len(to_merge[var]) < len(datasets):
++                # Some datasets don't have this variable
++                # For variables_to_merge, we don't need to fill or merge
++                # Just take the first variable we find
++                # This handles the case where different datasets have different scalar coordinates
++                result_vars[var] = valid_vars[0]
++            else:
++                # All datasets have this variable, use normal merge
++                vars_list = [to_merge[var][i] for i in range(len(datasets))]
++                result_vars[var] = unique_variable(
++                    var, vars_list, compat=compat, equals=equals.get(var, None)
++                )
+     else:
+         result_vars = {}
+     result_vars.update(dim_coords)
+@@ -345,7 +357,14 @@ def _dataset_concat(
+         # ensure each variable with the given name shares the same
+         # dimensions and the same shape for all of them except along the
+         # concat dimension
+-        common_dims = tuple(pd.unique([d for v in vars for d in v.dims]))
++        all_dims = [d for v in vars for d in v.dims]
++        common_dims = []
++        seen = set()
++        for d in all_dims:
++            if d not in seen:
++                common_dims.append(d)
++                seen.add(d)
++        common_dims = tuple(common_dims)
+         if dim not in common_dims:
+             common_dims = (dim,) + common_dims
+         for var, dim_len in zip(vars, concat_dim_lengths):
+@@ -358,14 +377,72 @@ def _dataset_concat(
+     # n.b. this loop preserves variable order, needed for groupby.
+     for k in datasets[0].variables:
+         if k in concat_over:
+-            try:
+-                vars = ensure_common_dims([ds.variables[k] for ds in datasets])
+-            except KeyError:
+-                raise ValueError("%r is not present in all datasets." % k)
++            vars_to_concat = []
++            for ds_idx, ds in enumerate(datasets):
++                if k in ds.variables:
++                    vars_to_concat.append(ds.variables[k])
++                else:
++                    # Variable is missing in this dataset, create a filled variable
++                    # with the right shape for this dataset
++                    first_var = datasets[0].variables[k]
++                    # Calculate the shape for this dataset's slice
++                    if dim in first_var.dims:
++                        # Need to adjust shape along concat dimension
++                        dim_idx = first_var.dims.index(dim)
++                        new_shape = list(first_var.shape)
++                        new_shape[dim_idx] = concat_dim_lengths[ds_idx]
++                        new_shape = tuple(new_shape)
++                    else:
++                        new_shape = first_var.shape
++
++                    filled_data = np.full(new_shape, np.nan, dtype=first_var.dtype)
++                    vars_to_concat.append(Variable(first_var.dims, filled_data))
++
++            vars = ensure_common_dims(vars_to_concat)
+             combined = concat_vars(vars, dim, positions)
+             assert isinstance(combined, Variable)
+             result_vars[k] = combined
+ 
++    # Also concatenate variables that are in concat_over but not in first dataset
++    for k in concat_over:
++        if k not in datasets[0].variables:
++            vars_to_concat = []
++            first_var = None
++
++            # First pass: collect all variables and find the first reference
++            for ds in datasets:
++                if k in ds.variables:
++                    if first_var is None:
++                        first_var = ds.variables[k]
++                    vars_to_concat.append(ds.variables[k])
++                else:
++                    vars_to_concat.append(None)
++
++            # Second pass: replace None with filled variables
++            if first_var is not None:
++                filled_vars = []
++                for ds_idx, v in enumerate(vars_to_concat):
++                    if v is None:
++                        # Create filled variable with the right shape for this dataset
++                        if dim in first_var.dims:
++                            # Need to adjust shape along concat dimension
++                            dim_idx = first_var.dims.index(dim)
++                            new_shape = list(first_var.shape)
++                            new_shape[dim_idx] = concat_dim_lengths[ds_idx]
++                            new_shape = tuple(new_shape)
++                        else:
++                            new_shape = first_var.shape
++
++                        filled_data = np.full(new_shape, np.nan, dtype=first_var.dtype)
++                        filled_vars.append(Variable(first_var.dims, filled_data))
++                    else:
++                        filled_vars.append(v)
++
++                vars = ensure_common_dims(filled_vars)
++                combined = concat_vars(vars, dim, positions)
++                assert isinstance(combined, Variable)
++                result_vars[k] = combined
++
+     result = Dataset(result_vars, attrs=result_attrs)
+     absent_coord_names = coord_names - set(result.variables)
+     if absent_coord_names:
+diff --git a/xarray/core/dtypes.py b/xarray/core/dtypes.py
+index 4db2990a..c64d356e 100644
+--- a/xarray/core/dtypes.py
++++ b/xarray/core/dtypes.py
+@@ -38,7 +38,7 @@ NINF = AlwaysLessThan()
+ PROMOTE_TO_OBJECT = [
+     {np.number, np.character},  # numpy promotes to character
+     {np.bool_, np.character},  # numpy promotes to character
+-    {np.bytes_, np.unicode_},  # numpy promotes to unicode
++    {np.bytes_, np.str_},  # numpy promotes to unicode
+ ]
+ 
+ 
+@@ -137,8 +137,7 @@ def get_neg_infinity(dtype):
+ 
+ 
+ def is_datetime_like(dtype):
+-    """Check if a dtype is a subclass of the numpy datetime types
+-    """
++    """Check if a dtype is a subclass of the numpy datetime types"""
+     return np.issubdtype(dtype, np.datetime64) or np.issubdtype(dtype, np.timedelta64)

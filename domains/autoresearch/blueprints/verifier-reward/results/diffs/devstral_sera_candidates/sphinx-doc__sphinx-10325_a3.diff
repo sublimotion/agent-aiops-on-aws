@@ -1,0 +1,64 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index 62631f7ff..ee5973f86 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -113,6 +113,12 @@ def inherited_members_option(arg: Any) -> Union[object, Set[str]]:
+     """Used to convert the :members: option to auto directives."""
+     if arg in (None, True):
+         return 'object'
++    elif isinstance(arg, str):
++        # Handle single class name as before
++        return {arg}
++    elif isinstance(arg, (list, tuple)):
++        # Handle list of class names
++        return {cls.strip() for cls in arg}
+     else:
+         return arg
+ 
+@@ -681,16 +687,36 @@ class Documenter:
+         """
+         def is_filtered_inherited_member(name: str, obj: Any) -> bool:
+             if inspect.isclass(self.object):
+-                for cls in self.object.__mro__:
+-                    if cls.__name__ == self.options.inherited_members and cls != self.object:
+-                        # given member is a member of specified *super class*
+-                        return True
+-                    elif name in cls.__dict__:
+-                        return False
+-                    elif name in self.get_attr(cls, '__annotations__', {}):
+-                        return False
+-                    elif isinstance(obj, ObjectMember) and obj.class_ is cls:
+-                        return False
++                # Get the classes that should be filtered
++                filter_classes = set()
++                if isinstance(self.options.inherited_members, set):
++                    filter_classes.update(self.options.inherited_members)
++                elif isinstance(self.options.inherited_members, str):
++                    filter_classes.add(self.options.inherited_members)
++                
++                # If no filter classes specified, use the old behavior
++                if not filter_classes:
++                    for cls in self.object.__mro__:
++                        if cls.__name__ == self.options.inherited_members and cls != self.object:
++                            return True
++                    return False
++                
++                # Check if this member should be filtered
++                for cls in self.object.__mro__[1:]:  # Skip self.object
++                    if cls.__name__ in filter_classes:
++                        # If the member is defined in this class, it should be filtered
++                        if name in cls.__dict__:
++                            return True
++                        if name in self.get_attr(cls, '__annotations__', {}):
++                            return True
++                
++                # If the member is defined in the current class, don't filter it
++                if name in self.object.__dict__:
++                    return False
++                if name in self.get_attr(self.object, '__annotations__', {}):
++                    return False
++                if isinstance(obj, ObjectMember) and obj.class_ is self.object:
++                    return False
+ 
+             return False
+ 

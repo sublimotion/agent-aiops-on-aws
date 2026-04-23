@@ -1,0 +1,33 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index b992b45c26..394c634b73 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,9 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping
++try:
++    from collections.abc import Mapping
++except ImportError:
++    from collections import Mapping
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+ from .cache import cacheit
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index 4c2ffd81e1..19f84e8336 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -106,6 +106,13 @@ def _print_Integral(self, expr):
+             args = expr.args
+         return "Hold[Integrate[" + ', '.join(self.doprint(a) for a in args) + "]]"
+ 
++    def _print_Derivative(self, expr):
++        return "Hold[D[%s]]" % (self.stringify(expr.args, ", "))
++
++    def _print_Float(self, expr):
++        res = str(expr)
++        return res.replace('e', '*^')
++
+     def _print_Sum(self, expr):
+         return "Hold[Sum[" + ', '.join(self.doprint(a) for a in expr.args) + "]]"
+ 

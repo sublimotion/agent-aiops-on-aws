@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 137.8,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 136577,
+    "duration_api_ms": 114790,
+    "num_turns": 21,
+    "result": "All edge cases work correctly. The `hasattr()` check is the right approach because:\n\n1. `contribute_to_class` is only called for the class that defines the field, not subclasses \u2014 so checking `hasattr(cls, ...)` on the defining class is fine\n2. When a subclass user-defines `get_foo_bar_display`, Python's MRO means the subclass method naturally overrides the parent's auto-generated one\n3. Mixin-based overrides are correctly respected via MRO\n\nThe fix is correct. All 310 model_fields tests pass. The one test error from `verify/run_tests.py` was a Django configuration issue with the test runner setup, not a real failure (my manual test confirms the scenarios all work).\n\n**Summary of the fix:** In `django/db/models/fields/__init__.py:765-767`, `contribute_to_class` was unconditionally calling `setattr` to install `get_FOO_display`, overwriting any user-defined method. The fix adds a `hasattr` check so the auto-generated method is only installed if the class doesn't already have one.",
+    "stop_reason": "end_turn",
+    "session_id": "f4dd1e30-bb63-4800-8397-281e2552bb26",
+    "total_cost_usd": 0.28399664999999996,
+    "usage": {
+      "input_tokens": 87,
+      "cache_creation_input_tokens": 19983,
+      "cache_read_input_tokens": 407398,
+      "output_tokens": 5772,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 19983
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 87,
+        "outputTokens": 5772,
+        "cacheReadInputTokens": 407398,
+        "cacheCreationInputTokens": 19983,
+        "webSearchRequests": 0,
+        "costUSD": 0.28399664999999996,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "803333e8-7bde-47b1-84c9-9f4b6a5a0a85"
+  },
+  "stderr": ""
+}

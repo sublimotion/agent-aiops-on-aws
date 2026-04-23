@@ -1,0 +1,667 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -8,7 +8,12 @@ from django.db.models.constants import LOOKUP_SEP
+-    CURSOR, GET_ITERATOR_CHUNK_SIZE, MULTI, NO_RESULTS, ORDER_DIR, SINGLE,
++    CURSOR,
++    GET_ITERATOR_CHUNK_SIZE,
++    MULTI,
++    NO_RESULTS,
++    ORDER_DIR,
++    SINGLE,
+@@ -24,7 +29,7 @@ class SQLCompiler:
+@@ -32,7 +37,7 @@ class SQLCompiler:
+@@ -102,7 +107,7 @@ class SQLCompiler:
+@@ -144,8 +149,10 @@ class SQLCompiler:
+-                if (getattr(expr, 'target', None) == self.query.model._meta.pk and
+-                        getattr(expr, 'alias', None) == self.query.base_table):
++                if (
++                    getattr(expr, "target", None) == self.query.model._meta.pk
++                    and getattr(expr, "alias", None) == self.query.base_table
++                ):
+@@ -153,13 +160,17 @@ class SQLCompiler:
+-                    expr.alias for expr in expressions
+-                    if hasattr(expr, 'target') and expr.target.primary_key
++                    expr.alias
++                    for expr in expressions
++                    if hasattr(expr, "target") and expr.target.primary_key
+-                    expr for expr in expressions
+-                    if expr in having or (
+-                        getattr(expr, 'alias', None) is not None and expr.alias not in pk_aliases
++                    expr
++                    for expr in expressions
++                    if expr in having
++                    or (
++                        getattr(expr, "alias", None) is not None
++                        and expr.alias not in pk_aliases
+@@ -170,12 +181,17 @@ class SQLCompiler:
+-                expr for expr in expressions
+-                if hasattr(expr, 'target') and expr.target.primary_key and expr.target.model._meta.managed
++                expr
++                for expr in expressions
++                if hasattr(expr, "target")
++                and expr.target.primary_key
++                and expr.target.model._meta.managed
+-                expr for expr in expressions if expr in pks or getattr(expr, 'alias', None) not in aliases
++                expr
++                for expr in expressions
++                if expr in pks or getattr(expr, "alias", None) not in aliases
+@@ -219,8 +235,8 @@ class SQLCompiler:
+-                'model': self.query.model,
+-                'select_fields': select_list,
++                "model": self.query.model,
++                "select_fields": select_list,
+@@ -229,14 +245,16 @@ class SQLCompiler:
+-                for ki in klass_info['related_klass_infos']:
+-                    if ki['from_parent']:
+-                        ki['select_fields'] = (klass_info['select_fields'] +
+-                                               ki['select_fields'])
++                for ki in klass_info["related_klass_infos"]:
++                    if ki["from_parent"]:
++                        ki["select_fields"] = (
++                            klass_info["select_fields"] + ki["select_fields"]
++                        )
++
+@@ -245,7 +263,7 @@ class SQLCompiler:
+@@ -270,64 +288,90 @@ class SQLCompiler:
+-                order_by.append((
+-                    OrderBy(Ref(col, self.query.annotation_select[col]), descending=descending),
+-                    True))
++                order_by.append(
++                    (
++                        OrderBy(
++                            Ref(col, self.query.annotation_select[col]),
++                            descending=descending,
++                        ),
++                        True,
++                    )
++                )
+-                order_by.append((
+-                    OrderBy(self.query.annotations[col], descending=descending),
+-                    False))
++                order_by.append(
++                    (OrderBy(self.query.annotations[col], descending=descending), False)
++                )
+-                table, col = col.split('.', 1)
+-                order_by.append((
+-                    OrderBy(
+-                        RawSQL('%s.%s' % (self.quote_name_unless_alias(table), col), []),
+-                        descending=descending
+-                    ), False))
++                table, col = col.split(".", 1)
++                order_by.append(
++                    (
++                        OrderBy(
++                            RawSQL(
++                                "%s.%s" % (self.quote_name_unless_alias(table), col), []
++                            ),
++                            descending=descending,
++                        ),
++                        False,
++                    )
++                )
+-                order_by.extend(self.find_ordering_name(
+-                    field, self.query.get_meta(), default_order=asc))
++                order_by.extend(
++                    self.find_ordering_name(
++                        field, self.query.get_meta(), default_order=asc
++                    )
++                )
+-                    order_by.append((
+-                        OrderBy(RawSQL(*self.query.extra[col]), descending=descending),
+-                        False))
++                    order_by.append(
++                        (
++                            OrderBy(
++                                RawSQL(*self.query.extra[col]), descending=descending
++                            ),
++                            False,
++                        )
++                    )
+-                    order_by.append((
+-                        OrderBy(Ref(col, RawSQL(*self.query.extra[col])), descending=descending),
+-                        True))
++                    order_by.append(
++                        (
++                            OrderBy(
++                                Ref(col, RawSQL(*self.query.extra[col])),
++                                descending=descending,
++                            ),
++                            True,
++                        )
++                    )
+@@ -344,16 +388,20 @@ class SQLCompiler:
+-                    raise DatabaseError('ORDER BY term does not match any column in the result set.')
++                    raise DatabaseError(
++                        "ORDER BY term does not match any column in the result set."
++                    )
+-            without_ordering = self.ordering_parts.search(sql).group(1)
++            without_ordering = self.ordering_parts.search(sql.replace("\n", " ")).group(
++                1
++            )
+@@ -366,7 +414,9 @@ class SQLCompiler:
+-                without_ordering = self.ordering_parts.search(sql).group(1)
++                without_ordering = self.ordering_parts.search(
++                    sql.replace("\n", " ")
++                ).group(1)
+@@ -379,9 +429,13 @@ class SQLCompiler:
+-        if ((name in self.query.alias_map and name not in self.query.table_map) or
+-                name in self.query.extra_select or (
+-                    name in self.query.external_aliases and name not in self.query.table_map)):
++        if (
++            (name in self.query.alias_map and name not in self.query.table_map)
++            or name in self.query.extra_select
++            or (
++                name in self.query.external_aliases and name not in self.query.table_map
++            )
++        ):
+@@ -389,7 +443,7 @@ class SQLCompiler:
+@@ -402,14 +456,19 @@ class SQLCompiler:
+-            for query in self.query.combined_queries if not query.is_empty()
++            for query in self.query.combined_queries
++            if not query.is_empty()
+-                    raise DatabaseError('LIMIT/OFFSET not allowed in subqueries of compound statements.')
++                    raise DatabaseError(
++                        "LIMIT/OFFSET not allowed in subqueries of compound statements."
++                    )
+-                    raise DatabaseError('ORDER BY not allowed in subqueries of compound statements.')
++                    raise DatabaseError(
++                        "ORDER BY not allowed in subqueries of compound statements."
++                    )
+@@ -417,36 +476,40 @@ class SQLCompiler:
+-                    compiler.query.set_values((
+-                        *self.query.extra_select,
+-                        *self.query.values_select,
+-                        *self.query.annotation_select,
+-                    ))
++                    compiler.query.set_values(
++                        (
++                            *self.query.extra_select,
++                            *self.query.values_select,
++                            *self.query.annotation_select,
++                        )
++                    )
+-        if all and combinator == 'union':
+-            combinator_sql += ' ALL'
+-        braces = '({})' if features.supports_slicing_ordering_in_compound else '{}'
+-        sql_parts, args_parts = zip(*((braces.format(sql), args) for sql, args in parts))
+-        result = [' {} '.format(combinator_sql).join(sql_parts)]
++        if all and combinator == "union":
++            combinator_sql += " ALL"
++        braces = "({})" if features.supports_slicing_ordering_in_compound else "{}"
++        sql_parts, args_parts = zip(
++            *((braces.format(sql), args) for sql, args in parts)
++        )
++        result = [" {} ".format(combinator_sql).join(sql_parts)]
+@@ -465,21 +528,33 @@ class SQLCompiler:
+-            with_limit_offset = with_limits and (self.query.high_mark is not None or self.query.low_mark)
++            with_limit_offset = with_limits and (
++                self.query.high_mark is not None or self.query.low_mark
++            )
+-                if not getattr(features, 'supports_select_{}'.format(combinator)):
+-                    raise NotSupportedError('{} is not supported on this database backend.'.format(combinator))
+-                result, params = self.get_combinator_sql(combinator, self.query.combinator_all)
++                if not getattr(features, "supports_select_{}".format(combinator)):
++                    raise NotSupportedError(
++                        "{} is not supported on this database backend.".format(
++                            combinator
++                        )
++                    )
++                result, params = self.get_combinator_sql(
++                    combinator, self.query.combinator_all
++                )
+-                where, w_params = self.compile(self.where) if self.where is not None else ("", [])
+-                having, h_params = self.compile(self.having) if self.having is not None else ("", [])
+-                result = ['SELECT']
++                where, w_params = (
++                    self.compile(self.where) if self.where is not None else ("", [])
++                )
++                having, h_params = (
++                    self.compile(self.having) if self.having is not None else ("", [])
++                )
++                result = ["SELECT"]
+@@ -494,24 +569,35 @@ class SQLCompiler:
+-                        s_sql = '%s AS %s' % (s_sql, self.connection.ops.quote_name(alias))
++                        s_sql = "%s AS %s" % (
++                            s_sql,
++                            self.connection.ops.quote_name(alias),
++                        )
+-                if self.query.select_for_update and self.connection.features.has_select_for_update:
++                if (
++                    self.query.select_for_update
++                    and self.connection.features.has_select_for_update
++                ):
+-                        raise TransactionManagementError('select_for_update cannot be used outside of a transaction.')
++                        raise TransactionManagementError(
++                            "select_for_update cannot be used outside of a transaction."
++                        )
+-                    if with_limit_offset and not self.connection.features.supports_select_for_update_with_limit:
++                    if (
++                        with_limit_offset
++                        and not self.connection.features.supports_select_for_update_with_limit
++                    ):
+-                            'LIMIT/OFFSET is not supported with '
+-                            'select_for_update on this database backend.'
++                            "LIMIT/OFFSET is not supported with "
++                            "select_for_update on this database backend."
+@@ -519,12 +605,24 @@ class SQLCompiler:
+-                    if nowait and not self.connection.features.has_select_for_update_nowait:
+-                        raise NotSupportedError('NOWAIT is not supported on this database backend.')
+-                    elif skip_locked and not self.connection.features.has_select_for_update_skip_locked:
+-                        raise NotSupportedError('SKIP LOCKED is not supported on this database backend.')
++                    if (
++                        nowait
++                        and not self.connection.features.has_select_for_update_nowait
++                    ):
++                        raise NotSupportedError(
++                            "NOWAIT is not supported on this database backend."
++                        )
++                    elif (
++                        skip_locked
++                        and not self.connection.features.has_select_for_update_skip_locked
++                    ):
++                        raise NotSupportedError(
++                            "SKIP LOCKED is not supported on this database backend."
++                        )
+-                        raise NotSupportedError('FOR UPDATE OF is not supported on this database backend.')
++                        raise NotSupportedError(
++                            "FOR UPDATE OF is not supported on this database backend."
++                        )
+@@ -535,7 +633,7 @@ class SQLCompiler:
+@@ -544,40 +642,49 @@ class SQLCompiler:
+-                        raise NotImplementedError('annotate() + distinct(fields) is not implemented.')
++                        raise NotImplementedError(
++                            "annotate() + distinct(fields) is not implemented."
++                        )
+-                            "Add .order_by('%s') to retain the current query." % (
++                            "Add .order_by('%s') to retain the current query."
++                            % (
+-                                "', '".join(self._meta_ordering)
++                                "', '".join(self._meta_ordering),
+-                result.insert(0, self.connection.ops.explain_query_prefix(
+-                    self.query.explain_format,
+-                    **self.query.explain_options
+-                ))
++                result.insert(
++                    0,
++                    self.connection.ops.explain_query_prefix(
++                        self.query.explain_format, **self.query.explain_options
++                    ),
++                )
+-                result.append(self.connection.ops.limit_offset_sql(self.query.low_mark, self.query.high_mark))
++                result.append(
++                    self.connection.ops.limit_offset_sql(
++                        self.query.low_mark, self.query.high_mark
++                    )
++                )
+@@ -593,23 +700,30 @@ class SQLCompiler:
+-                        sub_selects.append("%s.%s" % (
+-                            self.connection.ops.quote_name('subquery'),
+-                            self.connection.ops.quote_name(alias),
+-                        ))
++                        sub_selects.append(
++                            "%s.%s"
++                            % (
++                                self.connection.ops.quote_name("subquery"),
++                                self.connection.ops.quote_name(alias),
++                            )
++                        )
+-                        select_clone = select.relabeled_clone({select.alias: 'subquery'})
+-                        subselect, subparams = select_clone.as_sql(self, self.connection)
++                        select_clone = select.relabeled_clone(
++                            {select.alias: "subquery"}
++                        )
++                        subselect, subparams = select_clone.as_sql(
++                            self, self.connection
++                        )
+-                return 'SELECT %s FROM (%s) subquery' % (
+-                    ', '.join(sub_selects),
+-                    ' '.join(result),
++                return "SELECT %s FROM (%s) subquery" % (
++                    ", ".join(sub_selects),
++                    " ".join(result),
+@@ -642,8 +756,13 @@ class SQLCompiler:
+-            if from_parent and model is not None and issubclass(
+-                    from_parent._meta.concrete_model, model._meta.concrete_model):
++            if (
++                from_parent
++                and model is not None
++                and issubclass(
++                    from_parent._meta.concrete_model, model._meta.concrete_model
++                )
++            ):
+@@ -652,8 +771,7 @@ class SQLCompiler:
+-            alias = self.query.join_parent_model(opts, model, start_alias,
+-                                                 seen_models)
++            alias = self.query.join_parent_model(opts, model, start_alias, seen_models)
+@@ -671,7 +789,9 @@ class SQLCompiler:
+-            _, targets, alias, joins, path, _, transform_function = self._setup_joins(parts, opts, None)
++            _, targets, alias, joins, path, _, transform_function = self._setup_joins(
++                parts, opts, None
++            )
+@@ -682,36 +802,49 @@ class SQLCompiler:
+-    def find_ordering_name(self, name, opts, alias=None, default_order='ASC',
+-                           already_seen=None):
++    def find_ordering_name(
++        self, name, opts, alias=None, default_order="ASC", already_seen=None
++    ):
+-        field, targets, alias, joins, path, opts, transform_function = self._setup_joins(pieces, opts, alias)
++        field, targets, alias, joins, path, opts, transform_function = (
++            self._setup_joins(pieces, opts, alias)
++        )
+-        if field.is_relation and opts.ordering and getattr(field, 'attname', None) != name:
++        if (
++            field.is_relation
++            and opts.ordering
++            and getattr(field, "attname", None) != name
++        ):
+-            join_tuple = tuple(getattr(self.query.alias_map[j], 'join_cols', None) for j in joins)
++            join_tuple = tuple(
++                getattr(self.query.alias_map[j], "join_cols", None) for j in joins
++            )
+-                results.extend(self.find_ordering_name(item, opts, alias,
+-                                                       order, already_seen))
++                results.extend(
++                    self.find_ordering_name(item, opts, alias, order, already_seen)
++                )
+-        return [(OrderBy(transform_function(t, alias), descending=descending), False) for t in targets]
++        return [
++            (OrderBy(transform_function(t, alias), descending=descending), False)
++            for t in targets
++        ]
+@@ -722,7 +855,9 @@ class SQLCompiler:
+-        field, targets, opts, joins, path, transform_function = self.query.setup_joins(pieces, opts, alias)
++        field, targets, opts, joins, path, transform_function = self.query.setup_joins(
++            pieces, opts, alias
++        )
+@@ -756,25 +891,39 @@ class SQLCompiler:
+-            if alias not in self.query.alias_map or self.query.alias_refcount[alias] == 1:
+-                result.append(', %s' % self.quote_name_unless_alias(alias))
++            if (
++                alias not in self.query.alias_map
++                or self.query.alias_refcount[alias] == 1
++            ):
++                result.append(", %s" % self.quote_name_unless_alias(alias))
+-    def get_related_selections(self, select, opts=None, root_alias=None, cur_depth=1,
+-                               requested=None, restricted=None):
++    def get_related_selections(
++        self,
++        select,
++        opts=None,
++        root_alias=None,
++        cur_depth=1,
++        requested=None,
++        restricted=None,
++    ):
++
+-                for f in opts.related_objects if f.field.unique
++                for f in opts.related_objects
++                if f.field.unique
++            )
++            return chain(
++                direct_choices, reverse_choices, self.query._filtered_relations
+-            return chain(direct_choices, reverse_choices, self.query._filtered_relations)
+@@ -795,7 +944,7 @@ class SQLCompiler:
+@@ -809,37 +958,48 @@ class SQLCompiler:
+-                            "Choices are: %s" % (
++                            "Choices are: %s"
++                            % (
+-            if not select_related_descend(f, restricted, requested,
+-                                          only_load.get(field_model)):
++            if not select_related_descend(
++                f, restricted, requested, only_load.get(field_model)
++            ):
+-                'model': f.remote_field.model,
+-                'field': f,
+-                'reverse': False,
+-                'local_setter': f.set_cached_value,
+-                'remote_setter': f.remote_field.set_cached_value if f.unique else lambda x, y: None,
+-                'from_parent': False,
++                "model": f.remote_field.model,
++                "field": f,
++                "reverse": False,
++                "local_setter": f.set_cached_value,
++                "remote_setter": f.remote_field.set_cached_value
++                if f.unique
++                else lambda x, y: None,
++                "from_parent": False,
+-            _, _, _, joins, _, _ = self.query.setup_joins(
+-                [f.name], opts, root_alias)
++            _, _, _, joins, _, _ = self.query.setup_joins([f.name], opts, root_alias)
+-            columns = self.get_default_columns(start_alias=alias, opts=f.remote_field.model._meta)
++            columns = self.get_default_columns(
++                start_alias=alias, opts=f.remote_field.model._meta
++            )
+-                select, f.remote_field.model._meta, alias, cur_depth + 1, next, restricted)
++                select,
++                f.remote_field.model._meta,
++                alias,
++                cur_depth + 1,
++                next,
++                restricted,
++            )
+@@ -849,36 +1009,40 @@ class SQLCompiler:
+-                if not select_related_descend(f, restricted, requested,
+-                                              only_load.get(model), reverse=True):
++                if not select_related_descend(
++                    f, restricted, requested, only_load.get(model), reverse=True
++                ):
+-                join_info = self.query.setup_joins([related_field_name], opts, root_alias)
++                join_info = self.query.setup_joins(
++                    [related_field_name], opts, root_alias
++                )
+-                    'model': model,
+-                    'field': f,
+-                    'reverse': True,
+-                    'local_setter': f.remote_field.set_cached_value,
+-                    'remote_setter': f.set_cached_value,
+-                    'from_parent': from_parent,
++                    "model": model,
++                    "field": f,
++                    "reverse": True,
++                    "local_setter": f.remote_field.set_cached_value,
++                    "remote_setter": f.set_cached_value,
++                    "from_parent": from_parent,
+-                    start_alias=alias, opts=model._meta, from_parent=opts.model)
++                    start_alias=alias, opts=model._meta, from_parent=opts.model
++                )
+-                    select, model._meta, alias, cur_depth + 1,
+-                    next, restricted)
++                    select, model._meta, alias, cur_depth + 1, next, restricted
++                )
+@@ -886,10 +1050,14 @@ class SQLCompiler:
+-                    f, _, join_opts, joins, _, _ = self.query.setup_joins([name], opts, root_alias)
++                    f, _, join_opts, joins, _, _ = self.query.setup_joins(
++                        [name], opts, root_alias
++                    )
+-                    from_parent = issubclass(model, opts.model) and model is not opts.model
++                    from_parent = (
++                        issubclass(model, opts.model) and model is not opts.model
++                    )
+@@ -898,28 +1066,33 @@ class SQLCompiler:
++
+-                        'model': model,
+-                        'field': f,
+-                        'reverse': True,
+-                        'local_setter': local_setter,
+-                        'remote_setter': remote_setter,
+-                        'from_parent': from_parent,
++                        "model": model,
++                        "field": f,
++                        "reverse": True,
++                        "local_setter": local_setter,
++                        "remote_setter": remote_setter,
++                        "from_parent": from_parent,
+-                        start_alias=alias, opts=model._meta,
++                        start_alias=alias,
++                        opts=model._meta,
+-                        select, opts=model._meta, root_alias=alias,
+-                        cur_depth=cur_depth + 1, requested=next_requested,
++                        select,
++                        opts=model._meta,
++                        root_alias=alias,
++                        cur_depth=cur_depth + 1,
++                        requested=next_requested,
+@@ -927,10 +1100,11 @@ class SQLCompiler:
+-                    'Invalid field name(s) given in select_related: %s. '
+-                    'Choices are: %s' % (
+-                        ', '.join(invalid_fields),
+-                        ', '.join(_get_field_choices()) or '(none)',
++                    "Invalid field name(s) given in select_related: %s. "
++                    "Choices are: %s"
++                    % (
++                        ", ".join(invalid_fields),
++                        ", ".join(_get_field_choices()) or "(none)",
+@@ -940,6 +1114,7 @@ class SQLCompiler:
++
+@@ -947,26 +1122,27 @@ class SQLCompiler:
+-                    field = klass_info['field']
+-                    if klass_info['reverse']:
++                    field = klass_info["field"]
++                    if klass_info["reverse"]:
++
+-                for related_klass_info in klass_info.get('related_klass_infos', []):
+-                    field = related_klass_info['field']
+-                    if related_klass_info['reverse']:
++                for related_klass_info in klass_info.get("related_klass_infos", []):
++                    field = related_klass_info["field"]
++                    if related_klass_info["reverse"]:
+@@ -977,7 +1153,7 @@ class SQLCompiler:
+@@ -985,11 +1161,12 @@ class SQLCompiler:
+-                'Invalid field name(s) given in select_for_update(of=(...)): %s. '
+-                'Only relational fields followed in the query are allowed. '
+-                'Choices are: %s.' % (
+-                    ', '.join(invalid_names),
+-                    ', '.join(_get_field_choices()),
++                "Invalid field name(s) given in select_for_update(of=(...)): %s. "
++                "Only relational fields followed in the query are allowed. "
++                "Choices are: %s."
++                % (
++                    ", ".join(invalid_names),
++                    ", ".join(_get_field_choices()),
+@@ -1025,12 +1202,19 @@ class SQLCompiler:
+-    def results_iter(self, results=None, tuple_expected=False, chunked_fetch=False,
+-                     chunk_size=GET_ITERATOR_CHUNK_SIZE):
++    def results_iter(
++        self,
++        results=None,
++        tuple_expected=False,
++        chunked_fetch=False,
++        chunk_size=GET_ITERATOR_CHUNK_SIZE,
++    ):
+-            results = self.execute_sql(MULTI, chunked_fetch=chunked_fetch, chunk_size=chunk_size)
+-        fields = [s[0] for s in self.select[0:self.col_count]]
++            results = self.execute_sql(
++                MULTI, chunked_fetch=chunked_fetch, chunk_size=chunk_size
++            )
++        fields = [s[0] for s in self.select[0 : self.col_count]]
+@@ -1045,11 +1229,13 @@ class SQLCompiler:
+-        self.query.add_extra({'a': 1}, None, None, None, None, None)
+-        self.query.set_extra_mask(['a'])
++        self.query.add_extra({"a": 1}, None, None, None, None, None)
++        self.query.set_extra_mask(["a"])
+-    def execute_sql(self, result_type=MULTI, chunked_fetch=False, chunk_size=GET_ITERATOR_CHUNK_SIZE):
++    def execute_sql(
++        self, result_type=MULTI, chunked_fetch=False, chunk_size=GET_ITERATOR_CHUNK_SIZE
++    ):
+@@ -1090,7 +1276,7 @@ class SQLCompiler:
+-                    return val[0:self.col_count]
++                    return val[0 : self.col_count]
+@@ -1100,7 +1286,8 @@ class SQLCompiler:
+-            cursor, self.connection.features.empty_fetchmany_value,
++            cursor,
++            self.connection.features.empty_fetchmany_value,
+@@ -1122,12 +1309,13 @@ class SQLCompiler:
+-                QueryWrapper('%s = %s' % (lhs_sql, rhs), lhs_params), 'AND')
++                QueryWrapper("%s = %s" % (lhs_sql, rhs), lhs_params), "AND"
++            )
+@@ -1135,7 +1323,7 @@ class SQLCompiler:
+@@ -1155,16 +1343,16 @@ class SQLInsertCompiler(SQLCompiler):
+@@ -1180,24 +1368,26 @@ class SQLInsertCompiler(SQLCompiler):
+-        if hasattr(value, 'resolve_expression'):
+-            value = value.resolve_expression(self.query, allow_joins=False, for_save=True)
++        if hasattr(value, "resolve_expression"):
++            value = value.resolve_expression(
++                self.query, allow_joins=False, for_save=True
++            )
+-                    'Aggregate functions are not allowed in this query '
+-                    '(%s=%r).' % (field.name, value)
++                    "Aggregate functions are not allowed in this query "
++                    "(%s=%r)." % (field.name, value)
+@@ -1253,26 +1443,33 @@ class SQLInsertCompiler(SQLCompiler):
+-        insert_statement = self.connection.ops.insert_statement(ignore_conflicts=self.query.ignore_conflicts)
+-        result = ['%s %s' % (insert_statement, qn(opts.db_table))]
++        insert_statement = self.connection.ops.insert_statement(
++            ignore_conflicts=self.query.ignore_conflicts
++        )
++        result = ["%s %s" % (insert_statement, qn(opts.db_table))]
+-                [self.prepare_value(field, self.pre_save_val(field, obj)) for field in fields]
++                [
++                    self.prepare_value(field, self.pre_save_val(field, obj))
++                    for field in fields
++                ]
+-            value_rows = [[self.connection.ops.pk_default_value()] for _ in self.query.objs]
++            value_rows = [
++                [self.connection.ops.pk_default_value()] for _ in self.query.objs
++            ]
+-        can_bulk = (not self.return_id and self.connection.features.has_bulk_insert)
++        can_bulk = not self.return_id and self.connection.features.has_bulk_insert
+@@ -1281,7 +1478,9 @@ class SQLInsertCompiler(SQLCompiler):
+-                result.append(self.connection.ops.bulk_insert_sql(fields, placeholder_rows))
++                result.append(
++                    self.connection.ops.bulk_insert_sql(fields, placeholder_rows)
++                )
+@@ -1312,8 +1511,9 @@ class SQLInsertCompiler(SQLCompiler):
+-            return_id and len(self.query.objs) != 1 and
+-            not self.connection.features.can_return_rows_from_bulk_insert
++            return_id
++            and len(self.query.objs) != 1
++            and not self.connection.features.can_return_rows_from_bulk_insert
+@@ -1321,7 +1521,10 @@ class SQLInsertCompiler(SQLCompiler):
+-            if self.connection.features.can_return_rows_from_bulk_insert and len(self.query.objs) > 1:
++            if (
++                self.connection.features.can_return_rows_from_bulk_insert
++                and len(self.query.objs) > 1
++            ):
+@@ -1337,14 +1540,16 @@ class SQLDeleteCompiler(SQLCompiler):
+-        assert len([t for t in self.query.alias_map if self.query.alias_refcount[t] > 0]) == 1, \
+-            "Can only delete from one table at a time."
++        assert (
++            len([t for t in self.query.alias_map if self.query.alias_refcount[t] > 0])
++            == 1
++        ), "Can only delete from one table at a time."
+-            result.append('WHERE %s' % where)
+-        return ' '.join(result), tuple(params)
++            result.append("WHERE %s" % where)
++        return " ".join(result), tuple(params)
+@@ -1355,23 +1560,25 @@ class SQLUpdateCompiler(SQLCompiler):
+-            if hasattr(val, 'resolve_expression'):
+-                val = val.resolve_expression(self.query, allow_joins=False, for_save=True)
++            if hasattr(val, "resolve_expression"):
++                val = val.resolve_expression(
++                    self.query, allow_joins=False, for_save=True
++                )
+-                        'Aggregate functions are not allowed in this query '
+-                        '(%s=%r).' % (field.name, val)
++                        "Aggregate functions are not allowed in this query "
++                        "(%s=%r)." % (field.name, val)
+-                        'Window expressions are not allowed in this query '
+-                        '(%s=%r).' % (field.name, val)
++                        "Window expressions are not allowed in this query "
++                        "(%s=%r)." % (field.name, val)
+@@ -1387,29 +1594,29 @@ class SQLUpdateCompiler(SQLCompiler):
+-            'UPDATE %s SET' % qn(table),
+-            ', '.join(values),
++            "UPDATE %s SET" % qn(table),
++            ", ".join(values),
+-            result.append('WHERE %s' % where)
+-        return ' '.join(result), tuple(update_params + params)
++            result.append("WHERE %s" % where)
++        return " ".join(result), tuple(update_params + params)
+@@ -1455,7 +1662,9 @@ class SQLUpdateCompiler(SQLCompiler):
+-        must_pre_select = count > 1 and not self.connection.features.update_can_self_select
++        must_pre_select = (
++            count > 1 and not self.connection.features.update_can_self_select
++        )
+@@ -1467,11 +1676,11 @@ class SQLUpdateCompiler(SQLCompiler):
+@@ -1487,10 +1696,10 @@ class SQLAggregateCompiler(SQLCompiler):

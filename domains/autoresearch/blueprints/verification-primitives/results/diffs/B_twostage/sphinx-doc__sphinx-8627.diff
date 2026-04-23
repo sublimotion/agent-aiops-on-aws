@@ -1,0 +1,65 @@
+diff --git a/sphinx/util/typing.py b/sphinx/util/typing.py
+index 2d4f67bba..fb799ab95 100644
+--- a/sphinx/util/typing.py
++++ b/sphinx/util/typing.py
+@@ -105,6 +105,29 @@ def restify(cls: Optional["Type"]) -> str:
+             return _restify_py36(cls)
+ 
+ 
++def _get_module_name(cls: Any) -> str:
++    """Get the public module name for a class.
++
++    If the class's __module__ is a private module (starts with '_'), try to
++    find a public module that exposes the class under the same name.
++    """
++    module = getattr(cls, '__module__', None)
++    if module and module.startswith('_'):
++        # The class is defined in a private module (e.g. _struct.Struct).
++        # Try to find a public module that re-exports it.
++        import importlib
++        qualname = getattr(cls, '__qualname__', None) or getattr(cls, '__name__', None)
++        if qualname:
++            public_module = module[1:]  # strip leading '_'
++            try:
++                m = importlib.import_module(public_module)
++                if getattr(m, qualname, None) is cls:
++                    return public_module
++            except ImportError:
++                pass
++    return module
++
++
+ def _restify_py37(cls: Optional["Type"]) -> str:
+     """Convert python class to a reST reference."""
+     from sphinx.util import inspect  # lazy loading
+@@ -146,18 +169,18 @@ def _restify_py37(cls: Optional["Type"]) -> str:
+         if cls.__module__ == 'typing':
+             return ':class:`%s`' % cls.__qualname__
+         else:
+-            return ':class:`%s.%s`' % (cls.__module__, cls.__qualname__)
++            return ':class:`%s.%s`' % (_get_module_name(cls), cls.__qualname__)
+     elif hasattr(cls, '_name'):
+         # SpecialForm
+         if cls.__module__ == 'typing':
+             return ':obj:`%s`' % cls._name
+         else:
+-            return ':obj:`%s.%s`' % (cls.__module__, cls._name)
++            return ':obj:`%s.%s`' % (_get_module_name(cls), cls._name)
+     elif isinstance(cls, ForwardRef):
+         return ':class:`%s`' % cls.__forward_arg__
+     else:
+         # not a class (ex. TypeVar)
+-        return ':obj:`%s.%s`' % (cls.__module__, cls.__name__)
++        return ':obj:`%s.%s`' % (_get_module_name(cls), cls.__name__)
+ 
+ 
+ def _restify_py36(cls: Optional["Type"]) -> str:
+@@ -325,7 +348,7 @@ def _stringify_py37(annotation: Any) -> str:
+         else:
+             qualname = stringify(annotation.__origin__)  # ex. Union
+     elif hasattr(annotation, '__qualname__'):
+-        qualname = '%s.%s' % (module, annotation.__qualname__)
++        qualname = '%s.%s' % (_get_module_name(annotation), annotation.__qualname__)
+     elif hasattr(annotation, '__origin__'):
+         # instantiated generic provided by a user
+         qualname = stringify(annotation.__origin__)

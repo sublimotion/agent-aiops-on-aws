@@ -1,0 +1,37 @@
+diff --git a/astropy/io/ascii/rst.py b/astropy/io/ascii/rst.py
+index abdeba8ef..4d62ee196 100644
+--- a/astropy/io/ascii/rst.py
++++ b/astropy/io/ascii/rst.py
+@@ -27,10 +27,16 @@ class SimpleRSTHeader(FixedWidthHeader):
+ 
+ 
+ class SimpleRSTData(FixedWidthData):
+-    start_line = 3
+     end_line = -1
+     splitter_class = FixedWidthTwoLineDataSplitter
+ 
++    @property
++    def start_line(self):
++        # position_line (=====) is at 0, then header_rows lines, then another
++        # ===== line, then data starts.
++        header_rows = getattr(self.header, "header_rows", ["name"])
++        return len(header_rows) + 2
++
+ 
+ class RST(FixedWidth):
+     """reStructuredText simple format table.
+@@ -57,10 +63,11 @@ class RST(FixedWidth):
+     data_class = SimpleRSTData
+     header_class = SimpleRSTHeader
+ 
+-    def __init__(self):
+-        super().__init__(delimiter_pad=None, bookend=False)
++    def __init__(self, header_rows=None):
++        super().__init__(delimiter_pad=None, bookend=False, header_rows=header_rows)
+ 
+     def write(self, lines):
+         lines = super().write(lines)
+-        lines = [lines[1]] + lines + [lines[1]]
++        separator = lines[len(self.header.header_rows)]
++        lines = [separator] + lines + [separator]
+         return lines

@@ -1,0 +1,22 @@
+diff --git a/lib/matplotlib/offsetbox.py b/lib/matplotlib/offsetbox.py
+index 1dee8a23d9..5da58e1560 100644
+--- a/lib/matplotlib/offsetbox.py
++++ b/lib/matplotlib/offsetbox.py
+@@ -1571,6 +1571,17 @@ class DraggableBase:
+         else:
+             self.canvas.mpl_disconnect(c1)
+ 
++    def __getstate__(self):
++        state = self.__dict__.copy()
++        # canvas is not picklable, but we can get it back from the figure
++        state['canvas'] = None
++        return state
++
++    def __setstate__(self, state):
++        self.__dict__ = state
++        # Restore canvas from the ref_artist's figure
++        self.canvas = self.ref_artist.figure.canvas
++
+     def save_offset(self):
+         pass
+ 

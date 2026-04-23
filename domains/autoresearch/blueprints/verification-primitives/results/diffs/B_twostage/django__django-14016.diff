@@ -1,0 +1,31 @@
+diff --git a/django/db/models/query_utils.py b/django/db/models/query_utils.py
+index c2623f099f..27d52263ad 100644
+--- a/django/db/models/query_utils.py
++++ b/django/db/models/query_utils.py
+@@ -46,10 +46,10 @@ class Q(tree.Node):
+ 
+         # If the other Q() is empty, ignore it and just use `self`.
+         if not other:
+-            return copy.deepcopy(self)
++            return self.copy()
+         # Or if this Q is empty, ignore it and just use `other`.
+         elif not self:
+-            return copy.deepcopy(other)
++            return other.copy()
+ 
+         obj = type(self)()
+         obj.connector = conn
+@@ -69,6 +69,13 @@ class Q(tree.Node):
+         obj.negate()
+         return obj
+ 
++    def copy(self):
++        clone = self.__class__.__new__(self.__class__)
++        clone.connector = self.connector
++        clone.negated = self.negated
++        clone.children = self.children[:]
++        return clone
++
+     def resolve_expression(self, query=None, allow_joins=True, reuse=None, summarize=False, for_save=False):
+         # We must promote any new joins to left outer joins so that when Q is
+         # used as an expression, rows aren't filtered due to joins.

@@ -1,0 +1,49 @@
+diff --git a/lib/matplotlib/artist.py b/lib/matplotlib/artist.py
+index 1f33b9d3ec..3ec695f068 100644
+--- a/lib/matplotlib/artist.py
++++ b/lib/matplotlib/artist.py
+@@ -11,6 +11,7 @@ import warnings
+ import numpy as np
+ 
+ import matplotlib as mpl
++import matplotlib.colors as mcolors
+ from . import _api, cbook
+ from .cm import ScalarMappable
+ from .path import Path
+@@ -1304,10 +1305,19 @@ class Artist:
+             normed = self.norm(data)
+             if np.isfinite(normed):
+                 # Midpoints of neighboring color intervals.
+-                neighbors = self.norm.inverse(
+-                    (int(self.norm(data) * n) + np.array([0, 1])) / n)
+-                delta = abs(neighbors - data).max()
+-                g_sig_digits = cbook._g_sig_digits(data, delta)
++                if isinstance(self.norm, mcolors.BoundaryNorm):
++                    # For BoundaryNorm, find the nearest boundary and its neighbors
++                    cur_idx = np.argmin(np.abs(self.norm.boundaries - data))
++                    cur_bound = self.norm.boundaries[cur_idx]
++                    neigh_idx = max(0, cur_idx - 1) if data <= cur_bound else min(len(self.norm.boundaries) - 2, cur_idx + 1)
++                    neighbors = self.norm.boundaries[[neigh_idx, cur_idx]]
++                    delta = abs(neighbors - data).max()
++                    g_sig_digits = cbook._g_sig_digits(data, delta)
++                else:
++                    neighbors = self.norm.inverse(
++                        (int(self.norm(data) * n) + np.array([0, 1])) / n)
++                    delta = abs(neighbors - data).max()
++                    g_sig_digits = cbook._g_sig_digits(data, delta)
+             else:
+                 g_sig_digits = 3  # Consistent with default below.
+             return "[{:-#.{}g}]".format(data, g_sig_digits)
+diff --git a/lib/matplotlib/tests/test_artist.py b/lib/matplotlib/tests/test_artist.py
+index 0fb1fa442f..248ff2eb66 100644
+--- a/lib/matplotlib/tests/test_artist.py
++++ b/lib/matplotlib/tests/test_artist.py
+@@ -5,6 +5,8 @@ import numpy as np
+ 
+ import pytest
+ 
++# Import everything from matplotlib to avoid circular imports
++import matplotlib
+ from matplotlib import cm
+ import matplotlib.colors as mcolors
+ import matplotlib.pyplot as plt

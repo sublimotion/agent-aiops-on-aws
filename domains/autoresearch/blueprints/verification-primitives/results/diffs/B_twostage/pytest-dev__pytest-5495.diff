@@ -1,0 +1,31 @@
+diff --git a/src/_pytest/assertion/util.py b/src/_pytest/assertion/util.py
+index 762e5761..37636567 100644
+--- a/src/_pytest/assertion/util.py
++++ b/src/_pytest/assertion/util.py
+@@ -82,7 +82,7 @@ def _format_lines(lines):
+ 
+ 
+ def issequence(x):
+-    return isinstance(x, Sequence) and not isinstance(x, str)
++    return isinstance(x, Sequence) and not isinstance(x, (bytes, str))
+ 
+ 
+ def istext(x):
+@@ -108,7 +108,7 @@ def isattrs(obj):
+ def isiterable(obj):
+     try:
+         iter(obj)
+-        return not istext(obj)
++        return not istext(obj) and not isinstance(obj, bytes)
+     except TypeError:
+         return False
+ 
+@@ -127,6 +127,8 @@ def assertrepr_compare(config, op, left, right):
+         if op == "==":
+             if istext(left) and istext(right):
+                 explanation = _diff_text(left, right, verbose)
++            elif isinstance(left, bytes) and isinstance(right, bytes):
++                explanation = _diff_text(left, right, verbose)
+             else:
+                 if issequence(left) and issequence(right):
+                     explanation = _compare_eq_sequence(left, right, verbose)

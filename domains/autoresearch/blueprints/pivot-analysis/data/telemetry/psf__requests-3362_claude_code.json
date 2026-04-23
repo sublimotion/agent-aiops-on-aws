@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 79.7,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 78531,
+    "duration_api_ms": 60606,
+    "num_turns": 20,
+    "result": "The fix is clean and correct. Here's what was wrong and what was fixed:\n\n**Root cause**: In `stream_decode_response_unicode` (`requests/utils.py`), when `r.encoding is None`, the function was yielding raw bytes without attempting to decode them. This caused `iter_content(decode_unicode=True)` to return bytes instead of unicode when the response had no explicit encoding header.\n\n**Fix**: Mirror the behavior of `r.text` \u2014 when `r.encoding` is `None`, fall back to `r.apparent_encoding` (chardet-based detection). If that's also `None`, yield bytes as-is (there's genuinely nothing to decode with). Otherwise, use the detected encoding to decode the chunks.",
+    "stop_reason": "end_turn",
+    "session_id": "3f717755-2fef-4542-8616-c424415a4897",
+    "total_cost_usd": 0.22454880000000005,
+    "usage": {
+      "input_tokens": 86,
+      "cache_creation_input_tokens": 19176,
+      "cache_read_input_tokens": 373286,
+      "output_tokens": 2693,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 19176
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 86,
+        "outputTokens": 2693,
+        "cacheReadInputTokens": 373286,
+        "cacheCreationInputTokens": 19176,
+        "webSearchRequests": 0,
+        "costUSD": 0.22454880000000005,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "2b794073-1639-4137-8384-9390dbacec75"
+  },
+  "stderr": ""
+}

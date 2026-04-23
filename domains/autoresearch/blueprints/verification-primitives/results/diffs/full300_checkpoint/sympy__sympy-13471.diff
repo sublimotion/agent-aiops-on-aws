@@ -1,0 +1,15 @@
+diff --git a/sympy/core/numbers.py b/sympy/core/numbers.py
+index 7bc96e68eb..37b4b933a4 100644
+--- a/sympy/core/numbers.py
++++ b/sympy/core/numbers.py
+@@ -1042,7 +1042,9 @@ def __new__(cls, num, dps=None, prec=None, precision=None):
+                 # it's a hexadecimal (coming from a pickled object)
+                 # assume that it is in standard form
+                 num = list(num)
+-                num[1] = long(num[1], 16)
++                # Strip the 'L' suffix that Python 2 appends to long integers
++                # when converting to hex strings, so that Python 3 can parse them
++                num[1] = long(num[1].rstrip('L'), 16)
+                 _mpf_ = tuple(num)
+             else:
+                 if len(num) == 4:

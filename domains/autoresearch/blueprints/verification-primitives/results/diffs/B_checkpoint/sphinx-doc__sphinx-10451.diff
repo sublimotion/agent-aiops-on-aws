@@ -1,0 +1,41 @@
+diff --git a/sphinx/ext/autodoc/typehints.py b/sphinx/ext/autodoc/typehints.py
+index d912cd7d5..eb7141803 100644
+--- a/sphinx/ext/autodoc/typehints.py
++++ b/sphinx/ext/autodoc/typehints.py
+@@ -12,6 +12,16 @@ from sphinx.application import Sphinx
+ from sphinx.util import inspect, typing
+ 
+ 
++def _normalize_param_name(name: str) -> str:
++    """Normalize parameter name by removing leading * and **."""
++    if name.startswith('**'):
++        return name[2:]
++    elif name.startswith('*'):
++        return name[1:]
++    else:
++        return name
++
++
+ def record_typehints(app: Sphinx, objtype: str, name: str, obj: Any,
+                      options: Dict, args: str, retann: str) -> None:
+     """Record type hints to env object."""
+@@ -96,7 +106,8 @@ def modify_field_list(node: nodes.field_list, annotations: Dict[str, str],
+         if parts[0] == 'param':
+             if len(parts) == 2:
+                 # :param xxx:
+-                arg = arguments.setdefault(parts[1], {})
++                name = _normalize_param_name(parts[1])
++                arg = arguments.setdefault(name, {})
+                 arg['param'] = True
+             elif len(parts) > 2:
+                 # :param xxx yyy:
+@@ -152,7 +163,8 @@ def augment_descriptions_with_types(
+         if parts[0] == 'param':
+             if len(parts) == 2:
+                 # :param xxx:
+-                has_description.add(parts[1])
++                name = _normalize_param_name(parts[1])
++                has_description.add(name)
+             elif len(parts) > 2:
+                 # :param xxx yyy:
+                 name = ' '.join(parts[2:])

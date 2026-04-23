@@ -1,0 +1,36 @@
+diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py
+index 38da1e6ecc..60230ff452 100644
+--- a/django/db/migrations/serializer.py
++++ b/django/db/migrations/serializer.py
+@@ -125,6 +125,31 @@ class EnumSerializer(BaseSerializer):
+     def serialize(self):
+         enum_class = self.value.__class__
+         module = enum_class.__module__
++        if self.value.name is None:
++            # Combination of flags with no named value (e.g. on older Python):
++            # decompose into individual members joined by |.
++            members, uncovered = enum._decompose(enum_class, self.value.value)
++            return (
++                " | ".join(
++                    [
++                        "%s.%s[%r]" % (module, enum_class.__qualname__, m.name)
++                        for m in members
++                    ]
++                ),
++                {"import %s" % module},
++            )
++        if isinstance(self.value, enum.Flag):
++            # Flags may have a combination value whose name is a composite
++            # (e.g. 'A|B') not in the member map. Decompose via iteration.
++            members = list(self.value)
++            if len(members) > 1:
++                return (
++                    " | ".join(
++                        "%s.%s[%r]" % (module, enum_class.__qualname__, m.name)
++                        for m in members
++                    ),
++                    {"import %s" % module},
++                )
+         return (
+             "%s.%s[%r]" % (module, enum_class.__qualname__, self.value.name),
+             {"import %s" % module},

@@ -1,0 +1,25 @@
+diff --git a/sympy/printing/pycode.py b/sympy/printing/pycode.py
+index 6ec7bd891c..a4c4a8577b 100644
+--- a/sympy/printing/pycode.py
++++ b/sympy/printing/pycode.py
+@@ -362,6 +362,9 @@ def _print_Indexed(self, expr):
+         index = expr.args[1:]
+         return "{}[{}]".format(str(base), ", ".join([self._print(ind) for ind in index]))
+ 
++    def _print_Identity(self, expr):
++        return "eye({})".format(self._print(expr.args[0]))
++
+ 
+ for k in PythonCodePrinter._kf:
+     setattr(PythonCodePrinter, '_print_%s' % k, _print_known_func)
+@@ -608,6 +611,10 @@ def _print_MatrixBase(self, expr):
+             func = self._module_format('numpy.array')
+         return "%s(%s)" % (func, self._print(expr.tolist()))
+ 
++    def _print_Identity(self, expr):
++        return "{0}({1})".format(self._module_format('numpy.eye'),
++                                 self._print(expr.args[0]))
++
+     def _print_BlockMatrix(self, expr):
+         return '{0}({1})'.format(self._module_format('numpy.block'),
+                                  self._print(expr.args[0].tolist()))

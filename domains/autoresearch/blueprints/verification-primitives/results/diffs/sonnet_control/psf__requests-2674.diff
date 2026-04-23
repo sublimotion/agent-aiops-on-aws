@@ -1,0 +1,51 @@
+diff --git a/requests/adapters.py b/requests/adapters.py
+index 841cbbfe..6d0cc83b 100644
+--- a/requests/adapters.py
++++ b/requests/adapters.py
+@@ -27,9 +27,11 @@ from .packages.urllib3.exceptions import ProtocolError
+ from .packages.urllib3.exceptions import ReadTimeoutError
+ from .packages.urllib3.exceptions import SSLError as _SSLError
+ from .packages.urllib3.exceptions import ResponseError
++from .packages.urllib3.exceptions import DecodeError as _DecodeError
++from .packages.urllib3.exceptions import TimeoutError as _TimeoutError
+ from .cookies import extract_cookies_to_jar
+ from .exceptions import (ConnectionError, ConnectTimeout, ReadTimeout, SSLError,
+-                         ProxyError, RetryError)
++                         ProxyError, RetryError, ContentDecodingError)
+ from .auth import _basic_auth_str
+ 
+ DEFAULT_POOLBLOCK = False
+@@ -429,6 +431,10 @@ class HTTPAdapter(BaseAdapter):
+                 raise SSLError(e, request=request)
+             elif isinstance(e, ReadTimeoutError):
+                 raise ReadTimeout(e, request=request)
++            elif isinstance(e, _DecodeError):
++                raise ContentDecodingError(e, request=request)
++            elif isinstance(e, _TimeoutError):
++                raise ConnectionError(e, request=request)
+             else:
+                 raise
+ 
+diff --git a/requests/models.py b/requests/models.py
+index 4270c647..3121464f 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -20,7 +20,8 @@ from .packages.urllib3.fields import RequestField
+ from .packages.urllib3.filepost import encode_multipart_formdata
+ from .packages.urllib3.util import parse_url
+ from .packages.urllib3.exceptions import (
+-    DecodeError, ReadTimeoutError, ProtocolError, LocationParseError)
++    DecodeError, ReadTimeoutError, ProtocolError, LocationParseError,
++    TimeoutError)
+ from .exceptions import (
+     HTTPError, MissingSchema, InvalidURL, ChunkedEncodingError,
+     ContentDecodingError, ConnectionError, StreamConsumedError)
+@@ -662,6 +663,8 @@ class Response(object):
+                     raise ContentDecodingError(e)
+                 except ReadTimeoutError as e:
+                     raise ConnectionError(e)
++                except TimeoutError as e:
++                    raise ConnectionError(e)
+             else:
+                 # Standard file-like object.
+                 while True:

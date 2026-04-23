@@ -1,0 +1,100 @@
+diff --git a/sphinx/ext/autodoc/typehints.py b/sphinx/ext/autodoc/typehints.py
+index d912cd7d5..24e4531a4 100644
+--- a/sphinx/ext/autodoc/typehints.py
++++ b/sphinx/ext/autodoc/typehints.py
+@@ -96,7 +96,8 @@ def modify_field_list(node: nodes.field_list, annotations: Dict[str, str],
+         if parts[0] == 'param':
+             if len(parts) == 2:
+                 # :param xxx:
+-                arg = arguments.setdefault(parts[1], {})
++                name = parts[1].lstrip('*')
++                arg = arguments.setdefault(name, {})
+                 arg['param'] = True
+             elif len(parts) > 2:
+                 # :param xxx yyy:
+@@ -105,7 +106,7 @@ def modify_field_list(node: nodes.field_list, annotations: Dict[str, str],
+                 arg['param'] = True
+                 arg['type'] = True
+         elif parts[0] == 'type':
+-            name = ' '.join(parts[1:])
++            name = ' '.join(parts[1:]).lstrip('*')
+             arg = arguments.setdefault(name, {})
+             arg['type'] = True
+         elif parts[0] == 'rtype':
+@@ -152,14 +153,14 @@ def augment_descriptions_with_types(
+         if parts[0] == 'param':
+             if len(parts) == 2:
+                 # :param xxx:
+-                has_description.add(parts[1])
++                has_description.add(parts[1].lstrip('*'))
+             elif len(parts) > 2:
+                 # :param xxx yyy:
+                 name = ' '.join(parts[2:])
+                 has_description.add(name)
+                 has_type.add(name)
+         elif parts[0] == 'type':
+-            name = ' '.join(parts[1:])
++            name = ' '.join(parts[1:]).lstrip('*')
+             has_type.add(name)
+         elif parts[0] in ('return', 'returns'):
+             has_description.add('return')
+diff --git a/sphinx/util/images.py b/sphinx/util/images.py
+index 2def252f4..d125aab3e 100644
+--- a/sphinx/util/images.py
++++ b/sphinx/util/images.py
+@@ -1,7 +1,10 @@
+ """Image utility functions for Sphinx."""
+ 
+ import base64
+-import imghdr
++try:
++    import imghdr
++except ImportError:
++    imghdr = None  # type: ignore[assignment]
+ from collections import OrderedDict
+ from os import path
+ from typing import IO, BinaryIO, NamedTuple, Optional, Tuple
+@@ -48,11 +51,11 @@ def get_image_size(filename: str) -> Optional[Tuple[int, int]]:
+ 
+ 
+ def guess_mimetype_for_stream(stream: IO, default: Optional[str] = None) -> Optional[str]:
+-    imgtype = imghdr.what(stream)
+-    if imgtype:
+-        return 'image/' + imgtype
+-    else:
+-        return default
++    if imghdr is not None:
++        imgtype = imghdr.what(stream)
++        if imgtype:
++            return 'image/' + imgtype
++    return default
+ 
+ 
+ def guess_mimetype(filename: str = '', default: Optional[str] = None) -> Optional[str]:
+@@ -108,4 +111,5 @@ def test_svg(h: bytes, f: Optional[BinaryIO]) -> Optional[str]:
+ 
+ # install test_svg() to imghdr
+ # refs: https://docs.python.org/3.6/library/imghdr.html#imghdr.tests
+-imghdr.tests.append(test_svg)
++if imghdr is not None:
++    imghdr.tests.append(test_svg)
+diff --git a/tests/roots/test-ext-autodoc/target/typehints.py b/tests/roots/test-ext-autodoc/target/typehints.py
+index 4acfc8911..67a180e67 100644
+--- a/tests/roots/test-ext-autodoc/target/typehints.py
++++ b/tests/roots/test-ext-autodoc/target/typehints.py
+@@ -101,3 +101,15 @@ class _ClassWithDocumentedInit:
+         :param args: Some integer
+         :param kwargs: Some integer
+         """
++
++
++class _ClassWithDocumentedInitAndStarArgs:
++    """Class docstring."""
++
++    def __init__(self, x: int, *args: int, **kwargs: int) -> None:
++        """Init docstring.
++
++        :param x: Some integer
++        :param *args: Some integer
++        :param **kwargs: Some integer
++        """

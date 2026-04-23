@@ -1,0 +1,213 @@
+diff --git a/xarray/core/concat.py b/xarray/core/concat.py
+index ecae2566..db384813 100644
+--- a/xarray/core/concat.py
++++ b/xarray/core/concat.py
+@@ -16,6 +16,7 @@ def concat(
+     positions=None,
+     fill_value=dtypes.NA,
+     join="outer",
++    allow_missing=False,
+ ):
+     """Concatenate xarray objects along a new or existing dimension.
+ 
+@@ -90,6 +91,11 @@ def concat(
+         - 'override': if indexes are of same size, rewrite indexes to be
+           those of the first object with that dimension. Indexes for the same
+           dimension must have the same size in all objects.
++    allow_missing : bool, optional
++        If True, variables that are not present in all datasets will be filled with
++        fill_value in the datasets where they are missing. This allows concatenating
++        datasets with different variables, similar to pandas.concat with join='outer'.
++        Default is False for backward compatibility.
+ 
+     indexers, mode, concat_over : deprecated
+ 
+@@ -128,7 +134,7 @@ def concat(
+             "can only concatenate xarray Dataset and DataArray "
+             "objects, got %s" % type(first_obj)
+         )
+-    return f(objs, dim, data_vars, coords, compat, positions, fill_value, join)
++    return f(objs, dim, data_vars, coords, compat, positions, fill_value, join, allow_missing)
+ 
+ 
+ def _calc_concat_dim_coord(dim):
+@@ -269,6 +275,7 @@ def _dataset_concat(
+     positions,
+     fill_value=dtypes.NA,
+     join="outer",
++    allow_missing=False,
+ ):
+     """
+     Concatenate a sequence of datasets along a new or existing dimension
+@@ -313,14 +320,45 @@ def _dataset_concat(
+ 
+         for ds in datasets:
+             absent_merge_vars = variables_to_merge - set(ds.variables)
+-            if absent_merge_vars:
++            if absent_merge_vars and not allow_missing:
+                 raise ValueError(
+                     "variables %r are present in some datasets but not others. "
+                     % absent_merge_vars
+                 )
+ 
+             for var in variables_to_merge:
+-                to_merge[var].append(ds.variables[var])
++                if var in ds.variables:
++                    to_merge[var].append(ds.variables[var])
++                elif allow_missing:
++                    # Create a dummy variable filled with fill_value
++                    # Get the shape from other datasets that have this variable
++                    shape = None
++                    for other_ds in datasets:
++                        if var in other_ds.variables:
++                            # Create a shape with the concat dimension expanded
++                            other_shape = list(other_ds.variables[var].shape)
++                            if dim not in other_ds.variables[var].dims:
++                                other_shape.insert(0, 1)  # Add size 1 for the concat dim
++                            if shape is None:
++                                shape = other_shape
++                            else:
++                                # Ensure all shapes match except for the concat dimension
++                                assert all(s1 == s2 for s1, s2 in zip(shape, other_shape[1:])), \
++                                    f"Shapes don't match for variable {var}"
++                    
++                    if shape is not None:
++                        # Create a dummy variable with the right shape
++                        import numpy as np
++                        dummy_shape = list(shape)
++                        dummy_shape[0] = 1  # Set concat dim size to 1
++                        dummy_array = np.full(dummy_shape, fill_value, dtype=float)
++                        dummy_var = ds.variables[list(ds.variables.keys())[0]]._constructor(
++                            dummy_array,
++                            dims=tuple(dim if i == 0 else ds.variables[list(ds.variables.keys())[0]].dims[i-1] 
++                                      for i in range(len(dummy_shape))),
++                            attrs={}
++                        )
++                        to_merge[var].append(dummy_var)
+ 
+         for var in variables_to_merge:
+             result_vars[var] = unique_variable(
+@@ -345,7 +383,9 @@ def _dataset_concat(
+         # ensure each variable with the given name shares the same
+         # dimensions and the same shape for all of them except along the
+         # concat dimension
+-        common_dims = tuple(pd.unique([d for v in vars for d in v.dims]))
++        import numpy as np
++        all_dims = [d for v in vars for d in v.dims]
++        common_dims = tuple(dict((x, 1) for x in all_dims).keys())
+         if dim not in common_dims:
+             common_dims = (dim,) + common_dims
+         for var, dim_len in zip(vars, concat_dim_lengths):
+@@ -356,19 +396,74 @@ def _dataset_concat(
+ 
+     # stack up each variable to fill-out the dataset (in order)
+     # n.b. this loop preserves variable order, needed for groupby.
+-    for k in datasets[0].variables:
+-        if k in concat_over:
+-            try:
+-                vars = ensure_common_dims([ds.variables[k] for ds in datasets])
+-            except KeyError:
+-                raise ValueError("%r is not present in all datasets." % k)
+-            combined = concat_vars(vars, dim, positions)
+-            assert isinstance(combined, Variable)
+-            result_vars[k] = combined
++    # Get all variables that need to be concatenated (from all datasets)
++    all_vars = set()
++    for ds in datasets:
++        all_vars.update(ds.variables.keys())
++    
++    # Filter to only those in concat_over
++    vars_to_concat = all_vars & concat_over
++    
++    for k in vars_to_concat:
++        vars = []
++        for ds in datasets:
++            if k in ds.variables:
++                vars.append(ds.variables[k])
++            elif allow_missing:
++                # Create a dummy variable with the right shape
++                import numpy as np
++                # Find a variable with similar dimensions to use as a template
++                template_var = None
++                for v in ds.variables.values():
++                    if dim in v.dims:
++                        template_var = v
++                        break
++                if template_var is not None:
++                    # Create a shape with the concat dimension expanded
++                    shape = list(template_var.shape)
++                    if dim not in template_var.dims:
++                        shape.insert(0, 1)  # Add size 1 for the concat dim
++                    
++                    # Create a dummy variable filled with fill_value
++                    dummy_shape = list(shape)
++                    dummy_shape[0] = 1  # Set concat dim size to 1
++                    dummy_array = np.full(dummy_shape, fill_value, dtype=np.float64)
++                    dummy_var = template_var._constructor(
++                        dummy_array,
++                        dims=tuple(dim if i == 0 else template_var.dims[i-1] 
++                                  for i in range(len(dummy_shape))),
++                        attrs={}
++                    )
++                    vars.append(dummy_var)
++                else:
++                    # If no suitable template, use a simple array with the right size
++                    # Find the size of the concat dimension
++                    dim_size = 1
++                    for v in ds.variables.values():
++                        if dim in v.dims:
++                            dim_size = v.shape[v.dims.index(dim)]
++                            break
++                    
++                    # Create a dummy variable with the right shape
++                    dummy_shape = [dim_size] if dim_size > 1 else []
++                    dummy_array = np.full(dummy_shape, fill_value, dtype=np.float64)
++                    dummy_var = Variable((dim,), dummy_array)
++                    vars.append(dummy_var)
++            else:
++                # If not allow_missing and variable is missing, raise error
++                if k not in ds.variables:
++                    raise ValueError("%r is not present in all datasets." % k)
++        
++        # Ensure all variables have the same dimensions
++        vars = list(ensure_common_dims(vars))
++        
++        combined = concat_vars(vars, dim, positions)
++        assert isinstance(combined, Variable)
++        result_vars[k] = combined
+ 
+     result = Dataset(result_vars, attrs=result_attrs)
+     absent_coord_names = coord_names - set(result.variables)
+-    if absent_coord_names:
++    if absent_coord_names and not allow_missing:
+         raise ValueError(
+             "Variables %r are coordinates in some datasets but not others."
+             % absent_coord_names
+@@ -394,6 +489,7 @@ def _dataarray_concat(
+     positions,
+     fill_value=dtypes.NA,
+     join="outer",
++    allow_missing=False,
+ ):
+     arrays = list(arrays)
+ 
+@@ -422,5 +518,6 @@ def _dataarray_concat(
+         positions,
+         fill_value=fill_value,
+         join=join,
++        allow_missing=allow_missing,
+     )
+     return arrays[0]._from_temp_dataset(ds, name)
+diff --git a/xarray/core/dtypes.py b/xarray/core/dtypes.py
+index 4db2990a..295c15c3 100644
+--- a/xarray/core/dtypes.py
++++ b/xarray/core/dtypes.py
+@@ -38,7 +38,7 @@ NINF = AlwaysLessThan()
+ PROMOTE_TO_OBJECT = [
+     {np.number, np.character},  # numpy promotes to character
+     {np.bool_, np.character},  # numpy promotes to character
+-    {np.bytes_, np.unicode_},  # numpy promotes to unicode
++    {np.bytes_, np.str_},  # numpy promotes to unicode
+ ]
+ 
+ 

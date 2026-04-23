@@ -1,0 +1,63 @@
+diff --git a/django/core/exceptions.py b/django/core/exceptions.py
+index dc084b8692..5f3786f6df 100644
+--- a/django/core/exceptions.py
++++ b/django/core/exceptions.py
+@@ -182,6 +182,58 @@ class ValidationError(Exception):
+     def __repr__(self):
+         return 'ValidationError(%s)' % self
+ 
++    def __eq__(self, other):
++        if not isinstance(other, ValidationError):
++            return NotImplemented
++        # Compare error_dict errors (field-keyed): order of fields and errors
++        # within each field is ignored.
++        if hasattr(self, 'error_dict') != hasattr(other, 'error_dict'):
++            return False
++        if hasattr(self, 'error_dict'):
++            return self._error_dict_key() == other._error_dict_key()
++        # Compare error_list errors: order is ignored.
++        if hasattr(self, 'message') != hasattr(other, 'message'):
++            return False
++        if hasattr(self, 'message'):
++            return (
++                self.message == other.message and
++                self.code == other.code and
++                self.params == other.params
++            )
++        return self._error_list_key() == other._error_list_key()
++
++    def __hash__(self):
++        if hasattr(self, 'error_dict'):
++            return hash(self._error_dict_key())
++        if hasattr(self, 'message'):
++            return hash((
++                self.message,
++                self.code,
++                None if self.params is None
++                else frozenset(self.params.items()),
++            ))
++        return hash(self._error_list_key())
++
++    def _error_dict_key(self):
++        # Return a frozenset of (field, frozenset_of_error_keys) pairs so that
++        # comparison is independent of dict and list ordering.
++        return frozenset(
++            (field, frozenset(e._single_error_key() for e in errors))
++            for field, errors in self.error_dict.items()
++        )
++
++    def _error_list_key(self):
++        # Return a frozenset of error keys so that comparison is independent of
++        # list ordering.
++        return frozenset(e._single_error_key() for e in self.error_list)
++
++    def _single_error_key(self):
++        return (
++            self.message,
++            self.code,
++            None if self.params is None else frozenset(self.params.items()),
++        )
++
+ 
+ class EmptyResultSet(Exception):
+     """A database query predicate is impossible."""

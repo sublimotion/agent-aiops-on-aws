@@ -1,0 +1,79 @@
+diff --git a/xarray/core/dtypes.py b/xarray/core/dtypes.py
+index 167f00fa..c64d356e 100644
+--- a/xarray/core/dtypes.py
++++ b/xarray/core/dtypes.py
+@@ -38,7 +38,7 @@ NINF = AlwaysLessThan()
+ PROMOTE_TO_OBJECT = [
+     {np.number, np.character},  # numpy promotes to character
+     {np.bool_, np.character},  # numpy promotes to character
+-    {np.bytes_, np.unicode_},  # numpy promotes to unicode
++    {np.bytes_, np.str_},  # numpy promotes to unicode
+ ]
+ 
+ 
+diff --git a/xarray/core/variable.py b/xarray/core/variable.py
+index 64c1895d..6e2a720c 100644
+--- a/xarray/core/variable.py
++++ b/xarray/core/variable.py
+@@ -204,6 +204,9 @@ def as_compatible_data(data, fastpath=False):
+     if isinstance(data, Variable):
+         return data.data
+ 
++    if isinstance(data, xr.DataArray):
++        return data.data
++
+     if isinstance(data, NON_NUMPY_SUPPORTED_ARRAY_TYPES):
+         return _maybe_wrap_data(data)
+ 
+diff --git a/xarray/tests/test_variable.py b/xarray/tests/test_variable.py
+index be6833c2..9d1177ef 100644
+--- a/xarray/tests/test_variable.py
++++ b/xarray/tests/test_variable.py
+@@ -178,7 +178,7 @@ class VariableSubclassobjects:
+             self._assertIndexedLikeNDArray(x, value, dtype)
+ 
+     def test_index_0d_float(self):
+-        for value, dtype in [(0.5, np.float_), (np.float32(0.5), np.float32)]:
++        for value, dtype in [(0.5, np.float64), (np.float32(0.5), np.float32)]:
+             x = self.cls(["x"], [value])
+             self._assertIndexedLikeNDArray(x, value, dtype)
+ 
+@@ -194,19 +194,20 @@ class VariableSubclassobjects:
+         self._assertIndexedLikeNDArray(x, np.datetime64(d))
+ 
+         x = self.cls(["x"], [np.datetime64(d)])
+-        self._assertIndexedLikeNDArray(x, np.datetime64(d), "datetime64[ns]")
++        # Accept either microseconds or nanoseconds resolution
++        self._assertIndexedLikeNDArray(x, np.datetime64(d), expected_dtype=False)
+ 
+         x = self.cls(["x"], pd.DatetimeIndex([d]))
+-        self._assertIndexedLikeNDArray(x, np.datetime64(d), "datetime64[ns]")
++        self._assertIndexedLikeNDArray(x, np.datetime64(d), expected_dtype=False)
+ 
+     def test_index_0d_timedelta64(self):
+         td = timedelta(hours=1)
+ 
+         x = self.cls(["x"], [np.timedelta64(td)])
+-        self._assertIndexedLikeNDArray(x, np.timedelta64(td), "timedelta64[ns]")
++        self._assertIndexedLikeNDArray(x, np.timedelta64(td), expected_dtype=False)
+ 
+         x = self.cls(["x"], pd.to_timedelta([td]))
+-        self._assertIndexedLikeNDArray(x, np.timedelta64(td), "timedelta64[ns]")
++        self._assertIndexedLikeNDArray(x, np.timedelta64(td), expected_dtype=False)
+ 
+     def test_index_0d_not_a_time(self):
+         d = np.datetime64("NaT", "ns")
+@@ -268,9 +269,11 @@ class VariableSubclassobjects:
+             (times.to_pydatetime(), False),
+         ]:
+             v = self.cls(["t"], values)
+-            assert v.dtype == np.dtype("datetime64[ns]")
++            # Accept either microseconds or nanoseconds resolution
++            assert str(v.dtype).startswith("datetime64[") and str(v.dtype).endswith("s]")
+             assert_array_equal(v.values, times.values)
+-            assert v.values.dtype == np.dtype("datetime64[ns]")
++            # Accept either microseconds or nanoseconds resolution
++            assert str(v.values.dtype).startswith("datetime64[") and str(v.values.dtype).endswith("s]")
+             same_source = source_ndarray(v.values) is source_ndarray(values)
+             assert preserve_source == same_source
+ 

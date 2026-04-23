@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 151.4,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 149981,
+    "duration_api_ms": 124511,
+    "num_turns": 20,
+    "result": "All tests pass. The fix is correct and working.\n\n**Summary of the fix:**\n\n**Root cause:** In `sphinx/util/rst.py`, the `docinfo_re` regex `':\\\\w+:.*?'` incorrectly matched RST inline roles like `:mod:\\`mypackage2\\`` at the beginning of a document. The `prepend_prolog` function uses this regex to count docinfo fields and insert the prolog after them. When a document starts with a heading that uses an RST role (e.g., `:mod:\\`mypackage2\\`` followed by `=================`), the old regex would match the heading text as a \"docinfo field\" and insert the prolog between the heading text and its underline \u2014 breaking the heading syntax.\n\n**Fix:** Changed the regex to `r':\\w+: '` (requires a space after the closing colon). RST docinfo fields always have the form `:fieldname: value` (space required), while RST inline roles have the form `:rolename:\\`content\\`` (backtick, no space). This correctly distinguishes the two cases.",
+    "stop_reason": "end_turn",
+    "session_id": "0608fe8b-36e8-4748-8744-704ea942e9b0",
+    "total_cost_usd": 0.34004534999999997,
+    "usage": {
+      "input_tokens": 86,
+      "cache_creation_input_tokens": 27623,
+      "cache_read_input_tokens": 459837,
+      "output_tokens": 6550,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 27623
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 86,
+        "outputTokens": 6550,
+        "cacheReadInputTokens": 459837,
+        "cacheCreationInputTokens": 27623,
+        "webSearchRequests": 0,
+        "costUSD": 0.34004534999999997,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "3088f25b-0dcc-49fa-8987-8b64d7fcf579"
+  },
+  "stderr": ""
+}

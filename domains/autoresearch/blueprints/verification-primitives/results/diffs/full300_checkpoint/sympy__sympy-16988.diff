@@ -1,0 +1,13 @@
+diff --git a/sympy/sets/sets.py b/sympy/sets/sets.py
+index 03cf57a30b..c3c2d94a60 100644
+--- a/sympy/sets/sets.py
++++ b/sympy/sets/sets.py
+@@ -1264,7 +1264,7 @@ def __new__(cls, *args, **kwargs):
+ 
+         # Reduce sets using known rules
+         if evaluate:
+-            args = list(cls._new_args_filter(args))
++            args = list(ordered(set(cls._new_args_filter(args)), Set._infimum_key))
+             return simplify_intersection(args)
+ 
+         args = list(ordered(args, Set._infimum_key))

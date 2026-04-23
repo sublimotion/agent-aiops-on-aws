@@ -1,0 +1,15 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index a0eb97792e..e67082a9c8 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -1532,6 +1532,10 @@ def _print_MatPow(self, expr):
+         else:
+             return "%s^{%s}" % (self._print(base), self._print(exp))
+ 
++    def _print_Trace(self, expr):
++        mat = expr.arg
++        return r"\mathrm{tr}\left (%s \right )" % self._print(mat)
++
+     def _print_ZeroMatrix(self, Z):
+         return r"\mathbb{0}"
+ 

@@ -1,0 +1,56 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index b992b45c26..fe91845cae 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,6 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping
++from collections.abc import Mapping
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+ from .cache import cacheit
+diff --git a/sympy/plotting/plot.py b/sympy/plotting/plot.py
+index 664602d6ba..6268b99c06 100644
+--- a/sympy/plotting/plot.py
++++ b/sympy/plotting/plot.py
+@@ -25,7 +25,7 @@
+ from __future__ import print_function, division
+ 
+ import inspect
+-from collections import Callable
++from collections.abc import Callable
+ import warnings
+ import sys
+ 
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index 4c2ffd81e1..0da2e9713b 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -109,6 +109,26 @@ def _print_Integral(self, expr):
+     def _print_Sum(self, expr):
+         return "Hold[Sum[" + ', '.join(self.doprint(a) for a in expr.args) + "]]"
+ 
++    def _print_Derivative(self, expr):
++        return "D[%s]" % (self.stringify(expr.args, ", "))
++
++    def _print_Float(self, expr):
++        # Convert to string with exact representation
++        res = "%.10f" % expr
++        # Remove trailing zeros
++        res = res.rstrip('0').rstrip('.')
++        if 'e' in res:
++            # Convert scientific notation to Mathematica format
++            res = res.replace('e', '*^')
++        # Special case: preserve .0 for negative integers in powers
++        if self._print_Pow_context and res.endswith('.0'):
++            self._print_Pow_context = False
++            return res
++        # Handle integer floats (e.g. -1.0)
++        if res.endswith('.0'):
++            res = res[:-2]
++        return res
++
+ 
+ def mathematica_code(expr, **settings):
+     r"""Converts an expr to a string of the Wolfram Mathematica code

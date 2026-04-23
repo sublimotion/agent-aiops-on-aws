@@ -1,0 +1,40 @@
+diff --git a/pylint/lint/pylinter.py b/pylint/lint/pylinter.py
+index e2bbf061..9cdcc631 100644
+--- a/pylint/lint/pylinter.py
++++ b/pylint/lint/pylinter.py
+@@ -75,8 +75,7 @@ MANAGER = astroid.MANAGER
+ class GetAstProtocol(Protocol):
+     def __call__(
+         self, filepath: str, modname: str, data: str | None = None
+-    ) -> nodes.Module:
+-        ...
++    ) -> nodes.Module: ...
+ 
+ 
+ def _read_stdin() -> str:
+@@ -290,9 +289,9 @@ class PyLinter(
+         """Dictionary of possible but non-initialized reporters."""
+ 
+         # Attributes for checkers and plugins
+-        self._checkers: defaultdict[
+-            str, list[checkers.BaseChecker]
+-        ] = collections.defaultdict(list)
++        self._checkers: defaultdict[str, list[checkers.BaseChecker]] = (
++            collections.defaultdict(list)
++        )
+         """Dictionary of registered and initialized checkers."""
+         self._dynamic_plugins: set[str] = set()
+         """Set of loaded plugin names."""
+@@ -614,6 +613,12 @@ class PyLinter(
+                             os.path.join(root, file)
+                             for file in files
+                             if file.endswith(".py")
++                            and not _is_ignored_file(
++                                os.path.join(root, file),
++                                self.config.ignore,
++                                self.config.ignore_patterns,
++                                self.config.ignore_paths,
++                            )
+                         )
+             else:
+                 yield something

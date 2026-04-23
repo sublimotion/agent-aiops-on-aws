@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 136.8,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 135525,
+    "duration_api_ms": 109399,
+    "num_turns": 25,
+    "result": "The existing test `test_file_upload_default_permissions` uses `@override_settings(FILE_UPLOAD_PERMISSIONS=None)` to test the behavior when None is explicitly set \u2014 that test still works correctly since it explicitly overrides the setting. The default behavior will now use `0o644`.\n\nThe fix is correct and minimal:\n- Changed `FILE_UPLOAD_PERMISSIONS = None` to `FILE_UPLOAD_PERMISSIONS = 0o644` in `django/conf/global_settings.py`\n- This ensures `os.chmod` is called with `0o644` for all uploaded files, regardless of whether they went through `TemporaryUploadedFile` (which would get `0o600` permissions from `tempfile`) or `MemoryUploadedFile`\n- All 127 existing file storage tests pass",
+    "stop_reason": "end_turn",
+    "session_id": "0b0d4a97-28f3-4c3f-8aac-d90d639adc58",
+    "total_cost_usd": 0.27417359999999996,
+    "usage": {
+      "input_tokens": 26,
+      "cache_creation_input_tokens": 19166,
+      "cache_read_input_tokens": 512577,
+      "output_tokens": 3230,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 19166
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 26,
+        "outputTokens": 3230,
+        "cacheReadInputTokens": 512577,
+        "cacheCreationInputTokens": 19166,
+        "webSearchRequests": 0,
+        "costUSD": 0.27417359999999996,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "6ed2fff7-eff6-40b0-900f-7f912251db4e"
+  },
+  "stderr": ""
+}

@@ -1,0 +1,377 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b899..07b16444 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -1,4 +1,5 @@
+ """Rewrite assertion AST to produce nice error messages"""
++
+ from __future__ import absolute_import
+ from __future__ import division
+ from __future__ import print_function
+@@ -334,8 +335,7 @@ class AssertionRewritingHook(object):
+         pkg_resources.register_loader_type(cls, pkg_resources.DefaultProvider)
+ 
+     def get_data(self, pathname):
+-        """Optional PEP302 get_data API.
+-        """
++        """Optional PEP302 get_data API."""
+         with open(pathname, "rb") as f:
+             return f.read()
+ 
+@@ -483,11 +483,11 @@ def _saferepr(obj):
+     # only occurs in python2.x, repr must return text in python3+
+     if isinstance(r, bytes):
+         # Represent unprintable bytes as `\x##`
+-        r = u"".join(
+-            u"\\x{:x}".format(ord(c)) if c not in string.printable else c.decode()
++        r = "".join(
++            "\\x{:x}".format(ord(c)) if c not in string.printable else c.decode()
+             for c in r
+         )
+-    return r.replace(u"\n", u"\\n")
++    return r.replace("\n", "\\n")
+ 
+ 
+ def _format_assertmsg(obj):
+@@ -502,10 +502,10 @@ def _format_assertmsg(obj):
+     # contains a newline it gets escaped, however if an object has a
+     # .__repr__() which contains newlines it does not get escaped.
+     # However in either case we want to preserve the newline.
+-    replaces = [(u"\n", u"\n~"), (u"%", u"%%")]
++    replaces = [("\n", "\n~"), ("%", "%%")]
+     if not isinstance(obj, six.string_types):
+         obj = saferepr(obj)
+-        replaces.append((u"\\n", u"\n~"))
++        replaces.append(("\\n", "\n~"))
+ 
+     if isinstance(obj, bytes):
+         replaces = [(r1.encode(), r2.encode()) for r1, r2 in replaces]
+@@ -529,7 +529,7 @@ def _should_repr_global_name(obj):
+ def _format_boolop(explanations, is_or):
+     explanation = "(" + (is_or and " or " or " and ").join(explanations) + ")"
+     if isinstance(explanation, six.text_type):
+-        return explanation.replace(u"%", u"%%")
++        return explanation.replace("%", "%%")
+     else:
+         return explanation.replace(b"%", b"%%")
+ 
+@@ -549,6 +549,54 @@ def _call_reprcompare(ops, results, expls, each_obj):
+     return expl
+ 
+ 
++def _call_all_any(func_name, iterable):
++    """
++    Helper function to provide better error messages for all()/any().
++
++    When all() or any() fails, this function provides detailed information
++    about which element caused the failure.
++    """
++    # Convert to list to allow multiple iteration
++    items = list(iterable)
++
++    if func_name == "all":
++        # For all(), find the first False
++        for i, item in enumerate(items):
++            if not item:
++                # Raise with detailed message
++                raise AssertionError(
++                    "assert False\n"
++                    " +  where False = %s(%s)\n"
++                    "    where %s = %s"
++                    % (func_name, repr(items), repr(item), "items[%d]" % i)
++                )
++        return True
++    else:  # any
++        # For any(), find if all are False
++        for i, item in enumerate(items):
++            if item:
++                return True
++        # All were False
++        raise AssertionError(
++            "assert False\n +  where False = %s(%s)" % (func_name, repr(items))
++        )
++
++
++def _call_reprcompare(ops, results, expls, each_obj):
++    for i, res, expl in zip(range(len(ops)), results, expls):
++        try:
++            done = not res
++        except Exception:
++            done = True
++        if done:
++            break
++    if util._reprcompare is not None:
++        custom = util._reprcompare(ops[i], each_obj[i], each_obj[i + 1])
++        if custom is not None:
++            return custom
++    return expl
++
++
+ unary_map = {ast.Not: "not %s", ast.Invert: "~%s", ast.USub: "-%s", ast.UAdd: "+%s"}
+ 
+ binop_map = {
+@@ -899,9 +947,7 @@ warn_explicit(
+     filename={filename!r},
+     lineno={lineno},
+ )
+-            """.format(
+-                filename=module_path.strpath, lineno=lineno
+-            )
++            """.format(filename=module_path.strpath, lineno=lineno)
+         ).body
+         return ast.If(val_is_none, send_warning, [])
+ 
+@@ -964,10 +1010,253 @@ warn_explicit(
+         res = self.assign(ast.BinOp(left_expr, binop.op, right_expr))
+         return res, explanation
+ 
++    def _is_all_or_any_call(self, call):
++        """Check if call is to all() or any() with a single argument."""
++        if len(call.args) != 1:
++            return False
++        func = call.func
++        if not isinstance(func, ast.Name):
++            return False
++        return func.id in ("all", "any")
++
++    def _visit_all_any(self, call):
++        """
++        Unroll all()/any() calls to provide better error messages.
++
++        When all() or any() is called with a generator expression or list
++        comprehension, we transform it into an explicit loop that provides
++        better failure messages showing which specific element failed.
++        """
++        is_all = isinstance(call.func, ast.Name) and call.func.id == "all"
++        arg = call.args[0]
++
++        # Handle generator expressions and list comprehensions
++        if isinstance(arg, ast.GeneratorExp):
++            return self._unroll_generator(call, arg, is_all)
++        elif isinstance(arg, ast.ListComp):
++            return self._unroll_listcomp(call, arg, is_all)
++
++        # For other cases, use the standard handling
++        return self._visit_call_standard(call)
++
++    def _unroll_generator(self, call, gen_exp, is_all):
++        """Unroll a generator expression for better error messages."""
++        elt = gen_exp.elt
++        generators = gen_exp.generators
++
++        # Visit the iterator to get the iterable
++        iter_res, iter_expl = self.visit(generators[0].iter)
++        target = generators[0].target
++
++        # Create a variable for the boolean result
++        bool_var = self.variable()
++
++        # Create the for loop body
++        loop_body = []
++
++        # Save current state to prevent visit from adding to outer scope
++        saved_statements = self.statements
++        saved_specifiers = self.explanation_specifiers
++        saved_stack = self.stack[:]
++
++        self.statements = []
++        self.explanation_specifiers = {}
++        self.stack = [self.explanation_specifiers]
++
++        # Visit the element expression - any assignments will go to temp list
++        elt_res, elt_expl = self.visit(elt)
++
++        # Get any statements that were created during visit
++        elt_statements = self.statements
++        elt_specifiers = self.explanation_specifiers
++
++        # Restore outer state
++        self.statements = saved_statements
++        self.explanation_specifiers = saved_specifiers
++        self.stack = saved_stack
++
++        # Merge inner specifiers into outer specifiers
++        # This ensures the placeholders from elt_expl can be resolved
++        self.explanation_specifiers.update(elt_specifiers)
++
++        # Add element visit statements to loop body first
++        loop_body.extend(elt_statements)
++
++        # Store the boolean result
++        loop_body.append(ast.Assign([ast.Name(bool_var, ast.Store())], elt_res))
++
++        # For all(), check if False and fail immediately with detailed message
++        if is_all:
++            # Create failure block that mimics what visit_Assert does
++            fail_body = []
++
++            # Build the explanation string with placeholders
++            # The explanation will be formatted using pop_format_context
++            bool_display = self.display(ast.Name(bool_var, ast.Load()))
++            bool_placeholder = self.explanation_param(bool_display)
++
++            # Create the format string template
++            template = ast.Str("assert %s, where False = %s")
++
++            # Create the format dict
++            format_dict = ast.Dict(
++                [ast.Str("py0"), ast.Str("py1")],
++                [
++                    ast.Name(bool_var, ast.Load()),
++                    ast.Str(elt_expl.lstrip("%(").rstrip(")")),
++                ],
++            )
++
++            # Actually, let's use a simpler approach: create the explanation string
++            # and format it properly
++            explanation_str = "assert False, where False = " + elt_expl
++            expl_ast = ast.Str(explanation_str)
++
++            # Use pop_format_context to format the explanation
++            # But we need to add the required values to the format specifiers first
++            formatted = self.pop_format_context(expl_ast)
++
++            # Format the explanation
++            fmt = self.helper("_format_explanation", formatted)
++
++            # Create the AssertionError
++            err_name = ast.Name("AssertionError", ast.Load())
++            exc = ast_Call(err_name, [fmt], [])
++
++            # Raise the exception
++            fail_body.append(
++                ast.Raise(exc, None)
++                if sys.version_info[0] >= 3
++                else ast.Raise(exc, None, None)
++            )
++
++            # Create if statement to check for False
++            cond = ast.UnaryOp(ast.Not(), ast.Name(bool_var, ast.Load()))
++            loop_body.append(ast.If(cond, fail_body, []))
++
++        # Create the for loop
++        loop = ast.For(target, iter_res, loop_body, [])
++
++        # Set location information for the loop
++        set_location(loop, call.lineno, call.col_offset)
++
++        # Add to statements - this will be executed instead of the all() call
++        self.statements.append(loop)
++
++        # For the result, we still need to call all() to get the actual boolean
++        # But we've already added the loop that will fail with better messages
++        # Use the original gen_exp which has proper line numbers
++        new_call = ast.Call(call.func, [gen_exp], [])
++        res = self.assign(new_call)
++
++        # Build explanation
++        res_expl = self.explanation_param(self.display(res))
++        outer_expl = "%s\n{%s = %s\n}" % (
++            res_expl,
++            res_expl,
++            "%s(%s for %s in %s)"
++            % (call.func.id, elt_expl, self._get_target_name(target), iter_expl),
++        )
++        return res, outer_expl
++
++    def _get_target_name(self, target):
++        """Get the name of a target variable."""
++        if isinstance(target, ast.Name):
++            return target.id
++        return "?"
++
++    def _unroll_listcomp(self, call, list_comp, is_all):
++        """Unroll a list comprehension for better error messages."""
++        elt = list_comp.elt
++        generators = list_comp.generators
++
++        # Visit the iterator
++        iter_res, iter_expl = self.visit(generators[0].iter)
++        target = generators[0].target
++
++        # Visit the element expression
++        elt_res, elt_expl = self.visit(elt)
++
++        # Create a variable for the boolean result
++        bool_var = self.variable()
++
++        # Create the for loop body
++        loop_body = []
++
++        # Store the boolean result
++        loop_body.append(ast.Assign([ast.Name(bool_var, ast.Store())], elt_res))
++
++        # For all(), check if False and fail immediately
++        if is_all:
++            fail_body = []
++            fail_body.append(
++                ast.Assert(
++                    ast.Name(bool_var, ast.Load()),
++                    ast.Str("where False = %s" % elt_expl),
++                )
++            )
++            cond = ast.UnaryOp(ast.Not(), ast.Name(bool_var, ast.Load()))
++            loop_body.append(ast.If(cond, fail_body, []))
++
++        # Create the for loop
++        loop = ast.For(target, iter_res, loop_body, [])
++        self.statements.append(loop)
++
++        # Create the list comprehension for the actual call
++        new_list = ast.ListComp(elt, generators)
++        new_call = ast.Call(call.func, [new_list], [])
++        res = self.assign(new_call)
++
++        # Build explanation
++        res_expl = self.explanation_param(self.display(res))
++        outer_expl = "%s\n{%s = %s\n}" % (
++            res_expl,
++            res_expl,
++            "%s([%s for ...])" % (call.func.id, elt_expl),
++        )
++        return res, outer_expl
++
++    def _visit_call_standard(self, call):
++        """Standard call visitation for all/any with non-comprehension args."""
++        new_func, func_expl = self.visit(call.func)
++        arg_expls = []
++        new_args = []
++        for arg in call.args:
++            res, expl = self.visit(arg)
++            arg_expls.append(expl)
++            new_args.append(res)
++
++        expl = "%s(%s)" % (func_expl, ", ".join(arg_expls))
++        new_call = ast.Call(new_func, new_args, [])
++        res = self.assign(new_call)
++        res_expl = self.explanation_param(self.display(res))
++        outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
++        return res, outer_expl
++
++        # For other cases, use the standard handling
++        new_func, func_expl = self.visit(call.func)
++        arg_expls = []
++        new_args = []
++        for arg in call.args:
++            res, expl = self.visit(arg)
++            arg_expls.append(expl)
++            new_args.append(res)
++
++        expl = "%s(%s)" % (func_expl, ", ".join(arg_expls))
++        new_call = ast.Call(new_func, new_args, [])
++        res = self.assign(new_call)
++        res_expl = self.explanation_param(self.display(res))
++        outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
++        return res, outer_expl
++
+     def visit_Call_35(self, call):
+         """
+         visit `ast.Call` nodes on Python3.5 and after
+         """
++        # Check if this is a call to all() or any() with a generator/list comprehension
++        if self._is_all_or_any_call(call):
++            return self._visit_all_any(call)
++
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []

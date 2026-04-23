@@ -1,0 +1,47 @@
+diff --git a/sphinx/ext/autodoc/importer.py b/sphinx/ext/autodoc/importer.py
+index 477aae247..6cb03a246 100644
+--- a/sphinx/ext/autodoc/importer.py
++++ b/sphinx/ext/autodoc/importer.py
+@@ -295,23 +295,34 @@ def get_class_members(subject: Any, objpath: List[str], attrgetter: Callable
+     try:
+         for cls in getmro(subject):
+             # annotation only member (ex. attr: int)
+-            for name in getannotations(cls):
+-                name = unmangle(cls, name)
+-                if name and name not in members:
+-                    members[name] = ObjectMember(name, INSTANCEATTR, class_=cls)
+-
+-            # append instance attributes (cf. self.attr1) if analyzer knows
+             try:
+                 modname = safe_getattr(cls, '__module__')
+                 qualname = safe_getattr(cls, '__qualname__')
+                 analyzer = ModuleAnalyzer.for_module(modname)
+                 analyzer.analyze()
++                attr_docs = analyzer.attr_docs
++            except (AttributeError, PycodeError):
++                modname = None
++                qualname = None
++                analyzer = None
++                attr_docs = {}
++
++            for ann_name in getannotations(cls):
++                ann_name = unmangle(cls, ann_name)
++                if ann_name and ann_name not in members:
++                    if qualname and (qualname, ann_name) in attr_docs:
++                        docstring = '\n'.join(attr_docs[(qualname, ann_name)])
++                    else:
++                        docstring = ''
++                    members[ann_name] = ObjectMember(ann_name, INSTANCEATTR, class_=cls,
++                                                     docstring=docstring)
++
++            # append instance attributes (cf. self.attr1) if analyzer knows
++            if analyzer:
+                 for (ns, name), docstring in analyzer.attr_docs.items():
+                     if ns == qualname and name not in members:
+                         members[name] = ObjectMember(name, INSTANCEATTR, class_=cls,
+                                                      docstring='\n'.join(docstring))
+-            except (AttributeError, PycodeError):
+-                pass
+     except AttributeError:
+         pass
+ 

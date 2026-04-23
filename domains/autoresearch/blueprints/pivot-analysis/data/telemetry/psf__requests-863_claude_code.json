@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 65.8,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 64562,
+    "duration_api_ms": 45296,
+    "num_turns": 13,
+    "result": "The adversarial review raised a concern, but it's actually incorrect. Let me trace the code path:\n\nWhen `Request(hooks={'response': [func1, func2]})` is called:\n1. `__init__` iterates `hooks.items()` and calls `self.register_hook(event='response', hook=[func1, func2])`\n2. My fix: if `hook` is a list \u2192 `extend`, not `append`\n3. Result: `self.hooks['response'] == [func1, func2]` \u2713\n\nThe fix **does** cover the `__init__` path since `__init__` delegates to `register_hook`. The review misunderstood the call flow. The fix is correct and complete.\n\n**Summary of the change** (`requests/models.py:463`):\n\n`register_hook` now checks if `hook` is a list and uses `extend` instead of `append`, so passing a list of hooks via the `hooks` argument in `Request.__init__` (or directly) correctly registers all functions individually rather than wrapping the list as a single non-callable element.",
+    "stop_reason": "end_turn",
+    "session_id": "78b6ca15-adeb-4b48-b8e4-c0c4f7731a9b",
+    "total_cost_usd": 0.14487105,
+    "usage": {
+      "input_tokens": 322,
+      "cache_creation_input_tokens": 14089,
+      "cache_read_input_tokens": 174821,
+      "output_tokens": 2575,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 14089
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 322,
+        "outputTokens": 2575,
+        "cacheReadInputTokens": 174821,
+        "cacheCreationInputTokens": 14089,
+        "webSearchRequests": 0,
+        "costUSD": 0.14487105,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "6a26abda-72e9-4008-b899-11f20162758b"
+  },
+  "stderr": ""
+}

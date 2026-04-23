@@ -1,0 +1,33 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index bdfebf24cc..401182846e 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,10 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping, defaultdict
++try:
++    from collections import Mapping, defaultdict
++except ImportError:
++    from collections.abc import Mapping
++    from collections import defaultdict
+ from itertools import chain
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+diff --git a/sympy/core/expr.py b/sympy/core/expr.py
+index 2894db3618..aeb66117e6 100644
+--- a/sympy/core/expr.py
++++ b/sympy/core/expr.py
+@@ -9,7 +9,11 @@
+ from .compatibility import reduce, as_int, default_sort_key, range
+ from mpmath.libmp import mpf_log, prec_to_dps
+ 
+-from collections import defaultdict, Iterable
++from collections import defaultdict
++try:
++    from collections import Iterable
++except ImportError:
++    from collections.abc import Iterable
+ 
+ class Expr(Basic, EvalfMixin):
+     """

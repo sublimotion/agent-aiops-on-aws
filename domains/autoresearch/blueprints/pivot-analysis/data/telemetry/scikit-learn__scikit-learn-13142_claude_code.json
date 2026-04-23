@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 135.9,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 134621,
+    "duration_api_ms": 101745,
+    "num_turns": 19,
+    "result": "The `_e_step` calls `_estimate_log_prob_resp` \u2192 `_estimate_weighted_log_prob` \u2192 `_estimate_log_prob` + `_estimate_log_weights`, which depend on `weights_`, `means_`, and `precisions_cholesky_`. All four of these are saved and restored by `_get_parameters`/`_set_parameters`. The fix is correct.\n\nThe bug was clear: the final e-step (line 263) ran **before** `_set_parameters(best_params)` (line 272), so it used the last iteration's model parameters instead of the best model's parameters. Moving the e-step after `_set_parameters` ensures `fit_predict` returns labels consistent with `predict`.",
+    "stop_reason": "end_turn",
+    "session_id": "493a546a-5884-45c2-b05e-5a14f9ca2285",
+    "total_cost_usd": 0.29351535,
+    "usage": {
+      "input_tokens": 86,
+      "cache_creation_input_tokens": 25711,
+      "cache_read_input_tokens": 486187,
+      "output_tokens": 3399,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 25711
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 86,
+        "outputTokens": 3399,
+        "cacheReadInputTokens": 486187,
+        "cacheCreationInputTokens": 25711,
+        "webSearchRequests": 0,
+        "costUSD": 0.29351535,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "dde7e4d1-f93a-43a1-9c81-f7e8db2c566c"
+  },
+  "stderr": ""
+}

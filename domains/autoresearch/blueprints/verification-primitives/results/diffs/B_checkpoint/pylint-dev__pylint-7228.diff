@@ -1,0 +1,69 @@
+diff --git a/pylint/config/argument.py b/pylint/config/argument.py
+index 3c295151..09a6e310 100644
+--- a/pylint/config/argument.py
++++ b/pylint/config/argument.py
+@@ -99,11 +99,29 @@ def _py_version_transformer(value: str) -> tuple[int, ...]:
+     return version
+ 
+ 
++def _regexp_transformer(value: str) -> Pattern[str]:
++    """Transforms a regular expression string to a compiled pattern.
++    
++    Raises ArgumentTypeError if the pattern is invalid.
++    """
++    try:
++        return re.compile(value)
++    except re.error as e:
++        raise argparse.ArgumentTypeError(
++            f"Error in provided regular expression: {value} beginning at index {e.pos}: {e.msg}"
++        ) from e
++
++
+ def _regexp_csv_transfomer(value: str) -> Sequence[Pattern[str]]:
+     """Transforms a comma separated list of regular expressions."""
+     patterns: list[Pattern[str]] = []
+     for pattern in _csv_transformer(value):
+-        patterns.append(re.compile(pattern))
++        try:
++            patterns.append(re.compile(pattern))
++        except re.error as e:
++            raise argparse.ArgumentTypeError(
++                f"Error in provided regular expression: {pattern} beginning at index {e.pos}: {e.msg}"
++            ) from e
+     return patterns
+ 
+ 
+@@ -111,13 +129,18 @@ def _regexp_paths_csv_transfomer(value: str) -> Sequence[Pattern[str]]:
+     """Transforms a comma separated list of regular expressions paths."""
+     patterns: list[Pattern[str]] = []
+     for pattern in _csv_transformer(value):
+-        patterns.append(
+-            re.compile(
+-                str(pathlib.PureWindowsPath(pattern)).replace("\\", "\\\\")
+-                + "|"
+-                + pathlib.PureWindowsPath(pattern).as_posix()
++        try:
++            patterns.append(
++                re.compile(
++                    str(pathlib.PureWindowsPath(pattern)).replace("\\", "\\\\")
++                    + "|"
++                    + pathlib.PureWindowsPath(pattern).as_posix()
++                )
+             )
+-        )
++        except re.error as e:
++            raise argparse.ArgumentTypeError(
++                f"Error in provided regular expression: {pattern} beginning at index {e.pos}: {e.msg}"
++            ) from e
+     return patterns
+ 
+ 
+@@ -130,7 +153,7 @@ _TYPE_TRANSFORMERS: dict[str, Callable[[str], _ArgumentTypes]] = {
+     "non_empty_string": _non_empty_string_transformer,
+     "path": _path_transformer,
+     "py_version": _py_version_transformer,
+-    "regexp": re.compile,
++    "regexp": _regexp_transformer,
+     "regexp_csv": _regexp_csv_transfomer,
+     "regexp_paths_csv": _regexp_paths_csv_transfomer,
+     "string": pylint_utils._unquote,

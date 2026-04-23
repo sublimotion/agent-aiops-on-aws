@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 73.2,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 71838,
+    "duration_api_ms": 58502,
+    "num_turns": 20,
+    "result": "All 7 tests pass. The fix is a one-line addition of `__slots__ = ()` to the `Printable` class in `sympy/core/_print_helpers.py`.\n\n**Root cause**: The `Printable` mixin class was introduced in SymPy 1.7 but was missing `__slots__ = ()`. In Python, if any class in an inheritance chain defines `__slots__` but one ancestor doesn't, the ancestor without `__slots__` causes a `__dict__` to be allocated for every instance. Since `Symbol` inherits from `Printable` (via `Basic`), this caused `Symbol` instances to unexpectedly have a `__dict__`.",
+    "stop_reason": "end_turn",
+    "session_id": "443137ee-51d3-4b8e-a0c1-838eb34d5494",
+    "total_cost_usd": 0.2364546,
+    "usage": {
+      "input_tokens": 85,
+      "cache_creation_input_tokens": 19820,
+      "cache_read_input_tokens": 398732,
+      "output_tokens": 2817,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 19820
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 85,
+        "outputTokens": 2817,
+        "cacheReadInputTokens": 398732,
+        "cacheCreationInputTokens": 19820,
+        "webSearchRequests": 0,
+        "costUSD": 0.2364546,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "587e81f7-5a81-402e-9e71-86189890fd9f"
+  },
+  "stderr": ""
+}

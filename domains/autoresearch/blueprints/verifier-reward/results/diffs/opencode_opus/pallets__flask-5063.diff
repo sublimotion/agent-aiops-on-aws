@@ -1,0 +1,65 @@
+diff --git a/src/flask/cli.py b/src/flask/cli.py
+index 37a15ff2..69859d15 100644
+--- a/src/flask/cli.py
++++ b/src/flask/cli.py
+@@ -989,7 +989,7 @@ def shell_command() -> None:
+ @click.option(
+     "--sort",
+     "-s",
+-    type=click.Choice(("endpoint", "methods", "rule", "match")),
++    type=click.Choice(("endpoint", "methods", "domain", "rule", "match")),
+     default="endpoint",
+     help=(
+         'Method to sort routes by. "match" is the order that Flask will match '
+@@ -1012,6 +1012,13 @@ def routes_command(sort: str, all_methods: bool) -> None:
+         rules = sorted(rules, key=attrgetter(sort))
+     elif sort == "methods":
+         rules = sorted(rules, key=lambda rule: sorted(rule.methods))  # type: ignore
++    elif sort == "domain":
++        rules = sorted(
++            rules,
++            key=lambda rule: rule.host
++            if rule.host is not None
++            else rule.subdomain or "",
++        )
+ 
+     rule_methods = [
+         ", ".join(sorted(rule.methods - ignored_methods))  # type: ignore
+@@ -1024,14 +1031,34 @@ def routes_command(sort: str, all_methods: bool) -> None:
+         max(len(methods) for methods in rule_methods),
+         max(len(rule.rule) for rule in rules),
+     )
++
++    if current_app.url_map.host_matching:
++        host_header = "Host"
++        rule_domain = [rule.host if rule.host is not None else "" for rule in rules]
++    elif any(rule.subdomain for rule in rules):
++        host_header = "Subdomain"
++        rule_domain = [rule.subdomain or "" for rule in rules]
++    else:
++        host_header = None
++        rule_domain = None
++
++    if rule_domain is not None:
++        headers = (host_header, *headers)  # type: ignore[assignment]
++        widths = (max(len(d) for d in rule_domain), *widths)  # type: ignore[assignment]
++
+     widths = [max(len(h), w) for h, w in zip(headers, widths)]
+-    row = "{{0:<{0}}}  {{1:<{1}}}  {{2:<{2}}}".format(*widths)
++    row = "  ".join(f"{{{i}:<{w}}}" for i, w in enumerate(widths))
+ 
+     click.echo(row.format(*headers).strip())
+     click.echo(row.format(*("-" * width for width in widths)))
+ 
+-    for rule, methods in zip(rules, rule_methods):
+-        click.echo(row.format(rule.endpoint, methods, rule.rule).rstrip())
++    for i, (rule, methods) in enumerate(zip(rules, rule_methods)):
++        if rule_domain is not None:
++            click.echo(
++                row.format(rule_domain[i], rule.endpoint, methods, rule.rule).rstrip()
++            )
++        else:
++            click.echo(row.format(rule.endpoint, methods, rule.rule).rstrip())
+ 
+ 
+ cli = FlaskGroup(

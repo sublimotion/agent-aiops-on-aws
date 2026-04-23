@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 159.6,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 158206,
+    "duration_api_ms": 119164,
+    "num_turns": 16,
+    "result": "All 10 existing tests pass. The fix is complete.\n\n**Summary of the fix** in `pylint/reporters/text.py` line 178:\n\nThe regex used to extract format field names from the template didn't account for `{{` and `}}` escape sequences (which Python's `str.format()` treats as literal `{` and `}`). This caused two bugs:\n\n1. `{{ \"Category\": \"{category}\" }}` \u2014 the `{ \"Category\"` part was incorrectly matched as a field name, producing a spurious warning and stripping it from the template.\n2. The `(:.*)?` in the regex was greedy and would eat `}` characters, causing `{line:d}: {msg}` to be parsed as a single match instead of two.\n\nThe fix strips `{{` and `}}` from a copy of the template before applying the validation regex (using `[^}]*` instead of `.*` for the format spec group). This copy is only used for field name validation \u2014 the original template is still stored in `self._fixed_template` for actual formatting, where Python correctly handles `{{`/`}}` as literal braces.",
+    "stop_reason": "end_turn",
+    "session_id": "902f29e6-d7a1-4032-ba14-73f95c67b7c5",
+    "total_cost_usd": 0.29805465,
+    "usage": {
+      "input_tokens": 17,
+      "cache_creation_input_tokens": 23691,
+      "cache_read_input_tokens": 371608,
+      "output_tokens": 6512,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 23691
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 17,
+        "outputTokens": 6512,
+        "cacheReadInputTokens": 371608,
+        "cacheCreationInputTokens": 23691,
+        "webSearchRequests": 0,
+        "costUSD": 0.29805465,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "8fb11c92-861f-46bc-a098-9aa42eb8473b"
+  },
+  "stderr": ""
+}

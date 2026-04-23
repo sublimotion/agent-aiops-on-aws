@@ -1,0 +1,72 @@
+###############################################################################
+# Redis for Ray GCS Fault Tolerance
+# In-cluster Redis (no TLS required — Ray doesn't support Redis TLS natively)
+# ElastiCache Serverless enforces TLS which Ray can't negotiate.
+###############################################################################
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: ray-ft
+data:
+  redis.conf: |
+    maxmemory 256mb
+    maxmemory-policy allkeys-lru
+    save 60 1000
+    appendonly yes
+    appendfsync everysec
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: ray-ft
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      nodeSelector:
+        role: system
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          command: ["redis-server", "/etc/redis/redis.conf"]
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/redis
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: config
+          configMap:
+            name: redis-config
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: ray-ft
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+  type: ClusterIP

@@ -1,0 +1,77 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index 1edc712358..06bd54e8c7 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -346,28 +346,62 @@ def _print_Float(self, expr):
+             return str_real
+ 
+     def _print_Mul(self, expr):
+-        include_parens = False
++        from sympy import Rational, Pow
++        from sympy.simplify import fraction
++
++        # Handle negative coefficients
+         if _coeff_isneg(expr):
+             expr = -expr
+             tex = "- "
+-            if expr.is_Add:
+-                tex += "("
+-                include_parens = True
+         else:
+             tex = ""
+ 
+-        from sympy.simplify import fraction
++        # Separate numerator and denominator
+         numer, denom = fraction(expr, exact=True)
+         separator = self._settings['mul_symbol_latex']
+         numbersep = self._settings['mul_symbol_latex_numbers']
+ 
+-        def convert(expr):
+-            if not expr.is_Mul:
+-                return str(self._print(expr))
++        # Convert numerator
++        numer_terms = []
++        for term in numer.args:
++            if term.is_Rational and term is not S.Infinity:
++                if term.p != 1:
++                    numer_terms.append(str(term.p))
++                if term.q != 1:
++                    numer_terms.append(r"\frac{1}{%s}" % str(term.q))
++            elif term.is_Pow and term.exp.is_Rational and term.exp.is_negative:
++                if term.exp != -1:
++                    numer_terms.append(r"\frac{1}{%s^{%s}}" % (self._print(term.base), -term.exp))
++                else:
++                    numer_terms.append(r"\frac{1}{%s}" % self._print(term.base))
+             else:
+-                _tex = last_term_tex = ""
++                numer_terms.append(self._print(term))
++
++        # Convert denominator
++        denom_terms = []
++        for term in denom.args:
++            if term.is_Rational and term is not S.Infinity:
++                if term.p != 1:
++                    denom_terms.append(str(term.p))
++                if term.q != 1:
++                    denom_terms.append(r"\frac{1}{%s}" % str(term.q))
++            elif term.is_Pow and term.exp.is_Rational and term.exp.is_negative:
++                if term.exp != -1:
++                    denom_terms.append(r"\frac{1}{%s^{%s}}" % (self._print(term.base), -term.exp))
++                else:
++                    denom_terms.append(r"\frac{1}{%s}" % self._print(term.base))
++            else:
++                denom_terms.append(self._print(term))
+ 
+-                if self.order not in ('old', 'none'):
++        # Combine terms with proper spacing
++        if numer_terms:
++            tex += " ".join(numer_terms)
++        if denom_terms:
++            if not numer_terms:
++                tex += "1"
++            tex += r" \frac{1}{%s}" % " ".join(denom_terms)
++
++        return tex
+                     args = expr.as_ordered_factors()
+                 else:
+                     args = expr.args

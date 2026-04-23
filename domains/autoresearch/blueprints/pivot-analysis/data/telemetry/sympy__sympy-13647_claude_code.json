@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 116.3,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 114977,
+    "duration_api_ms": 87115,
+    "num_turns": 18,
+    "result": "All tests pass. The fix is a one-line change in `sympy/matrices/common.py:89`:\n\n**Bug:** `return self[i, j - pos - other.cols]`  \n**Fix:** `return self[i, j - other.cols]`\n\n**Explanation:** When inserting `other` (with `other.cols` columns) at position `pos`, columns after the insertion point in the new matrix (index `j >= pos + other.cols`) map back to original columns at index `j - other.cols`. The old code incorrectly subtracted `pos` as well, which shifted the right portion to start from column `0` instead of column `pos`, causing the identity block to appear in the wrong rows.",
+    "stop_reason": "end_turn",
+    "session_id": "46292be2-6355-421b-889c-618a80e3a191",
+    "total_cost_usd": 0.24356910000000004,
+    "usage": {
+      "input_tokens": 84,
+      "cache_creation_input_tokens": 18388,
+      "cache_read_input_tokens": 352407,
+      "output_tokens": 4576,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 18388
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 84,
+        "outputTokens": 4576,
+        "cacheReadInputTokens": 352407,
+        "cacheCreationInputTokens": 18388,
+        "webSearchRequests": 0,
+        "costUSD": 0.24356910000000004,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "ce1ff3fb-cd82-4028-b087-47afdc7f9d19"
+  },
+  "stderr": ""
+}

@@ -1,0 +1,13 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 84960d77e1..c1c5e2d283 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -820,7 +820,7 @@ class Ref(Expression):
+         return connection.ops.quote_name(self.refs), []
+ 
+     def get_group_by_cols(self, alias=None):
+-        return [self]
++        return self.source.get_group_by_cols()
+ 
+ 
+ class ExpressionList(Func):

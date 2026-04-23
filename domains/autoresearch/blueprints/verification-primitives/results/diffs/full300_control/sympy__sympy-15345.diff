@@ -1,0 +1,24 @@
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index ea7e3a2d94..270d1f84eb 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -6,6 +6,7 @@
+ from sympy.printing.codeprinter import CodePrinter
+ from sympy.printing.str import StrPrinter
+ from sympy.printing.precedence import precedence
++from sympy.utilities import default_sort_key
+ 
+ # Used in MCodePrinter._print_Function(self)
+ known_functions = {
+@@ -101,6 +102,11 @@ def _print_Function(self, expr):
+                     return "%s[%s]" % (mfunc, self.stringify(expr.args, ", "))
+         return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
+ 
++    def _print_LatticeOp(self, expr):
++        # Max and Min inherit from LatticeOp; use Mathematica bracket syntax
++        args = sorted(expr.args, key=default_sort_key)
++        return expr.func.__name__ + "[%s]" % ", ".join(self.doprint(arg) for arg in args)
++
+     def _print_Integral(self, expr):
+         if len(expr.variables) == 1 and not expr.limits[0][1:]:
+             args = [expr.args[0], expr.variables[0]]

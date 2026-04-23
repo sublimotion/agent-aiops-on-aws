@@ -1,0 +1,224 @@
+diff --git a/xarray/core/dataarray.py b/xarray/core/dataarray.py
+index b0df8749..b93747e1 100644
+--- a/xarray/core/dataarray.py
++++ b/xarray/core/dataarray.py
+@@ -319,7 +319,6 @@ class DataArray(AbstractArray, DataWithCoords):
+         else:
+             # try to fill in arguments from data if they weren't supplied
+             if coords is None:
+-
+                 if isinstance(data, DataArray):
+                     coords = data.coords
+                 elif isinstance(data, pd.Series):
+@@ -430,7 +429,7 @@ class DataArray(AbstractArray, DataWithCoords):
+         return self._replace(variable, coords, name, indexes=indexes)
+ 
+     def _to_dataset_split(self, dim: Hashable) -> Dataset:
+-        """ splits dataarray along dimension 'dim' """
++        """splits dataarray along dimension 'dim'"""
+ 
+         def subset(dim, label):
+             array = self.loc[{dim: label}]
+@@ -518,8 +517,7 @@ class DataArray(AbstractArray, DataWithCoords):
+ 
+     @property
+     def name(self) -> Optional[Hashable]:
+-        """The name of this array.
+-        """
++        """The name of this array."""
+         return self._name
+ 
+     @name.setter
+@@ -556,8 +554,7 @@ class DataArray(AbstractArray, DataWithCoords):
+ 
+     @property
+     def data(self) -> Any:
+-        """The array's data as a dask or numpy array
+-        """
++        """The array's data as a dask or numpy array"""
+         return self.variable.data
+ 
+     @data.setter
+@@ -664,14 +661,12 @@ class DataArray(AbstractArray, DataWithCoords):
+ 
+     @property
+     def _attr_sources(self) -> List[Mapping[Hashable, Any]]:
+-        """List of places to look-up items for attribute-style access
+-        """
++        """List of places to look-up items for attribute-style access"""
+         return self._item_sources + [self.attrs]
+ 
+     @property
+     def _item_sources(self) -> List[Mapping[Hashable, Any]]:
+-        """List of places to look-up items for key-completion
+-        """
++        """List of places to look-up items for key-completion"""
+         return [
+             self.coords,
+             {d: self.coords[d] for d in self.dims},
+@@ -683,8 +678,7 @@ class DataArray(AbstractArray, DataWithCoords):
+ 
+     @property
+     def loc(self) -> _LocIndexer:
+-        """Attribute for location based indexing like pandas.
+-        """
++        """Attribute for location based indexing like pandas."""
+         return _LocIndexer(self)
+ 
+     @property
+@@ -709,16 +703,14 @@ class DataArray(AbstractArray, DataWithCoords):
+ 
+     @property
+     def indexes(self) -> Indexes:
+-        """Mapping of pandas.Index objects used for label based indexing
+-        """
++        """Mapping of pandas.Index objects used for label based indexing"""
+         if self._indexes is None:
+             self._indexes = default_indexes(self._coords, self.dims)
+         return Indexes(self._indexes)
+ 
+     @property
+     def coords(self) -> DataArrayCoordinates:
+-        """Dictionary-like container of coordinate arrays.
+-        """
++        """Dictionary-like container of coordinate arrays."""
+         return DataArrayCoordinates(self)
+ 
+     def reset_coords(
+@@ -840,7 +832,7 @@ class DataArray(AbstractArray, DataWithCoords):
+         return new.load(**kwargs)
+ 
+     def persist(self, **kwargs) -> "DataArray":
+-        """ Trigger computation in constituent dask arrays
++        """Trigger computation in constituent dask arrays
+ 
+         This keeps them as dask arrays but encourages them to keep data in
+         memory.  This is particularly useful when on a distributed machine.
+@@ -1402,7 +1394,7 @@ class DataArray(AbstractArray, DataWithCoords):
+         kwargs: Mapping[str, Any] = None,
+         **coords_kwargs: Any,
+     ) -> "DataArray":
+-        """ Multidimensional interpolation of variables.
++        """Multidimensional interpolation of variables.
+ 
+         coords : dict, optional
+             Mapping from dimension names to the new coordinates.
+@@ -1449,8 +1441,9 @@ class DataArray(AbstractArray, DataWithCoords):
+         """
+         if self.dtype.kind not in "uifc":
+             raise TypeError(
+-                "interp only works for a numeric type array. "
+-                "Given {}.".format(self.dtype)
++                "interp only works for a numeric type array. Given {}.".format(
++                    self.dtype
++                )
+             )
+         ds = self._to_temp_dataset().interp(
+             coords,
+@@ -1508,8 +1501,9 @@ class DataArray(AbstractArray, DataWithCoords):
+         """
+         if self.dtype.kind not in "uifc":
+             raise TypeError(
+-                "interp only works for a numeric type array. "
+-                "Given {}.".format(self.dtype)
++                "interp only works for a numeric type array. Given {}.".format(
++                    self.dtype
++                )
+             )
+         ds = self._to_temp_dataset().interp_like(
+             other, method=method, kwargs=kwargs, assume_sorted=assume_sorted
+@@ -1963,6 +1957,13 @@ class DataArray(AbstractArray, DataWithCoords):
+         for k in variables:
+             data_dict[k] = self.sel({variable_dim: k}).squeeze(drop=True)
+ 
++        # Remove stacked dim coordinate from each variable to avoid merge
++        # conflicts when the dim is not a dimension (i.e., it became a scalar
++        # coordinate after sel+squeeze for single-dim variables)
++        for k in data_dict:
++            if dim in data_dict[k].coords and dim not in data_dict[k].dims:
++                del data_dict[k].coords[dim]
++
+         # unstacked dataset
+         return Dataset(data_dict)
+ 
+@@ -2127,8 +2128,7 @@ class DataArray(AbstractArray, DataWithCoords):
+         """
+         if utils.is_dict_like(value):
+             raise TypeError(
+-                "cannot provide fill value as a dictionary with "
+-                "fillna on a DataArray"
++                "cannot provide fill value as a dictionary with fillna on a DataArray"
+             )
+         out = ops.fillna(self, value)
+         return out
+@@ -2550,38 +2550,33 @@ class DataArray(AbstractArray, DataWithCoords):
+         return result
+ 
+     def to_cdms2(self) -> "cdms2_Variable":
+-        """Convert this array into a cdms2.Variable
+-        """
++        """Convert this array into a cdms2.Variable"""
+         from ..convert import to_cdms2
+ 
+         return to_cdms2(self)
+ 
+     @classmethod
+     def from_cdms2(cls, variable: "cdms2_Variable") -> "DataArray":
+-        """Convert a cdms2.Variable into an xarray.DataArray
+-        """
++        """Convert a cdms2.Variable into an xarray.DataArray"""
+         from ..convert import from_cdms2
+ 
+         return from_cdms2(variable)
+ 
+     def to_iris(self) -> "iris_Cube":
+-        """Convert this array into a iris.cube.Cube
+-        """
++        """Convert this array into a iris.cube.Cube"""
+         from ..convert import to_iris
+ 
+         return to_iris(self)
+ 
+     @classmethod
+     def from_iris(cls, cube: "iris_Cube") -> "DataArray":
+-        """Convert a iris.cube.Cube into an xarray.DataArray
+-        """
++        """Convert a iris.cube.Cube into an xarray.DataArray"""
+         from ..convert import from_iris
+ 
+         return from_iris(cube)
+ 
+     def _all_compat(self, other: "DataArray", compat_str: str) -> bool:
+-        """Helper function for equals, broadcast_equals, and identical
+-        """
++        """Helper function for equals, broadcast_equals, and identical"""
+ 
+         def compat(x, y):
+             return getattr(x.variable, compat_str)(y.variable)
+@@ -3163,7 +3158,7 @@ class DataArray(AbstractArray, DataWithCoords):
+     def differentiate(
+         self, coord: Hashable, edge_order: int = 1, datetime_unit: str = None
+     ) -> "DataArray":
+-        """ Differentiate the array with the second order accurate central
++        """Differentiate the array with the second order accurate central
+         differences.
+ 
+         .. note::
+@@ -3222,7 +3217,7 @@ class DataArray(AbstractArray, DataWithCoords):
+     def integrate(
+         self, dim: Union[Hashable, Sequence[Hashable]], datetime_unit: str = None
+     ) -> "DataArray":
+-        """ integrate the array with the trapezoidal rule.
++        """integrate the array with the trapezoidal rule.
+ 
+         .. note::
+             This feature is limited to simple cartesian geometry, i.e. dim
+@@ -3272,7 +3267,7 @@ class DataArray(AbstractArray, DataWithCoords):
+         return self._from_temp_dataset(ds)
+ 
+     def unify_chunks(self) -> "DataArray":
+-        """ Unify chunk size along all chunked dimensions of this DataArray.
++        """Unify chunk size along all chunked dimensions of this DataArray.
+ 
+         Returns
+         -------

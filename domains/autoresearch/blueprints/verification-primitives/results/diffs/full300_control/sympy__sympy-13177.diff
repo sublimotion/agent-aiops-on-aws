@@ -1,0 +1,32 @@
+diff --git a/sympy/core/mod.py b/sympy/core/mod.py
+index 11c800704b..64fd63f961 100644
+--- a/sympy/core/mod.py
++++ b/sympy/core/mod.py
+@@ -39,7 +39,8 @@ def doit(p, q):
+             if p.is_infinite or q.is_infinite or p is nan or q is nan:
+                 return nan
+             if (p == q or p == -q or
+-                    p.is_Pow and p.exp.is_Integer and p.base == q or
++                    p.is_Pow and p.exp.is_Integer and p.exp.is_positive and
++                    p.base == q and q.is_integer or
+                     p.is_integer and q == 1):
+                 return S.Zero
+ 
+diff --git a/sympy/core/tests/test_arit.py b/sympy/core/tests/test_arit.py
+index 06d65203fb..6189d2177f 100644
+--- a/sympy/core/tests/test_arit.py
++++ b/sympy/core/tests/test_arit.py
+@@ -1607,6 +1607,13 @@ def test_Mod():
+     # issue 10963
+     assert (x**6000%400).args[1] == 400
+ 
++    # issue 13177
++    # x**2 % x is not always 0 (only when x is an integer)
++    assert Mod(x**2, x) != S.Zero
++    i = Symbol('i', integer=True)
++    assert Mod(i**2, i) == S.Zero
++    assert Mod(S(1.5)**2, S(1.5)) != S.Zero
++
+ 
+ def test_Mod_is_integer():
+     p = Symbol('p', integer=True)

@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 126.9,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 125609,
+    "duration_api_ms": 102454,
+    "num_turns": 23,
+    "result": "All tests pass. The fix is correct and verified.\n\n**Summary of the fix:** In `django/urls/resolvers.py:162`, the condition for choosing between kwargs and args mode was `if kwargs` (checking if the filtered-non-None kwargs dict is non-empty). The bug: when an optional named group like `(?P<format>(html|json|xml))?` doesn't match, `kwargs` becomes `{}` (falsy), so it fell back to `match.groups()` which returns ALL groups \u2014 including unnamed inner groups \u2014 as positional args.\n\nThe fix changes the check to `if match.groupdict()`, which is truthy whenever the pattern has **any** named groups at all (even if they're all `None`). This correctly implements the documented behavior: \"If there are any named groups, use those as kwargs, ignoring non-named groups.\"",
+    "stop_reason": "end_turn",
+    "session_id": "44ae6fe6-e50a-4e45-ab00-a2e403e3f3ba",
+    "total_cost_usd": 0.2847273,
+    "usage": {
+      "input_tokens": 23,
+      "cache_creation_input_tokens": 17478,
+      "cache_read_input_tokens": 454586,
+      "output_tokens": 5516,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 17478
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 23,
+        "outputTokens": 5516,
+        "cacheReadInputTokens": 454586,
+        "cacheCreationInputTokens": 17478,
+        "webSearchRequests": 0,
+        "costUSD": 0.2847273,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "fa2f041f-fd59-4e9e-92c6-1c6088586fe5"
+  },
+  "stderr": ""
+}

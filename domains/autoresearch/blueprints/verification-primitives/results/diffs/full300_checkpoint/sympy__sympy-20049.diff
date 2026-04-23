@@ -1,0 +1,60 @@
+diff --git a/sympy/physics/vector/point.py b/sympy/physics/vector/point.py
+index d4e3cfcc90..4ac32daf60 100644
+--- a/sympy/physics/vector/point.py
++++ b/sympy/physics/vector/point.py
+@@ -508,17 +508,54 @@ def vel(self, frame):
+         Examples
+         ========
+ 
+-        >>> from sympy.physics.vector import Point, ReferenceFrame
++        >>> from sympy.physics.vector import Point, ReferenceFrame, dynamicsymbols
++        >>> from sympy.physics.vector import init_vprinting
++        >>> init_vprinting(pretty_print=False)
+         >>> N = ReferenceFrame('N')
+         >>> p1 = Point('p1')
+         >>> p1.set_vel(N, 10 * N.x)
+         >>> p1.vel(N)
+         10*N.x
+ 
++        Automatic velocity calculation is possible if the velocity of
++        another point, with a defined position relative to this point, is
++        known::
++
++        >>> p2 = Point('p2')
++        >>> q = dynamicsymbols('q')
++        >>> p2.set_pos(p1, q * N.x)
++        >>> p2.vel(N)
++        q'*N.x + 10*N.x
++
+         """
+ 
+         _check_frame(frame)
+         if not (frame in self._vel_dict):
++            try:
++                visited = []
++                queue = list(self._pos_dict.keys())
++                while queue:
++                    point = queue.pop(0)
++                    if point in visited:
++                        continue
++                    visited.append(point)
++                    if frame in point._vel_dict:
++                        pos = self.pos_from(point)
++                        try:
++                            self._vel_dict.update(
++                                {frame: point._vel_dict[frame] + pos.dt(frame)})
++                        except Exception:
++                            queue.extend(
++                                [p for p in point._pos_dict.keys()
++                                 if p not in visited])
++                            continue
++                        return self._vel_dict[frame]
++                    else:
++                        queue.extend(
++                            [p for p in point._pos_dict.keys()
++                             if p not in visited])
++            except (ValueError, AttributeError):
++                pass
+             raise ValueError('Velocity of point ' + self.name + ' has not been'
+                              ' defined in ReferenceFrame ' + frame.name)
+         return self._vel_dict[frame]

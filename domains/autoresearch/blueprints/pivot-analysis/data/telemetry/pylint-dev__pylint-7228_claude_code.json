@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 173.1,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 172017,
+    "duration_api_ms": 114421,
+    "num_turns": 27,
+    "result": "All three cases work correctly:\n1. Standard patterns still use `re.compile` (no change in behavior)\n2. Unicode property patterns (`\\p{Han}`) fall back to `regex` module\n3. Truly invalid patterns raise a proper `ArgumentTypeError` with a helpful message\n\nThe fix is correct. The adversarial review's concern about control flow was a false alarm - the `return _regex_module.compile(value)` statement exits before reaching the `raise` statement.\n\nHere's a summary of what was changed in `pylint/config/argument.py`:\n\n1. **Added optional import** of the `regex` module (falls back to `None` if not installed)\n2. **Added `_regexp_transformer` function** that tries `re.compile` first, and if it fails with `re.error`, attempts `regex.compile` as a fallback (when the `regex` package is installed). If both fail, raises `argparse.ArgumentTypeError` with a helpful message.\n3. **Updated `_TYPE_TRANSFORMERS`** to use `_regexp_transformer` instead of `re.compile`\n4. **Updated `_regexp_csv_transfomer`** to use `_regexp_transformer` instead of `re.compile`\n\nUsers who want Unicode property escape support (`\\p{Han}`, `\\p{L}`, etc.) can install the `regex` package, and pylint will automatically use it as a fallback.",
+    "stop_reason": "end_turn",
+    "session_id": "6a2eae8c-86b4-430d-a657-aa800a4bc1e3",
+    "total_cost_usd": 0.3978707999999999,
+    "usage": {
+      "input_tokens": 26,
+      "cache_creation_input_tokens": 30536,
+      "cache_read_input_tokens": 661626,
+      "output_tokens": 5653,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 30536
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 26,
+        "outputTokens": 5653,
+        "cacheReadInputTokens": 661626,
+        "cacheCreationInputTokens": 30536,
+        "webSearchRequests": 0,
+        "costUSD": 0.3978707999999999,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "f238a3ef-7feb-4b7d-9a13-1fd3a6c9f87a"
+  },
+  "stderr": ""
+}

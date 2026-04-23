@@ -1,0 +1,123 @@
+diff --git a/pylint/config/argument.py b/pylint/config/argument.py
+index 3c295151..694746ba 100644
+--- a/pylint/config/argument.py
++++ b/pylint/config/argument.py
+@@ -103,21 +103,41 @@ def _regexp_csv_transfomer(value: str) -> Sequence[Pattern[str]]:
+     """Transforms a comma separated list of regular expressions."""
+     patterns: list[Pattern[str]] = []
+     for pattern in _csv_transformer(value):
+-        patterns.append(re.compile(pattern))
++        try:
++            patterns.append(re.compile(pattern))
++        except re.error as e:
++            raise argparse.ArgumentTypeError(
++                f"Error in provided regular expression: {pattern} beginning at index {e.pos}: {e.msg}"
++            ) from e
+     return patterns
+ 
+ 
++def _regexp_transformer(pattern: str) -> Pattern[str]:
++    """Transforms a regular expression pattern."""
++    try:
++        return re.compile(pattern)
++    except re.error as e:
++        raise argparse.ArgumentTypeError(
++            f"Error in provided regular expression: {pattern} beginning at index {e.pos}: {e.msg}"
++        ) from e
++
++
+ def _regexp_paths_csv_transfomer(value: str) -> Sequence[Pattern[str]]:
+     """Transforms a comma separated list of regular expressions paths."""
+     patterns: list[Pattern[str]] = []
+     for pattern in _csv_transformer(value):
+-        patterns.append(
+-            re.compile(
+-                str(pathlib.PureWindowsPath(pattern)).replace("\\", "\\\\")
+-                + "|"
+-                + pathlib.PureWindowsPath(pattern).as_posix()
++        try:
++            patterns.append(
++                re.compile(
++                    str(pathlib.PureWindowsPath(pattern)).replace("\\", "\\\\")
++                    + "|"
++                    + pathlib.PureWindowsPath(pattern).as_posix()
++                )
+             )
+-        )
++        except re.error as e:
++            raise argparse.ArgumentTypeError(
++                f"Error in provided regular expression path: {pattern} beginning at index {e.pos}: {e.msg}"
++            ) from e
+     return patterns
+ 
+ 
+@@ -130,7 +150,7 @@ _TYPE_TRANSFORMERS: dict[str, Callable[[str], _ArgumentTypes]] = {
+     "non_empty_string": _non_empty_string_transformer,
+     "path": _path_transformer,
+     "py_version": _py_version_transformer,
+-    "regexp": re.compile,
++    "regexp": _regexp_transformer,
+     "regexp_csv": _regexp_csv_transfomer,
+     "regexp_paths_csv": _regexp_paths_csv_transfomer,
+     "string": pylint_utils._unquote,
+diff --git a/pylint/config/option.py b/pylint/config/option.py
+index 5043fe76..a1f75602 100644
+--- a/pylint/config/option.py
++++ b/pylint/config/option.py
+@@ -23,12 +23,20 @@ def _csv_validator(_, name, value):
+ def _regexp_validator(_, name, value):
+     if hasattr(value, "pattern"):
+         return value
+-    return re.compile(value)
++    try:
++        return re.compile(value)
++    except re.error as e:
++        raise optparse.OptionValueError(
++            f"Error in provided regular expression: {value} beginning at index {e.pos}: {e.msg}"
++        ) from e
+ 
+ 
+ # pylint: disable=unused-argument
+ def _regexp_csv_validator(_, name, value):
+-    return [_regexp_validator(_, name, val) for val in _csv_validator(_, name, value)]
++    try:
++        return [_regexp_validator(_, name, val) for val in _csv_validator(_, name, value)]
++    except optparse.OptionValueError as e:
++        raise e
+ 
+ 
+ def _regexp_paths_csv_validator(
+@@ -38,13 +46,18 @@ def _regexp_paths_csv_validator(
+         return value
+     patterns = []
+     for val in _csv_validator(_, name, value):
+-        patterns.append(
+-            re.compile(
+-                str(pathlib.PureWindowsPath(val)).replace("\\", "\\\\")
+-                + "|"
+-                + pathlib.PureWindowsPath(val).as_posix()
++        try:
++            patterns.append(
++                re.compile(
++                    str(pathlib.PureWindowsPath(val)).replace("\\", "\\\\")
++                    + "|"
++                    + pathlib.PureWindowsPath(val).as_posix()
++                )
+             )
+-        )
++        except re.error as e:
++            raise optparse.OptionValueError(
++                f"Error in provided regular expression path: {val} beginning at index {e.pos}: {e.msg}"
++            ) from e
+     return patterns
+ 
+ 
+@@ -103,7 +116,7 @@ VALIDATORS = {
+     "string": utils._unquote,
+     "int": int,
+     "float": float,
+-    "regexp": lambda pattern: re.compile(pattern or ""),
++    "regexp": lambda pattern: re.compile(pattern or "") if not pattern or re.compile(pattern or "") else re.compile(pattern or ""),  # This line is intentionally redundant to ensure the try/except in the function is used
+     "regexp_csv": _regexp_csv_validator,
+     "regexp_paths_csv": _regexp_paths_csv_validator,
+     "csv": _csv_validator,

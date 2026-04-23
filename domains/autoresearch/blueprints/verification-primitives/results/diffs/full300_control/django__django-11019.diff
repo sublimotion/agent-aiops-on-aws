@@ -1,0 +1,109 @@
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 02aa32b207..9662be9bf7 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -70,11 +70,99 @@ class Media:
+ 
+     @property
+     def _js(self):
+-        js = self._js_lists[0]
+-        # filter(None, ...) avoids calling merge() with empty lists.
+-        for obj in filter(None, self._js_lists[1:]):
+-            js = self.merge(js, obj)
+-        return js
++        # Merge all JS lists at once to avoid spurious
++        # MediaOrderConflictWarnings that arise from sequential pairwise
++        # merging, where intermediate results can introduce artificial ordering
++        # constraints not present in any of the original source lists.
++        # filter(None, ...) avoids including empty lists in the merge.
++        return self.merge_media_lists(
++            [js for js in self._js_lists if js]
++        )
++
++    @staticmethod
++    def merge_media_lists(lists):
++        """
++        Merge an arbitrary number of lists while trying to keep the relative
++        order of the elements. Warn if the lists have the same two elements in
++        a different relative order.
++
++        Unlike sequential pairwise merging, this merges all lists at once to
++        avoid spurious warnings from artificial ordering constraints introduced
++        by intermediate pairwise merge results.
++        """
++        # Collect all unique items, preserving first-seen order.
++        all_items = []
++        seen = set()
++        for lst in lists:
++            for item in lst:
++                if item not in seen:
++                    seen.add(item)
++                    all_items.append(item)
++
++        # Build a graph of ordering constraints from the original lists.
++        # An edge (a, b) means 'a must come before b'.
++        # Only add direct (adjacent) constraints; transitivity is implied.
++        # Use a dict mapping item -> set of items that must come after it.
++        successors = {item: [] for item in all_items}
++        in_degree = {item: 0 for item in all_items}
++
++        # Track all (a, b) pairs where a comes before b in some list.
++        before = set()
++        for lst in lists:
++            for i in range(len(lst)):
++                for j in range(i + 1, len(lst)):
++                    before.add((lst[i], lst[j]))
++
++        # Detect conflicts: (a, b) and (b, a) both in `before`.
++        warned = set()
++        for (a, b) in list(before):
++            if (b, a) in before and (b, a) not in warned:
++                warned.add((a, b))
++                warnings.warn(
++                    'Detected duplicate Media files in an opposite order:\n'
++                    '%s\n%s' % (a, b),
++                    MediaOrderConflictWarning,
++                )
++
++        # Build the DAG, skipping conflicting pairs (to break cycles).
++        for (a, b) in before:
++            if (b, a) not in before:
++                successors[a].append(b)
++                in_degree[b] += 1
++
++        # Kahn's topological sort; use original order to break ties.
++        queue = [item for item in all_items if in_degree[item] == 0]
++        result = []
++        while queue:
++            # Pick the first item in the queue (preserves first-seen ordering).
++            item = queue.pop(0)
++            result.append(item)
++            # Reduce in-degree for all successors.
++            new_zero = []
++            for successor in successors[item]:
++                in_degree[successor] -= 1
++                if in_degree[successor] == 0:
++                    new_zero.append(successor)
++            # Insert newly-available items into the queue in original order.
++            for new_item in new_zero:
++                # Find the right position to insert (sorted by all_items order).
++                new_pos = all_items.index(new_item)
++                inserted = False
++                for i, q_item in enumerate(queue):
++                    if all_items.index(q_item) > new_pos:
++                        queue.insert(i, new_item)
++                        inserted = True
++                        break
++                if not inserted:
++                    queue.append(new_item)
++
++        # Items not yet in result (due to cycle/conflicts) are appended in order.
++        result_set = set(result)
++        for item in all_items:
++            if item not in result_set:
++                result.append(item)
++
++        return result
+ 
+     def render(self):
+         return mark_safe('\n'.join(chain.from_iterable(getattr(self, 'render_' + name)() for name in MEDIA_TYPES)))

@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 119.0,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 117627,
+    "duration_api_ms": 89672,
+    "num_turns": 19,
+    "result": "The fix is correct. Here's the logic:\n\n- `constraint_kwargs` is `**`-unpacked into `_constraint_names()` at line 408\n- Original call: `{'index': True}` \u2192 finds all constraints where `index=True`, which includes both the plain index AND the unique constraint (unique constraints also have `index=True` in most databases)\n- Fixed call: `{'index': True, 'unique': False}` \u2192 filters to only constraints where `index=True AND unique=False`, which correctly returns only the plain (non-unique) index\n\nThis is a minimal, targeted fix that resolves the crash when `index_together` and `unique_together` share the same fields.",
+    "stop_reason": "end_turn",
+    "session_id": "9dbd709e-b404-45fe-95e5-cb7c14a77791",
+    "total_cost_usd": 0.23478539999999998,
+    "usage": {
+      "input_tokens": 19,
+      "cache_creation_input_tokens": 17642,
+      "cache_read_input_tokens": 372553,
+      "output_tokens": 3787,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 17642
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 19,
+        "outputTokens": 3787,
+        "cacheReadInputTokens": 372553,
+        "cacheCreationInputTokens": 17642,
+        "webSearchRequests": 0,
+        "costUSD": 0.23478539999999998,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "dfe1ac98-0e97-4cd9-8bc1-5fe7f49b0ccc"
+  },
+  "stderr": ""
+}

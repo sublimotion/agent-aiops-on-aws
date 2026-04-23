@@ -1,0 +1,76 @@
+diff --git a/src/_pytest/assertion/util.py b/src/_pytest/assertion/util.py
+index 762e5761..b7f56b88 100644
+--- a/src/_pytest/assertion/util.py
++++ b/src/_pytest/assertion/util.py
+@@ -82,13 +82,17 @@ def _format_lines(lines):
+ 
+ 
+ def issequence(x):
+-    return isinstance(x, Sequence) and not isinstance(x, str)
++    return isinstance(x, Sequence) and not isinstance(x, (str, bytes))
+ 
+ 
+ def istext(x):
+     return isinstance(x, str)
+ 
+ 
++def isbytes(x):
++    return isinstance(x, bytes)
++
++
+ def isdict(x):
+     return isinstance(x, dict)
+ 
+@@ -108,7 +112,7 @@ def isattrs(obj):
+ def isiterable(obj):
+     try:
+         iter(obj)
+-        return not istext(obj)
++        return not istext(obj) and not isbytes(obj)
+     except TypeError:
+         return False
+ 
+@@ -127,6 +131,8 @@ def assertrepr_compare(config, op, left, right):
+         if op == "==":
+             if istext(left) and istext(right):
+                 explanation = _diff_text(left, right, verbose)
++            elif isbytes(left) and isbytes(right):
++                explanation = _diff_text(left, right, verbose)
+             else:
+                 if issequence(left) and issequence(right):
+                     explanation = _compare_eq_sequence(left, right, verbose)
+diff --git a/testing/test_assertion.py b/testing/test_assertion.py
+index f58d240a..30998423 100644
+--- a/testing/test_assertion.py
++++ b/testing/test_assertion.py
+@@ -332,24 +332,22 @@ class TestAssert_reprcompare:
+         assert "+ eggs" in diff
+ 
+     def test_bytes_diff_normal(self):
+-        """Check special handling for bytes diff (#5260)"""
++        """Check special handling for bytes diff (#5495)"""
+         diff = callequal(b"spam", b"eggs")
+ 
+         assert diff == [
+             "b'spam' == b'eggs'",
+-            "At index 0 diff: b's' != b'e'",
+-            "Use -v to get the full diff",
++            "- 'spam",
++            "+ 'eggs",
+         ]
+ 
+     def test_bytes_diff_verbose(self):
+-        """Check special handling for bytes diff (#5260)"""
++        """Check special handling for bytes diff (#5495)"""
+         diff = callequal(b"spam", b"eggs", verbose=True)
+         assert diff == [
+             "b'spam' == b'eggs'",
+-            "At index 0 diff: b's' != b'e'",
+-            "Full diff:",
+-            "- b'spam'",
+-            "+ b'eggs'",
++            "- 'spam",
++            "+ 'eggs",
+         ]
+ 
+     def test_list(self):

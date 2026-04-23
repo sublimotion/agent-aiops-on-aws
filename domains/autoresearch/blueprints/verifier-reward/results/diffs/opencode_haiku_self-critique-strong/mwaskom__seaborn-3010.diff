@@ -1,0 +1,41 @@
+diff --git a/seaborn/_stats/regression.py b/seaborn/_stats/regression.py
+index 7b7ddc8d..bb42aaeb 100644
+--- a/seaborn/_stats/regression.py
++++ b/seaborn/_stats/regression.py
+@@ -12,6 +12,7 @@ class PolyFit(Stat):
+     """
+     Fit a polynomial of the given order and resample data onto predicted curve.
+     """
++
+     # This is a provisional class that is useful for building out functionality.
+     # It may or may not change substantially in form or dissappear as we think
+     # through the organization of the stats subpackage.
+@@ -20,9 +21,14 @@ class PolyFit(Stat):
+     gridsize: int = 100
+ 
+     def _fit_predict(self, data):
+-
+         x = data["x"]
+         y = data["y"]
++
++        # Remove missing values
++        valid = ~(x.isna() | y.isna())
++        x = x[valid]
++        y = y[valid]
++
+         if x.nunique() <= self.order:
+             # TODO warn?
+             xx = yy = []
+@@ -37,11 +43,8 @@ class PolyFit(Stat):
+     # and then only define __call__ on a base-class of stats with this pattern
+ 
+     def __call__(self, data, groupby, orient, scales):
+-
+         return groupby.apply(data, self._fit_predict)
+ 
+ 
+ @dataclass
+-class OLSFit(Stat):
+-
+-    ...
++class OLSFit(Stat): ...

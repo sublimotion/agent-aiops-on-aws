@@ -1,0 +1,53 @@
+diff --git a/seaborn/_oldcore.py b/seaborn/_oldcore.py
+index c9218c1f..3f3dfe13 100644
+--- a/seaborn/_oldcore.py
++++ b/seaborn/_oldcore.py
+@@ -1093,7 +1093,11 @@ class VectorPlotter:
+                 parts = []
+                 grouped = self.plot_data[var].groupby(self.converters[var], sort=False)
+                 for converter, orig in grouped:
+-                    with pd.option_context('mode.use_inf_as_null', True):
++                    # Handle pandas version compatibility
++                    try:
++                        with pd.option_context('mode.use_inf_as_null', True):
++                            orig = orig.dropna()
++                    except Exception:
+                         orig = orig.dropna()
+                         if var in self.var_levels:
+                             # TODO this should happen in some centralized location
+diff --git a/seaborn/axisgrid.py b/seaborn/axisgrid.py
+index 8526f44b..246b7c8e 100644
+--- a/seaborn/axisgrid.py
++++ b/seaborn/axisgrid.py
+@@ -1564,6 +1564,14 @@ class PairGrid(Grid):
+             hue = None
+         else:
+             hue = data.get(self._hue_var)
++            # Filter out values not in hue_order
++            if self._hue_order is not None:
++                # Create a mask for values in hue_order
++                mask = hue.isin(self._hue_order)
++                # Apply the mask to all series using their common index
++                hue = hue[mask]
++                x = x[mask]
++                y = y[mask]
+ 
+         if "hue" not in kwargs:
+             kwargs.update({
+diff --git a/seaborn/cm.py b/seaborn/cm.py
+index 4e39fe7a..ac088bcd 100644
+--- a/seaborn/cm.py
++++ b/seaborn/cm.py
+@@ -1579,7 +1579,9 @@ for _name, _lut in _lut_dict.items():
+     _cmap_r = colors.ListedColormap(_lut[::-1], _name + "_r")  
+     locals()[_name + "_r"] = _cmap_r
+ 
+-    mpl_cm.register_cmap(_name, _cmap)
+-    mpl_cm.register_cmap(_name + "_r", _cmap_r)
++    # Register cmaps if available (matplotlib >= 1.5)
++    if hasattr(mpl_cm, 'register_cmap'):
++        mpl_cm.register_cmap(_name, _cmap)
++        mpl_cm.register_cmap(_name + "_r", _cmap_r)
+ 
+ del colors, mpl_cm
+\ No newline at end of file

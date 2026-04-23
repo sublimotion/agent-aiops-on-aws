@@ -1,0 +1,29 @@
+diff --git a/seaborn/axisgrid.py b/seaborn/axisgrid.py
+index 75349099..6cd07dbb 100644
+--- a/seaborn/axisgrid.py
++++ b/seaborn/axisgrid.py
+@@ -1241,6 +1241,11 @@ class PairGrid(Grid):
+ 
+         super().__init__()
+ 
++        # Flatten MultiIndex columns to avoid KeyErrors when indexing by column name
++        if isinstance(data.columns, pd.MultiIndex):
++            data = data.copy()
++            data.columns = ["_".join(map(str, col)) for col in data.columns]
++
+         # Sort out the variables that define the grid
+         numeric_cols = self._find_numeric_cols(data)
+         if hue in numeric_cols:
+diff --git a/tests/test_axisgrid.py b/tests/test_axisgrid.py
+index c7e11610..c01035d7 100644
+--- a/tests/test_axisgrid.py
++++ b/tests/test_axisgrid.py
+@@ -1427,7 +1427,7 @@ class TestPairGrid:
+         cols = pd.MultiIndex.from_arrays([["x", "y"], [1, 2]])
+         df = self.df[["x", "y"]].set_axis(cols, axis=1)
+         g = ag.pairplot(df)
+-        assert g.diag_vars == list(cols)
++        assert g.diag_vars == ["x_1", "y_2"]
+ 
+     def test_corner_despine(self):
+ 

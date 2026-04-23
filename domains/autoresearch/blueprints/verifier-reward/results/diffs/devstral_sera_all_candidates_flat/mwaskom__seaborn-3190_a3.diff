@@ -1,0 +1,14 @@
+diff --git a/seaborn/_core/scales.py b/seaborn/_core/scales.py
+index 6c9ecbc9..3b982a78 100644
+--- a/seaborn/_core/scales.py
++++ b/seaborn/_core/scales.py
+@@ -346,6 +346,9 @@ class ContinuousBase(Scale):
+                 vmin, vmax = data.min(), data.max()
+             else:
+                 vmin, vmax = new.norm
++            # Convert boolean values to numeric (0/1) before scaling
++            if data.dtype == bool:
++                vmin, vmax = float(vmin), float(vmax)
+             vmin, vmax = axis.convert_units((vmin, vmax))
+             a = forward(vmin)
+             b = forward(vmax) - forward(vmin)

@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: stage-weights
+  namespace: default
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    sagemaker.amazonaws.com/node-health-status: Schedulable
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  containers:
+    - name: downloader
+      image: python:3.11-slim
+      command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          pip install -q huggingface_hub hf_transfer
+          export HF_HUB_ENABLE_HF_TRANSFER=1
+          export PATH="/usr/local/bin:$PATH"
+
+          echo "=== Downloading Mistral-Small-4-119B-2603 (FP8, ~119GB) ==="
+          if [ -f /models/Mistral-Small-4-119B-2603/config.json ]; then
+            echo "Already downloaded, skipping"
+          else
+            python3 -c "
+          from huggingface_hub import snapshot_download
+          snapshot_download('mistralai/Mistral-Small-4-119B-2603',
+                           local_dir='/models/Mistral-Small-4-119B-2603')
+          "
+          fi
+          echo "=== Mistral SM4 done ==="
+          du -sh /models/Mistral-Small-4-119B-2603/
+
+          echo "=== All downloads complete ==="
+          ls -la /models/
+          echo "Pod will exit now"
+      env: []
+      volumeMounts:
+        - name: model-store
+          mountPath: /models
+      resources:
+        requests:
+          cpu: "4"
+          memory: 8Gi
+  volumes:
+    - name: model-store
+      hostPath:
+        path: /opt/dlami/nvme/models
+        type: DirectoryOrCreate

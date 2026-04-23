@@ -1,0 +1,42 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 7649c39262..d6b9a82ca3 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -32,6 +32,8 @@ class SQLCompiler:
+         self.select = None
+         self.annotation_col_map = None
+         self.klass_info = None
++        # Match the entire SQL expression up to the ASC/DESC keyword
++        # Match the entire SQL expression up to the ASC/DESC keyword
+         self.ordering_parts = re.compile(r'(.*)\s(ASC|DESC)(.*)')
+         self._meta_ordering = None
+ 
+@@ -353,12 +355,22 @@ class SQLCompiler:
+             # not taken into account so we strip it. When this entire method
+             # is refactored into expressions, then we can check each part as we
+             # generate it.
+-            without_ordering = self.ordering_parts.search(sql).group(1)
+-            params_hash = make_hashable(params)
+-            if (without_ordering, params_hash) in seen:
+-                continue
+-            seen.add((without_ordering, params_hash))
+-            result.append((resolved, (sql, params, is_ref)))
++            match = self.ordering_parts.search(sql)
++            if match:
++                without_ordering = match.group(1)
++                # For RawSQL expressions, use the entire SQL as the key to preserve
++                # the user's ordering and prevent false duplicates due to identical
++                # last lines
++                if isinstance(resolved, RawSQL):
++                    key = sql
++                else:
++                    # For regular expressions, normalize whitespace
++                    key = ' '.join(without_ordering.split())
++                params_hash = make_hashable(params)
++                if (key, params_hash) in seen:
++                    continue
++                seen.add((key, params_hash))
++                result.append((resolved, (sql, params, is_ref)))
+         return result
+ 
+     def get_extra_select(self, order_by, select):

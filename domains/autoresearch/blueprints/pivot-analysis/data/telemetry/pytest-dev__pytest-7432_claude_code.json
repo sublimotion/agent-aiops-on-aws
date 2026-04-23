@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 120.5,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 119396,
+    "duration_api_ms": 97715,
+    "num_turns": 17,
+    "result": "The fix is minimal and correct. Here's the summary:\n\n**Root cause**: In `pytest_runtest_makereport` (`src/_pytest/skipping.py`), the block that fixes skip location reporting was an `elif` chained after `elif item.config.option.runxfail: pass`. When `--runxfail` was active, the `pass` branch was taken and all subsequent `elif` blocks were skipped, including the one that fixes the skip location to point to the test item instead of pytest internals.\n\n**Fix**: Changed `elif (item._store.get(skipped_by_mark_key, True) and rep.skipped ...)` to `if (...)`, making it an independent check that always runs regardless of the `--runxfail` flag. The existing guards (`rep.skipped` and `type(rep.longrepr) is tuple`) ensure it only fires for genuine skip-by-mark reports, not xfail reports.",
+    "stop_reason": "end_turn",
+    "session_id": "8038ac60-71d1-4d95-86c9-17594a2755fb",
+    "total_cost_usd": 0.2935563,
+    "usage": {
+      "input_tokens": 18,
+      "cache_creation_input_tokens": 24518,
+      "cache_read_input_tokens": 418166,
+      "output_tokens": 5074,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 24518
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 18,
+        "outputTokens": 5074,
+        "cacheReadInputTokens": 418166,
+        "cacheCreationInputTokens": 24518,
+        "webSearchRequests": 0,
+        "costUSD": 0.2935563,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "24a6d4ca-7360-4c8f-9feb-514178aaf0db"
+  },
+  "stderr": ""
+}

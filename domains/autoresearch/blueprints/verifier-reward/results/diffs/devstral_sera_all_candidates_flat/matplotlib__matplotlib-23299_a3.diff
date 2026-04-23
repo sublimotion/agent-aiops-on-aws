@@ -1,0 +1,74 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index c268a56724..ce747ef84d 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -673,15 +673,51 @@ class RcParams(MutableMapping, dict):
+         elif key == "backend" and self is globals().get("rcParams"):
+             val = dict.__getitem__(self, key)
+             if val is rcsetup._auto_backend_sentinel:
+-                from matplotlib import pyplot as plt
+-                plt.switch_backend(rcsetup._auto_backend_sentinel)
++                # Only resolve the backend if we're not just reading it
++                import inspect
++                frame = inspect.currentframe()
++                try:
++                    caller = inspect.getouterframes(frame)
++                    # Check if we're being called from get_backend()
++                    is_get_backend_call = any(
++                        frame.function == 'get_backend' 
++                        or (frame.function == '__getitem__' and 
++                            any(f.function == 'get_backend' for f in caller[1:]))
++                        for frame in caller[1:5]  # Look up to 5 frames up
++                    )
++                    if not is_get_backend_call:
++                        from matplotlib import pyplot as plt
++                        plt.switch_backend(rcsetup._auto_backend_sentinel)
++                finally:
++                    del frame
+ 
+         return dict.__getitem__(self, key)
+ 
+     def _get_backend_or_none(self):
+         """Get the requested backend, if any, without triggering resolution."""
+         backend = dict.__getitem__(self, "backend")
+-        return None if backend is rcsetup._auto_backend_sentinel else backend
++        if backend is rcsetup._auto_backend_sentinel:
++            # Only resolve the backend if we're not just reading it
++            import inspect
++            frame = inspect.currentframe()
++            try:
++                caller = inspect.getouterframes(frame)
++                # Check if we're being called from get_backend()
++                is_get_backend_call = any(
++                    frame.function == 'get_backend' 
++                    or (frame.function == '_get_backend_or_none' and 
++                        any(f.function == 'get_backend' for f in caller[1:]))
++                    for frame in caller[1:5]  # Look up to 5 frames up
++                )
++                if not is_get_backend_call:
++                    from matplotlib import pyplot as plt
++                    plt.switch_backend(rcsetup._auto_backend_sentinel)
++                    backend = dict.__getitem__(self, "backend")  # Get the resolved backend
++                else:
++                    return None
++            finally:
++                del frame
++        return backend
+ 
+     def __repr__(self):
+         class_name = self.__class__.__name__
+@@ -1175,7 +1211,13 @@ def get_backend():
+     --------
+     matplotlib.use
+     """
+-    return rcParams['backend']
++    # Use direct dictionary access to avoid triggering backend resolution
++    backend = dict.__getitem__(rcParams, 'backend')
++    if backend is rcsetup._auto_backend_sentinel:
++        from matplotlib import pyplot as plt
++        plt.switch_backend(rcsetup._auto_backend_sentinel)
++        backend = dict.__getitem__(rcParams, 'backend')  # Get the resolved backend
++    return backend
+ 
+ 
+ def interactive(b):

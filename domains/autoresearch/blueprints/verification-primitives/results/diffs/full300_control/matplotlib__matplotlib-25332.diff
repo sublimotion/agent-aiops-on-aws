@@ -1,0 +1,33 @@
+diff --git a/lib/matplotlib/cbook.py b/lib/matplotlib/cbook.py
+index c9699b2e21..2ab6d20f8a 100644
+--- a/lib/matplotlib/cbook.py
++++ b/lib/matplotlib/cbook.py
+@@ -788,6 +788,28 @@ class Grouper:
+     def __init__(self, init=()):
+         self._mapping = {weakref.ref(x): [weakref.ref(x)] for x in init}
+ 
++    def __getstate__(self):
++        return {'_mapping': {
++            x(): [y() for y in siblings]
++            for x, siblings in self._mapping.items()
++        }}
++
++    def __setstate__(self, state):
++        mapping = state['_mapping']
++        # Reconstruct the _mapping dict, preserving the shared list structure.
++        # The original mapping values (sibling lists) are shared between
++        # entries; we need to re-create these shared lists properly.
++        id_to_new_list = {}
++        self._mapping = {}
++        for x, siblings in mapping.items():
++            # Use the id of the original (deserialized) list to track
++            # which entries share a sibling list.
++            siblings_id = id(siblings)
++            if siblings_id not in id_to_new_list:
++                id_to_new_list[siblings_id] = [weakref.ref(s) for s in siblings
++                                                if s is not None]
++            self._mapping[weakref.ref(x)] = id_to_new_list[siblings_id]
++
+     def __contains__(self, item):
+         return weakref.ref(item) in self._mapping
+ 

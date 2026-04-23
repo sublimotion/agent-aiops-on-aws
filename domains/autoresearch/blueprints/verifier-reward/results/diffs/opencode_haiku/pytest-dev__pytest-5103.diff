@@ -1,0 +1,112 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b899..5ef5839b 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -1,4 +1,5 @@
+ """Rewrite assertion AST to produce nice error messages"""
++
+ from __future__ import absolute_import
+ from __future__ import division
+ from __future__ import print_function
+@@ -334,8 +335,7 @@ class AssertionRewritingHook(object):
+         pkg_resources.register_loader_type(cls, pkg_resources.DefaultProvider)
+ 
+     def get_data(self, pathname):
+-        """Optional PEP302 get_data API.
+-        """
++        """Optional PEP302 get_data API."""
+         with open(pathname, "rb") as f:
+             return f.read()
+ 
+@@ -483,11 +483,11 @@ def _saferepr(obj):
+     # only occurs in python2.x, repr must return text in python3+
+     if isinstance(r, bytes):
+         # Represent unprintable bytes as `\x##`
+-        r = u"".join(
+-            u"\\x{:x}".format(ord(c)) if c not in string.printable else c.decode()
++        r = "".join(
++            "\\x{:x}".format(ord(c)) if c not in string.printable else c.decode()
+             for c in r
+         )
+-    return r.replace(u"\n", u"\\n")
++    return r.replace("\n", "\\n")
+ 
+ 
+ def _format_assertmsg(obj):
+@@ -502,10 +502,10 @@ def _format_assertmsg(obj):
+     # contains a newline it gets escaped, however if an object has a
+     # .__repr__() which contains newlines it does not get escaped.
+     # However in either case we want to preserve the newline.
+-    replaces = [(u"\n", u"\n~"), (u"%", u"%%")]
++    replaces = [("\n", "\n~"), ("%", "%%")]
+     if not isinstance(obj, six.string_types):
+         obj = saferepr(obj)
+-        replaces.append((u"\\n", u"\n~"))
++        replaces.append(("\\n", "\n~"))
+ 
+     if isinstance(obj, bytes):
+         replaces = [(r1.encode(), r2.encode()) for r1, r2 in replaces]
+@@ -529,7 +529,7 @@ def _should_repr_global_name(obj):
+ def _format_boolop(explanations, is_or):
+     explanation = "(" + (is_or and " or " or " and ").join(explanations) + ")"
+     if isinstance(explanation, six.text_type):
+-        return explanation.replace(u"%", u"%%")
++        return explanation.replace("%", "%%")
+     else:
+         return explanation.replace(b"%", b"%%")
+ 
+@@ -899,9 +899,7 @@ warn_explicit(
+     filename={filename!r},
+     lineno={lineno},
+ )
+-            """.format(
+-                filename=module_path.strpath, lineno=lineno
+-            )
++            """.format(filename=module_path.strpath, lineno=lineno)
+         ).body
+         return ast.If(val_is_none, send_warning, [])
+ 
+@@ -964,10 +962,26 @@ warn_explicit(
+         res = self.assign(ast.BinOp(left_expr, binop.op, right_expr))
+         return res, explanation
+ 
++    def _should_rewrite_all_any(self, call):
++        """Check if we should rewrite all/any call for better error messages."""
++        if len(call.args) != 1 or call.keywords:
++            return False
++        if not isinstance(call.func, ast.Name):
++            return False
++        return call.func.id in ("all", "any")
++
+     def visit_Call_35(self, call):
+         """
+         visit `ast.Call` nodes on Python3.5 and after
+         """
++        # Handle all/any with generator expressions by converting to list
++        if self._should_rewrite_all_any(call):
++            arg = call.args[0]
++            if isinstance(arg, ast.GeneratorExp):
++                # Convert generator expression to list comprehension
++                list_comp = ast.ListComp(arg.elt, arg.generators)
++                call = ast.Call(call.func, [list_comp], call.keywords)
++
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []
+@@ -1001,6 +1015,16 @@ warn_explicit(
+         """
+         visit `ast.Call nodes on 3.4 and below`
+         """
++        # Handle all/any with generator expressions by converting to list
++        if self._should_rewrite_all_any(call):
++            arg = call.args[0]
++            if isinstance(arg, ast.GeneratorExp):
++                # Convert generator expression to list comprehension
++                list_comp = ast.ListComp(arg.elt, arg.generators)
++                call = ast.Call(
++                    call.func, [list_comp], call.keywords, call.starargs, call.kwargs
++                )
++
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []

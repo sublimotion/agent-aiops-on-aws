@@ -1,0 +1,26 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index b657a35cf7..896a21e9a6 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -106,7 +106,11 @@ from packaging.version import parse as parse_version
+ 
+ # cbook must import matplotlib only within function
+ # definitions, so it is safe to import from it here.
+-from . import _api, _version, cbook, docstring, rcsetup
++from . import _api, cbook, docstring, rcsetup
++import _version
++
++# Expose version_info tuple for easy version comparison
++__version_info__ = _version.version_tuple
+ from matplotlib.cbook import MatplotlibDeprecationWarning, sanitize_sequence
+ from matplotlib.cbook import mplDeprecation  # deprecated
+ from matplotlib.rcsetup import validate_backend, cycler
+@@ -148,6 +152,8 @@ def __getattr__(name):
+         else:  # Get the version from the _version.py setuptools_scm file.
+             __version__ = _version.version
+         return __version__
++    elif name == "__version_info__":
++        return _version.version_tuple
+     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+ 
+ 

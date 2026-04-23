@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 75.6,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 74474,
+    "duration_api_ms": 50697,
+    "num_turns": 17,
+    "result": "The fix scores 1.0 across all axes. Here's what was done:\n\n1. Extracted the inline dict construction `{'id': str(getattr(obj, to_field_name)), 'text': str(obj)}` into a new `serialize_result(self, obj, to_field_name)` method\n2. Updated `get()` to call `self.serialize_result(obj, to_field_name)` instead\n\nNow subclasses can override just `serialize_result()` to add extra fields without needing to duplicate the entire `get()` method:\n\n```python\nclass CustomAutocompleteJsonView(AutocompleteJsonView):\n    def serialize_result(self, obj, to_field_name):\n        return super().serialize_result(obj, to_field_name) | {'notes': obj.notes}\n```",
+    "stop_reason": "end_turn",
+    "session_id": "c3fffce8-62d3-41a5-bb8c-66c88171a246",
+    "total_cost_usd": 0.18388845,
+    "usage": {
+      "input_tokens": 84,
+      "cache_creation_input_tokens": 15185,
+      "cache_read_input_tokens": 319209,
+      "output_tokens": 2062,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 15185
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 84,
+        "outputTokens": 2062,
+        "cacheReadInputTokens": 319209,
+        "cacheCreationInputTokens": 15185,
+        "webSearchRequests": 0,
+        "costUSD": 0.18388845,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "67d804ab-321c-47ed-bf23-7ece140c7f1a"
+  },
+  "stderr": ""
+}

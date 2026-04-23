@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 125.2,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 123904,
+    "duration_api_ms": 92667,
+    "num_turns": 23,
+    "result": "All 9 tests pass (7 original + 2 new). The fix is complete.\n\n**Summary of changes:**\n\n1. **`django/core/checks/translation.py`**: Modified `check_language_settings_consistent` to also check if the base language (part before `-`) is in `available_tags` before raising `E004`. Now `LANGUAGE_CODE = \"de-at\"` won't raise an error when `de` is in `LANGUAGES`, matching Django's documented fallback behavior.\n\n2. **`tests/check_framework/test_translation.py`**: Added two tests:\n   - `test_sublanguage_with_base_language_available`: verifies `de-at` is valid when `de` is in LANGUAGES\n   - `test_sublanguage_without_base_language`: verifies `E004` is still raised when neither `de-at` nor `de` are in LANGUAGES",
+    "stop_reason": "end_turn",
+    "session_id": "2482d1fb-36b7-493e-a036-70b3a2714b14",
+    "total_cost_usd": 0.26294775000000004,
+    "usage": {
+      "input_tokens": 87,
+      "cache_creation_input_tokens": 20473,
+      "cache_read_input_tokens": 423810,
+      "output_tokens": 3918,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 20473
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 87,
+        "outputTokens": 3918,
+        "cacheReadInputTokens": 423810,
+        "cacheCreationInputTokens": 20473,
+        "webSearchRequests": 0,
+        "costUSD": 0.26294775000000004,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "30775911-aabe-4c06-b24c-cf3a2f6808c7"
+  },
+  "stderr": ""
+}

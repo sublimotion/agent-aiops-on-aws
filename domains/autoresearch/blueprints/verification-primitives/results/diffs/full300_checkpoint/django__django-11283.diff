@@ -1,0 +1,40 @@
+diff --git a/django/contrib/auth/migrations/0011_update_proxy_permissions.py b/django/contrib/auth/migrations/0011_update_proxy_permissions.py
+index 0e66649695..74220bbf69 100644
+--- a/django/contrib/auth/migrations/0011_update_proxy_permissions.py
++++ b/django/contrib/auth/migrations/0011_update_proxy_permissions.py
+@@ -24,10 +24,33 @@ def update_proxy_model_permissions(apps, schema_editor, reverse=False):
+         proxy_content_type = ContentType.objects.get_for_model(Model, for_concrete_model=False)
+         old_content_type = proxy_content_type if reverse else concrete_content_type
+         new_content_type = concrete_content_type if reverse else proxy_content_type
+-        Permission.objects.filter(
++        # Collect the codenames of permissions that already exist with the
++        # new_content_type, to avoid IntegrityError on update.
++        old_permissions = Permission.objects.filter(
+             permissions_query,
+             content_type=old_content_type,
+-        ).update(content_type=new_content_type)
++        )
++        new_permissions_codenames = set(
++            Permission.objects.filter(
++                permissions_query,
++                content_type=new_content_type,
++            ).values_list('codename', flat=True)
++        )
++        # If a permission already exists with the new content type, print a
++        # warning and delete the old one to avoid a duplicate key IntegrityError.
++        if new_permissions_codenames:
++            print(
++                "A problem arose migrating proxy model permissions for '%s.%s'.\n"
++                "During the migration, the permissions for the '%s' model could "
++                "not be updated. Please manually ensure that the correct "
++                "permissions exist." % (
++                    opts.app_label, opts.model_name, opts.model_name,
++                )
++            )
++            old_permissions.filter(codename__in=new_permissions_codenames).delete()
++        old_permissions.exclude(codename__in=new_permissions_codenames).update(
++            content_type=new_content_type,
++        )
+ 
+ 
+ def revert_proxy_model_permissions(apps, schema_editor):

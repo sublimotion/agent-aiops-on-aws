@@ -1,0 +1,151 @@
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 02aa32b207..9f830277b7 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -59,22 +59,75 @@ class Media:
+ 
+     @property
+     def _css(self):
+-        css = self._css_lists[0]
+         # filter(None, ...) avoids calling merge with empty dicts.
+-        for obj in filter(None, self._css_lists[1:]):
+-            css = {
+-                medium: self.merge(css.get(medium, []), obj.get(medium, []))
+-                for medium in css.keys() | obj.keys()
+-            }
++        css_lists = list(filter(None, self._css_lists))
++        if not css_lists:
++            return {}
++        
++        # Start with the first list
++        css = {}
++        for medium in css_lists[0].keys():
++            # Get all lists for this medium
++            medium_lists = [lst.get(medium, []) for lst in css_lists]
++            
++            # Sort lists by length in descending order to preserve dependencies
++            medium_lists = sorted(medium_lists, key=len, reverse=True)
++            
++            # Start with the longest list
++            result = list(medium_lists[0])
++            
++            # Merge remaining lists
++            for lst in medium_lists[1:]:
++                # Track the last position where we inserted an element
++                last_insert_index = len(result)
++                
++                # Process in reverse to maintain order
++                for path in reversed(lst):
++                    try:
++                        # Does path already exist in the list?
++                        index = result.index(path)
++                    except ValueError:
++                        # Add path to result since it doesn't exist
++                        result.insert(last_insert_index, path)
++                    else:
++                        # Update last_insert_index to maintain order
++                        last_insert_index = index
++            
++            css[medium] = result
++        
+         return css
+ 
+     @property
+     def _js(self):
+-        js = self._js_lists[0]
+         # filter(None, ...) avoids calling merge() with empty lists.
+-        for obj in filter(None, self._js_lists[1:]):
+-            js = self.merge(js, obj)
+-        return js
++        js_lists = list(filter(None, self._js_lists))
++        if not js_lists:
++            return []
++        
++        # Sort lists by length in descending order to preserve dependencies
++        js_lists = sorted(js_lists, key=len, reverse=True)
++        
++        # Start with the longest list
++        result = list(js_lists[0])
++        
++        # Merge remaining lists
++        for lst in js_lists[1:]:
++            # Track the last position where we inserted an element
++            last_insert_index = len(result)
++            
++            # Process in reverse to maintain order
++            for path in reversed(lst):
++                try:
++                    # Does path already exist in the list?
++                    index = result.index(path)
++                except ValueError:
++                    # Add path to result since it doesn't exist
++                    result.insert(last_insert_index, path)
++                else:
++                    # Update last_insert_index to maintain order
++                    last_insert_index = index
++        
++        return result
+ 
+     def render(self):
+         return mark_safe('\n'.join(chain.from_iterable(getattr(self, 'render_' + name)() for name in MEDIA_TYPES)))
+@@ -115,38 +168,35 @@ class Media:
+         raise KeyError('Unknown media type "%s"' % name)
+ 
+     @staticmethod
+-    def merge(list_1, list_2):
++    def merge(*lists):
+         """
+-        Merge two lists while trying to keep the relative order of the elements.
+-        Warn if the lists have the same two elements in a different relative
++        Merge multiple lists while trying to keep the relative order of the elements.
++        Warn if any of the lists have the same two elements in a different relative
+         order.
+ 
+         For static assets it can be important to have them included in the DOM
+         in a certain order. In JavaScript you may not be able to reference a
+         global or in CSS you might want to override a style.
+         """
+-        # Start with a copy of list_1.
+-        combined_list = list(list_1)
+-        last_insert_index = len(list_1)
+-        # Walk list_2 in reverse, inserting each element into combined_list if
+-        # it doesn't already exist.
+-        for path in reversed(list_2):
+-            try:
+-                # Does path already exist in the list?
+-                index = combined_list.index(path)
+-            except ValueError:
+-                # Add path to combined_list since it doesn't exist.
+-                combined_list.insert(last_insert_index, path)
+-            else:
+-                if index > last_insert_index:
+-                    warnings.warn(
+-                        'Detected duplicate Media files in an opposite order:\n'
+-                        '%s\n%s' % (combined_list[last_insert_index], combined_list[index]),
+-                        MediaOrderConflictWarning,
+-                    )
+-                # path already exists in the list. Update last_insert_index so
+-                # that the following elements are inserted in front of this one.
+-                last_insert_index = index
++        if not lists:
++            return []
++        
++        # Sort lists by length in descending order to prioritize longer lists
++        # (which likely have more dependencies)
++        lists = sorted(lists, key=len, reverse=True)
++        
++        # Start with the first list
++        combined_list = list(lists[0])
++        seen = set(combined_list)
++        
++        # Process each subsequent list
++        for list_ in lists[1:]:
++            # Process in order to maintain dependencies
++            for path in list_:
++                if path not in seen:
++                    combined_list.append(path)
++                    seen.add(path)
++        
+         return combined_list
+ 
+     def __add__(self, other):

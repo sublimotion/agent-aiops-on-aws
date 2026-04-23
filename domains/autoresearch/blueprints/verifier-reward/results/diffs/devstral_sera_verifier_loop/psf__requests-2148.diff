@@ -1,0 +1,99 @@
+diff --git a/requests/compat.py b/requests/compat.py
+index 84d703b6..2fdcfcc3 100644
+--- a/requests/compat.py
++++ b/requests/compat.py
+@@ -6,6 +6,7 @@ pythoncompat
+ 
+ from .packages import chardet
+ 
++import socket
+ import sys
+ 
+ # -------
+diff --git a/requests/models.py b/requests/models.py
+index 0dc55568..29fc3dd2 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -30,6 +30,7 @@ from .utils import (
+ from .compat import (
+     cookielib, urlunparse, urlsplit, urlencode, str, bytes, StringIO,
+     is_py2, chardet, json, builtin_str, basestring, IncompleteRead)
++import socket
+ from .status_codes import codes
+ 
+ #: The set of HTTP status codes that indicate an automatically
+@@ -630,25 +631,56 @@ class Response(object):
+         If decode_unicode is True, content will be decoded using the best
+         available encoding based on the response.
+         """
+-        def generate():
+-            try:
+-                # Special case for urllib3.
++        class ContentIterator(object):
++            def __init__(self, response, chunk_size, decode_unicode):
++                self.response = response
++                self.chunk_size = chunk_size
++                self.decode_unicode = decode_unicode
++                self._content_consumed = False
++                self._exhausted = False
++                self._chunk = None
++
++            def __iter__(self):
++                return self
++
++            def __next__(self):
++                if self._exhausted:
++                    raise StopIteration
++
+                 try:
+-                    for chunk in self.raw.stream(chunk_size, decode_content=True):
+-                        yield chunk
+-                except IncompleteRead as e:
+-                    raise ChunkedEncodingError(e)
+-                except DecodeError as e:
+-                    raise ContentDecodingError(e)
+-            except AttributeError:
+-                # Standard file-like object.
+-                while True:
+-                    chunk = self.raw.read(chunk_size)
+-                    if not chunk:
+-                        break
+-                    yield chunk
+-
+-            self._content_consumed = True
++                    if hasattr(self.response.raw, 'stream'):
++                        # Special case for urllib3.
++                        try:
++                            if self._chunk is None:
++                                self._chunk = next(self.response.raw.stream(self.chunk_size, decode_content=True))
++                            chunk = self._chunk
++                            self._chunk = None
++                            return chunk
++                        except IncompleteRead as e:
++                            raise ChunkedEncodingError(e)
++                        except DecodeError as e:
++                            raise ContentDecodingError(e)
++                        except (socket.error, OSError) as e:
++                            raise ConnectionError(e)
++                        except StopIteration:
++                            self._exhausted = True
++                            return self.__next__()
++                    else:
++                        # Standard file-like object.
++                        chunk = self.response.raw.read(self.chunk_size)
++                        if not chunk:
++                            self._exhausted = True
++                            raise StopIteration
++                        return chunk
++                except Exception as e:
++                    self._content_consumed = True
++                    raise e
++                finally:
++                    self._content_consumed = True
++
++        # Set the content consumed flag
++        self._content_consumed = True
++        return ContentIterator(self, chunk_size, decode_unicode)
+ 
+         # simulate reading small chunks of the content
+         reused_chunks = iter_slices(self._content, chunk_size)

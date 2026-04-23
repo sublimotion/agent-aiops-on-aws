@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bench-runner
+  namespace: default
+spec:
+  restartPolicy: Never
+  containers:
+    - name: runner
+      image: python:3.11-slim
+      command:
+        - /bin/sh
+        - -c
+        - |
+          pip install aiohttp -q
+          echo "Ready. Run benchmarks with:"
+          echo "  kubectl exec -it bench-runner -- python /scripts/benchmark.py --config config0-nocache"
+          echo "  kubectl exec -it bench-runner -- python /scripts/benchmark.py --config config1-prefix-cache"
+          sleep infinity
+      env:
+        - name: BENCHMARK_API_URL
+          value: "http://qwen3-32b-prefix-cache:8000"
+        - name: BENCHMARK_MODEL
+          value: "/opt/ml/model"
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+        - name: results
+          mountPath: /results
+      resources:
+        requests:
+          cpu: "1"
+          memory: 2Gi
+  volumes:
+    - name: scripts
+      configMap:
+        name: benchmark-scripts
+    - name: results
+      emptyDir: {}

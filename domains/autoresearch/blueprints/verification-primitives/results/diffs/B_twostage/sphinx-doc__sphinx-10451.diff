@@ -1,0 +1,63 @@
+diff --git a/sphinx/ext/autodoc/typehints.py b/sphinx/ext/autodoc/typehints.py
+index d912cd7d5..6320dc5ae 100644
+--- a/sphinx/ext/autodoc/typehints.py
++++ b/sphinx/ext/autodoc/typehints.py
+@@ -96,7 +96,9 @@ def modify_field_list(node: nodes.field_list, annotations: Dict[str, str],
+         if parts[0] == 'param':
+             if len(parts) == 2:
+                 # :param xxx:
+-                arg = arguments.setdefault(parts[1], {})
++                # Strip leading asterisks so that :param *args: and :param **kwargs:
++                # are stored under the same key ('args', 'kwargs') as in annotations.
++                arg = arguments.setdefault(parts[1].lstrip('*'), {})
+                 arg['param'] = True
+             elif len(parts) > 2:
+                 # :param xxx yyy:
+@@ -105,7 +107,7 @@ def modify_field_list(node: nodes.field_list, annotations: Dict[str, str],
+                 arg['param'] = True
+                 arg['type'] = True
+         elif parts[0] == 'type':
+-            name = ' '.join(parts[1:])
++            name = ' '.join(parts[1:]).lstrip('*')
+             arg = arguments.setdefault(name, {})
+             arg['type'] = True
+         elif parts[0] == 'rtype':
+@@ -152,14 +154,16 @@ def augment_descriptions_with_types(
+         if parts[0] == 'param':
+             if len(parts) == 2:
+                 # :param xxx:
+-                has_description.add(parts[1])
++                # Strip leading asterisks so that :param *args: and :param **kwargs:
++                # are stored under the same key ('args', 'kwargs') as in annotations.
++                has_description.add(parts[1].lstrip('*'))
+             elif len(parts) > 2:
+                 # :param xxx yyy:
+                 name = ' '.join(parts[2:])
+                 has_description.add(name)
+                 has_type.add(name)
+         elif parts[0] == 'type':
+-            name = ' '.join(parts[1:])
++            name = ' '.join(parts[1:]).lstrip('*')
+             has_type.add(name)
+         elif parts[0] in ('return', 'returns'):
+             has_description.add('return')
+diff --git a/tests/roots/test-ext-autodoc/target/typehints.py b/tests/roots/test-ext-autodoc/target/typehints.py
+index 4acfc8911..67a180e67 100644
+--- a/tests/roots/test-ext-autodoc/target/typehints.py
++++ b/tests/roots/test-ext-autodoc/target/typehints.py
+@@ -101,3 +101,15 @@ class _ClassWithDocumentedInit:
+         :param args: Some integer
+         :param kwargs: Some integer
+         """
++
++
++class _ClassWithDocumentedInitAndStarArgs:
++    """Class docstring."""
++
++    def __init__(self, x: int, *args: int, **kwargs: int) -> None:
++        """Init docstring.
++
++        :param x: Some integer
++        :param *args: Some integer
++        :param **kwargs: Some integer
++        """

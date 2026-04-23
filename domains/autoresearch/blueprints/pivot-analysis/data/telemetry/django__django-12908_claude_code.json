@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 87.7,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 86421,
+    "duration_api_ms": 67949,
+    "num_turns": 23,
+    "result": "All tests still pass (29 tests, same count because `distinct` is now tested inside the existing loop). The fix is correct.\n\n**Summary:**\n\nThe `distinct()` method on `QuerySet` was missing a call to `_not_support_combined_queries('distinct')`, which other operations like `annotate()`, `filter()`, `extra()`, `defer()`, etc. already have. This caused `distinct()` to silently do nothing when called on a combined queryset (union/intersection/difference).\n\n**Fix:** Added `self._not_support_combined_queries('distinct')` at the start of `distinct()` in `django/db/models/query.py:1137`, and added `'distinct'` to the list of tested operations in `tests/queries/test_qs_combinators.py`.",
+    "stop_reason": "end_turn",
+    "session_id": "d9813781-05d8-4438-93b6-151eeb95d8a7",
+    "total_cost_usd": 0.23740020000000006,
+    "usage": {
+      "input_tokens": 417,
+      "cache_creation_input_tokens": 16400,
+      "cache_read_input_tokens": 413364,
+      "output_tokens": 3376,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 16400
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 417,
+        "outputTokens": 3376,
+        "cacheReadInputTokens": 413364,
+        "cacheCreationInputTokens": 16400,
+        "webSearchRequests": 0,
+        "costUSD": 0.23740020000000006,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "11488adc-8547-40be-8987-1c3c04f944a8"
+  },
+  "stderr": ""
+}

@@ -1,0 +1,55 @@
+diff --git a/src/flask/config.py b/src/flask/config.py
+index d4fc310f..7ea62dd0 100644
+--- a/src/flask/config.py
++++ b/src/flask/config.py
+@@ -1,4 +1,5 @@
+ import errno
++import inspect
+ import json
+ import os
+ import types
+@@ -234,6 +235,8 @@ class Config(dict):
+         filename: str,
+         load: t.Callable[[t.IO[t.Any]], t.Mapping],
+         silent: bool = False,
++        mode: str = "r",
++        text: bool = True,
+     ) -> bool:
+         """Update the values in the config from a file that is loaded
+         using the ``load`` parameter. The loaded data is passed to the
+@@ -247,6 +250,9 @@ class Config(dict):
+             import toml
+             app.config.from_file("config.toml", load=toml.load)
+ 
++            import tomllib
++            app.config.from_file("config.toml", load=tomllib.load, text=False)
++
+         :param filename: The path to the data file. This can be an
+             absolute path or relative to the config root path.
+         :param load: A callable that takes a file handle and returns a
+@@ -254,14 +260,24 @@ class Config(dict):
+         :type load: ``Callable[[Reader], Mapping]`` where ``Reader``
+             implements a ``read`` method.
+         :param silent: Ignore the file if it doesn't exist.
++        :param mode: The mode to pass to ``open()``. Defaults to "r" (text mode).
++            Use "rb" for binary mode when using ``tomllib.load``.
++        :param text: Whether to open the file in text mode (True) or binary mode (False).
++            If both ``text`` and ``mode`` are provided, ``text`` takes precedence.
+         :return: ``True`` if the file was loaded successfully.
+ 
+         .. versionadded:: 2.0
+         """
+         filename = os.path.join(self.root_path, filename)
+ 
++        # Determine the file mode
++        if text:
++            file_mode = "r"
++        else:
++            file_mode = "rb"
++
+         try:
+-            with open(filename) as f:
++            with open(filename, file_mode) as f:
+                 obj = load(f)
+         except OSError as e:
+             if silent and e.errno in (errno.ENOENT, errno.EISDIR):

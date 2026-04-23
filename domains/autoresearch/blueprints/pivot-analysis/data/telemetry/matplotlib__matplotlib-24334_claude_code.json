@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 133.1,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 131650,
+    "duration_api_ms": 49334,
+    "num_turns": 14,
+    "result": "Good, no existing tests pass kwargs without labels. The fix is correct. All 17 generated tests pass. The fix raises a `ValueError` when kwargs are provided without labels, which aligns with the issue's proposed solution.\n\nThe change is minimal and targeted \u2014 in `axis.py:2024-2027`, we now raise a `ValueError` upfront if any `**kwargs` are passed but `labels` is `None`, catching the bug where e.g. `ax.set_xticks([0, 1], xticklabels=[\"a\", \"b\"])` would silently ignore the `xticklabels` kwarg.",
+    "stop_reason": "end_turn",
+    "session_id": "cba04d15-35b4-4a57-a25b-8773419ed6ef",
+    "total_cost_usd": 0.1519746,
+    "usage": {
+      "input_tokens": 80,
+      "cache_creation_input_tokens": 13488,
+      "cache_read_input_tokens": 232932,
+      "output_tokens": 2085,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 13488
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 80,
+        "outputTokens": 2085,
+        "cacheReadInputTokens": 232932,
+        "cacheCreationInputTokens": 13488,
+        "webSearchRequests": 0,
+        "costUSD": 0.1519746,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "8407a776-618b-41ef-8d32-415e6ff94f74"
+  },
+  "stderr": ""
+}

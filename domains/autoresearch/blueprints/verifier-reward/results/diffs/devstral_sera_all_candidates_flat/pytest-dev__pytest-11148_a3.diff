@@ -1,0 +1,48 @@
+diff --git a/src/_pytest/config/__init__.py b/src/_pytest/config/__init__.py
+index 47651ad9..7b9103c3 100644
+--- a/src/_pytest/config/__init__.py
++++ b/src/_pytest/config/__init__.py
+@@ -161,6 +161,10 @@ def main(
+             for line in formatted_tb.splitlines():
+                 tw.line(line.rstrip(), red=True)
+             return ExitCode.USAGE_ERROR
++        except AssertionError as e:
++            tw = TerminalWriter(sys.stderr)
++            tw.line(f"ERROR: AssertionError in conftest file: {e}", red=True)
++            return ExitCode.USAGE_ERROR
+         else:
+             try:
+                 ret: Union[ExitCode, int] = config.hook.pytest_cmdline_main(
+@@ -641,6 +645,9 @@ class PytestPluginManager(PluginManager):
+ 
+         try:
+             mod = import_path(conftestpath, mode=importmode, root=rootpath)
++        except AssertionError as e:
++            # Convert AssertionError in conftest to UsageError
++            raise UsageError(f"AssertionError in conftest file '{conftestpath}'") from e
+         except Exception as e:
+             assert e.__traceback__ is not None
+             exc_info = (type(e), e, e.__traceback__)
+diff --git a/src/_pytest/pathlib.py b/src/_pytest/pathlib.py
+index e43310ef..e3d78424 100644
+--- a/src/_pytest/pathlib.py
++++ b/src/_pytest/pathlib.py
+@@ -524,6 +524,10 @@ def import_path(
+     if mode is ImportMode.importlib:
+         module_name = module_name_from_path(path, root)
+ 
++        # Check if the module already exists in sys.modules
++        if module_name in sys.modules:
++            return sys.modules[module_name]
++
+         for meta_importer in sys.meta_path:
+             spec = meta_importer.find_spec(module_name, [str(path.parent)])
+             if spec is not None:
+@@ -651,6 +655,7 @@ def insert_missing_modules(modules: Dict[str, ModuleType], module_name: str) ->
+                     module_name,
+                     doc="Empty module created by pytest's importmode=importlib.",
+                 )
++                modules[module_name] = module
+         else:
+             module = modules[module_name]
+         if child_module:

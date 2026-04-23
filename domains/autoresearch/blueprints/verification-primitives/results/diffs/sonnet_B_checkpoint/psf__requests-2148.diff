@@ -1,0 +1,65 @@
+diff --git a/requests/models.py b/requests/models.py
+index 0dc55568..2ababaf8 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -9,6 +9,7 @@ This module contains the primary objects that power Requests.
+ 
+ import collections
+ import datetime
++import socket
+ 
+ from io import BytesIO, UnsupportedOperation
+ from .hooks import default_hooks
+@@ -22,7 +23,7 @@ from .packages.urllib3.util import parse_url
+ from .packages.urllib3.exceptions import DecodeError
+ from .exceptions import (
+     HTTPError, RequestException, MissingSchema, InvalidURL,
+-    ChunkedEncodingError, ContentDecodingError)
++    ChunkedEncodingError, ContentDecodingError, ConnectionError)
+ from .utils import (
+     guess_filename, get_auth_from_url, requote_uri,
+     stream_decode_response_unicode, to_key_val_list, parse_header_links,
+@@ -640,6 +641,8 @@ class Response(object):
+                     raise ChunkedEncodingError(e)
+                 except DecodeError as e:
+                     raise ContentDecodingError(e)
++                except socket.error as e:
++                    raise ConnectionError(e)
+             except AttributeError:
+                 # Standard file-like object.
+                 while True:
+diff --git a/requests/utils.py b/requests/utils.py
+index 68e50cf0..41acf3f8 100644
+--- a/requests/utils.py
++++ b/requests/utils.py
+@@ -9,7 +9,10 @@ that are also useful for external consumption.
+ 
+ """
+ 
+-import cgi
++try:
++    import cgi
++except ImportError:
++    cgi = None
+ import codecs
+ import collections
+ import io
+@@ -308,7 +311,17 @@ def get_encoding_from_headers(headers):
+     if not content_type:
+         return None
+ 
+-    content_type, params = cgi.parse_header(content_type)
++    if cgi is not None:
++        content_type, params = cgi.parse_header(content_type)
++    else:
++        # Python 3.13+ removed cgi module; use email.message instead
++        import email.message
++        msg = email.message.Message()
++        msg['content-type'] = content_type
++        params = dict(msg.get_params() or [])
++        content_type = params.pop('content-type', content_type)
++        if '' in params:
++            content_type = params.pop('')
+ 
+     if 'charset' in params:
+         return params['charset'].strip("'\"")

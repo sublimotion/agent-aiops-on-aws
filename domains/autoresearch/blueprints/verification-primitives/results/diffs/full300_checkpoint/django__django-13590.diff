@@ -1,0 +1,23 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 4648daf395..2938d68255 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -1077,10 +1077,16 @@ class Query(BaseExpression):
+         elif isinstance(value, (list, tuple)):
+             # The items of the iterable may be expressions and therefore need
+             # to be resolved independently.
+-            return type(value)(
++            values = [
+                 self.resolve_lookup_value(sub_value, can_reuse, allow_joins)
+                 for sub_value in value
+-            )
++            ]
++            # type(value) may be a subclass of tuple (e.g., a named tuple),
++            # which requires positional arguments rather than a single iterable
++            # argument.
++            if isinstance(value, tuple) and type(value) is not tuple:
++                return type(value)(*values)
++            return type(value)(values)
+         return value
+ 
+     def solve_lookup_type(self, lookup):

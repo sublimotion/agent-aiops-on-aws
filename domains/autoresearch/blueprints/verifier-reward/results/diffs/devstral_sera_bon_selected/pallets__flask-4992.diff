@@ -1,0 +1,81 @@
+diff --git a/src/flask/config.py b/src/flask/config.py
+index d4fc310f..067830cc 100644
+--- a/src/flask/config.py
++++ b/src/flask/config.py
+@@ -1,4 +1,5 @@
+ import errno
++import inspect
+ import json
+ import os
+ import types
+@@ -234,6 +235,8 @@ class Config(dict):
+         filename: str,
+         load: t.Callable[[t.IO[t.Any]], t.Mapping],
+         silent: bool = False,
++        mode: str = "r",
++        text: bool = True,
+     ) -> bool:
+         """Update the values in the config from a file that is loaded
+         using the ``load`` parameter. The loaded data is passed to the
+@@ -247,6 +250,11 @@ class Config(dict):
+             import toml
+             app.config.from_file("config.toml", load=toml.load)
+ 
++            import tomllib
++            app.config.from_file("config.toml", load=tomllib.load, text=False)
++            # or
++            app.config.from_file("config.toml", load=tomllib.load, mode="rb")
++
+         :param filename: The path to the data file. This can be an
+             absolute path or relative to the config root path.
+         :param load: A callable that takes a file handle and returns a
+@@ -254,14 +262,27 @@ class Config(dict):
+         :type load: ``Callable[[Reader], Mapping]`` where ``Reader``
+             implements a ``read`` method.
+         :param silent: Ignore the file if it doesn't exist.
++        :param mode: The mode to pass to the ``open`` function. Defaults to "r".
++            Use "rb" for binary files like TOML.
++        :param text: Whether to open the file in text mode (True) or binary mode (False).
++            This parameter is provided for convenience and will override the mode parameter
++            if both are specified.
+         :return: ``True`` if the file was loaded successfully.
+ 
+         .. versionadded:: 2.0
+         """
+         filename = os.path.join(self.root_path, filename)
+ 
++        # Determine the file mode based on parameters
++        if not text:
++            open_kwargs = {'mode': 'rb'}
++        elif mode != "r":
++            open_kwargs = {'mode': mode}
++        else:
++            open_kwargs = {'mode': 'r'}
++
+         try:
+-            with open(filename) as f:
++            with open(filename, **open_kwargs) as f:
+                 obj = load(f)
+         except OSError as e:
+             if silent and e.errno in (errno.ENOENT, errno.EISDIR):
+diff --git a/tests/test_config.py b/tests/test_config.py
+index 580ae864..9819c2bf 100644
+--- a/tests/test_config.py
++++ b/tests/test_config.py
+@@ -46,6 +46,16 @@ def test_config_from_file_toml():
+     common_object_test(app)
+ 
+ 
++def test_config_from_file_toml_with_mode():
++    tomllib = pytest.importorskip("tomllib", reason="tomllib added in 3.11")
++    app = flask.Flask(__name__)
++    current_dir = os.path.dirname(os.path.abspath(__file__))
++    app.config.from_file(
++        os.path.join(current_dir, "static", "config.toml"), tomllib.load, mode="rb"
++    )
++    common_object_test(app)
++
++
+ def test_from_prefixed_env(monkeypatch):
+     monkeypatch.setenv("FLASK_STRING", "value")
+     monkeypatch.setenv("FLASK_BOOL", "true")

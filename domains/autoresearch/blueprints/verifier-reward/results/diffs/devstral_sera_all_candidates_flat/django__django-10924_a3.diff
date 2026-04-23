@@ -1,0 +1,45 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 0c64748ccd..48a22397e9 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -1667,6 +1667,16 @@ class FilePathField(Field):
+         self.allow_files, self.allow_folders = allow_files, allow_folders
+         kwargs.setdefault('max_length', 100)
+         super().__init__(verbose_name, name, **kwargs)
++        
++    @property
++    def path(self):
++        if callable(self._path):
++            return self._path()
++        return self._path
++        
++    @path.setter
++    def path(self, value):
++        self._path = value
+ 
+     def check(self, **kwargs):
+         return [
+diff --git a/django/forms/fields.py b/django/forms/fields.py
+index a977256525..1016d461a2 100644
+--- a/django/forms/fields.py
++++ b/django/forms/fields.py
+@@ -1078,6 +1078,8 @@ class MultiValueField(Field):
+ class FilePathField(ChoiceField):
+     def __init__(self, path, *, match=None, recursive=False, allow_files=True,
+                  allow_folders=False, **kwargs):
++        if callable(path):
++            path = path()
+         self.path, self.match, self.recursive = path, match, recursive
+         self.allow_files, self.allow_folders = allow_files, allow_folders
+         super().__init__(choices=(), **kwargs)
+diff --git a/tests/model_fields/test_filepathfield.py b/tests/model_fields/test_filepathfield.py
+index 362d12d0db..9eb36ab1bb 100644
+--- a/tests/model_fields/test_filepathfield.py
++++ b/tests/model_fields/test_filepathfield.py
+@@ -18,5 +18,5 @@ class FilePathFieldTests(SimpleTestCase):
+             return path
+ 
+         field = FilePathField(path=generate_path)
+-        self.assertEqual(field.path(), path)
++        self.assertEqual(field.path, path)
+         self.assertEqual(field.formfield().path, path)

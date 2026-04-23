@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 127.1,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 125793,
+    "duration_api_ms": 105624,
+    "num_turns": 28,
+    "result": "All 177 widget tests pass. The fix is correct and complete.\n\n**Summary:** Removed the `_0` suffix logic from `MultiWidget.id_for_label`, making it return `''` instead. Django's `BoundField.label_tag()` already checks `if id_for_label:` before adding the `for` attribute (line 171 in `boundfield.py`), so returning `''` means `<label>` elements for `MultiWidget` will have no `for` attribute \u2014 which is the correct behavior since the widget has multiple sub-inputs and pointing to just the first one (with `_0`) is arbitrary and misleading.",
+    "stop_reason": "end_turn",
+    "session_id": "edc8979a-333b-41f6-b142-8c3ece1effe1",
+    "total_cost_usd": 0.2781744,
+    "usage": {
+      "input_tokens": 416,
+      "cache_creation_input_tokens": 16498,
+      "cache_read_input_tokens": 528213,
+      "output_tokens": 3773,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 16498
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 416,
+        "outputTokens": 3773,
+        "cacheReadInputTokens": 528213,
+        "cacheCreationInputTokens": 16498,
+        "webSearchRequests": 0,
+        "costUSD": 0.2781744,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "06568367-8796-411b-9da4-1d470e59c9bf"
+  },
+  "stderr": ""
+}

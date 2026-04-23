@@ -1,0 +1,75 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b899..2a72a2aa 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -990,6 +990,29 @@ warn_explicit(
+         res_expl = self.explanation_param(self.display(res))
+         outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
+         return res, outer_expl
++        
++        # Normal call handling
++        arg_expls = []
++        new_args = []
++        new_kwargs = []
++        for arg in call.args:
++            res, expl = self.visit(arg)
++            arg_expls.append(expl)
++            new_args.append(res)
++        for keyword in call.keywords:
++            res, expl = self.visit(keyword.value)
++            new_kwargs.append(ast.keyword(keyword.arg, res))
++            if keyword.arg:
++                arg_expls.append(keyword.arg + "=" + expl)
++            else:  # **args have `arg` keywords with an .arg of None
++                arg_expls.append("**" + expl)
++
++        expl = "%s(%s)" % (func_expl, ", ".join(arg_expls))
++        new_call = ast.Call(new_func, new_args, new_kwargs)
++        res = self.assign(new_call)
++        res_expl = self.explanation_param(self.display(res))
++        outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
++        return res, outer_expl
+ 
+     def visit_Starred(self, starred):
+         # From Python 3.5, a Starred node can appear in a function call
+@@ -1026,6 +1049,40 @@ warn_explicit(
+         res_expl = self.explanation_param(self.display(res))
+         outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
+         return res, outer_expl
++        
++        # Normal call handling
++        arg_expls = []
++        new_args = []
++        new_kwargs = []
++        new_star = new_kwarg = None
++        for arg in call.args:
++            res, expl = self.visit(arg)
++            new_args.append(res)
++            arg_expls.append(expl)
++        for keyword in call.keywords:
++            res, expl = self.visit(keyword.value)
++            new_kwargs.append(ast.keyword(keyword.arg, res))
++            arg_expls.append(keyword.arg + "=" + expl)
++        if call.starargs:
++            new_star, expl = self.visit(call.starargs)
++            arg_expls.append("*" + expl)
++        if call.kwargs:
++            new_kwarg, expl = self.visit(call.kwargs)
++            arg_expls.append("**" + expl)
++        expl = "%s(%s)" % (func_expl, ", ".join(arg_expls))
++        new_call = ast.Call(new_func, new_args, new_kwargs, new_star, new_kwarg)
++        res = self.assign(new_call)
++        res_expl = self.explanation_param(self.display(res))
++        outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
++        return res, outer_expl
++
++    def visit_GeneratorExp(self, gen_exp):
++        """Handle generator expressions in all() and any() calls."""
++        return self.generic_visit(gen_exp)
++
++    def visit_ListComp(self, list_comp):
++        """Handle list comprehensions in all() and any() calls."""
++        return self.generic_visit(list_comp)
+ 
+     # ast.Call signature changed on 3.5,
+     # conditionally change  which methods is named

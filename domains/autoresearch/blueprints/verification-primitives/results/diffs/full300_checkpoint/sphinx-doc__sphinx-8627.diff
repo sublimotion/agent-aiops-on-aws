@@ -1,0 +1,50 @@
+diff --git a/sphinx/util/typing.py b/sphinx/util/typing.py
+index 2d4f67bba..4b2810827 100644
+--- a/sphinx/util/typing.py
++++ b/sphinx/util/typing.py
+@@ -86,6 +86,45 @@ def is_system_TypeVar(typ: Any) -> bool:
+     return modname == 'typing' and isinstance(typ, TypeVar)
+ 
+ 
++def _isinternalclass(cls: Any) -> bool:
++    """Check if *cls* belongs to a private/internal module (name starting with ``_``).
++
++    Some classes (e.g. ``struct.Struct``) are implemented in a C extension
++    whose module name starts with ``_`` (e.g. ``_struct``), but are
++    re-exported under a public module name (e.g. ``struct``).  This helper
++    returns ``True`` when the class's ``__module__`` starts with ``_`` AND the
++    class is NOT accessible from the public module that would be obtained by
++    stripping the leading underscore.
++    """
++    modname = getattr(cls, '__module__', None)
++    return modname is not None and modname.startswith('_')
++
++
++def _get_module_name(cls: Any) -> str:
++    """Return the best module name for *cls*.
++
++    When *cls.__module__* starts with an underscore (i.e. it is a private /
++    C-extension module like ``_struct``), try to find a public module that
++    re-exports the class.  For example ``struct.Struct.__module__`` is
++    ``'_struct'``, but the class is also accessible as ``struct.Struct``, so
++    ``'struct'`` is returned.
++    """
++    import importlib
++
++    modname = getattr(cls, '__module__', None)
++    if modname and modname.startswith('_'):
++        qualname = getattr(cls, '__qualname__', None)
++        if qualname:
++            public_modname = modname[1:]
++            try:
++                mod = importlib.import_module(public_modname)
++                if getattr(mod, qualname, None) is cls:
++                    return public_modname
++            except ImportError:
++                pass
++    return modname
++
++
+ def restify(cls: Optional["Type"]) -> str:
+     """Convert python class to a reST reference."""
+     from sphinx.util import inspect  # lazy loading

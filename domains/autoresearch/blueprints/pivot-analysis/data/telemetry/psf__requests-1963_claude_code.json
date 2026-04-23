@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 85.4,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 84105,
+    "duration_api_ms": 53666,
+    "num_turns": 17,
+    "result": "The adversarial review gives a score of 0.89 with verdict `likely_correct`. The fix is clean and directly addresses the root cause.\n\n## Summary\n\nThe bug was in `requests/sessions.py` in the `resolve_redirects` method. Each loop iteration was:\n1. Copying the **original** `req` object (`req.copy()`)\n2. Reading the method from the **original** `req.method`\n\nThis meant that if a 303 converted POST\u2192GET, the next iteration would start fresh from the original POST, undoing that conversion.\n\n**Fix:** Copy from `resp.request` (the request that was actually sent for the current response) instead of `req` (the original request). This preserves method changes accumulated through the redirect chain.",
+    "stop_reason": "end_turn",
+    "session_id": "c6217eed-1a35-48c2-9511-69a06ae5fce0",
+    "total_cost_usd": 0.20141384999999995,
+    "usage": {
+      "input_tokens": 83,
+      "cache_creation_input_tokens": 18789,
+      "cache_read_input_tokens": 324687,
+      "output_tokens": 2220,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 18789
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 83,
+        "outputTokens": 2220,
+        "cacheReadInputTokens": 324687,
+        "cacheCreationInputTokens": 18789,
+        "webSearchRequests": 0,
+        "costUSD": 0.20141384999999995,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "46868deb-dce7-43fd-b586-842ad43a4adb"
+  },
+  "stderr": ""
+}

@@ -1,0 +1,986 @@
+diff --git a/requests/adapters.py b/requests/adapters.py
+index 841cbbfe..37a7df2c 100644
+--- a/requests/adapters.py
++++ b/requests/adapters.py
+@@ -16,8 +16,13 @@ from .packages.urllib3.response import HTTPResponse
+ from .packages.urllib3.util import Timeout as TimeoutSauce
+ from .packages.urllib3.util.retry import Retry
+ from .compat import urlparse, basestring
+-from .utils import (DEFAULT_CA_BUNDLE_PATH, get_encoding_from_headers,
+-                    prepend_scheme_if_needed, get_auth_from_url, urldefragauth)
++from .utils import (
++    DEFAULT_CA_BUNDLE_PATH,
++    get_encoding_from_headers,
++    prepend_scheme_if_needed,
++    get_auth_from_url,
++    urldefragauth,
++)
+ from .structures import CaseInsensitiveDict
+ from .packages.urllib3.exceptions import ConnectTimeoutError
+ from .packages.urllib3.exceptions import HTTPError as _HTTPError
+@@ -27,9 +32,20 @@ from .packages.urllib3.exceptions import ProtocolError
+ from .packages.urllib3.exceptions import ReadTimeoutError
+ from .packages.urllib3.exceptions import SSLError as _SSLError
+ from .packages.urllib3.exceptions import ResponseError
++from .packages.urllib3.exceptions import TimeoutError as _TimeoutError
++from .packages.urllib3.exceptions import DecodeError as _DecodeError
+ from .cookies import extract_cookies_to_jar
+-from .exceptions import (ConnectionError, ConnectTimeout, ReadTimeout, SSLError,
+-                         ProxyError, RetryError)
++from .exceptions import (
++    ConnectionError,
++    ConnectTimeout,
++    ReadTimeout,
++    SSLError,
++    ProxyError,
++    RetryError,
++    Timeout,
++    DecodeError,
++    TimeoutError,
++)
+ from .auth import _basic_auth_str
+ 
+ DEFAULT_POOLBLOCK = False
+@@ -77,12 +93,22 @@ class HTTPAdapter(BaseAdapter):
+       >>> a = requests.adapters.HTTPAdapter(max_retries=3)
+       >>> s.mount('http://', a)
+     """
+-    __attrs__ = ['max_retries', 'config', '_pool_connections', '_pool_maxsize',
+-                 '_pool_block']
+ 
+-    def __init__(self, pool_connections=DEFAULT_POOLSIZE,
+-                 pool_maxsize=DEFAULT_POOLSIZE, max_retries=DEFAULT_RETRIES,
+-                 pool_block=DEFAULT_POOLBLOCK):
++    __attrs__ = [
++        "max_retries",
++        "config",
++        "_pool_connections",
++        "_pool_maxsize",
++        "_pool_block",
++    ]
++
++    def __init__(
++        self,
++        pool_connections=DEFAULT_POOLSIZE,
++        pool_maxsize=DEFAULT_POOLSIZE,
++        max_retries=DEFAULT_RETRIES,
++        pool_block=DEFAULT_POOLBLOCK,
++    ):
+         if max_retries == DEFAULT_RETRIES:
+             self.max_retries = Retry(0, read=False)
+         else:
+@@ -99,8 +125,7 @@ class HTTPAdapter(BaseAdapter):
+         self.init_poolmanager(pool_connections, pool_maxsize, block=pool_block)
+ 
+     def __getstate__(self):
+-        return dict((attr, getattr(self, attr, None)) for attr in
+-                    self.__attrs__)
++        return dict((attr, getattr(self, attr, None)) for attr in self.__attrs__)
+ 
+     def __setstate__(self, state):
+         # Can't handle by adding 'proxy_manager' to self.__attrs__ because
+@@ -111,10 +136,13 @@ class HTTPAdapter(BaseAdapter):
+         for attr, value in state.items():
+             setattr(self, attr, value)
+ 
+-        self.init_poolmanager(self._pool_connections, self._pool_maxsize,
+-                              block=self._pool_block)
++        self.init_poolmanager(
++            self._pool_connections, self._pool_maxsize, block=self._pool_block
++        )
+ 
+-    def init_poolmanager(self, connections, maxsize, block=DEFAULT_POOLBLOCK, **pool_kwargs):
++    def init_poolmanager(
++        self, connections, maxsize, block=DEFAULT_POOLBLOCK, **pool_kwargs
++    ):
+         """Initializes a urllib3 PoolManager.
+ 
+         This method should not be called from user code, and is only
+@@ -131,8 +159,13 @@ class HTTPAdapter(BaseAdapter):
+         self._pool_maxsize = maxsize
+         self._pool_block = block
+ 
+-        self.poolmanager = PoolManager(num_pools=connections, maxsize=maxsize,
+-                                       block=block, strict=True, **pool_kwargs)
++        self.poolmanager = PoolManager(
++            num_pools=connections,
++            maxsize=maxsize,
++            block=block,
++            strict=True,
++            **pool_kwargs,
++        )
+ 
+     def proxy_manager_for(self, proxy, **proxy_kwargs):
+         """Return urllib3 ProxyManager for the given proxy.
+@@ -153,7 +186,8 @@ class HTTPAdapter(BaseAdapter):
+                 num_pools=self._pool_connections,
+                 maxsize=self._pool_maxsize,
+                 block=self._pool_block,
+-                **proxy_kwargs)
++                **proxy_kwargs,
++            )
+ 
+         return self.proxy_manager[proxy]
+ 
+@@ -167,8 +201,7 @@ class HTTPAdapter(BaseAdapter):
+         :param verify: Whether we should actually verify the certificate.
+         :param cert: The SSL certificate to verify.
+         """
+-        if url.lower().startswith('https') and verify:
+-
++        if url.lower().startswith("https") and verify:
+             cert_loc = None
+ 
+             # Allow self-specified cert location.
+@@ -181,10 +214,10 @@ class HTTPAdapter(BaseAdapter):
+             if not cert_loc:
+                 raise Exception("Could not find a suitable SSL CA certificate bundle.")
+ 
+-            conn.cert_reqs = 'CERT_REQUIRED'
++            conn.cert_reqs = "CERT_REQUIRED"
+             conn.ca_certs = cert_loc
+         else:
+-            conn.cert_reqs = 'CERT_NONE'
++            conn.cert_reqs = "CERT_NONE"
+             conn.ca_certs = None
+ 
+         if cert:
+@@ -206,10 +239,10 @@ class HTTPAdapter(BaseAdapter):
+         response = Response()
+ 
+         # Fallback to None if there's no status_code, for whatever reason.
+-        response.status_code = getattr(resp, 'status', None)
++        response.status_code = getattr(resp, "status", None)
+ 
+         # Make headers case-insensitive.
+-        response.headers = CaseInsensitiveDict(getattr(resp, 'headers', {}))
++        response.headers = CaseInsensitiveDict(getattr(resp, "headers", {}))
+ 
+         # Set encoding.
+         response.encoding = get_encoding_from_headers(response.headers)
+@@ -217,7 +250,7 @@ class HTTPAdapter(BaseAdapter):
+         response.reason = response.raw.reason
+ 
+         if isinstance(req.url, bytes):
+-            response.url = req.url.decode('utf-8')
++            response.url = req.url.decode("utf-8")
+         else:
+             response.url = req.url
+ 
+@@ -242,7 +275,7 @@ class HTTPAdapter(BaseAdapter):
+         proxy = proxies.get(urlparse(url.lower()).scheme)
+ 
+         if proxy:
+-            proxy = prepend_scheme_if_needed(proxy, 'http')
++            proxy = prepend_scheme_if_needed(proxy, "http")
+             proxy_manager = self.proxy_manager_for(proxy)
+             conn = proxy_manager.connection_from_url(url)
+         else:
+@@ -278,7 +311,7 @@ class HTTPAdapter(BaseAdapter):
+         scheme = urlparse(request.url).scheme
+         proxy = proxies.get(scheme)
+ 
+-        if proxy and scheme != 'https':
++        if proxy and scheme != "https":
+             url = urldefragauth(request.url)
+         else:
+             url = request.path_url
+@@ -316,12 +349,13 @@ class HTTPAdapter(BaseAdapter):
+         username, password = get_auth_from_url(proxy)
+ 
+         if username and password:
+-            headers['Proxy-Authorization'] = _basic_auth_str(username,
+-                                                             password)
++            headers["Proxy-Authorization"] = _basic_auth_str(username, password)
+ 
+         return headers
+ 
+-    def send(self, request, stream=False, timeout=None, verify=True, cert=None, proxies=None):
++    def send(
++        self, request, stream=False, timeout=None, verify=True, cert=None, proxies=None
++    ):
+         """Sends PreparedRequest object. Returns Response object.
+ 
+         :param request: The :class:`PreparedRequest <PreparedRequest>` being sent.
+@@ -341,7 +375,7 @@ class HTTPAdapter(BaseAdapter):
+         url = self.request_url(request, proxies)
+         self.add_headers(request)
+ 
+-        chunked = not (request.body is None or 'Content-Length' in request.headers)
++        chunked = not (request.body is None or "Content-Length" in request.headers)
+ 
+         if isinstance(timeout, tuple):
+             try:
+@@ -349,9 +383,11 @@ class HTTPAdapter(BaseAdapter):
+                 timeout = TimeoutSauce(connect=connect, read=read)
+             except ValueError as e:
+                 # this may raise a string formatting error.
+-                err = ("Invalid timeout {0}. Pass a (connect, read) "
+-                       "timeout tuple, or a single float to set "
+-                       "both timeouts to the same value".format(timeout))
++                err = (
++                    "Invalid timeout {0}. Pass a (connect, read) "
++                    "timeout tuple, or a single float to set "
++                    "both timeouts to the same value".format(timeout)
++                )
+                 raise ValueError(err)
+         else:
+             timeout = TimeoutSauce(connect=timeout, read=timeout)
+@@ -368,20 +404,18 @@ class HTTPAdapter(BaseAdapter):
+                     preload_content=False,
+                     decode_content=False,
+                     retries=self.max_retries,
+-                    timeout=timeout
++                    timeout=timeout,
+                 )
+ 
+             # Send the request.
+             else:
+-                if hasattr(conn, 'proxy_pool'):
++                if hasattr(conn, "proxy_pool"):
+                     conn = conn.proxy_pool
+ 
+                 low_conn = conn._get_conn(timeout=DEFAULT_POOL_TIMEOUT)
+ 
+                 try:
+-                    low_conn.putrequest(request.method,
+-                                        url,
+-                                        skip_accept_encoding=True)
++                    low_conn.putrequest(request.method, url, skip_accept_encoding=True)
+ 
+                     for header, value in request.headers.items():
+                         low_conn.putheader(header, value)
+@@ -389,11 +423,11 @@ class HTTPAdapter(BaseAdapter):
+                     low_conn.endheaders()
+ 
+                     for i in request.body:
+-                        low_conn.send(hex(len(i))[2:].encode('utf-8'))
+-                        low_conn.send(b'\r\n')
++                        low_conn.send(hex(len(i))[2:].encode("utf-8"))
++                        low_conn.send(b"\r\n")
+                         low_conn.send(i)
+-                        low_conn.send(b'\r\n')
+-                    low_conn.send(b'0\r\n\r\n')
++                        low_conn.send(b"\r\n")
++                    low_conn.send(b"0\r\n\r\n")
+ 
+                     r = low_conn.getresponse()
+                     resp = HTTPResponse.from_httplib(
+@@ -401,7 +435,7 @@ class HTTPAdapter(BaseAdapter):
+                         pool=conn,
+                         connection=low_conn,
+                         preload_content=False,
+-                        decode_content=False
++                        decode_content=False,
+                     )
+                 except:
+                     # If we hit any problems here, clean up the connection.
+@@ -432,4 +466,10 @@ class HTTPAdapter(BaseAdapter):
+             else:
+                 raise
+ 
++        except _TimeoutError as e:
++            raise Timeout(e, request=request)
++
++        except _DecodeError as e:
++            raise DecodeError(e, request=request)
++
+         return self.build_response(request, resp)
+diff --git a/requests/exceptions.py b/requests/exceptions.py
+index 89135a80..823c4808 100644
+--- a/requests/exceptions.py
++++ b/requests/exceptions.py
+@@ -7,6 +7,7 @@ requests.exceptions
+ This module contains the set of Requests' exceptions.
+ 
+ """
++
+ from .packages.urllib3.exceptions import HTTPError as BaseHTTPError
+ 
+ 
+@@ -18,11 +19,10 @@ class RequestException(IOError):
+         """
+         Initialize RequestException with `request` and `response` objects.
+         """
+-        response = kwargs.pop('response', None)
++        response = kwargs.pop("response", None)
+         self.response = response
+-        self.request = kwargs.pop('request', None)
+-        if (response is not None and not self.request and
+-                hasattr(response, 'request')):
++        self.request = kwargs.pop("request", None)
++        if response is not None and not self.request and hasattr(response, "request"):
+             self.request = self.response.request
+         super(RequestException, self).__init__(*args, **kwargs)
+ 
+@@ -80,7 +80,7 @@ class InvalidSchema(RequestException, ValueError):
+ 
+ 
+ class InvalidURL(RequestException, ValueError):
+-    """ The URL provided was somehow invalid. """
++    """The URL provided was somehow invalid."""
+ 
+ 
+ class ChunkedEncodingError(RequestException):
+@@ -97,3 +97,11 @@ class StreamConsumedError(RequestException, TypeError):
+ 
+ class RetryError(RequestException):
+     """Custom retries logic failed"""
++
++
++class DecodeError(RequestException):
++    """Failed to decode response content (from urllib3)"""
++
++
++class TimeoutError(RequestException):
++    """The request timed out from urllib3."""
+diff --git a/requests/models.py b/requests/models.py
+index 4270c647..d13c9c0d 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -20,28 +20,58 @@ from .packages.urllib3.fields import RequestField
+ from .packages.urllib3.filepost import encode_multipart_formdata
+ from .packages.urllib3.util import parse_url
+ from .packages.urllib3.exceptions import (
+-    DecodeError, ReadTimeoutError, ProtocolError, LocationParseError)
++    DecodeError as _DecodeError,
++    ReadTimeoutError as _ReadTimeoutError,
++    ProtocolError,
++    LocationParseError,
++)
+ from .exceptions import (
+-    HTTPError, MissingSchema, InvalidURL, ChunkedEncodingError,
+-    ContentDecodingError, ConnectionError, StreamConsumedError)
++    HTTPError,
++    MissingSchema,
++    InvalidURL,
++    ChunkedEncodingError,
++    ContentDecodingError,
++    ConnectionError,
++    StreamConsumedError,
++    DecodeError,
++    TimeoutError as TimeoutErrorWrapper,
++)
+ from .utils import (
+-    guess_filename, get_auth_from_url, requote_uri,
+-    stream_decode_response_unicode, to_key_val_list, parse_header_links,
+-    iter_slices, guess_json_utf, super_len, to_native_string)
++    guess_filename,
++    get_auth_from_url,
++    requote_uri,
++    stream_decode_response_unicode,
++    to_key_val_list,
++    parse_header_links,
++    iter_slices,
++    guess_json_utf,
++    super_len,
++    to_native_string,
++)
+ from .compat import (
+-    cookielib, urlunparse, urlsplit, urlencode, str, bytes, StringIO,
+-    is_py2, chardet, builtin_str, basestring)
++    cookielib,
++    urlunparse,
++    urlsplit,
++    urlencode,
++    str,
++    bytes,
++    StringIO,
++    is_py2,
++    chardet,
++    builtin_str,
++    basestring,
++)
+ from .compat import json as complexjson
+ from .status_codes import codes
+ 
+ #: The set of HTTP status codes that indicate an automatically
+ #: processable redirect.
+ REDIRECT_STATI = (
+-    codes.moved,              # 301
+-    codes.found,              # 302
+-    codes.other,              # 303
+-    codes.temporary_redirect, # 307
+-    codes.permanent_redirect, # 308
++    codes.moved,  # 301
++    codes.found,  # 302
++    codes.other,  # 303
++    codes.temporary_redirect,  # 307
++    codes.permanent_redirect,  # 308
+ )
+ 
+ DEFAULT_REDIRECT_LIMIT = 30
+@@ -60,16 +90,16 @@ class RequestEncodingMixin(object):
+ 
+         path = p.path
+         if not path:
+-            path = '/'
++            path = "/"
+ 
+         url.append(path)
+ 
+         query = p.query
+         if query:
+-            url.append('?')
++            url.append("?")
+             url.append(query)
+ 
+-        return ''.join(url)
++        return "".join(url)
+ 
+     @staticmethod
+     def _encode_params(data):
+@@ -82,18 +112,21 @@ class RequestEncodingMixin(object):
+ 
+         if isinstance(data, (str, bytes)):
+             return data
+-        elif hasattr(data, 'read'):
++        elif hasattr(data, "read"):
+             return data
+-        elif hasattr(data, '__iter__'):
++        elif hasattr(data, "__iter__"):
+             result = []
+             for k, vs in to_key_val_list(data):
+-                if isinstance(vs, basestring) or not hasattr(vs, '__iter__'):
++                if isinstance(vs, basestring) or not hasattr(vs, "__iter__"):
+                     vs = [vs]
+                 for v in vs:
+                     if v is not None:
+                         result.append(
+-                            (k.encode('utf-8') if isinstance(k, str) else k,
+-                             v.encode('utf-8') if isinstance(v, str) else v))
++                            (
++                                k.encode("utf-8") if isinstance(k, str) else k,
++                                v.encode("utf-8") if isinstance(v, str) else v,
++                            )
++                        )
+             return urlencode(result, doseq=True)
+         else:
+             return data
+@@ -107,7 +140,7 @@ class RequestEncodingMixin(object):
+         if parameters are supplied as a dict.
+ 
+         """
+-        if (not files):
++        if not files:
+             raise ValueError("Files must be provided.")
+         elif isinstance(data, basestring):
+             raise ValueError("Data must not be a string.")
+@@ -117,7 +150,7 @@ class RequestEncodingMixin(object):
+         files = to_key_val_list(files or {})
+ 
+         for field, val in fields:
+-            if isinstance(val, basestring) or not hasattr(val, '__iter__'):
++            if isinstance(val, basestring) or not hasattr(val, "__iter__"):
+                 val = [val]
+             for v in val:
+                 if v is not None:
+@@ -126,10 +159,15 @@ class RequestEncodingMixin(object):
+                         v = str(v)
+ 
+                     new_fields.append(
+-                        (field.decode('utf-8') if isinstance(field, bytes) else field,
+-                         v.encode('utf-8') if isinstance(v, str) else v))
++                        (
++                            field.decode("utf-8")
++                            if isinstance(field, bytes)
++                            else field,
++                            v.encode("utf-8") if isinstance(v, str) else v,
++                        )
++                    )
+ 
+-        for (k, v) in files:
++        for k, v in files:
+             # support for explicit filename
+             ft = None
+             fh = None
+@@ -163,12 +201,16 @@ class RequestHooksMixin(object):
+         """Properly register a hook."""
+ 
+         if event not in self.hooks:
+-            raise ValueError('Unsupported event specified, with event name "%s"' % (event))
++            raise ValueError(
++                'Unsupported event specified, with event name "%s"' % (event)
++            )
+ 
+         if isinstance(hook, collections.Callable):
+             self.hooks[event].append(hook)
+-        elif hasattr(hook, '__iter__'):
+-            self.hooks[event].extend(h for h in hook if isinstance(h, collections.Callable))
++        elif hasattr(hook, "__iter__"):
++            self.hooks[event].extend(
++                h for h in hook if isinstance(h, collections.Callable)
++            )
+ 
+     def deregister_hook(self, event, hook):
+         """Deregister a previously registered hook.
+@@ -206,9 +248,20 @@ class Request(RequestHooksMixin):
+       <PreparedRequest [GET]>
+ 
+     """
+-    def __init__(self, method=None, url=None, headers=None, files=None,
+-        data=None, params=None, auth=None, cookies=None, hooks=None, json=None):
+ 
++    def __init__(
++        self,
++        method=None,
++        url=None,
++        headers=None,
++        files=None,
++        data=None,
++        params=None,
++        auth=None,
++        cookies=None,
++        hooks=None,
++        json=None,
++    ):
+         # Default empty dicts for dict params.
+         data = [] if data is None else data
+         files = [] if files is None else files
+@@ -217,7 +270,7 @@ class Request(RequestHooksMixin):
+         hooks = {} if hooks is None else hooks
+ 
+         self.hooks = default_hooks()
+-        for (k, v) in list(hooks.items()):
++        for k, v in list(hooks.items()):
+             self.register_hook(event=k, hook=v)
+ 
+         self.method = method
+@@ -231,7 +284,7 @@ class Request(RequestHooksMixin):
+         self.cookies = cookies
+ 
+     def __repr__(self):
+-        return '<Request [%s]>' % (self.method)
++        return "<Request [%s]>" % (self.method)
+ 
+     def prepare(self):
+         """Constructs a :class:`PreparedRequest <PreparedRequest>` for transmission and returns it."""
+@@ -285,8 +338,19 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
+         #: dictionary of callback hooks, for internal usage.
+         self.hooks = default_hooks()
+ 
+-    def prepare(self, method=None, url=None, headers=None, files=None,
+-        data=None, params=None, auth=None, cookies=None, hooks=None, json=None):
++    def prepare(
++        self,
++        method=None,
++        url=None,
++        headers=None,
++        files=None,
++        data=None,
++        params=None,
++        auth=None,
++        cookies=None,
++        hooks=None,
++        json=None,
++    ):
+         """Prepares the entire request with the given parameters."""
+ 
+         self.prepare_method(method)
+@@ -303,7 +367,7 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
+         self.prepare_hooks(hooks)
+ 
+     def __repr__(self):
+-        return '<PreparedRequest [%s]>' % (self.method)
++        return "<PreparedRequest [%s]>" % (self.method)
+ 
+     def copy(self):
+         p = PreparedRequest()
+@@ -329,14 +393,14 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
+         #: on python 3.x.
+         #: https://github.com/kennethreitz/requests/pull/2238
+         if isinstance(url, bytes):
+-            url = url.decode('utf8')
++            url = url.decode("utf8")
+         else:
+             url = unicode(url) if is_py2 else str(url)
+ 
+         # Don't do any URL preparation for non-HTTP schemes like `mailto`,
+         # `data` etc to work around exceptions from `url_parse`, which
+         # handles RFC 3986 only.
+-        if ':' in url and not url.lower().startswith('http'):
++        if ":" in url and not url.lower().startswith("http"):
+             self.url = url
+             return
+ 
+@@ -347,8 +411,10 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
+             raise InvalidURL(*e.args)
+ 
+         if not scheme:
+-            error = ("Invalid URL {0!r}: No schema supplied. Perhaps you meant http://{0}?")
+-            error = error.format(to_native_string(url, 'utf8'))
++            error = (
++                "Invalid URL {0!r}: No schema supplied. Perhaps you meant http://{0}?"
++            )
++            error = error.format(to_native_string(url, "utf8"))
+ 
+             raise MissingSchema(error)
+ 
+@@ -357,38 +423,38 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
+ 
+         # Only want to apply IDNA to the hostname
+         try:
+-            host = host.encode('idna').decode('utf-8')
++            host = host.encode("idna").decode("utf-8")
+         except UnicodeError:
+-            raise InvalidURL('URL has an invalid label.')
++            raise InvalidURL("URL has an invalid label.")
+ 
+         # Carefully reconstruct the network location
+-        netloc = auth or ''
++        netloc = auth or ""
+         if netloc:
+-            netloc += '@'
++            netloc += "@"
+         netloc += host
+         if port:
+-            netloc += ':' + str(port)
++            netloc += ":" + str(port)
+ 
+         # Bare domains aren't valid URLs.
+         if not path:
+-            path = '/'
++            path = "/"
+ 
+         if is_py2:
+             if isinstance(scheme, str):
+-                scheme = scheme.encode('utf-8')
++                scheme = scheme.encode("utf-8")
+             if isinstance(netloc, str):
+-                netloc = netloc.encode('utf-8')
++                netloc = netloc.encode("utf-8")
+             if isinstance(path, str):
+-                path = path.encode('utf-8')
++                path = path.encode("utf-8")
+             if isinstance(query, str):
+-                query = query.encode('utf-8')
++                query = query.encode("utf-8")
+             if isinstance(fragment, str):
+-                fragment = fragment.encode('utf-8')
++                fragment = fragment.encode("utf-8")
+ 
+         enc_params = self._encode_params(params)
+         if enc_params:
+             if query:
+-                query = '%s&%s' % (query, enc_params)
++                query = "%s&%s" % (query, enc_params)
+             else:
+                 query = enc_params
+ 
+@@ -399,7 +465,9 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
+         """Prepares the given HTTP headers."""
+ 
+         if headers:
+-            self.headers = CaseInsensitiveDict((to_native_string(name), value) for name, value in headers.items())
++            self.headers = CaseInsensitiveDict(
++                (to_native_string(name), value) for name, value in headers.items()
++            )
+         else:
+             self.headers = CaseInsensitiveDict()
+ 
+@@ -415,13 +483,15 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
+         length = None
+ 
+         if json is not None:
+-            content_type = 'application/json'
++            content_type = "application/json"
+             body = complexjson.dumps(json)
+ 
+-        is_stream = all([
+-            hasattr(data, '__iter__'),
+-            not isinstance(data, (basestring, list, tuple, dict))
+-        ])
++        is_stream = all(
++            [
++                hasattr(data, "__iter__"),
++                not isinstance(data, (basestring, list, tuple, dict)),
++            ]
++        )
+ 
+         try:
+             length = super_len(data)
+@@ -432,12 +502,14 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
+             body = data
+ 
+             if files:
+-                raise NotImplementedError('Streamed bodies and files are mutually exclusive.')
++                raise NotImplementedError(
++                    "Streamed bodies and files are mutually exclusive."
++                )
+ 
+             if length is not None:
+-                self.headers['Content-Length'] = builtin_str(length)
++                self.headers["Content-Length"] = builtin_str(length)
+             else:
+-                self.headers['Transfer-Encoding'] = 'chunked'
++                self.headers["Transfer-Encoding"] = "chunked"
+         else:
+             # Multi-part file uploads.
+             if files:
+@@ -445,32 +517,34 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
+             else:
+                 if data and json is None:
+                     body = self._encode_params(data)
+-                    if isinstance(data, basestring) or hasattr(data, 'read'):
++                    if isinstance(data, basestring) or hasattr(data, "read"):
+                         content_type = None
+                     else:
+-                        content_type = 'application/x-www-form-urlencoded'
++                        content_type = "application/x-www-form-urlencoded"
+ 
+             self.prepare_content_length(body)
+ 
+             # Add content-type if it wasn't explicitly provided.
+-            if content_type and ('content-type' not in self.headers):
+-                self.headers['Content-Type'] = content_type
++            if content_type and ("content-type" not in self.headers):
++                self.headers["Content-Type"] = content_type
+ 
+         self.body = body
+ 
+     def prepare_content_length(self, body):
+-        if hasattr(body, 'seek') and hasattr(body, 'tell'):
++        if hasattr(body, "seek") and hasattr(body, "tell"):
+             body.seek(0, 2)
+-            self.headers['Content-Length'] = builtin_str(body.tell())
++            self.headers["Content-Length"] = builtin_str(body.tell())
+             body.seek(0, 0)
+         elif body is not None:
+             l = super_len(body)
+             if l:
+-                self.headers['Content-Length'] = builtin_str(l)
+-        elif (self.method not in ('GET', 'HEAD')) and (self.headers.get('Content-Length') is None):
+-            self.headers['Content-Length'] = '0'
++                self.headers["Content-Length"] = builtin_str(l)
++        elif (self.method not in ("GET", "HEAD")) and (
++            self.headers.get("Content-Length") is None
++        ):
++            self.headers["Content-Length"] = "0"
+ 
+-    def prepare_auth(self, auth, url=''):
++    def prepare_auth(self, auth, url=""):
+         """Prepares the given HTTP auth data."""
+ 
+         # If no Auth is explicitly provided, extract it from the URL first.
+@@ -510,7 +584,7 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
+ 
+         cookie_header = get_cookie_header(self._cookies, self)
+         if cookie_header is not None:
+-            self.headers['Cookie'] = cookie_header
++            self.headers["Cookie"] = cookie_header
+ 
+     def prepare_hooks(self, hooks):
+         """Prepares the given hooks."""
+@@ -528,8 +602,16 @@ class Response(object):
+     """
+ 
+     __attrs__ = [
+-        '_content', 'status_code', 'headers', 'url', 'history',
+-        'encoding', 'reason', 'cookies', 'elapsed', 'request'
++        "_content",
++        "status_code",
++        "headers",
++        "url",
++        "history",
++        "encoding",
++        "reason",
++        "cookies",
++        "elapsed",
++        "request",
+     ]
+ 
+     def __init__(self):
+@@ -586,21 +668,18 @@ class Response(object):
+         if not self._content_consumed:
+             self.content
+ 
+-        return dict(
+-            (attr, getattr(self, attr, None))
+-            for attr in self.__attrs__
+-        )
++        return dict((attr, getattr(self, attr, None)) for attr in self.__attrs__)
+ 
+     def __setstate__(self, state):
+         for name, value in state.items():
+             setattr(self, name, value)
+ 
+         # pickled objects do not have .raw
+-        setattr(self, '_content_consumed', True)
+-        setattr(self, 'raw', None)
++        setattr(self, "_content_consumed", True)
++        setattr(self, "raw", None)
+ 
+     def __repr__(self):
+-        return '<Response [%s]>' % (self.status_code)
++        return "<Response [%s]>" % (self.status_code)
+ 
+     def __bool__(self):
+         """Returns true if :attr:`status_code` is 'OK'."""
+@@ -627,17 +706,20 @@ class Response(object):
+         """True if this Response is a well-formed HTTP redirect that could have
+         been processed automatically (by :meth:`Session.resolve_redirects`).
+         """
+-        return ('location' in self.headers and self.status_code in REDIRECT_STATI)
++        return "location" in self.headers and self.status_code in REDIRECT_STATI
+ 
+     @property
+     def is_permanent_redirect(self):
+         """True if this Response one of the permanant versions of redirect"""
+-        return ('location' in self.headers and self.status_code in (codes.moved_permanently, codes.permanent_redirect))
++        return "location" in self.headers and self.status_code in (
++            codes.moved_permanently,
++            codes.permanent_redirect,
++        )
+ 
+     @property
+     def apparent_encoding(self):
+         """The apparent encoding, provided by the chardet library"""
+-        return chardet.detect(self.content)['encoding']
++        return chardet.detect(self.content)["encoding"]
+ 
+     def iter_content(self, chunk_size=1, decode_unicode=False):
+         """Iterates over the response data.  When stream=True is set on the
+@@ -652,16 +734,16 @@ class Response(object):
+ 
+         def generate():
+             # Special case for urllib3.
+-            if hasattr(self.raw, 'stream'):
++            if hasattr(self.raw, "stream"):
+                 try:
+                     for chunk in self.raw.stream(chunk_size, decode_content=True):
+                         yield chunk
+                 except ProtocolError as e:
+                     raise ChunkedEncodingError(e)
+-                except DecodeError as e:
+-                    raise ContentDecodingError(e)
+-                except ReadTimeoutError as e:
+-                    raise ConnectionError(e)
++                except _DecodeError as e:
++                    raise DecodeError(e)
++                except _ReadTimeoutError as e:
++                    raise TimeoutErrorWrapper(e)
+             else:
+                 # Standard file-like object.
+                 while True:
+@@ -686,7 +768,9 @@ class Response(object):
+ 
+         return chunks
+ 
+-    def iter_lines(self, chunk_size=ITER_CHUNK_SIZE, decode_unicode=None, delimiter=None):
++    def iter_lines(
++        self, chunk_size=ITER_CHUNK_SIZE, decode_unicode=None, delimiter=None
++    ):
+         """Iterates over the response data, one line at a time.  When
+         stream=True is set on the request, this avoids reading the
+         content at once into memory for large responses.
+@@ -696,8 +780,9 @@ class Response(object):
+ 
+         pending = None
+ 
+-        for chunk in self.iter_content(chunk_size=chunk_size, decode_unicode=decode_unicode):
+-
++        for chunk in self.iter_content(
++            chunk_size=chunk_size, decode_unicode=decode_unicode
++        ):
+             if pending is not None:
+                 chunk = pending + chunk
+ 
+@@ -726,12 +811,15 @@ class Response(object):
+             try:
+                 if self._content_consumed:
+                     raise RuntimeError(
+-                        'The content for this response was already consumed')
++                        "The content for this response was already consumed"
++                    )
+ 
+                 if self.status_code == 0:
+                     self._content = None
+                 else:
+-                    self._content = bytes().join(self.iter_content(CONTENT_CHUNK_SIZE)) or bytes()
++                    self._content = (
++                        bytes().join(self.iter_content(CONTENT_CHUNK_SIZE)) or bytes()
++                    )
+ 
+             except AttributeError:
+                 self._content = None
+@@ -759,7 +847,7 @@ class Response(object):
+         encoding = self.encoding
+ 
+         if not self.content:
+-            return str('')
++            return str("")
+ 
+         # Fallback to auto-detected encoding.
+         if self.encoding is None:
+@@ -767,7 +855,7 @@ class Response(object):
+ 
+         # Decode unicode from given encoding.
+         try:
+-            content = str(self.content, encoding, errors='replace')
++            content = str(self.content, encoding, errors="replace")
+         except (LookupError, TypeError):
+             # A LookupError is raised if the encoding was not found which could
+             # indicate a misspelling or similar mistake.
+@@ -775,7 +863,7 @@ class Response(object):
+             # A TypeError can be raised if encoding is None
+             #
+             # So we try blindly encoding.
+-            content = str(self.content, errors='replace')
++            content = str(self.content, errors="replace")
+ 
+         return content
+ 
+@@ -793,9 +881,7 @@ class Response(object):
+             encoding = guess_json_utf(self.content)
+             if encoding is not None:
+                 try:
+-                    return complexjson.loads(
+-                        self.content.decode(encoding), **kwargs
+-                    )
++                    return complexjson.loads(self.content.decode(encoding), **kwargs)
+                 except UnicodeDecodeError:
+                     # Wrong UTF codec detected; usually because it's not UTF-8
+                     # but some other 8-bit codec.  This is an RFC violation,
+@@ -808,7 +894,7 @@ class Response(object):
+     def links(self):
+         """Returns the parsed header links of the response, if any."""
+ 
+-        header = self.headers.get('link')
++        header = self.headers.get("link")
+ 
+         # l = MultiDict()
+         l = {}
+@@ -817,7 +903,7 @@ class Response(object):
+             links = parse_header_links(header)
+ 
+             for link in links:
+-                key = link.get('rel') or link.get('url')
++                key = link.get("rel") or link.get("url")
+                 l[key] = link
+ 
+         return l
+@@ -825,13 +911,21 @@ class Response(object):
+     def raise_for_status(self):
+         """Raises stored :class:`HTTPError`, if one occurred."""
+ 
+-        http_error_msg = ''
++        http_error_msg = ""
+ 
+         if 400 <= self.status_code < 500:
+-            http_error_msg = '%s Client Error: %s for url: %s' % (self.status_code, self.reason, self.url)
++            http_error_msg = "%s Client Error: %s for url: %s" % (
++                self.status_code,
++                self.reason,
++                self.url,
++            )
+ 
+         elif 500 <= self.status_code < 600:
+-            http_error_msg = '%s Server Error: %s for url: %s' % (self.status_code, self.reason, self.url)
++            http_error_msg = "%s Server Error: %s for url: %s" % (
++                self.status_code,
++                self.reason,
++                self.url,
++            )
+ 
+         if http_error_msg:
+             raise HTTPError(http_error_msg, response=self)

@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 159.5,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 158336,
+    "duration_api_ms": 137622,
+    "num_turns": 28,
+    "result": "All tests pass. The fix is minimal and correct:\n\n**The fix**: Set `self.query.subquery = True` in `Subquery.__init__()` (`expressions.py:1153`).\n\n**Why it works**: `Query.as_sql()` wraps the SQL in parentheses only when `subquery=True`. `Subquery.as_sql()` then calls `query.as_sql()` and strips `[1:-1]` to remove those parentheses before re-wrapping with the template `(%(subquery)s)`. Without `subquery=True`, the query returns unwrapped SQL, so `[1:-1]` strips the first and last actual characters instead.",
+    "stop_reason": "end_turn",
+    "session_id": "6afe5797-936e-46a0-97dc-5a2cbd24c499",
+    "total_cost_usd": 0.34539885000000004,
+    "usage": {
+      "input_tokens": 94,
+      "cache_creation_input_tokens": 21257,
+      "cache_read_input_tokens": 603227,
+      "output_tokens": 5629,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 21257
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 94,
+        "outputTokens": 5629,
+        "cacheReadInputTokens": 603227,
+        "cacheCreationInputTokens": 21257,
+        "webSearchRequests": 0,
+        "costUSD": 0.34539885000000004,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "bb2ffa74-01be-435a-ad92-25dab8ad82ba"
+  },
+  "stderr": ""
+}

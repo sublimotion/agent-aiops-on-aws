@@ -31,6 +31,7 @@ Read these files **on demand** based on what you're doing:
 | Deploying an agent-runtime blueprint | `domains/agent-runtime/specs/<name>.md` |
 | Running an autoresearch experiment | `domains/autoresearch/specs/<name>.md` |
 | Running the compound step after deployment | `domains/<domain>/blueprints/<name>/lessons.md` + `.claude/steering/*.md`; compound-learner must generate YAML frontmatter (see `docs/card-format.md`) as its final step, then run `scripts/fe.sh learn <path>` |
+| Fixing lint, checkov, tflint, or pre-commit failures | `.claude/steering/lint-remediation.md` |
 | Running pre-flight or post-deploy checks | Use the `deployment-orchestrator` skill |
 | Validating GPU hardware before serving (Stage 4a) | Use `gpu-infra` MCP tools: `discover_cluster`, `check_gpu_health`, `run_nccl_test` |
 | Diagnosing GPU hardware issues | Use `gpu-infra` MCP tools: `explain_xid`, `get_gpu_metrics`, `check_gpu_health` |
@@ -53,14 +54,24 @@ Read these files **on demand** based on what you're doing:
 | `domains/gpu-serving/blueprints/nemotron-super/` | `domains/gpu-serving/specs/nemotron-super.md` |
 | `domains/gpu-serving/blueprints/ray-serve-ft/` | `domains/gpu-serving/specs/ray-serve-ft.md` |
 | `domains/gpu-serving/blueprints/ray-serve-video/` | `domains/gpu-serving/specs/ray-serve-video.md` |
+| `domains/gpu-serving/blueprints/llmd-hyperpod/` | `domains/gpu-serving/specs/llmd-hyperpod.md` |
+| `domains/gpu-serving/blueprints/dynamo-hyperpod/` | `domains/gpu-serving/specs/dynamo-hyperpod.md` |
+| `domains/gpu-serving/blueprints/gemma4-hyperpod/` | `domains/gpu-serving/specs/gemma4-hyperpod.md` |
+| `domains/gpu-serving/blueprints/gemma4-4b-hyperpod/` | `domains/gpu-serving/specs/gemma4-4b-hyperpod.md` |
+| `domains/gpu-serving/blueprints/mistral-small-4-hyperpod/` | `domains/gpu-serving/specs/mistral-small-4-hyperpod.md` |
+| `domains/gpu-serving/blueprints/kimi-k2-thinking/` | `domains/gpu-serving/specs/kimi-k2-thinking.md` |
+| `domains/gpu-serving/blueprints/qwen3-235b-b300/` | `domains/gpu-serving/specs/qwen3-235b-b300.md` |
 | `domains/agent-runtime/blueprints/research-agent/` | `domains/agent-runtime/specs/research-agent.md` |
 | `domains/autoresearch/blueprints/training-recipes/` | `domains/autoresearch/specs/training-recipes.md` |
 | `domains/autoresearch/blueprints/agent-harness/` | `domains/autoresearch/specs/agent-harness.md` |
 | `domains/autoresearch/blueprints/finetuning-recipes/` | `domains/autoresearch/specs/finetuning-recipes.md` |
+| `domains/autoresearch/blueprints/finetuning-recipes-1.7b/` | `domains/autoresearch/specs/finetuning-recipes-1.7b.md` |
 | `domains/autoresearch/blueprints/agent-swarm/` | `domains/autoresearch/specs/agent-swarm.md` |
 | `domains/autoresearch/blueprints/verifier-reward/` | `domains/autoresearch/specs/verifier-reward.md` |
 | `domains/autoresearch/blueprints/coderforge-eval/` | `domains/autoresearch/specs/coderforge-eval.md` |
 | `domains/autoresearch/blueprints/verification-primitives/` | `domains/autoresearch/specs/verification-primitives.md` |
+| `domains/autoresearch/blueprints/verification-primitives-swebench/` | `domains/autoresearch/specs/verification-primitives-swebench.md` |
+| `domains/autoresearch/blueprints/boltz2-foldbench/` | `domains/autoresearch/specs/boltz2-foldbench.md` |
 
 **Blueprint-local context** — for operational details (lessons, results, plans), look inside the blueprint directory itself rather than in specs.
 

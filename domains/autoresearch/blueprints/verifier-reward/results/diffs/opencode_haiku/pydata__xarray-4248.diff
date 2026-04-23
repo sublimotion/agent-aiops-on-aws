@@ -1,0 +1,107 @@
+diff --git a/xarray/core/formatting.py b/xarray/core/formatting.py
+index 28eaae5f..5799fadf 100644
+--- a/xarray/core/formatting.py
++++ b/xarray/core/formatting.py
+@@ -1,5 +1,5 @@
+-"""String formatting routines for __repr__.
+-"""
++"""String formatting routines for __repr__."""
++
+ import contextlib
+ import functools
+ from datetime import datetime, timedelta
+@@ -278,7 +278,15 @@ def summarize_variable(
+             raise TypeError(f"`max_width` value of `{max_width}` is not a valid int")
+         else:
+             max_width = max_width_options
+-    first_col = pretty_print(f"  {marker} {name} ", col_width)
++
++    # Get units from variable attributes if available
++    units = var.attrs.get("units", None)
++    if units:
++        name_str = f"{name}, in {units}"
++    else:
++        name_str = name
++
++    first_col = pretty_print(f"  {marker} {name_str} ", col_width)
+     if var.dims:
+         dims_str = "({}) ".format(", ".join(map(str, var.dims)))
+     else:
+@@ -356,15 +364,32 @@ def _get_col_items(mapping):
+     return col_items
+ 
+ 
+-def _calculate_col_width(col_items):
+-    max_name_length = max(len(str(s)) for s in col_items) if col_items else 0
++def _calculate_col_width(col_items, mapping=None):
++    """Calculate column width for formatting, accounting for units if provided."""
++    max_name_length = 0
++
++    if col_items:
++        for s in col_items:
++            # Calculate base name length
++            name_length = len(str(s))
++
++            # If mapping is provided, account for units
++            if mapping is not None and s in mapping:
++                var = getattr(mapping[s], "variable", mapping[s])
++                units = var.attrs.get("units", None)
++                if units:
++                    # Add ", in {units}" to the length calculation
++                    name_length += len(f", in {units}")
++
++            max_name_length = max(max_name_length, name_length)
++
+     col_width = max(max_name_length, 7) + 6
+     return col_width
+ 
+ 
+ def _mapping_repr(mapping, title, summarizer, col_width=None):
+     if col_width is None:
+-        col_width = _calculate_col_width(mapping)
++        col_width = _calculate_col_width(_get_col_items(mapping), mapping=mapping)
+     summary = [f"{title}:"]
+     if mapping:
+         summary += [summarizer(k, v, col_width) for k, v in mapping.items()]
+@@ -385,7 +410,7 @@ attrs_repr = functools.partial(
+ 
+ def coords_repr(coords, col_width=None):
+     if col_width is None:
+-        col_width = _calculate_col_width(_get_col_items(coords))
++        col_width = _calculate_col_width(_get_col_items(coords), mapping=coords)
+     return _mapping_repr(
+         coords, title="Coordinates", summarizer=summarize_coord, col_width=col_width
+     )
+@@ -495,7 +520,7 @@ def array_repr(arr):
+ def dataset_repr(ds):
+     summary = ["<xarray.{}>".format(type(ds).__name__)]
+ 
+-    col_width = _calculate_col_width(_get_col_items(ds.variables))
++    col_width = _calculate_col_width(_get_col_items(ds.variables), mapping=ds.variables)
+ 
+     dims_start = pretty_print("Dimensions:", col_width)
+     summary.append("{}({})".format(dims_start, dim_summary(ds)))
+@@ -644,7 +669,10 @@ def diff_array_repr(a, b, compat):
+         summary += ["Differing values:"] + diff_data_repr
+ 
+     if hasattr(a, "coords"):
+-        col_width = _calculate_col_width(set(a.coords) | set(b.coords))
++        merged_coords = {**a.coords, **b.coords}
++        col_width = _calculate_col_width(
++            set(a.coords) | set(b.coords), mapping=merged_coords
++        )
+         summary.append(
+             diff_coords_repr(a.coords, b.coords, compat, col_width=col_width)
+         )
+@@ -662,8 +690,10 @@ def diff_dataset_repr(a, b, compat):
+         )
+     ]
+ 
++    merged_variables = {**a.variables, **b.variables}
+     col_width = _calculate_col_width(
+-        set(_get_col_items(a.variables) + _get_col_items(b.variables))
++        set(_get_col_items(a.variables) + _get_col_items(b.variables)),
++        mapping=merged_variables,
+     )
+ 
+     summary.append(diff_dim_summary(a, b))

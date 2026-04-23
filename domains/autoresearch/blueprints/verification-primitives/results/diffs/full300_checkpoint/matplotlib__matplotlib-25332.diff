@@ -1,0 +1,36 @@
+diff --git a/lib/matplotlib/cbook.py b/lib/matplotlib/cbook.py
+index c9699b2e21..cc02287b8f 100644
+--- a/lib/matplotlib/cbook.py
++++ b/lib/matplotlib/cbook.py
+@@ -788,6 +788,31 @@ class Grouper:
+     def __init__(self, init=()):
+         self._mapping = {weakref.ref(x): [weakref.ref(x)] for x in init}
+ 
++    def __getstate__(self):
++        return {'_mapping': {x(): [y() for y in group]
++                             for x, group in self._mapping.items()
++                             if x() is not None}}
++
++    def __setstate__(self, state):
++        # Reconstruct _mapping with weakrefs, preserving shared list identity
++        # for members of the same group.  The serialised form maps each object
++        # to the list of all objects in its group; objects in the same group
++        # share the same Python list object, so we rebuild that invariant by
++        # keying on the id() of the serialised list.
++        self._mapping = {}
++        # serial_id_to_ref_list: maps id(serialised_list) -> rebuilt list of
++        # weakrefs, so that every key that belonged to the same group gets
++        # assigned the *same* list object.
++        serial_id_to_ref_list = {}
++        for obj, group in state['_mapping'].items():
++            if obj is None:
++                continue
++            serial_id = id(group)
++            if serial_id not in serial_id_to_ref_list:
++                serial_id_to_ref_list[serial_id] = [
++                    weakref.ref(i) for i in group if i is not None]
++            self._mapping[weakref.ref(obj)] = serial_id_to_ref_list[serial_id]
++
+     def __contains__(self, item):
+         return weakref.ref(item) in self._mapping
+ 

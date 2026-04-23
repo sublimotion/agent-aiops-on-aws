@@ -1,0 +1,21 @@
+diff --git a/astropy/io/ascii/qdp.py b/astropy/io/ascii/qdp.py
+index 83a4f004a..4305e2c53 100644
+--- a/astropy/io/ascii/qdp.py
++++ b/astropy/io/ascii/qdp.py
+@@ -4,6 +4,7 @@ This package contains functions for reading and writing QDP tables that are
+ not meant to be used directly, but instead are available as readers/writers in
+ `astropy.table`. See :ref:`astropy:table_io` for more details.
+ """
++
+ import copy
+ import re
+ import warnings
+@@ -60,7 +61,7 @@ def _line_type(line, delimiter=None):
+     ValueError: Unrecognized QDP line...
+     """
+     _decimal_re = r"[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?"
+-    _command_re = r"READ [TS]ERR(\s+[0-9]+)+"
++    _command_re = r"(?i:READ [TS]ERR)(\s+[0-9]+)+"
+ 
+     sep = delimiter
+     if delimiter is None:

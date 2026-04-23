@@ -1,0 +1,1836 @@
+diff --git a/lib/mpl_toolkits/mplot3d/axes3d.py b/lib/mpl_toolkits/mplot3d/axes3d.py
+index 9db44b7994..2deedf3cfe 100644
+--- a/lib/mpl_toolkits/mplot3d/axes3d.py
++++ b/lib/mpl_toolkits/mplot3d/axes3d.py
+@@ -40,13 +40,13 @@ from . import axis3d
+ 
+ 
+ @_docstring.interpd
+-@_api.define_aliases({
+-    "xlim": ["xlim3d"], "ylim": ["ylim3d"], "zlim": ["zlim3d"]})
++@_api.define_aliases({"xlim": ["xlim3d"], "ylim": ["ylim3d"], "zlim": ["zlim3d"]})
+ class Axes3D(Axes):
+     """
+     3D Axes object.
+     """
+-    name = '3d'
++
++    name = "3d"
+ 
+     _axis_names = ("x", "y", "z")
+     Axes._shared_axes["z"] = cbook.Grouper()
+@@ -54,10 +54,20 @@ class Axes3D(Axes):
+     dist = _api.deprecate_privatize_attribute("3.6")
+ 
+     def __init__(
+-            self, fig, rect=None, *args,
+-            elev=30, azim=-60, roll=0, sharez=None, proj_type='persp',
+-            box_aspect=None, computed_zorder=True, focal_length=None,
+-            **kwargs):
++        self,
++        fig,
++        rect=None,
++        *args,
++        elev=30,
++        azim=-60,
++        roll=0,
++        sharez=None,
++        proj_type="persp",
++        box_aspect=None,
++        computed_zorder=True,
++        focal_length=None,
++        **kwargs,
++    ):
+         """
+         Parameters
+         ----------
+@@ -139,9 +149,9 @@ class Axes3D(Axes):
+         self._sharez = sharez
+         if sharez is not None:
+             self._shared_axes["z"].join(self, sharez)
+-            self._adjustable = 'datalim'
++            self._adjustable = "datalim"
+ 
+-        auto_add_to_figure = kwargs.pop('auto_add_to_figure', False)
++        auto_add_to_figure = kwargs.pop("auto_add_to_figure", False)
+ 
+         super().__init__(
+             fig, rect, frameon=True, box_aspect=box_aspect, *args, **kwargs
+@@ -157,11 +167,14 @@ class Axes3D(Axes):
+ 
+         self.mouse_init()
+         self.figure.canvas.callbacks._connect_picklable(
+-            'motion_notify_event', self._on_move)
++            "motion_notify_event", self._on_move
++        )
+         self.figure.canvas.callbacks._connect_picklable(
+-            'button_press_event', self._button_press)
++            "button_press_event", self._button_press
++        )
+         self.figure.canvas.callbacks._connect_picklable(
+-            'button_release_event', self._button_release)
++            "button_release_event", self._button_release
++        )
+         self.set_top_view()
+ 
+         self.patch.set_linewidth(0)
+@@ -175,14 +188,17 @@ class Axes3D(Axes):
+ 
+         if auto_add_to_figure:
+             _api.warn_deprecated(
+-                "3.4", removal="3.7", message="Axes3D(fig) adding itself "
++                "3.4",
++                removal="3.7",
++                message="Axes3D(fig) adding itself "
+                 "to the figure is deprecated since %(since)s. "
+                 "Pass the keyword argument auto_add_to_figure=False "
+                 "and use fig.add_axes(ax) to suppress this warning. "
+                 "The default value of auto_add_to_figure is changed to "
+                 "False in mpl3.6 and True values will "
+                 "no longer work %(removal)s.  This is consistent with "
+-                "other Axes classes.")
++                "other Axes classes.",
++            )
+             fig.add_axes(self)
+ 
+     def set_axis_off(self):
+@@ -226,22 +242,27 @@ class Axes3D(Axes):
+     get_zticklines = _axis_method_wrapper("zaxis", "get_ticklines")
+ 
+     w_xaxis = _api.deprecated("3.1", alternative="xaxis", pending=True)(
+-        property(lambda self: self.xaxis))
++        property(lambda self: self.xaxis)
++    )
+     w_yaxis = _api.deprecated("3.1", alternative="yaxis", pending=True)(
+-        property(lambda self: self.yaxis))
++        property(lambda self: self.yaxis)
++    )
+     w_zaxis = _api.deprecated("3.1", alternative="zaxis", pending=True)(
+-        property(lambda self: self.zaxis))
++        property(lambda self: self.zaxis)
++    )
+ 
+     def unit_cube(self, vals=None):
+         minx, maxx, miny, maxy, minz, maxz = vals or self.get_w_lims()
+-        return [(minx, miny, minz),
+-                (maxx, miny, minz),
+-                (maxx, maxy, minz),
+-                (minx, maxy, minz),
+-                (minx, miny, maxz),
+-                (maxx, miny, maxz),
+-                (maxx, maxy, maxz),
+-                (minx, maxy, maxz)]
++        return [
++            (minx, miny, minz),
++            (maxx, miny, minz),
++            (maxx, maxy, minz),
++            (minx, maxy, minz),
++            (minx, miny, maxz),
++            (maxx, miny, maxz),
++            (maxx, maxy, maxz),
++            (minx, maxy, maxz),
++        ]
+ 
+     def tunit_cube(self, vals=None, M=None):
+         if M is None:
+@@ -252,20 +273,20 @@ class Axes3D(Axes):
+ 
+     def tunit_edges(self, vals=None, M=None):
+         tc = self.tunit_cube(vals, M)
+-        edges = [(tc[0], tc[1]),
+-                 (tc[1], tc[2]),
+-                 (tc[2], tc[3]),
+-                 (tc[3], tc[0]),
+-
+-                 (tc[0], tc[4]),
+-                 (tc[1], tc[5]),
+-                 (tc[2], tc[6]),
+-                 (tc[3], tc[7]),
+-
+-                 (tc[4], tc[5]),
+-                 (tc[5], tc[6]),
+-                 (tc[6], tc[7]),
+-                 (tc[7], tc[4])]
++        edges = [
++            (tc[0], tc[1]),
++            (tc[1], tc[2]),
++            (tc[2], tc[3]),
++            (tc[3], tc[0]),
++            (tc[0], tc[4]),
++            (tc[1], tc[5]),
++            (tc[2], tc[6]),
++            (tc[3], tc[7]),
++            (tc[4], tc[5]),
++            (tc[5], tc[6]),
++            (tc[6], tc[7]),
++            (tc[7], tc[4]),
++        ]
+         return edges
+ 
+     def set_aspect(self, aspect, adjustable=None, anchor=None, share=False):
+@@ -321,13 +342,12 @@ class Axes3D(Axes):
+         --------
+         mpl_toolkits.mplot3d.axes3d.Axes3D.set_box_aspect
+         """
+-        if aspect != 'auto':
++        if aspect != "auto":
+             raise NotImplementedError(
+                 "Axes3D currently only supports the aspect argument "
+                 f"'auto'. You passed in {aspect!r}."
+             )
+-        super().set_aspect(
+-            aspect, adjustable=adjustable, anchor=anchor, share=share)
++        super().set_aspect(aspect, adjustable=adjustable, anchor=anchor, share=share)
+ 
+     def set_box_aspect(self, aspect, *, zoom=1):
+         """
+@@ -355,7 +375,7 @@ class Axes3D(Axes):
+             Control overall size of the Axes3D in the figure. Must be > 0.
+         """
+         if zoom <= 0:
+-            raise ValueError(f'Argument zoom = {zoom} must be > 0')
++            raise ValueError(f"Argument zoom = {zoom} must be > 0")
+ 
+         if aspect is None:
+             aspect = np.asarray((4, 4, 3), dtype=float)
+@@ -383,10 +403,12 @@ class Axes3D(Axes):
+         box_aspect = 1
+         pb = position.frozen()
+         pb1 = pb.shrunk_to_aspect(box_aspect, pb, fig_aspect)
+-        self._set_position(pb1.anchored(self.get_anchor(), pb), 'active')
++        self._set_position(pb1.anchored(self.get_anchor(), pb), "active")
+ 
+     @martist.allow_rasterization
+     def draw(self, renderer):
++        if not self.get_visible():
++            return
+         self._unstale_viewLim()
+ 
+         # draw the background patch
+@@ -409,19 +431,24 @@ class Axes3D(Axes):
+         self.M = self.get_proj()
+ 
+         collections_and_patches = (
+-            artist for artist in self._children
++            artist
++            for artist in self._children
+             if isinstance(artist, (mcoll.Collection, mpatches.Patch))
+-            and artist.get_visible())
++            and artist.get_visible()
++        )
+         if self.computed_zorder:
+             # Calculate projection of collections and patches and zorder
+             # them. Make sure they are drawn above the grids.
+-            zorder_offset = max(axis.get_zorder()
+-                                for axis in self._axis_map.values()) + 1
++            zorder_offset = (
++                max(axis.get_zorder() for axis in self._axis_map.values()) + 1
++            )
+             collection_zorder = patch_zorder = zorder_offset
+ 
+-            for artist in sorted(collections_and_patches,
+-                                 key=lambda artist: artist.do_3d_projection(),
+-                                 reverse=True):
++            for artist in sorted(
++                collections_and_patches,
++                key=lambda artist: artist.do_3d_projection(),
++                reverse=True,
++            ):
+                 if isinstance(artist, mcoll.Collection):
+                     artist.zorder = collection_zorder
+                     collection_zorder += 1
+@@ -488,19 +515,22 @@ class Axes3D(Axes):
+         ``(xmargin, ymargin, zmargin)``.
+         """
+         if margins and x is not None and y is not None and z is not None:
+-            raise TypeError('Cannot pass both positional and keyword '
+-                            'arguments for x, y, and/or z.')
++            raise TypeError(
++                "Cannot pass both positional and keyword arguments for x, y, and/or z."
++            )
+         elif len(margins) == 1:
+             x = y = z = margins[0]
+         elif len(margins) == 3:
+             x, y, z = margins
+         elif margins:
+-            raise TypeError('Must pass a single positional argument for all '
+-                            'margins, or one for each margin (x, y, z).')
++            raise TypeError(
++                "Must pass a single positional argument for all "
++                "margins, or one for each margin (x, y, z)."
++            )
+ 
+         if x is None and y is None and z is None:
+             if tight is not True:
+-                _api.warn_external(f'ignoring tight={tight!r} in get mode')
++                _api.warn_external(f"ignoring tight={tight!r} in get mode")
+             return self._xmargin, self._ymargin, self._zmargin
+ 
+         if x is not None:
+@@ -511,11 +541,13 @@ class Axes3D(Axes):
+             self.set_zmargin(z)
+ 
+         self.autoscale_view(
+-            tight=tight, scalex=(x is not None), scaley=(y is not None),
+-            scalez=(z is not None)
++            tight=tight,
++            scalex=(x is not None),
++            scaley=(y is not None),
++            scalez=(z is not None),
+         )
+ 
+-    def autoscale(self, enable=True, axis='both', tight=None):
++    def autoscale(self, enable=True, axis="both", tight=None):
+         """
+         Convenience method for simple axis view autoscaling.
+ 
+@@ -528,17 +560,17 @@ class Axes3D(Axes):
+             scaley = True
+             scalez = True
+         else:
+-            if axis in ['x', 'both']:
++            if axis in ["x", "both"]:
+                 self.set_autoscalex_on(bool(enable))
+                 scalex = self.get_autoscalex_on()
+             else:
+                 scalex = False
+-            if axis in ['y', 'both']:
++            if axis in ["y", "both"]:
+                 self.set_autoscaley_on(bool(enable))
+                 scaley = self.get_autoscaley_on()
+             else:
+                 scaley = False
+-            if axis in ['z', 'both']:
++            if axis in ["z", "both"]:
+                 self.set_autoscalez_on(bool(enable))
+                 scalez = self.get_autoscalez_on()
+             else:
+@@ -555,7 +587,8 @@ class Axes3D(Axes):
+         # minimum sized rectangular volume holds the data.
+         if np.shape(X) == np.shape(Y):
+             self.xy_dataLim.update_from_data_xy(
+-                np.column_stack([np.ravel(X), np.ravel(Y)]), not had_data)
++                np.column_stack([np.ravel(X), np.ravel(Y)]), not had_data
++            )
+         else:
+             self.xy_dataLim.update_from_data_x(X, not had_data)
+             self.xy_dataLim.update_from_data_y(Y, not had_data)
+@@ -564,8 +597,7 @@ class Axes3D(Axes):
+         # Let autoscale_view figure out how to use this data.
+         self.autoscale_view()
+ 
+-    def autoscale_view(self, tight=None, scalex=True, scaley=True,
+-                       scalez=True):
++    def autoscale_view(self, tight=None, scalex=True, scaley=True, scalez=True):
+         """
+         Autoscale the view limits using the data limits.
+ 
+@@ -635,8 +667,9 @@ class Axes3D(Axes):
+ 
+     # set_xlim, set_ylim are directly inherited from base Axes.
+     @_api.make_keyword_only("3.6", "emit")
+-    def set_zlim(self, bottom=None, top=None, emit=True, auto=False,
+-                 *, zmin=None, zmax=None):
++    def set_zlim(
++        self, bottom=None, top=None, emit=True, auto=False, *, zmin=None, zmax=None
++    ):
+         """
+         Set 3D z limits.
+ 
+@@ -712,7 +745,8 @@ class Axes3D(Axes):
+             Keyword arguments are nominally forwarded to the scale class, but
+             none of them is applicable for linear scales.
+         """.format,
+-        ["x", "y", "z"])
++        ["x", "y", "z"],
++    )
+ 
+     get_zticks = _axis_method_wrapper("zaxis", "get_ticklocs")
+     set_zticks = _axis_method_wrapper("zaxis", "set_ticks")
+@@ -720,8 +754,8 @@ class Axes3D(Axes):
+     get_zminorticklabels = _axis_method_wrapper("zaxis", "get_minorticklabels")
+     get_zticklabels = _axis_method_wrapper("zaxis", "get_ticklabels")
+     set_zticklabels = _axis_method_wrapper(
+-        "zaxis", "_set_ticklabels",
+-        doc_sub={"Axis.set_ticks": "Axes3D.set_zticks"})
++        "zaxis", "_set_ticklabels", doc_sub={"Axis.set_ticks": "Axes3D.set_zticks"}
++    )
+ 
+     zaxis_date = _axis_method_wrapper("zaxis", "axis_date")
+     if zaxis_date.__doc__:
+@@ -806,18 +840,21 @@ class Axes3D(Axes):
+             The focal length can be computed from a desired Field Of View via
+             the equation: focal_length = 1/tan(FOV/2)
+         """
+-        _api.check_in_list(['persp', 'ortho'], proj_type=proj_type)
+-        if proj_type == 'persp':
++        _api.check_in_list(["persp", "ortho"], proj_type=proj_type)
++        if proj_type == "persp":
+             if focal_length is None:
+                 focal_length = 1
+             elif focal_length <= 0:
+-                raise ValueError(f"focal_length = {focal_length} must be "
+-                                 "greater than 0")
++                raise ValueError(
++                    f"focal_length = {focal_length} must be greater than 0"
++                )
+             self._focal_length = focal_length
+-        elif proj_type == 'ortho':
++        elif proj_type == "ortho":
+             if focal_length not in (None, np.inf):
+-                raise ValueError(f"focal_length = {focal_length} must be "
+-                                 f"None for proj_type = {proj_type}")
++                raise ValueError(
++                    f"focal_length = {focal_length} must be "
++                    f"None for proj_type = {proj_type}"
++                )
+             self._focal_length = np.inf
+ 
+     def _roll_to_vertical(self, arr):
+@@ -884,9 +921,9 @@ class Axes3D(Axes):
+             # Scale the eye dist to compensate for the focal length zoom effect
+             eye_focal = R + self._dist * ps * self._focal_length
+             viewM = proj3d.view_transformation(eye_focal, R, V, roll_rad)
+-            projM = proj3d.persp_transformation(-self._dist,
+-                                                self._dist,
+-                                                self._focal_length)
++            projM = proj3d.persp_transformation(
++                -self._dist, self._dist, self._focal_length
++            )
+ 
+         # Combine all the transformation matrices to get the final projection
+         M0 = np.dot(viewM, worldM)
+@@ -943,7 +980,7 @@ class Axes3D(Axes):
+             self.set_zlim(z0, z1, emit=False, auto=None)
+             self.zaxis._set_scale(self._sharez.zaxis.get_scale())
+         else:
+-            self.zaxis._set_scale('linear')
++            self.zaxis._set_scale("linear")
+             try:
+                 self.set_zlim(0, 1)
+             except TypeError:
+@@ -951,11 +988,11 @@ class Axes3D(Axes):
+ 
+         self.set_autoscalez_on(True)
+         if self._focal_length == np.inf:
+-            self._zmargin = rcParams['axes.zmargin']
++            self._zmargin = rcParams["axes.zmargin"]
+         else:
+-            self._zmargin = 0.
++            self._zmargin = 0.0
+ 
+-        self.grid(rcParams['axes3d.grid'])
++        self.grid(rcParams["axes3d.grid"])
+ 
+     def _button_press(self, event):
+         if event.inaxes == self:
+@@ -973,8 +1010,14 @@ class Axes3D(Axes):
+ 
+     def _get_view(self):
+         # docstring inherited
+-        return (self.get_xlim(), self.get_ylim(), self.get_zlim(),
+-                self.elev, self.azim, self.roll)
++        return (
++            self.get_xlim(),
++            self.get_ylim(),
++            self.get_zlim(),
++            self.elev,
++            self.azim,
++            self.roll,
++        )
+ 
+     def _set_view(self, view):
+         # docstring inherited
+@@ -1005,37 +1048,39 @@ class Axes3D(Axes):
+         """
+ 
+         if self.M is None:
+-            return ''
++            return ""
+ 
+         if self.button_pressed in self._rotate_btn:
+             # ignore xd and yd and display angles instead
+             norm_elev = art3d._norm_angle(self.elev)
+             norm_azim = art3d._norm_angle(self.azim)
+             norm_roll = art3d._norm_angle(self.roll)
+-            return (f"elevation={norm_elev:.0f}\N{DEGREE SIGN}, "
+-                    f"azimuth={norm_azim:.0f}\N{DEGREE SIGN}, "
+-                    f"roll={norm_roll:.0f}\N{DEGREE SIGN}"
+-                    ).replace("-", "\N{MINUS SIGN}")
++            return (
++                f"elevation={norm_elev:.0f}\N{DEGREE SIGN}, "
++                f"azimuth={norm_azim:.0f}\N{DEGREE SIGN}, "
++                f"roll={norm_roll:.0f}\N{DEGREE SIGN}"
++            ).replace("-", "\N{MINUS SIGN}")
+ 
+         # nearest edge
+-        p0, p1 = min(self.tunit_edges(),
+-                     key=lambda edge: proj3d._line2d_seg_dist(
+-                         edge[0], edge[1], (xd, yd)))
++        p0, p1 = min(
++            self.tunit_edges(),
++            key=lambda edge: proj3d._line2d_seg_dist(edge[0], edge[1], (xd, yd)),
++        )
+ 
+         # scale the z value to match
+         x0, y0, z0 = p0
+         x1, y1, z1 = p1
+-        d0 = np.hypot(x0-xd, y0-yd)
+-        d1 = np.hypot(x1-xd, y1-yd)
+-        dt = d0+d1
+-        z = d1/dt * z0 + d0/dt * z1
++        d0 = np.hypot(x0 - xd, y0 - yd)
++        d1 = np.hypot(x1 - xd, y1 - yd)
++        dt = d0 + d1
++        z = d1 / dt * z0 + d0 / dt * z1
+ 
+         x, y, z = proj3d.inv_transform(xd, yd, z, self.M)
+ 
+         xs = self.format_xdata(x)
+         ys = self.format_ydata(y)
+         zs = self.format_zdata(z)
+-        return 'x=%s, y=%s, z=%s' % (xs, ys, zs)
++        return "x=%s, y=%s, z=%s" % (xs, ys, zs)
+ 
+     def _on_move(self, event):
+         """
+@@ -1069,8 +1114,8 @@ class Axes3D(Axes):
+                 return
+ 
+             roll = np.deg2rad(self.roll)
+-            delev = -(dy/h)*180*np.cos(roll) + (dx/w)*180*np.sin(roll)
+-            dazim = -(dy/h)*180*np.sin(roll) - (dx/w)*180*np.cos(roll)
++            delev = -(dy / h) * 180 * np.cos(roll) + (dx / w) * 180 * np.sin(roll)
++            dazim = -(dy / h) * 180 * np.sin(roll) - (dx / w) * 180 * np.cos(roll)
+             self.elev = self.elev + delev
+             self.azim = self.azim + dazim
+             self.get_proj()
+@@ -1083,14 +1128,16 @@ class Axes3D(Axes):
+             if dx == 0 and dy == 0:
+                 return
+             minx, maxx, miny, maxy, minz, maxz = self.get_w_lims()
+-            dx = 1-((w - dx)/w)
+-            dy = 1-((h - dy)/h)
++            dx = 1 - ((w - dx) / w)
++            dy = 1 - ((h - dy) / h)
+             elev = np.deg2rad(self.elev)
+             azim = np.deg2rad(self.azim)
+             # project xv, yv, zv -> xw, yw, zw
+-            dxx = (maxx-minx)*(dy*np.sin(elev)*np.cos(azim) + dx*np.sin(azim))
+-            dyy = (maxy-miny)*(-dx*np.cos(azim) + dy*np.sin(elev)*np.sin(azim))
+-            dzz = (maxz-minz)*(-dy*np.cos(elev))
++            dxx = (maxx - minx) * (dy * np.sin(elev) * np.cos(azim) + dx * np.sin(azim))
++            dyy = (maxy - miny) * (
++                -dx * np.cos(azim) + dy * np.sin(elev) * np.sin(azim)
++            )
++            dzz = (maxz - minz) * (-dy * np.cos(elev))
+             # pan
+             self.set_xlim3d(minx + dxx, maxx + dxx)
+             self.set_ylim3d(miny + dyy, maxy + dyy)
+@@ -1103,10 +1150,10 @@ class Axes3D(Axes):
+             # zoom view
+             # hmmm..this needs some help from clipping....
+             minx, maxx, miny, maxy, minz, maxz = self.get_w_lims()
+-            df = 1-((h - dy)/h)
+-            dx = (maxx-minx)*df
+-            dy = (maxy-miny)*df
+-            dz = (maxz-minz)*df
++            df = 1 - ((h - dy) / h)
++            dx = (maxx - minx) * df
++            dy = (maxy - miny) * df
++            dz = (maxz - minz) * df
+             self.set_xlim3d(minx - dx, maxx + dx)
+             self.set_ylim3d(miny - dy, maxy + dy)
+             self.set_zlim3d(minz - dz, maxz + dz)
+@@ -1162,7 +1209,7 @@ class Axes3D(Axes):
+         self._draw_grid = visible
+         self.stale = True
+ 
+-    def tick_params(self, axis='both', **kwargs):
++    def tick_params(self, axis="both", **kwargs):
+         """
+         Convenience method for changing the appearance of ticks and
+         tick labels.
+@@ -1179,15 +1226,15 @@ class Axes3D(Axes):
+         .. note::
+            Axes3D currently ignores some of these settings.
+         """
+-        _api.check_in_list(['x', 'y', 'z', 'both'], axis=axis)
+-        if axis in ['x', 'y', 'both']:
++        _api.check_in_list(["x", "y", "z", "both"], axis=axis)
++        if axis in ["x", "y", "both"]:
+             super().tick_params(axis, **kwargs)
+-        if axis in ['z', 'both']:
++        if axis in ["z", "both"]:
+             zkw = dict(kwargs)
+-            zkw.pop('top', None)
+-            zkw.pop('bottom', None)
+-            zkw.pop('labeltop', None)
+-            zkw.pop('labelbottom', None)
++            zkw.pop("top", None)
++            zkw.pop("bottom", None)
++            zkw.pop("labeltop", None)
++            zkw.pop("labelbottom", None)
+             self.zaxis.set_tick_params(**zkw)
+ 
+     # data limits, ticks, tick labels, and formatting
+@@ -1232,9 +1279,9 @@ class Axes3D(Axes):
+         if upper is None:
+             upper = old_upper
+ 
+-        self.set_zlim(sorted((lower, upper),
+-                             reverse=bool(self.zaxis_inverted())),
+-                      auto=None)
++        self.set_zlim(
++            sorted((lower, upper), reverse=bool(self.zaxis_inverted())), auto=None
++        )
+ 
+     def text(self, x, y, z, s, zdir=None, **kwargs):
+         """
+@@ -1249,7 +1296,7 @@ class Axes3D(Axes):
+     text3D = text
+     text2D = Axes.text
+ 
+-    def plot(self, xs, ys, *args, zdir='z', **kwargs):
++    def plot(self, xs, ys, *args, zdir="z", **kwargs):
+         """
+         Plot 2D or 3D data.
+ 
+@@ -1274,10 +1321,10 @@ class Axes3D(Axes):
+         # `_process_plot_var_args`).
+         if args and not isinstance(args[0], str):
+             zs, *args = args
+-            if 'zs' in kwargs:
++            if "zs" in kwargs:
+                 raise TypeError("plot() for multiple values for argument 'z'")
+         else:
+-            zs = kwargs.pop('zs', 0)
++            zs = kwargs.pop("zs", 0)
+ 
+         # Match length
+         zs = np.broadcast_to(zs, np.shape(xs))
+@@ -1292,8 +1339,9 @@ class Axes3D(Axes):
+ 
+     plot3D = plot
+ 
+-    def plot_surface(self, X, Y, Z, *, norm=None, vmin=None,
+-                     vmax=None, lightsource=None, **kwargs):
++    def plot_surface(
++        self, X, Y, Z, *, norm=None, vmin=None, vmax=None, lightsource=None, **kwargs
++    ):
+         """
+         Create a surface plot.
+ 
+@@ -1371,18 +1419,18 @@ class Axes3D(Axes):
+         X, Y, Z = np.broadcast_arrays(X, Y, Z)
+         rows, cols = Z.shape
+ 
+-        has_stride = 'rstride' in kwargs or 'cstride' in kwargs
+-        has_count = 'rcount' in kwargs or 'ccount' in kwargs
++        has_stride = "rstride" in kwargs or "cstride" in kwargs
++        has_count = "rcount" in kwargs or "ccount" in kwargs
+ 
+         if has_stride and has_count:
+             raise ValueError("Cannot specify both stride and count arguments")
+ 
+-        rstride = kwargs.pop('rstride', 10)
+-        cstride = kwargs.pop('cstride', 10)
+-        rcount = kwargs.pop('rcount', 50)
+-        ccount = kwargs.pop('ccount', 50)
++        rstride = kwargs.pop("rstride", 10)
++        cstride = kwargs.pop("cstride", 10)
++        rcount = kwargs.pop("rcount", 50)
++        ccount = kwargs.pop("ccount", 50)
+ 
+-        if rcParams['_internal.classic_mode']:
++        if rcParams["_internal.classic_mode"]:
+             # Strides have priority over counts in classic mode.
+             # So, only compute strides from counts
+             # if counts were explicitly given
+@@ -1396,39 +1444,37 @@ class Axes3D(Axes):
+             rstride = int(max(np.ceil(rows / rcount), 1))
+             cstride = int(max(np.ceil(cols / ccount), 1))
+ 
+-        if 'facecolors' in kwargs:
+-            fcolors = kwargs.pop('facecolors')
++        if "facecolors" in kwargs:
++            fcolors = kwargs.pop("facecolors")
+         else:
+-            color = kwargs.pop('color', None)
++            color = kwargs.pop("color", None)
+             if color is None:
+                 color = self._get_lines.get_next_color()
+             color = np.array(mcolors.to_rgba(color))
+             fcolors = None
+ 
+-        cmap = kwargs.get('cmap', None)
+-        shade = kwargs.pop('shade', cmap is None)
++        cmap = kwargs.get("cmap", None)
++        shade = kwargs.pop("shade", cmap is None)
+         if shade is None:
+             raise ValueError("shade cannot be None.")
+ 
+         colset = []  # the sampled facecolor
+-        if (rows - 1) % rstride == 0 and \
+-           (cols - 1) % cstride == 0 and \
+-           fcolors is None:
++        if (rows - 1) % rstride == 0 and (cols - 1) % cstride == 0 and fcolors is None:
+             polys = np.stack(
+-                [cbook._array_patch_perimeters(a, rstride, cstride)
+-                 for a in (X, Y, Z)],
+-                axis=-1)
++                [cbook._array_patch_perimeters(a, rstride, cstride) for a in (X, Y, Z)],
++                axis=-1,
++            )
+         else:
+             # evenly spaced, and including both endpoints
+-            row_inds = list(range(0, rows-1, rstride)) + [rows-1]
+-            col_inds = list(range(0, cols-1, cstride)) + [cols-1]
++            row_inds = list(range(0, rows - 1, rstride)) + [rows - 1]
++            col_inds = list(range(0, cols - 1, cstride)) + [cols - 1]
+ 
+             polys = []
+             for rs, rs_next in zip(row_inds[:-1], row_inds[1:]):
+                 for cs, cs_next in zip(col_inds[:-1], col_inds[1:]):
+                     ps = [
+                         # +1 ensures we share edges between polygons
+-                        cbook._array_perimeter(a[rs:rs_next+1, cs:cs_next+1])
++                        cbook._array_perimeter(a[rs : rs_next + 1, cs : cs_next + 1])
+                         for a in (X, Y, Z)
+                     ]
+                     # ps = np.stack(ps, axis=-1)
+@@ -1466,7 +1512,8 @@ class Axes3D(Axes):
+         if fcolors is not None:
+             if shade:
+                 colset = self._shade_colors(
+-                    colset, self._generate_normals(polys), lightsource)
++                    colset, self._generate_normals(polys), lightsource
++                )
+             polyc.set_facecolors(colset)
+             polyc.set_edgecolors(colset)
+         elif cmap:
+@@ -1483,7 +1530,8 @@ class Axes3D(Axes):
+         else:
+             if shade:
+                 colset = self._shade_colors(
+-                    color, self._generate_normals(polys), lightsource)
++                    color, self._generate_normals(polys), lightsource
++                )
+             else:
+                 colset = color
+             polyc.set_facecolors(colset)
+@@ -1522,7 +1570,7 @@ class Axes3D(Axes):
+             # optimization: polygons all have the same number of points, so can
+             # vectorize
+             n = polygons.shape[-2]
+-            i1, i2, i3 = 0, n//3, 2*n//3
++            i1, i2, i3 = 0, n // 3, 2 * n // 3
+             v1 = polygons[..., i1, :] - polygons[..., i2, :]
+             v2 = polygons[..., i2, :] - polygons[..., i3, :]
+         else:
+@@ -1531,7 +1579,7 @@ class Axes3D(Axes):
+             v2 = np.empty((len(polygons), 3))
+             for poly_i, ps in enumerate(polygons):
+                 n = len(ps)
+-                i1, i2, i3 = 0, n//3, 2*n//3
++                i1, i2, i3 = 0, n // 3, 2 * n // 3
+                 v1[poly_i, :] = ps[i1, :] - ps[i2, :]
+                 v2[poly_i, :] = ps[i2, :] - ps[i3, :]
+         return np.cross(v1, v2)
+@@ -1546,8 +1594,9 @@ class Axes3D(Axes):
+             lightsource = mcolors.LightSource(azdeg=225, altdeg=19.4712)
+ 
+         with np.errstate(invalid="ignore"):
+-            shade = ((normals / np.linalg.norm(normals, axis=1, keepdims=True))
+-                     @ lightsource.direction)
++            shade = (
++                normals / np.linalg.norm(normals, axis=1, keepdims=True)
++            ) @ lightsource.direction
+         mask = ~np.isnan(shade)
+ 
+         if mask.any():
+@@ -1617,18 +1666,18 @@ class Axes3D(Axes):
+         X, Y, Z = np.broadcast_arrays(X, Y, Z)
+         rows, cols = Z.shape
+ 
+-        has_stride = 'rstride' in kwargs or 'cstride' in kwargs
+-        has_count = 'rcount' in kwargs or 'ccount' in kwargs
++        has_stride = "rstride" in kwargs or "cstride" in kwargs
++        has_count = "rcount" in kwargs or "ccount" in kwargs
+ 
+         if has_stride and has_count:
+             raise ValueError("Cannot specify both stride and count arguments")
+ 
+-        rstride = kwargs.pop('rstride', 1)
+-        cstride = kwargs.pop('cstride', 1)
+-        rcount = kwargs.pop('rcount', 50)
+-        ccount = kwargs.pop('ccount', 50)
++        rstride = kwargs.pop("rstride", 1)
++        cstride = kwargs.pop("cstride", 1)
++        rcount = kwargs.pop("rcount", 50)
++        ccount = kwargs.pop("ccount", 50)
+ 
+-        if rcParams['_internal.classic_mode']:
++        if rcParams["_internal.classic_mode"]:
+             # Strides have priority over counts in classic mode.
+             # So, only compute strides from counts
+             # if counts were explicitly given
+@@ -1651,14 +1700,14 @@ class Axes3D(Axes):
+             rii = list(range(0, rows, rstride))
+             # Add the last index only if needed
+             if rows > 0 and rii[-1] != (rows - 1):
+-                rii += [rows-1]
++                rii += [rows - 1]
+         else:
+             rii = []
+         if cstride:
+             cii = list(range(0, cols, cstride))
+             # Add the last index only if needed
+             if cols > 0 and cii[-1] != (cols - 1):
+-                cii += [cols-1]
++                cii += [cols - 1]
+         else:
+             cii = []
+ 
+@@ -1679,10 +1728,9 @@ class Axes3D(Axes):
+         tylines = [tY[i] for i in cii]
+         tzlines = [tZ[i] for i in cii]
+ 
+-        lines = ([list(zip(xl, yl, zl))
+-                 for xl, yl, zl in zip(xlines, ylines, zlines)]
+-                 + [list(zip(xl, yl, zl))
+-                 for xl, yl, zl in zip(txlines, tylines, tzlines)])
++        lines = [
++            list(zip(xl, yl, zl)) for xl, yl, zl in zip(xlines, ylines, zlines)
++        ] + [list(zip(xl, yl, zl)) for xl, yl, zl in zip(txlines, tylines, tzlines)]
+ 
+         linec = art3d.Line3DCollection(lines, **kwargs)
+         self.add_collection(linec)
+@@ -1690,8 +1738,16 @@ class Axes3D(Axes):
+ 
+         return linec
+ 
+-    def plot_trisurf(self, *args, color=None, norm=None, vmin=None, vmax=None,
+-                     lightsource=None, **kwargs):
++    def plot_trisurf(
++        self,
++        *args,
++        color=None,
++        norm=None,
++        vmin=None,
++        vmax=None,
++        lightsource=None,
++        **kwargs,
++    ):
+         """
+         Plot a triangulated surface.
+ 
+@@ -1750,13 +1806,12 @@ class Axes3D(Axes):
+             color = self._get_lines.get_next_color()
+         color = np.array(mcolors.to_rgba(color))
+ 
+-        cmap = kwargs.get('cmap', None)
+-        shade = kwargs.pop('shade', cmap is None)
++        cmap = kwargs.get("cmap", None)
++        shade = kwargs.pop("shade", cmap is None)
+ 
+-        tri, args, kwargs = \
+-            Triangulation.get_from_args_and_kwargs(*args, **kwargs)
++        tri, args, kwargs = Triangulation.get_from_args_and_kwargs(*args, **kwargs)
+         try:
+-            z = kwargs.pop('Z')
++            z = kwargs.pop("Z")
+         except KeyError:
+             # We do this so Z doesn't get passed as an arg to PolyCollection
+             z, *args = args
+@@ -1822,10 +1877,9 @@ class Axes3D(Axes):
+             for i in range(int(round(nsteps)) - 1):
+                 i1 = int(round(i * stepsize))
+                 i2 = int(round((i + 1) * stepsize))
+-                polyverts.append([topverts[0][i1],
+-                                  topverts[0][i2],
+-                                  botverts[0][i2],
+-                                  botverts[0][i1]])
++                polyverts.append(
++                    [topverts[0][i1], topverts[0][i2], botverts[0][i2], botverts[0][i1]]
++                )
+ 
+             # all polygons have 4 vertices, so vectorize
+             polyverts = np.array(polyverts)
+@@ -1833,18 +1887,17 @@ class Axes3D(Axes):
+ 
+             colors = self._shade_colors(color, normals)
+             colors2 = self._shade_colors(color, normals)
+-            polycol = art3d.Poly3DCollection(polyverts,
+-                                             facecolors=colors,
+-                                             edgecolors=colors2)
++            polycol = art3d.Poly3DCollection(
++                polyverts, facecolors=colors, edgecolors=colors2
++            )
+             polycol.set_sort_zpos(z)
+             self.add_collection3d(polycol)
+ 
+         for col in colls:
+             col.remove()
+ 
+-    def add_contour_set(
+-            self, cset, extend3d=False, stride=5, zdir='z', offset=None):
+-        zdir = '-' + zdir
++    def add_contour_set(self, cset, extend3d=False, stride=5, zdir="z", offset=None):
++        zdir = "-" + zdir
+         if extend3d:
+             self._3d_extend_contour(cset, stride)
+         else:
+@@ -1853,17 +1906,17 @@ class Axes3D(Axes):
+                     z = offset
+                 art3d.line_collection_2d_to_3d(linec, z, zdir=zdir)
+ 
+-    def add_contourf_set(self, cset, zdir='z', offset=None):
++    def add_contourf_set(self, cset, zdir="z", offset=None):
+         self._add_contourf_set(cset, zdir=zdir, offset=offset)
+ 
+-    def _add_contourf_set(self, cset, zdir='z', offset=None):
++    def _add_contourf_set(self, cset, zdir="z", offset=None):
+         """
+         Returns
+         -------
+         levels : numpy.ndarray
+             Levels at which the filled contours are added.
+         """
+-        zdir = '-' + zdir
++        zdir = "-" + zdir
+ 
+         midpoints = cset.levels[:-1] + np.diff(cset.levels) / 2
+         # Linearly interpolate to get levels for any extensions
+@@ -1882,8 +1935,9 @@ class Axes3D(Axes):
+         return midpoints
+ 
+     @_preprocess_data()
+-    def contour(self, X, Y, Z, *args,
+-                extend3d=False, stride=5, zdir='z', offset=None, **kwargs):
++    def contour(
++        self, X, Y, Z, *args, extend3d=False, stride=5, zdir="z", offset=None, **kwargs
++    ):
+         """
+         Create a 3D contour plot.
+ 
+@@ -1922,8 +1976,9 @@ class Axes3D(Axes):
+     contour3D = contour
+ 
+     @_preprocess_data()
+-    def tricontour(self, *args,
+-                   extend3d=False, stride=5, zdir='z', offset=None, **kwargs):
++    def tricontour(
++        self, *args, extend3d=False, stride=5, zdir="z", offset=None, **kwargs
++    ):
+         """
+         Create a 3D contour plot.
+ 
+@@ -1955,12 +2010,11 @@ class Axes3D(Axes):
+         """
+         had_data = self.has_data()
+ 
+-        tri, args, kwargs = Triangulation.get_from_args_and_kwargs(
+-                *args, **kwargs)
++        tri, args, kwargs = Triangulation.get_from_args_and_kwargs(*args, **kwargs)
+         X = tri.x
+         Y = tri.y
+-        if 'Z' in kwargs:
+-            Z = kwargs.pop('Z')
++        if "Z" in kwargs:
++            Z = kwargs.pop("Z")
+         else:
+             # We do this so Z doesn't get passed as an arg to Axes.tricontour
+             Z, *args = args
+@@ -1977,15 +2031,17 @@ class Axes3D(Axes):
+     def _auto_scale_contourf(self, X, Y, Z, zdir, levels, had_data):
+         # Autoscale in the zdir based on the levels added, which are
+         # different from data range if any contour extensions are present
+-        dim_vals = {'x': X, 'y': Y, 'z': Z, zdir: levels}
++        dim_vals = {"x": X, "y": Y, "z": Z, zdir: levels}
+         # Input data and levels have different sizes, but auto_scale_xyz
+         # expected same-size input, so manually take min/max limits
+-        limits = [(np.nanmin(dim_vals[dim]), np.nanmax(dim_vals[dim]))
+-                  for dim in ['x', 'y', 'z']]
++        limits = [
++            (np.nanmin(dim_vals[dim]), np.nanmax(dim_vals[dim]))
++            for dim in ["x", "y", "z"]
++        ]
+         self.auto_scale_xyz(*limits, had_data)
+ 
+     @_preprocess_data()
+-    def contourf(self, X, Y, Z, *args, zdir='z', offset=None, **kwargs):
++    def contourf(self, X, Y, Z, *args, zdir="z", offset=None, **kwargs):
+         """
+         Create a 3D filled contour plot.
+ 
+@@ -2019,7 +2075,7 @@ class Axes3D(Axes):
+     contourf3D = contourf
+ 
+     @_preprocess_data()
+-    def tricontourf(self, *args, zdir='z', offset=None, **kwargs):
++    def tricontourf(self, *args, zdir="z", offset=None, **kwargs):
+         """
+         Create a 3D filled contour plot.
+ 
+@@ -2048,12 +2104,11 @@ class Axes3D(Axes):
+         """
+         had_data = self.has_data()
+ 
+-        tri, args, kwargs = Triangulation.get_from_args_and_kwargs(
+-                *args, **kwargs)
++        tri, args, kwargs = Triangulation.get_from_args_and_kwargs(*args, **kwargs)
+         X = tri.x
+         Y = tri.y
+-        if 'Z' in kwargs:
+-            Z = kwargs.pop('Z')
++        if "Z" in kwargs:
++            Z = kwargs.pop("Z")
+         else:
+             # We do this so Z doesn't get passed as an arg to Axes.tricontourf
+             Z, *args = args
+@@ -2067,7 +2122,7 @@ class Axes3D(Axes):
+         self._auto_scale_contourf(X, Y, Z, zdir, levels, had_data)
+         return cset
+ 
+-    def add_collection3d(self, col, zs=0, zdir='z'):
++    def add_collection3d(self, col, zs=0, zdir="z"):
+         """
+         Add a 3D collection object to the plot.
+ 
+@@ -2081,8 +2136,7 @@ class Axes3D(Axes):
+         - PatchCollection
+         """
+         zvals = np.atleast_1d(zs)
+-        zsortval = (np.min(zvals) if zvals.size
+-                    else 0)  # FIXME: arbitrary default
++        zsortval = np.min(zvals) if zvals.size else 0  # FIXME: arbitrary default
+ 
+         # FIXME: use issubclass() (although, then a 3D collection
+         #       object would also pass.)  Maybe have a collection3d
+@@ -2100,11 +2154,22 @@ class Axes3D(Axes):
+         collection = super().add_collection(col)
+         return collection
+ 
+-    @_preprocess_data(replace_names=["xs", "ys", "zs", "s",
+-                                     "edgecolors", "c", "facecolor",
+-                                     "facecolors", "color"])
+-    def scatter(self, xs, ys, zs=0, zdir='z', s=20, c=None, depthshade=True,
+-                *args, **kwargs):
++    @_preprocess_data(
++        replace_names=[
++            "xs",
++            "ys",
++            "zs",
++            "s",
++            "edgecolors",
++            "c",
++            "facecolor",
++            "facecolors",
++            "color",
++        ]
++    )
++    def scatter(
++        self, xs, ys, zs=0, zdir="z", s=20, c=None, depthshade=True, *args, **kwargs
++    ):
+         """
+         Create a scatter plot.
+ 
+@@ -2154,7 +2219,8 @@ class Axes3D(Axes):
+         zs_orig = zs
+ 
+         xs, ys, zs = np.broadcast_arrays(
+-            *[np.ravel(np.ma.filled(t, np.nan)) for t in [xs, ys, zs]])
++            *[np.ravel(np.ma.filled(t, np.nan)) for t in [xs, ys, zs]]
++        )
+         s = np.ma.ravel(s)  # This doesn't have to match x, y in size.
+ 
+         xs, ys, zs, s, c = cbook.delete_masked_points(xs, ys, zs, s, c)
+@@ -2164,8 +2230,9 @@ class Axes3D(Axes):
+             zs = zs.copy()
+ 
+         patches = super().scatter(xs, ys, s=s, c=c, *args, **kwargs)
+-        art3d.patch_collection_2d_to_3d(patches, zs=zs, zdir=zdir,
+-                                        depthshade=depthshade)
++        art3d.patch_collection_2d_to_3d(
++            patches, zs=zs, zdir=zdir, depthshade=depthshade
++        )
+ 
+         if self._zmargin < 0.05 and xs.size > 0:
+             self.set_zmargin(0.05)
+@@ -2177,7 +2244,7 @@ class Axes3D(Axes):
+     scatter3D = scatter
+ 
+     @_preprocess_data()
+-    def bar(self, left, height, zs=0, zdir='z', *args, **kwargs):
++    def bar(self, left, height, zs=0, zdir="z", *args, **kwargs):
+         """
+         Add 2D bar(s).
+ 
+@@ -2214,8 +2281,8 @@ class Axes3D(Axes):
+             verts += vs.tolist()
+             verts_zs += [z] * len(vs)
+             art3d.patch_2d_to_3d(p, z, zdir)
+-            if 'alpha' in kwargs:
+-                p.set_alpha(kwargs['alpha'])
++            if "alpha" in kwargs:
++                p.set_alpha(kwargs["alpha"])
+ 
+         if len(verts) > 0:
+             # the following has to be skipped if verts is empty
+@@ -2231,8 +2298,21 @@ class Axes3D(Axes):
+         return patches
+ 
+     @_preprocess_data()
+-    def bar3d(self, x, y, z, dx, dy, dz, color=None,
+-              zsort='average', shade=True, lightsource=None, *args, **kwargs):
++    def bar3d(
++        self,
++        x,
++        y,
++        z,
++        dx,
++        dy,
++        dz,
++        color=None,
++        zsort="average",
++        shade=True,
++        lightsource=None,
++        *args,
++        **kwargs,
++    ):
+         """
+         Generate a 3D barplot.
+ 
+@@ -2295,8 +2375,7 @@ class Axes3D(Axes):
+ 
+         had_data = self.has_data()
+ 
+-        x, y, z, dx, dy, dz = np.broadcast_arrays(
+-            np.atleast_1d(x), y, z, dx, dy, dz)
++        x, y, z, dx, dy, dz = np.broadcast_arrays(np.atleast_1d(x), y, z, dx, dy, dz)
+         minx = np.min(x)
+         maxx = np.max(x + dx)
+         miny = np.min(y)
+@@ -2307,50 +2386,52 @@ class Axes3D(Axes):
+         # shape (6, 4, 3)
+         # All faces are oriented facing outwards - when viewed from the
+         # outside, their vertices are in a counterclockwise ordering.
+-        cuboid = np.array([
+-            # -z
+-            (
+-                (0, 0, 0),
+-                (0, 1, 0),
+-                (1, 1, 0),
+-                (1, 0, 0),
+-            ),
+-            # +z
+-            (
+-                (0, 0, 1),
+-                (1, 0, 1),
+-                (1, 1, 1),
+-                (0, 1, 1),
+-            ),
+-            # -y
+-            (
+-                (0, 0, 0),
+-                (1, 0, 0),
+-                (1, 0, 1),
+-                (0, 0, 1),
+-            ),
+-            # +y
+-            (
+-                (0, 1, 0),
+-                (0, 1, 1),
+-                (1, 1, 1),
+-                (1, 1, 0),
+-            ),
+-            # -x
+-            (
+-                (0, 0, 0),
+-                (0, 0, 1),
+-                (0, 1, 1),
+-                (0, 1, 0),
+-            ),
+-            # +x
+-            (
+-                (1, 0, 0),
+-                (1, 1, 0),
+-                (1, 1, 1),
+-                (1, 0, 1),
+-            ),
+-        ])
++        cuboid = np.array(
++            [
++                # -z
++                (
++                    (0, 0, 0),
++                    (0, 1, 0),
++                    (1, 1, 0),
++                    (1, 0, 0),
++                ),
++                # +z
++                (
++                    (0, 0, 1),
++                    (1, 0, 1),
++                    (1, 1, 1),
++                    (0, 1, 1),
++                ),
++                # -y
++                (
++                    (0, 0, 0),
++                    (1, 0, 0),
++                    (1, 0, 1),
++                    (0, 0, 1),
++                ),
++                # +y
++                (
++                    (0, 1, 0),
++                    (0, 1, 1),
++                    (1, 1, 1),
++                    (1, 1, 0),
++                ),
++                # -x
++                (
++                    (0, 0, 0),
++                    (0, 0, 1),
++                    (0, 1, 1),
++                    (0, 1, 0),
++                ),
++                # +x
++                (
++                    (1, 0, 0),
++                    (1, 1, 0),
++                    (1, 1, 1),
++                    (1, 0, 1),
++                ),
++            ]
++        )
+ 
+         # indexed by [bar, face, vertex, coord]
+         polys = np.empty(x.shape + cuboid.shape)
+@@ -2378,7 +2459,7 @@ class Axes3D(Axes):
+             # a single color specified, or face colors specified explicitly
+             facecolors = color
+             if len(facecolors) < len(x):
+-                facecolors *= (6 * len(x))
++                facecolors *= 6 * len(x)
+ 
+         if shade:
+             normals = self._generate_normals(polys)
+@@ -2386,17 +2467,16 @@ class Axes3D(Axes):
+         else:
+             sfacecolors = facecolors
+ 
+-        col = art3d.Poly3DCollection(polys,
+-                                     zsort=zsort,
+-                                     facecolor=sfacecolors,
+-                                     *args, **kwargs)
++        col = art3d.Poly3DCollection(
++            polys, zsort=zsort, facecolor=sfacecolors, *args, **kwargs
++        )
+         self.add_collection(col)
+ 
+         self.auto_scale_xyz((minx, maxx), (miny, maxy), (minz, maxz), had_data)
+ 
+         return col
+ 
+-    def set_title(self, label, fontdict=None, loc='center', **kwargs):
++    def set_title(self, label, fontdict=None, loc="center", **kwargs):
+         # docstring inherited
+         ret = super().set_title(label, fontdict=fontdict, loc=loc, **kwargs)
+         (x, y) = self.title.get_position()
+@@ -2404,9 +2484,15 @@ class Axes3D(Axes):
+         return ret
+ 
+     @_preprocess_data()
+-    def quiver(self, *args,
+-               length=1, arrow_length_ratio=.3, pivot='tail', normalize=False,
+-               **kwargs):
++    def quiver(
++        self,
++        *args,
++        length=1,
++        arrow_length_ratio=0.3,
++        pivot="tail",
++        normalize=False,
++        **kwargs,
++    ):
+         """
+         ax.quiver(X, Y, Z, U, V, W, /, length=1, arrow_length_ratio=.3, \
+ pivot='tail', normalize=False, **kwargs)
+@@ -2455,16 +2541,19 @@ pivot='tail', normalize=False, **kwargs)
+             y = UVW[:, 1]
+             norm = np.linalg.norm(UVW[:, :2], axis=1)
+             x_p = np.divide(y, norm, where=norm != 0, out=np.zeros_like(x))
+-            y_p = np.divide(-x,  norm, where=norm != 0, out=np.ones_like(x))
++            y_p = np.divide(-x, norm, where=norm != 0, out=np.ones_like(x))
+             # compute the two arrowhead direction unit vectors
+             ra = math.radians(angle)
+             c = math.cos(ra)
+             s = math.sin(ra)
+             # construct the rotation matrices of shape (3, 3, n)
+             Rpos = np.array(
+-                [[c + (x_p ** 2) * (1 - c), x_p * y_p * (1 - c), y_p * s],
+-                 [y_p * x_p * (1 - c), c + (y_p ** 2) * (1 - c), -x_p * s],
+-                 [-y_p * s, x_p * s, np.full_like(x_p, c)]])
++                [
++                    [c + (x_p**2) * (1 - c), x_p * y_p * (1 - c), y_p * s],
++                    [y_p * x_p * (1 - c), c + (y_p**2) * (1 - c), -x_p * s],
++                    [-y_p * s, x_p * s, np.full_like(x_p, c)],
++                ]
++            )
+             # opposite rotation negates all the sin terms
+             Rneg = Rpos.copy()
+             Rneg[[0, 1, 2, 2], [2, 2, 0, 1]] *= -1
+@@ -2480,15 +2569,15 @@ pivot='tail', normalize=False, **kwargs)
+         # handle args
+         argi = 6
+         if len(args) < argi:
+-            raise ValueError('Wrong number of arguments. Expected %d got %d' %
+-                             (argi, len(args)))
++            raise ValueError(
++                "Wrong number of arguments. Expected %d got %d" % (argi, len(args))
++            )
+ 
+         # first 6 arguments are X, Y, Z, U, V, W
+         input_args = args[:argi]
+ 
+         # extract the masks, if any
+-        masks = [k.mask for k in input_args
+-                 if isinstance(k, np.ma.MaskedArray)]
++        masks = [k.mask for k in input_args if isinstance(k, np.ma.MaskedArray)]
+         # broadcast to match the shape
+         bcast = np.broadcast_arrays(*input_args, *masks)
+         input_args = bcast[:argi]
+@@ -2497,8 +2586,7 @@ pivot='tail', normalize=False, **kwargs)
+             # combine the masks into one
+             mask = functools.reduce(np.logical_or, masks)
+             # put mask on and compress
+-            input_args = [np.ma.array(k, mask=mask).compressed()
+-                          for k in input_args]
++            input_args = [np.ma.array(k, mask=mask).compressed() for k in input_args]
+         else:
+             input_args = [np.ravel(k) for k in input_args]
+ 
+@@ -2508,13 +2596,13 @@ pivot='tail', normalize=False, **kwargs)
+             self.add_collection(linec)
+             return linec
+ 
+-        shaft_dt = np.array([0., length], dtype=float)
++        shaft_dt = np.array([0.0, length], dtype=float)
+         arrow_dt = shaft_dt * arrow_length_ratio
+ 
+-        _api.check_in_list(['tail', 'middle', 'tip'], pivot=pivot)
+-        if pivot == 'tail':
++        _api.check_in_list(["tail", "middle", "tip"], pivot=pivot)
++        if pivot == "tail":
+             shaft_dt -= length
+-        elif pivot == 'middle':
++        elif pivot == "middle":
+             shaft_dt -= length / 2
+ 
+         XYZ = np.column_stack(input_args[:3])
+@@ -2556,8 +2644,15 @@ pivot='tail', normalize=False, **kwargs)
+ 
+     quiver3D = quiver
+ 
+-    def voxels(self, *args, facecolors=None, edgecolors=None, shade=True,
+-               lightsource=None, **kwargs):
++    def voxels(
++        self,
++        *args,
++        facecolors=None,
++        edgecolors=None,
++        shade=True,
++        lightsource=None,
++        **kwargs,
++    ):
+         """
+         ax.voxels([x, y, z,] /, filled, facecolors=None, edgecolors=None, \
+ **kwargs)
+@@ -2633,6 +2728,7 @@ pivot='tail', normalize=False, **kwargs)
+             def voxels(__x, __y, __z, filled, **kwargs):
+                 return (__x, __y, __z), filled, kwargs
+         else:
++
+             def voxels(filled, **kwargs):
+                 return None, filled, kwargs
+ 
+@@ -2659,7 +2755,8 @@ pivot='tail', normalize=False, **kwargs)
+                 if np.shape(color)[:3] != filled.shape:
+                     raise ValueError(
+                         "When multidimensional, {} must match the shape of "
+-                        "filled".format(name))
++                        "filled".format(name)
++                    )
+                 return color
+             else:
+                 raise ValueError("Invalid {} argument".format(name))
+@@ -2667,21 +2764,24 @@ pivot='tail', normalize=False, **kwargs)
+         # broadcast and default on facecolors
+         if facecolors is None:
+             facecolors = self._get_patches_for_fill.get_next_color()
+-        facecolors = _broadcast_color_arg(facecolors, 'facecolors')
++        facecolors = _broadcast_color_arg(facecolors, "facecolors")
+ 
+         # broadcast but no default on edgecolors
+-        edgecolors = _broadcast_color_arg(edgecolors, 'edgecolors')
++        edgecolors = _broadcast_color_arg(edgecolors, "edgecolors")
+ 
+         # scale to the full array, even if the data is only in the center
+         self.auto_scale_xyz(x, y, z)
+ 
+         # points lying on corners of a square
+-        square = np.array([
+-            [0, 0, 0],
+-            [1, 0, 0],
+-            [1, 1, 0],
+-            [0, 1, 0],
+-        ], dtype=np.intp)
++        square = np.array(
++            [
++                [0, 0, 0],
++                [1, 0, 0],
++                [1, 1, 0],
++                [0, 1, 0],
++            ],
++            dtype=np.intp,
++        )
+ 
+         voxel_faces = defaultdict(list)
+ 
+@@ -2731,7 +2831,7 @@ pivot='tail', normalize=False, **kwargs)
+                             voxel_faces[i2].append(p2 + square_rot_neg)
+ 
+                     # draw upper faces
+-                    pk = permute.dot([p, q, rc-1])
++                    pk = permute.dot([p, q, rc - 1])
+                     pk2 = permute.dot([p, q, rc])
+                     ik = tuple(pk)
+                     if filled[ik]:
+@@ -2761,23 +2861,40 @@ pivot='tail', normalize=False, **kwargs)
+                 normals = self._generate_normals(faces)
+                 facecolor = self._shade_colors(facecolor, normals, lightsource)
+                 if edgecolor is not None:
+-                    edgecolor = self._shade_colors(
+-                        edgecolor, normals, lightsource
+-                    )
++                    edgecolor = self._shade_colors(edgecolor, normals, lightsource)
+ 
+             poly = art3d.Poly3DCollection(
+-                faces, facecolors=facecolor, edgecolors=edgecolor, **kwargs)
++                faces, facecolors=facecolor, edgecolors=edgecolor, **kwargs
++            )
+             self.add_collection3d(poly)
+             polygons[coord] = poly
+ 
+         return polygons
+ 
+     @_preprocess_data(replace_names=["x", "y", "z", "xerr", "yerr", "zerr"])
+-    def errorbar(self, x, y, z, zerr=None, yerr=None, xerr=None, fmt='',
+-                 barsabove=False, errorevery=1, ecolor=None, elinewidth=None,
+-                 capsize=None, capthick=None, xlolims=False, xuplims=False,
+-                 ylolims=False, yuplims=False, zlolims=False, zuplims=False,
+-                 **kwargs):
++    def errorbar(
++        self,
++        x,
++        y,
++        z,
++        zerr=None,
++        yerr=None,
++        xerr=None,
++        fmt="",
++        barsabove=False,
++        errorevery=1,
++        ecolor=None,
++        elinewidth=None,
++        capsize=None,
++        capthick=None,
++        xlolims=False,
++        xuplims=False,
++        ylolims=False,
++        yuplims=False,
++        zlolims=False,
++        zuplims=False,
++        **kwargs,
++    ):
+         """
+         Plot lines and/or markers with errorbars around them.
+ 
+@@ -2884,10 +3001,9 @@ pivot='tail', normalize=False, **kwargs)
+         kwargs = cbook.normalize_kwargs(kwargs, mlines.Line2D)
+         # Drop anything that comes in as None to use the default instead.
+         kwargs = {k: v for k, v in kwargs.items() if v is not None}
+-        kwargs.setdefault('zorder', 2)
++        kwargs.setdefault("zorder", 2)
+ 
+-        self._process_unit_info([("x", x), ("y", y), ("z", z)], kwargs,
+-                                convert=False)
++        self._process_unit_info([("x", x), ("y", y), ("z", z)], kwargs, convert=False)
+ 
+         # make sure all the args are iterable; use lists not arrays to
+         # preserve units
+@@ -2901,64 +3017,76 @@ pivot='tail', normalize=False, **kwargs)
+         everymask = self._errorevery_to_mask(x, errorevery)
+ 
+         label = kwargs.pop("label", None)
+-        kwargs['label'] = '_nolegend_'
++        kwargs["label"] = "_nolegend_"
+ 
+         # Create the main line and determine overall kwargs for child artists.
+         # We avoid calling self.plot() directly, or self._get_lines(), because
+         # that would call self._process_unit_info again, and do other indirect
+         # data processing.
+-        (data_line, base_style), = self._get_lines._plot_args(
+-            (x, y) if fmt == '' else (x, y, fmt), kwargs, return_kwargs=True)
++        ((data_line, base_style),) = self._get_lines._plot_args(
++            (x, y) if fmt == "" else (x, y, fmt), kwargs, return_kwargs=True
++        )
+         art3d.line_2d_to_3d(data_line, zs=z)
+ 
+         # Do this after creating `data_line` to avoid modifying `base_style`.
+         if barsabove:
+-            data_line.set_zorder(kwargs['zorder'] - .1)
++            data_line.set_zorder(kwargs["zorder"] - 0.1)
+         else:
+-            data_line.set_zorder(kwargs['zorder'] + .1)
++            data_line.set_zorder(kwargs["zorder"] + 0.1)
+ 
+         # Add line to plot, or throw it away and use it to determine kwargs.
+-        if fmt.lower() != 'none':
++        if fmt.lower() != "none":
+             self.add_line(data_line)
+         else:
+             data_line = None
+             # Remove alpha=0 color that _process_plot_format returns.
+-            base_style.pop('color')
++            base_style.pop("color")
+ 
+-        if 'color' not in base_style:
+-            base_style['color'] = 'C0'
++        if "color" not in base_style:
++            base_style["color"] = "C0"
+         if ecolor is None:
+-            ecolor = base_style['color']
++            ecolor = base_style["color"]
+ 
+         # Eject any line-specific information from format string, as it's not
+         # needed for bars or caps.
+-        for key in ['marker', 'markersize', 'markerfacecolor',
+-                    'markeredgewidth', 'markeredgecolor', 'markevery',
+-                    'linestyle', 'fillstyle', 'drawstyle', 'dash_capstyle',
+-                    'dash_joinstyle', 'solid_capstyle', 'solid_joinstyle']:
++        for key in [
++            "marker",
++            "markersize",
++            "markerfacecolor",
++            "markeredgewidth",
++            "markeredgecolor",
++            "markevery",
++            "linestyle",
++            "fillstyle",
++            "drawstyle",
++            "dash_capstyle",
++            "dash_joinstyle",
++            "solid_capstyle",
++            "solid_joinstyle",
++        ]:
+             base_style.pop(key, None)
+ 
+         # Make the style dict for the line collections (the bars).
+-        eb_lines_style = {**base_style, 'color': ecolor}
++        eb_lines_style = {**base_style, "color": ecolor}
+ 
+         if elinewidth:
+-            eb_lines_style['linewidth'] = elinewidth
+-        elif 'linewidth' in kwargs:
+-            eb_lines_style['linewidth'] = kwargs['linewidth']
++            eb_lines_style["linewidth"] = elinewidth
++        elif "linewidth" in kwargs:
++            eb_lines_style["linewidth"] = kwargs["linewidth"]
+ 
+-        for key in ('transform', 'alpha', 'zorder', 'rasterized'):
++        for key in ("transform", "alpha", "zorder", "rasterized"):
+             if key in kwargs:
+                 eb_lines_style[key] = kwargs[key]
+ 
+         # Make the style dict for caps (the "hats").
+-        eb_cap_style = {**base_style, 'linestyle': 'None'}
++        eb_cap_style = {**base_style, "linestyle": "None"}
+         if capsize is None:
+             capsize = rcParams["errorbar.capsize"]
+         if capsize > 0:
+-            eb_cap_style['markersize'] = 2. * capsize
++            eb_cap_style["markersize"] = 2.0 * capsize
+         if capthick is not None:
+-            eb_cap_style['markeredgewidth'] = capthick
+-        eb_cap_style['color'] = ecolor
++            eb_cap_style["markeredgewidth"] = capthick
++        eb_cap_style["color"] = ecolor
+ 
+         def _apply_mask(arrays, mask):
+             # Return, for each array in *arrays*, the elements for which *mask*
+@@ -2985,19 +3113,19 @@ pivot='tail', normalize=False, **kwargs)
+ 
+         # define the markers used for errorbar caps and limits below
+         # the dictionary key is mapped by the `i_xyz` helper dictionary
+-        capmarker = {0: '|', 1: '|', 2: '_'}
+-        i_xyz = {'x': 0, 'y': 1, 'z': 2}
++        capmarker = {0: "|", 1: "|", 2: "_"}
++        i_xyz = {"x": 0, "y": 1, "z": 2}
+ 
+         # Calculate marker size from points to quiver length. Because these are
+         # not markers, and 3D Axes do not use the normal transform stack, this
+         # is a bit involved. Since the quiver arrows will change size as the
+         # scene is rotated, they are given a standard size based on viewing
+         # them directly in planar form.
+-        quiversize = eb_cap_style.get('markersize',
+-                                      rcParams['lines.markersize']) ** 2
++        quiversize = eb_cap_style.get("markersize", rcParams["lines.markersize"]) ** 2
+         quiversize *= self.figure.dpi / 72
+-        quiversize = self.transAxes.inverted().transform([
+-            (0, 0), (quiversize, quiversize)])
++        quiversize = self.transAxes.inverted().transform(
++            [(0, 0), (quiversize, quiversize)]
++        )
+         quiversize = np.mean(np.diff(quiversize, axis=0))
+         # quiversize is now in Axes coordinates, and to convert back to data
+         # coordinates, we need to run it through the inverse 3D transform. For
+@@ -3011,15 +3139,21 @@ pivot='tail', normalize=False, **kwargs)
+         # that the size corresponds to the base. In other words, this constant
+         # corresponds to the equation tan(15) = (base / 2) / (arrow length).
+         quiversize *= 1.8660254037844388
+-        eb_quiver_style = {**eb_cap_style,
+-                           'length': quiversize, 'arrow_length_ratio': 1}
+-        eb_quiver_style.pop('markersize', None)
++        eb_quiver_style = {
++            **eb_cap_style,
++            "length": quiversize,
++            "arrow_length_ratio": 1,
++        }
++        eb_quiver_style.pop("markersize", None)
+ 
+         # loop over x-, y-, and z-direction and draw relevant elements
+         for zdir, data, err, lolims, uplims in zip(
+-                ['x', 'y', 'z'], [x, y, z], [xerr, yerr, zerr],
+-                [xlolims, ylolims, zlolims], [xuplims, yuplims, zuplims]):
+-
++            ["x", "y", "z"],
++            [x, y, z],
++            [xerr, yerr, zerr],
++            [xlolims, ylolims, zlolims],
++            [xuplims, yuplims, zuplims],
++        ):
+             dir_vector = art3d.get_dir_vector(zdir)
+             i_zdir = i_xyz[zdir]
+ 
+@@ -3040,7 +3174,8 @@ pivot='tail', normalize=False, **kwargs)
+             # positions of errorbars in a dimension we're looping over
+             coorderr = [
+                 _extract_errs(err * dir_vector[i], coord, lolims, uplims)
+-                for i, coord in enumerate([x, y, z])]
++                for i, coord in enumerate([x, y, z])
++            ]
+             (xl, xh), (yl, yh), (zl, zh) = coorderr
+ 
+             # draws capmarkers - flat caps orthogonal to the error bars
+@@ -3051,12 +3186,12 @@ pivot='tail', normalize=False, **kwargs)
+ 
+                 # setting '_' for z-caps and '|' for x- and y-caps;
+                 # these markers will rotate as the viewing angle changes
+-                cap_lo = art3d.Line3D(*lo_caps_xyz, ls='',
+-                                      marker=capmarker[i_zdir],
+-                                      **eb_cap_style)
+-                cap_hi = art3d.Line3D(*hi_caps_xyz, ls='',
+-                                      marker=capmarker[i_zdir],
+-                                      **eb_cap_style)
++                cap_lo = art3d.Line3D(
++                    *lo_caps_xyz, ls="", marker=capmarker[i_zdir], **eb_cap_style
++                )
++                cap_hi = art3d.Line3D(
++                    *hi_caps_xyz, ls="", marker=capmarker[i_zdir], **eb_cap_style
++                )
+                 self.add_line(cap_lo)
+                 self.add_line(cap_hi)
+                 caplines.append(cap_lo)
+@@ -3069,8 +3204,7 @@ pivot='tail', normalize=False, **kwargs)
+                 xl0, yl0, zl0 = _apply_mask([xl, yl, zl], uplims & everymask)
+                 self.quiver(xl0, yl0, zl0, *-dir_vector, **eb_quiver_style)
+ 
+-            errline = art3d.Line3DCollection(np.array(coorderr).T,
+-                                             **eb_lines_style)
++            errline = art3d.Line3DCollection(np.array(coorderr).T, **eb_lines_style)
+             self.add_collection(errline)
+             errlines.append(errline)
+             coorderrs.append(coorderr)
+@@ -3078,12 +3212,14 @@ pivot='tail', normalize=False, **kwargs)
+         coorderrs = np.array(coorderrs)
+ 
+         def _digout_minmax(err_arr, coord_label):
+-            return (np.nanmin(err_arr[:, i_xyz[coord_label], :, :]),
+-                    np.nanmax(err_arr[:, i_xyz[coord_label], :, :]))
++            return (
++                np.nanmin(err_arr[:, i_xyz[coord_label], :, :]),
++                np.nanmax(err_arr[:, i_xyz[coord_label], :, :]),
++            )
+ 
+-        minx, maxx = _digout_minmax(coorderrs, 'x')
+-        miny, maxy = _digout_minmax(coorderrs, 'y')
+-        minz, maxz = _digout_minmax(coorderrs, 'z')
++        minx, maxx = _digout_minmax(coorderrs, "x")
++        miny, maxy = _digout_minmax(coorderrs, "y")
++        minz, maxz = _digout_minmax(coorderrs, "z")
+         self.auto_scale_xyz((minx, maxx), (miny, maxy), (minz, maxz), had_data)
+ 
+         # Adapting errorbar containers for 3d case, assuming z-axis points "up"
+@@ -3091,30 +3227,49 @@ pivot='tail', normalize=False, **kwargs)
+             (data_line, tuple(caplines), tuple(errlines)),
+             has_xerr=(xerr is not None or yerr is not None),
+             has_yerr=(zerr is not None),
+-            label=label)
++            label=label,
++        )
+         self.containers.append(errorbar_container)
+ 
+         return errlines, caplines, limmarks
+ 
+-    def get_tightbbox(self, renderer=None, call_axes_locator=True,
+-                      bbox_extra_artists=None, *, for_layout_only=False):
+-        ret = super().get_tightbbox(renderer,
+-                                    call_axes_locator=call_axes_locator,
+-                                    bbox_extra_artists=bbox_extra_artists,
+-                                    for_layout_only=for_layout_only)
++    def get_tightbbox(
++        self,
++        renderer=None,
++        call_axes_locator=True,
++        bbox_extra_artists=None,
++        *,
++        for_layout_only=False,
++    ):
++        ret = super().get_tightbbox(
++            renderer,
++            call_axes_locator=call_axes_locator,
++            bbox_extra_artists=bbox_extra_artists,
++            for_layout_only=for_layout_only,
++        )
+         batch = [ret]
+         if self._axis3don:
+             for axis in self._axis_map.values():
+                 if axis.get_visible():
+-                    axis_bb = martist._get_tightbbox_for_layout_only(
+-                        axis, renderer)
++                    axis_bb = martist._get_tightbbox_for_layout_only(axis, renderer)
+                     if axis_bb:
+                         batch.append(axis_bb)
+         return mtransforms.Bbox.union(batch)
+ 
+     @_preprocess_data()
+-    def stem(self, x, y, z, *, linefmt='C0-', markerfmt='C0o', basefmt='C3-',
+-             bottom=0, label=None, orientation='z'):
++    def stem(
++        self,
++        x,
++        y,
++        z,
++        *,
++        linefmt="C0-",
++        markerfmt="C0o",
++        basefmt="C3-",
++        bottom=0,
++        label=None,
++        orientation="z",
++    ):
+         """
+         Create a 3D stem plot.
+ 
+@@ -3182,7 +3337,7 @@ pivot='tail', normalize=False, **kwargs)
+ 
+         had_data = self.has_data()
+ 
+-        _api.check_in_list(['x', 'y', 'z'], orientation=orientation)
++        _api.check_in_list(["x", "y", "z"], orientation=orientation)
+ 
+         xlim = (np.min(x), np.max(x))
+         ylim = (np.min(y), np.max(y))
+@@ -3190,41 +3345,49 @@ pivot='tail', normalize=False, **kwargs)
+ 
+         # Determine the appropriate plane for the baseline and the direction of
+         # stemlines based on the value of orientation.
+-        if orientation == 'x':
++        if orientation == "x":
+             basex, basexlim = y, ylim
+             basey, baseylim = z, zlim
+-            lines = [[(bottom, thisy, thisz), (thisx, thisy, thisz)]
+-                     for thisx, thisy, thisz in zip(x, y, z)]
+-        elif orientation == 'y':
++            lines = [
++                [(bottom, thisy, thisz), (thisx, thisy, thisz)]
++                for thisx, thisy, thisz in zip(x, y, z)
++            ]
++        elif orientation == "y":
+             basex, basexlim = x, xlim
+             basey, baseylim = z, zlim
+-            lines = [[(thisx, bottom, thisz), (thisx, thisy, thisz)]
+-                     for thisx, thisy, thisz in zip(x, y, z)]
++            lines = [
++                [(thisx, bottom, thisz), (thisx, thisy, thisz)]
++                for thisx, thisy, thisz in zip(x, y, z)
++            ]
+         else:
+             basex, basexlim = x, xlim
+             basey, baseylim = y, ylim
+-            lines = [[(thisx, thisy, bottom), (thisx, thisy, thisz)]
+-                     for thisx, thisy, thisz in zip(x, y, z)]
++            lines = [
++                [(thisx, thisy, bottom), (thisx, thisy, thisz)]
++                for thisx, thisy, thisz in zip(x, y, z)
++            ]
+ 
+         # Determine style for stem lines.
+         linestyle, linemarker, linecolor = _process_plot_format(linefmt)
+         if linestyle is None:
+-            linestyle = rcParams['lines.linestyle']
++            linestyle = rcParams["lines.linestyle"]
+ 
+         # Plot everything in required order.
+-        baseline, = self.plot(basex, basey, basefmt, zs=bottom,
+-                              zdir=orientation, label='_nolegend_')
++        (baseline,) = self.plot(
++            basex, basey, basefmt, zs=bottom, zdir=orientation, label="_nolegend_"
++        )
+         stemlines = art3d.Line3DCollection(
+-            lines, linestyles=linestyle, colors=linecolor, label='_nolegend_')
++            lines, linestyles=linestyle, colors=linecolor, label="_nolegend_"
++        )
+         self.add_collection(stemlines)
+-        markerline, = self.plot(x, y, z, markerfmt, label='_nolegend_')
++        (markerline,) = self.plot(x, y, z, markerfmt, label="_nolegend_")
+ 
+-        stem_container = StemContainer((markerline, stemlines, baseline),
+-                                       label=label)
++        stem_container = StemContainer((markerline, stemlines, baseline), label=label)
+         self.add_container(stem_container)
+ 
+-        jx, jy, jz = art3d.juggle_axes(basexlim, baseylim, [bottom, bottom],
+-                                       orientation)
++        jx, jy, jz = art3d.juggle_axes(
++            basexlim, baseylim, [bottom, bottom], orientation
++        )
+         self.auto_scale_xyz([*jx, *xlim], [*jy, *ylim], [*jz, *zlim], had_data)
+ 
+         return stem_container
+@@ -3238,8 +3401,9 @@ def get_test_data(delta=0.05):
+     X, Y = np.meshgrid(x, y)
+ 
+     Z1 = np.exp(-(X**2 + Y**2) / 2) / (2 * np.pi)
+-    Z2 = (np.exp(-(((X - 1) / 1.5)**2 + ((Y - 1) / 0.5)**2) / 2) /
+-          (2 * np.pi * 0.5 * 1.5))
++    Z2 = np.exp(-(((X - 1) / 1.5) ** 2 + ((Y - 1) / 0.5) ** 2) / 2) / (
++        2 * np.pi * 0.5 * 1.5
++    )
+     Z = Z2 - Z1
+ 
+     X = X * 10

@@ -1,0 +1,15 @@
+diff --git a/sympy/simplify/cse_main.py b/sympy/simplify/cse_main.py
+index d649dd02a9..6ec8541ed1 100644
+--- a/sympy/simplify/cse_main.py
++++ b/sympy/simplify/cse_main.py
+@@ -586,6 +586,10 @@ def _find_repeated(expr):
+         if isinstance(expr, RootOf):
+             return
+ 
++        if isinstance(expr, MatrixSymbol):
++            excluded_symbols.add(expr)
++            return
++
+         if isinstance(expr, Basic) and (expr.is_Atom or expr.is_Order):
+             if expr.is_Symbol:
+                 excluded_symbols.add(expr)

@@ -1,0 +1,15 @@
+diff --git a/sympy/printing/pycode.py b/sympy/printing/pycode.py
+index 6ec7bd891c..b6a636a7e6 100644
+--- a/sympy/printing/pycode.py
++++ b/sympy/printing/pycode.py
+@@ -667,6 +667,10 @@ def _print_CodegenArrayPermuteDims(self, expr):
+             self._print(expr.permutation.args[0]),
+         )
+ 
++    def _print_Identity(self, expr):
++        return "{0}({1})".format(self._module_format('numpy.eye'),
++                                 self._print(expr.args[0]))
++
+     def _print_CodegenArrayElementwiseAdd(self, expr):
+         return self._expand_fold_binary_op('numpy.add', expr.args)
+ 

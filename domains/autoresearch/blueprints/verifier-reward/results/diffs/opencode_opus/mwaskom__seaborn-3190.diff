@@ -1,0 +1,1247 @@
+diff --git a/seaborn/_core/properties.py b/seaborn/_core/properties.py
+index cd10e260..432e77d8 100644
+--- a/seaborn/_core/properties.py
++++ b/seaborn/_core/properties.py
+@@ -99,8 +99,10 @@ class Property:
+         self, scale: Scale, data: Series
+     ) -> Callable[[ArrayLike], ArrayLike]:
+         """Return a function that maps from data domain to property range."""
++
+         def identity(x):
+             return x
++
+         return identity
+ 
+     def standardize(self, val: Any) -> Any:
+@@ -119,19 +121,23 @@ class Property:
+         """Input check when values are provided as a list."""
+         message = ""
+         if len(levels) > len(values):
+-            message = " ".join([
+-                f"\nThe {self.variable} list has fewer values ({len(values)})",
+-                f"than needed ({len(levels)}) and will cycle, which may",
+-                "produce an uninterpretable plot."
+-            ])
++            message = " ".join(
++                [
++                    f"\nThe {self.variable} list has fewer values ({len(values)})",
++                    f"than needed ({len(levels)}) and will cycle, which may",
++                    "produce an uninterpretable plot.",
++                ]
++            )
+             values = [x for _, x in zip(levels, itertools.cycle(values))]
+ 
+         elif len(values) > len(levels):
+-            message = " ".join([
+-                f"The {self.variable} list has more values ({len(values)})",
+-                f"than needed ({len(levels)}), which may not be intended.",
+-            ])
+-            values = values[:len(levels)]
++            message = " ".join(
++                [
++                    f"The {self.variable} list has more values ({len(values)})",
++                    f"than needed ({len(levels)}), which may not be intended.",
++                ]
++            )
++            values = values[: len(levels)]
+ 
+         # TODO look into custom PlotSpecWarning with better formatting
+         if message:
+@@ -147,6 +153,7 @@ class Property:
+ 
+ class Coordinate(Property):
+     """The position of visual marks with respect to the axes of the plot."""
++
+     legend = False
+     normed = False
+ 
+@@ -158,6 +165,7 @@ class Coordinate(Property):
+ 
+ class IntervalProperty(Property):
+     """A numeric property where scale range can be defined as an interval."""
++
+     legend = True
+     normed = True
+ 
+@@ -208,10 +216,12 @@ class IntervalProperty(Property):
+             else:
+                 actual = str(type(scale.values))
+             scale_class = scale.__class__.__name__
+-            err = " ".join([
+-                f"Values for {self.variable} variables with {scale_class} scale",
+-                f"must be 2-tuple; not {actual}.",
+-            ])
++            err = " ".join(
++                [
++                    f"Values for {self.variable} variables with {scale_class} scale",
++                    f"must be 2-tuple; not {actual}.",
++                ]
++            )
+             raise TypeError(err)
+ 
+         def mapping(x):
+@@ -237,10 +247,12 @@ class IntervalProperty(Property):
+                 vmin, vmax = scale.values
+             else:
+                 scale_class = scale.__class__.__name__
+-                err = " ".join([
+-                    f"Values for {self.variable} variables with {scale_class} scale",
+-                    f"must be a dict, list or tuple; not {type(scale.values)}",
+-                ])
++                err = " ".join(
++                    [
++                        f"Values for {self.variable} variables with {scale_class} scale",
++                        f"must be a dict, list or tuple; not {type(scale.values)}",
++                    ]
++                )
+                 raise TypeError(err)
+ 
+             vmin, vmax = self._forward([vmin, vmax])
+@@ -258,6 +270,7 @@ class IntervalProperty(Property):
+ 
+ class PointSize(IntervalProperty):
+     """Size (diameter) of a point mark, in points, with scaling by area."""
++
+     _default_range = 2, 8  # TODO use rcparams?
+ 
+     def _forward(self, values):
+@@ -271,48 +284,54 @@ class PointSize(IntervalProperty):
+ 
+ class LineWidth(IntervalProperty):
+     """Thickness of a line mark, in points."""
++
+     @property
+     def default_range(self) -> tuple[float, float]:
+         """Min and max values used by default for semantic mapping."""
+         base = mpl.rcParams["lines.linewidth"]
+-        return base * .5, base * 2
++        return base * 0.5, base * 2
+ 
+ 
+ class EdgeWidth(IntervalProperty):
+     """Thickness of the edges on a patch mark, in points."""
++
+     @property
+     def default_range(self) -> tuple[float, float]:
+         """Min and max values used by default for semantic mapping."""
+         base = mpl.rcParams["patch.linewidth"]
+-        return base * .5, base * 2
++        return base * 0.5, base * 2
+ 
+ 
+ class Stroke(IntervalProperty):
+     """Thickness of lines that define point glyphs."""
+-    _default_range = .25, 2.5
++
++    _default_range = 0.25, 2.5
+ 
+ 
+ class Alpha(IntervalProperty):
+     """Opacity of the color values for an arbitrary mark."""
+-    _default_range = .3, .95
++
++    _default_range = 0.3, 0.95
+     # TODO validate / enforce that output is in [0, 1]
+ 
+ 
+ class Offset(IntervalProperty):
+     """Offset for edge-aligned text, in point units."""
++
+     _default_range = 0, 5
+     _legend = False
+ 
+ 
+ class FontSize(IntervalProperty):
+     """Font size for textual marks, in points."""
++
+     _legend = False
+ 
+     @property
+     def default_range(self) -> tuple[float, float]:
+         """Min and max values used by default for semantic mapping."""
+         base = mpl.rcParams["font.size"]
+-        return base * .5, base * 2
++        return base * 0.5, base * 2
+ 
+ 
+ # =================================================================================== #
+@@ -322,6 +341,7 @@ class FontSize(IntervalProperty):
+ 
+ class ObjectProperty(Property):
+     """A property defined by arbitrary an object, with inherently nominal scaling."""
++
+     legend = True
+     normed = False
+ 
+@@ -339,7 +359,9 @@ class ObjectProperty(Property):
+         return Nominal(arg)
+ 
+     def get_mapping(
+-        self, scale: Scale, data: Series,
++        self,
++        scale: Scale,
++        data: Series,
+     ) -> Callable[[ArrayLike], list]:
+         """Define mapping as lookup into list of object values."""
+         order = getattr(scale, "order", None)
+@@ -354,10 +376,12 @@ class ObjectProperty(Property):
+         elif scale.values is None:
+             values = self._default_values(n)
+         else:
+-            msg = " ".join([
+-                f"Scale values for a {self.variable} variable must be provided",
+-                f"in a dict or list; not {type(scale.values)}."
+-            ])
++            msg = " ".join(
++                [
++                    f"Scale values for a {self.variable} variable must be provided",
++                    f"in a dict or list; not {type(scale.values)}.",
++                ]
++            )
+             raise TypeError(msg)
+ 
+         values = [self.standardize(x) for x in values]
+@@ -374,6 +398,7 @@ class ObjectProperty(Property):
+ 
+ class Marker(ObjectProperty):
+     """Shape of points in scatter-type marks or lines with data points marked."""
++
+     null_value = MarkerStyle("")
+ 
+     # TODO should we have named marker "palettes"? (e.g. see d3 options)
+@@ -401,7 +426,15 @@ class Marker(ObjectProperty):
+         """
+         # Start with marker specs that are well distinguishable
+         markers = [
+-            "o", "X", (4, 0, 45), "P", (4, 0, 0), (4, 1, 0), "^", (4, 1, 45), "v",
++            "o",
++            "X",
++            (4, 0, 45),
++            "P",
++            (4, 0, 0),
++            (4, 1, 0),
++            "^",
++            (4, 1, 45),
++            "v",
+         ]
+ 
+         # Now generate more from regular polygons of increasing order
+@@ -418,6 +451,7 @@ class Marker(ObjectProperty):
+ 
+ class LineStyle(ObjectProperty):
+     """Dash pattern for line-type marks."""
++
+     null_value = ""
+ 
+     def standardize(self, val: str | DashPattern) -> DashPatternWithOffset:
+@@ -442,13 +476,16 @@ class LineStyle(ObjectProperty):
+         """
+         # Start with dash specs that are well distinguishable
+         dashes: list[str | DashPattern] = [
+-            "-", (4, 1.5), (1, 1), (3, 1.25, 1.5, 1.25), (5, 1, 1, 1),
++            "-",
++            (4, 1.5),
++            (1, 1),
++            (3, 1.25, 1.5, 1.25),
++            (5, 1, 1, 1),
+         ]
+ 
+         # Now programmatically build as many as we need
+         p = 3
+         while len(dashes) < n:
+-
+             # Take combinations of long and short dashes
+             a = itertools.combinations_with_replacement([3, 1.25], p)
+             b = itertools.combinations_with_replacement([4, 1], p)
+@@ -518,14 +555,12 @@ class TextAlignment(ObjectProperty):
+ 
+ 
+ class HorizontalAlignment(TextAlignment):
+-
+     def _default_values(self, n: int) -> list:
+         vals = itertools.cycle(["left", "right"])
+         return [next(vals) for _ in range(n)]
+ 
+ 
+ class VerticalAlignment(TextAlignment):
+-
+     def _default_values(self, n: int) -> list:
+         vals = itertools.cycle(["top", "bottom"])
+         return [next(vals) for _ in range(n)]
+@@ -538,6 +573,7 @@ class VerticalAlignment(TextAlignment):
+ 
+ class Color(Property):
+     """Color, as RGB(A), scalable with nominal palettes or continuous gradients."""
++
+     legend = True
+     normed = True
+ 
+@@ -551,6 +587,7 @@ class Color(Property):
+ 
+     def _standardize_color_sequence(self, colors: ArrayLike) -> ArrayLike:
+         """Convert color sequence to RGB(A) array, preserving but not adding alpha."""
++
+         def has_alpha(x):
+             return to_rgba(x) != to_rgba(x, 1)
+ 
+@@ -564,6 +601,16 @@ class Color(Property):
+         else:
+             return to_rgba_array(colors)[:, :3]
+ 
++    def default_scale(self, data: Series) -> Scale:
++        """Given data, initialize appropriate scale class."""
++        var_type = variable_type(data, boolean_type="categorical")
++        if var_type == "numeric":
++            return Continuous()
++        elif var_type == "datetime":
++            return Temporal()
++        else:
++            return Nominal()
++
+     def infer_scale(self, arg: Any, data: Series) -> Scale:
+         # TODO when inferring Continuous without data, verify type
+ 
+@@ -592,10 +639,12 @@ class Color(Property):
+         # - Boolean?
+ 
+         if not isinstance(arg, str):
+-            msg = " ".join([
+-                f"A single scale argument for {self.variable} variables must be",
+-                f"a string, dict, tuple, list, or callable, not {type(arg)}."
+-            ])
++            msg = " ".join(
++                [
++                    f"A single scale argument for {self.variable} variables must be",
++                    f"a string, dict, tuple, list, or callable, not {type(arg)}.",
++                ]
++            )
+             raise TypeError(msg)
+ 
+         if arg in QUAL_PALETTES:
+@@ -630,10 +679,12 @@ class Color(Property):
+                 colors = color_palette("husl", n)
+         else:
+             scale_class = scale.__class__.__name__
+-            msg = " ".join([
+-                f"Scale values for {self.variable} with a {scale_class} mapping",
+-                f"must be string, list, tuple, or dict; not {type(scale.values)}."
+-            ])
++            msg = " ".join(
++                [
++                    f"Scale values for {self.variable} with a {scale_class} mapping",
++                    f"must be string, list, tuple, or dict; not {type(scale.values)}.",
++                ]
++            )
+             raise TypeError(msg)
+ 
+         # If color specified here has alpha channel, it will override alpha property
+@@ -673,10 +724,12 @@ class Color(Property):
+             mapping = scale.values
+         else:
+             scale_class = scale.__class__.__name__
+-            msg = " ".join([
+-                f"Scale values for {self.variable} with a {scale_class} mapping",
+-                f"must be string, tuple, or callable; not {type(scale.values)}."
+-            ])
++            msg = " ".join(
++                [
++                    f"Scale values for {self.variable} with a {scale_class} mapping",
++                    f"must be string, tuple, or callable; not {type(scale.values)}.",
++                ]
++            )
+             raise TypeError(msg)
+ 
+         def _mapping(x):
+@@ -697,6 +750,7 @@ class Color(Property):
+ 
+ class Fill(Property):
+     """Boolean property of points/bars/patches that can be solid or outlined."""
++
+     legend = True
+     normed = False
+ 
+@@ -710,10 +764,12 @@ class Fill(Property):
+     def _default_values(self, n: int) -> list:
+         """Return a list of n values, alternating True and False."""
+         if n > 2:
+-            msg = " ".join([
+-                f"The variable assigned to {self.variable} has more than two levels,",
+-                f"so {self.variable} values will cycle and may be uninterpretable",
+-            ])
++            msg = " ".join(
++                [
++                    f"The variable assigned to {self.variable} has more than two levels,",
++                    f"so {self.variable} values will cycle and may be uninterpretable",
++                ]
++            )
+             # TODO fire in a "nice" way (see above)
+             warnings.warn(msg, UserWarning)
+         return [x for x, _ in zip(itertools.cycle([True, False]), range(n))]
+@@ -746,17 +802,18 @@ class Fill(Property):
+         elif scale.values is None:
+             values = self._default_values(len(levels))
+         else:
+-            msg = " ".join([
+-                f"Scale values for {self.variable} must be passed in",
+-                f"a list or dict; not {type(scale.values)}."
+-            ])
++            msg = " ".join(
++                [
++                    f"Scale values for {self.variable} must be passed in",
++                    f"a list or dict; not {type(scale.values)}.",
++                ]
++            )
+             raise TypeError(msg)
+ 
+         def mapping(x):
+             ixs = np.asarray(x, np.intp)
+             return [
+-                values[ix] if np.isfinite(x_i) else False
+-                for x_i, ix in zip(x, ixs)
++                values[ix] if np.isfinite(x_i) else False for x_i, ix in zip(x, ixs)
+             ]
+ 
+         return mapping
+diff --git a/seaborn/_core/scales.py b/seaborn/_core/scales.py
+index 6c9ecbc9..38094846 100644
+--- a/seaborn/_core/scales.py
++++ b/seaborn/_core/scales.py
+@@ -38,6 +38,7 @@ from seaborn._core.rules import categorical_order
+ from seaborn._core.typing import Default, default
+ 
+ from typing import TYPE_CHECKING
++
+ if TYPE_CHECKING:
+     from seaborn._core.properties import Property
+     from numpy.typing import ArrayLike, NDArray
+@@ -63,7 +64,6 @@ class Scale:
+     _legend: tuple[list[str], list[Any]] | None
+ 
+     def __post_init__(self):
+-
+         self._tick_params = None
+         self._label_params = None
+         self._legend = None
+@@ -81,7 +81,6 @@ class Scale:
+         raise NotImplementedError()
+ 
+     def _get_scale(self, name: str, forward: Callable, inverse: Callable):
+-
+         major_locator, minor_locator = self._get_locators(**self._tick_params)
+         major_formatter = self._get_formatter(major_locator, **self._label_params)
+ 
+@@ -103,12 +102,14 @@ class Scale:
+         return space
+ 
+     def _setup(
+-        self, data: Series, prop: Property, axis: Axis | None = None,
++        self,
++        data: Series,
++        prop: Property,
++        axis: Axis | None = None,
+     ) -> Scale:
+         raise NotImplementedError()
+ 
+     def __call__(self, data: Series) -> ArrayLike:
+-
+         trans_data: Series | NDArray | list
+ 
+         # TODO sometimes we need to handle scalars (e.g. for Line)
+@@ -130,7 +131,6 @@ class Scale:
+ 
+     @staticmethod
+     def _identity():
+-
+         class Identity(Scale):
+             _pipeline = []
+             _spacer = None
+@@ -145,6 +145,7 @@ class Nominal(Scale):
+     """
+     A categorical scale without relative importance / magnitude.
+     """
++
+     # Categorical (convert to strings), un-sortable
+ 
+     values: tuple | str | list | dict | None = None
+@@ -153,9 +154,11 @@ class Nominal(Scale):
+     _priority: ClassVar[int] = 3
+ 
+     def _setup(
+-        self, data: Series, prop: Property, axis: Axis | None = None,
++        self,
++        data: Series,
++        prop: Property,
++        axis: Axis | None = None,
+     ) -> Scale:
+-
+         new = copy(self)
+         if new._tick_params is None:
+             new = new.tick()
+@@ -283,7 +286,6 @@ class Nominal(Scale):
+         return new
+ 
+     def _get_locators(self, locator):
+-
+         if locator is not None:
+             return locator, None
+ 
+@@ -292,7 +294,6 @@ class Nominal(Scale):
+         return locator, None
+ 
+     def _get_formatter(self, locator, formatter):
+-
+         if formatter is not None:
+             return formatter
+ 
+@@ -315,14 +316,15 @@ class Discrete(Scale):
+ 
+ @dataclass
+ class ContinuousBase(Scale):
+-
+     values: tuple | str | None = None
+     norm: tuple | None = None
+ 
+     def _setup(
+-        self, data: Series, prop: Property, axis: Axis | None = None,
++        self,
++        data: Series,
++        prop: Property,
++        axis: Axis | None = None,
+     ) -> Scale:
+-
+         new = copy(self)
+         if new._tick_params is None:
+             new = new.tick()
+@@ -331,6 +333,11 @@ class ContinuousBase(Scale):
+ 
+         forward, inverse = new._get_transform()
+ 
++        # Boolean data needs to be cast to int to support arithmetic operations
++        # (numpy boolean subtraction is not supported)
++        if data.dtype.kind == "b":
++            data = data.astype(int)
++
+         mpl_scale = new._get_scale(str(data.name), forward, inverse)
+ 
+         if axis is None:
+@@ -360,7 +367,7 @@ class ContinuousBase(Scale):
+             axis.convert_units,
+             forward,
+             normalize,
+-            prop.get_mapping(new, data)
++            prop.get_mapping(new, data),
+         ]
+ 
+         def spacer(x):
+@@ -368,6 +375,7 @@ class ContinuousBase(Scale):
+             if len(x) < 2:
+                 return np.nan
+             return np.min(np.diff(np.sort(x)))
++
+         new._spacer = spacer
+ 
+         # TODO How to allow disabling of legend for all uses of property?
+@@ -392,13 +400,12 @@ class ContinuousBase(Scale):
+         return new
+ 
+     def _get_transform(self):
+-
+         arg = self.trans
+ 
+         def get_param(method, default):
+             if arg == method:
+                 return default
+-            return float(arg[len(method):])
++            return float(arg[len(method) :])
+ 
+         if arg is None:
+             return _make_identity_transforms()
+@@ -430,6 +437,7 @@ class Continuous(ContinuousBase):
+     """
+     A numeric scale supporting norms and functional transforms.
+     """
++
+     values: tuple | str | None = None
+     trans: str | TransFuncs | None = None
+ 
+@@ -440,7 +448,8 @@ class Continuous(ContinuousBase):
+ 
+     def tick(
+         self,
+-        locator: Locator | None = None, *,
++        locator: Locator | None = None,
++        *,
+         at: Sequence[float] | None = None,
+         upto: int | None = None,
+         count: int | None = None,
+@@ -501,7 +510,8 @@ class Continuous(ContinuousBase):
+ 
+     def label(
+         self,
+-        formatter: Formatter | None = None, *,
++        formatter: Formatter | None = None,
++        *,
+         like: str | Callable | None = None,
+         base: int | None | Default = default,
+         unit: str | None = None,
+@@ -553,7 +563,6 @@ class Continuous(ContinuousBase):
+     def _parse_for_log_params(
+         self, trans: str | TransFuncs | None
+     ) -> tuple[float | None, float | None]:
+-
+         log_base = symlog_thresh = None
+         if isinstance(trans, str):
+             m = re.match(r"^log(\d*)", trans)
+@@ -565,7 +574,6 @@ class Continuous(ContinuousBase):
+         return log_base, symlog_thresh
+ 
+     def _get_locators(self, locator, at, upto, count, every, between, minor):
+-
+         log_base, symlog_thresh = self._parse_for_log_params(self.trans)
+ 
+         if locator is not None:
+@@ -621,7 +629,6 @@ class Continuous(ContinuousBase):
+         return major_locator, minor_locator
+ 
+     def _get_formatter(self, locator, formatter, like, base, unit):
+-
+         log_base, symlog_thresh = self._parse_for_log_params(self.trans)
+         if base is default:
+             if symlog_thresh:
+@@ -665,6 +672,7 @@ class Temporal(ContinuousBase):
+     """
+     A scale for date/time data.
+     """
++
+     # TODO date: bool?
+     # For when we only care about the time component, would affect
+     # default formatter and norm conversion. Should also happen in
+@@ -680,7 +688,9 @@ class Temporal(ContinuousBase):
+     _priority: ClassVar[int] = 2
+ 
+     def tick(
+-        self, locator: Locator | None = None, *,
++        self,
++        locator: Locator | None = None,
++        *,
+         upto: int | None = None,
+     ) -> Temporal:
+         """
+@@ -715,7 +725,8 @@ class Temporal(ContinuousBase):
+ 
+     def label(
+         self,
+-        formatter: Formatter | None = None, *,
++        formatter: Formatter | None = None,
++        *,
+         concise: bool = False,
+     ) -> Temporal:
+         """
+@@ -743,7 +754,6 @@ class Temporal(ContinuousBase):
+         return new
+ 
+     def _get_locators(self, locator, upto):
+-
+         if locator is not None:
+             major_locator = locator
+         elif upto is not None:
+@@ -756,7 +766,6 @@ class Temporal(ContinuousBase):
+         return major_locator, minor_locator
+ 
+     def _get_formatter(self, locator, formatter, concise):
+-
+         if formatter is not None:
+             return formatter
+ 
+@@ -798,10 +807,10 @@ class PseudoAxis:
+     code, this object acts like an Axis and can be used to scale other variables.
+ 
+     """
++
+     axis_name = ""  # Matplotlib requirement but not actually used
+ 
+     def __init__(self, scale):
+-
+         self.converter = None
+         self.units = None
+         self.scale = scale
+@@ -899,7 +908,6 @@ class PseudoAxis:
+ 
+ 
+ def _make_identity_transforms() -> TransFuncs:
+-
+     def identity(x):
+         return x
+ 
+@@ -907,7 +915,6 @@ def _make_identity_transforms() -> TransFuncs:
+ 
+ 
+ def _make_logit_transforms(base: float | None = None) -> TransFuncs:
+-
+     log, exp = _make_log_transforms(base)
+ 
+     def logit(x):
+@@ -922,7 +929,6 @@ def _make_logit_transforms(base: float | None = None) -> TransFuncs:
+ 
+ 
+ def _make_log_transforms(base: float | None = None) -> TransFuncs:
+-
+     fs: TransFuncs
+     if base is None:
+         fs = np.log, np.exp
+@@ -931,8 +937,10 @@ def _make_log_transforms(base: float | None = None) -> TransFuncs:
+     elif base == 10:
+         fs = np.log10, partial(np.power, 10)
+     else:
++
+         def forward(x):
+             return np.log(x) / np.log(base)
++
+         fs = forward, partial(np.power, base)
+ 
+     def log(x: ArrayLike) -> ArrayLike:
+@@ -947,7 +955,6 @@ def _make_log_transforms(base: float | None = None) -> TransFuncs:
+ 
+ 
+ def _make_symlog_transforms(c: float = 1, base: float = 10) -> TransFuncs:
+-
+     # From https://iopscience.iop.org/article/10.1088/0957-0233/24/2/027001
+ 
+     # Note: currently not using base because we only get
+@@ -967,7 +974,6 @@ def _make_symlog_transforms(c: float = 1, base: float = 10) -> TransFuncs:
+ 
+ 
+ def _make_sqrt_transforms() -> TransFuncs:
+-
+     def sqrt(x):
+         return np.sign(x) * np.sqrt(np.abs(x))
+ 
+@@ -978,7 +984,6 @@ def _make_sqrt_transforms() -> TransFuncs:
+ 
+ 
+ def _make_power_transforms(exp: float) -> TransFuncs:
+-
+     def forward(x):
+         return np.sign(x) * np.power(np.abs(x), exp)
+ 
+diff --git a/tests/_core/test_properties.py b/tests/_core/test_properties.py
+index efef33c3..00a91ee4 100644
+--- a/tests/_core/test_properties.py
++++ b/tests/_core/test_properties.py
+@@ -1,4 +1,3 @@
+-
+ import numpy as np
+ import pandas as pd
+ import matplotlib as mpl
+@@ -26,7 +25,6 @@ from seaborn.palettes import color_palette
+ 
+ 
+ class DataFixtures:
+-
+     @pytest.fixture
+     def num_vector(self, long_df):
+         return long_df["s"]
+@@ -57,27 +55,22 @@ class DataFixtures:
+ 
+ 
+ class TestCoordinate(DataFixtures):
+-
+     def test_bad_scale_arg_str(self, num_vector):
+-
+         err = "Unknown magic arg for x scale: 'xxx'."
+         with pytest.raises(ValueError, match=err):
+             Coordinate("x").infer_scale("xxx", num_vector)
+ 
+     def test_bad_scale_arg_type(self, cat_vector):
+-
+         err = "Magic arg for x scale must be str, not list."
+         with pytest.raises(TypeError, match=err):
+             Coordinate("x").infer_scale([1, 2, 3], cat_vector)
+ 
+ 
+ class TestColor(DataFixtures):
+-
+     def assert_same_rgb(self, a, b):
+         assert_array_equal(a[:, :3], b[:, :3])
+ 
+     def test_nominal_default_palette(self, cat_vector, cat_order):
+-
+         m = Color().get_mapping(Nominal(), cat_vector)
+         n = len(cat_order)
+         actual = m(np.arange(n))
+@@ -86,7 +79,6 @@ class TestColor(DataFixtures):
+             assert same_color(have, want)
+ 
+     def test_nominal_default_palette_large(self):
+-
+         vector = pd.Series(list("abcdefghijklmnopqrstuvwxyz"))
+         m = Color().get_mapping(Nominal(), vector)
+         actual = m(np.arange(26))
+@@ -95,7 +87,6 @@ class TestColor(DataFixtures):
+             assert same_color(have, want)
+ 
+     def test_nominal_named_palette(self, cat_vector, cat_order):
+-
+         palette = "Blues"
+         m = Color().get_mapping(Nominal(palette), cat_vector)
+         n = len(cat_order)
+@@ -105,7 +96,6 @@ class TestColor(DataFixtures):
+             assert same_color(have, want)
+ 
+     def test_nominal_list_palette(self, cat_vector, cat_order):
+-
+         palette = color_palette("Reds", len(cat_order))
+         m = Color().get_mapping(Nominal(palette), cat_vector)
+         actual = m(np.arange(len(palette)))
+@@ -114,7 +104,6 @@ class TestColor(DataFixtures):
+             assert same_color(have, want)
+ 
+     def test_nominal_dict_palette(self, cat_vector, cat_order):
+-
+         colors = color_palette("Greens")
+         palette = dict(zip(cat_order, colors))
+         m = Color().get_mapping(Nominal(palette), cat_vector)
+@@ -125,13 +114,11 @@ class TestColor(DataFixtures):
+             assert same_color(have, want)
+ 
+     def test_nominal_dict_with_missing_keys(self, cat_vector, cat_order):
+-
+         palette = dict(zip(cat_order[1:], color_palette("Purples")))
+         with pytest.raises(ValueError, match="No entry in color dict"):
+             Color("color").get_mapping(Nominal(palette), cat_vector)
+ 
+     def test_nominal_list_too_short(self, cat_vector, cat_order):
+-
+         n = len(cat_order) - 1
+         palette = color_palette("Oranges", n)
+         msg = rf"The edgecolor list has fewer values \({n}\) than needed \({n + 1}\)"
+@@ -139,7 +126,6 @@ class TestColor(DataFixtures):
+             Color("edgecolor").get_mapping(Nominal(palette), cat_vector)
+ 
+     def test_nominal_list_too_long(self, cat_vector, cat_order):
+-
+         n = len(cat_order) + 1
+         palette = color_palette("Oranges", n)
+         msg = rf"The edgecolor list has more values \({n}\) than needed \({n - 1}\)"
+@@ -147,71 +133,59 @@ class TestColor(DataFixtures):
+             Color("edgecolor").get_mapping(Nominal(palette), cat_vector)
+ 
+     def test_continuous_default_palette(self, num_vector):
+-
+         cmap = color_palette("ch:", as_cmap=True)
+         m = Color().get_mapping(Continuous(), num_vector)
+         self.assert_same_rgb(m(num_vector), cmap(num_vector))
+ 
+     def test_continuous_named_palette(self, num_vector):
+-
+         pal = "flare"
+         cmap = color_palette(pal, as_cmap=True)
+         m = Color().get_mapping(Continuous(pal), num_vector)
+         self.assert_same_rgb(m(num_vector), cmap(num_vector))
+ 
+     def test_continuous_tuple_palette(self, num_vector):
+-
+         vals = ("blue", "red")
+         cmap = color_palette("blend:" + ",".join(vals), as_cmap=True)
+         m = Color().get_mapping(Continuous(vals), num_vector)
+         self.assert_same_rgb(m(num_vector), cmap(num_vector))
+ 
+     def test_continuous_callable_palette(self, num_vector):
+-
+         cmap = get_colormap("viridis")
+         m = Color().get_mapping(Continuous(cmap), num_vector)
+         self.assert_same_rgb(m(num_vector), cmap(num_vector))
+ 
+     def test_continuous_missing(self):
+-
+         x = pd.Series([1, 2, np.nan, 4])
+         m = Color().get_mapping(Continuous(), x)
+         assert np.isnan(m(x)[2]).all()
+ 
+     def test_bad_scale_values_continuous(self, num_vector):
+-
+         with pytest.raises(TypeError, match="Scale values for color with a Continuous"):
+             Color().get_mapping(Continuous(["r", "g", "b"]), num_vector)
+ 
+     def test_bad_scale_values_nominal(self, cat_vector):
+-
+         with pytest.raises(TypeError, match="Scale values for color with a Nominal"):
+             Color().get_mapping(Nominal(get_colormap("viridis")), cat_vector)
+ 
+     def test_bad_inference_arg(self, cat_vector):
+-
+         with pytest.raises(TypeError, match="A single scale argument for color"):
+             Color().infer_scale(123, cat_vector)
+ 
+     @pytest.mark.parametrize(
+-        "data_type,scale_class",
+-        [("cat", Nominal), ("num", Continuous)]
++        "data_type,scale_class", [("cat", Nominal), ("num", Continuous)]
+     )
+     def test_default(self, data_type, scale_class, vectors):
+-
+         scale = Color().default_scale(vectors[data_type])
+         assert isinstance(scale, scale_class)
+ 
+     def test_default_numeric_data_category_dtype(self, num_vector):
+-
+         scale = Color().default_scale(num_vector.astype("category"))
+         assert isinstance(scale, Nominal)
+ 
+     def test_default_binary_data(self):
+-
+         x = pd.Series([0, 0, 1, 0, 1], dtype=int)
+         scale = Color().default_scale(x)
+-        assert isinstance(scale, Continuous)
++        assert isinstance(scale, Nominal)
+ 
+     # TODO default scales for other types
+ 
+@@ -226,28 +200,25 @@ class TestColor(DataFixtures):
+             (("r", "b"), "num", Continuous),  # Based on tuple / variable type
+             (("g", "m"), "cat", Nominal),  # Based on tuple / variable type
+             (get_colormap("inferno"), "num", Continuous),  # Based on callable
+-        ]
++        ],
+     )
+     def test_inference(self, values, data_type, scale_class, vectors):
+-
+         scale = Color().infer_scale(values, vectors[data_type])
+         assert isinstance(scale, scale_class)
+         assert scale.values == values
+ 
+     def test_inference_binary_data(self):
+-
+         x = pd.Series([0, 0, 1, 0, 1], dtype=int)
+         scale = Color().infer_scale("viridis", x)
+         assert isinstance(scale, Nominal)
+ 
+     def test_standardization(self):
+-
+         f = Color().standardize
+         assert f("C3") == to_rgb("C3")
+         assert f("dodgerblue") == to_rgb("dodgerblue")
+ 
+-        assert f((.1, .2, .3)) == (.1, .2, .3)
+-        assert f((.1, .2, .3, .4)) == (.1, .2, .3, .4)
++        assert f((0.1, 0.2, 0.3)) == (0.1, 0.2, 0.3)
++        assert f((0.1, 0.2, 0.3, 0.4)) == (0.1, 0.2, 0.3, 0.4)
+ 
+         assert f("#123456") == to_rgb("#123456")
+         assert f("#12345678") == to_rgba("#12345678")
+@@ -258,9 +229,7 @@ class TestColor(DataFixtures):
+ 
+ 
+ class ObjectPropertyBase(DataFixtures):
+-
+     def assert_equal(self, a, b):
+-
+         assert self.unpack(a) == self.unpack(b)
+ 
+     def unpack(self, x):
+@@ -268,20 +237,17 @@ class ObjectPropertyBase(DataFixtures):
+ 
+     @pytest.mark.parametrize("data_type", ["cat", "num"])
+     def test_default(self, data_type, vectors):
+-
+         scale = self.prop().default_scale(vectors[data_type])
+         assert isinstance(scale, Nominal)
+ 
+     @pytest.mark.parametrize("data_type", ["cat", "num"])
+     def test_inference_list(self, data_type, vectors):
+-
+         scale = self.prop().infer_scale(self.values, vectors[data_type])
+         assert isinstance(scale, Nominal)
+         assert scale.values == self.values
+ 
+     @pytest.mark.parametrize("data_type", ["cat", "num"])
+     def test_inference_dict(self, data_type, vectors):
+-
+         x = vectors[data_type]
+         values = dict(zip(categorical_order(x), self.values))
+         scale = self.prop().infer_scale(values, x)
+@@ -289,7 +255,6 @@ class ObjectPropertyBase(DataFixtures):
+         assert scale.values == values
+ 
+     def test_dict_missing(self, cat_vector):
+-
+         levels = categorical_order(cat_vector)
+         values = dict(zip(levels, self.values[:-1]))
+         scale = Nominal(values)
+@@ -300,27 +265,24 @@ class ObjectPropertyBase(DataFixtures):
+ 
+     @pytest.mark.parametrize("data_type", ["cat", "num"])
+     def test_mapping_default(self, data_type, vectors):
+-
+         x = vectors[data_type]
+         mapping = self.prop().get_mapping(Nominal(), x)
+         n = x.nunique()
+         for i, expected in enumerate(self.prop()._default_values(n)):
+-            actual, = mapping([i])
++            (actual,) = mapping([i])
+             self.assert_equal(actual, expected)
+ 
+     @pytest.mark.parametrize("data_type", ["cat", "num"])
+     def test_mapping_from_list(self, data_type, vectors):
+-
+         x = vectors[data_type]
+         scale = Nominal(self.values)
+         mapping = self.prop().get_mapping(scale, x)
+         for i, expected in enumerate(self.standardized_values):
+-            actual, = mapping([i])
++            (actual,) = mapping([i])
+             self.assert_equal(actual, expected)
+ 
+     @pytest.mark.parametrize("data_type", ["cat", "num"])
+     def test_mapping_from_dict(self, data_type, vectors):
+-
+         x = vectors[data_type]
+         levels = categorical_order(x)
+         values = dict(zip(levels, self.values[::-1]))
+@@ -329,12 +291,11 @@ class ObjectPropertyBase(DataFixtures):
+         scale = Nominal(values)
+         mapping = self.prop().get_mapping(scale, x)
+         for i, level in enumerate(levels):
+-            actual, = mapping([i])
++            (actual,) = mapping([i])
+             expected = standardized_values[level]
+             self.assert_equal(actual, expected)
+ 
+     def test_mapping_with_null_value(self, cat_vector):
+-
+         mapping = self.prop().get_mapping(Nominal(self.values), cat_vector)
+         actual = mapping(np.array([0, np.nan, 2]))
+         v0, _, v2 = self.standardized_values
+@@ -343,21 +304,18 @@ class ObjectPropertyBase(DataFixtures):
+             self.assert_equal(a, b)
+ 
+     def test_unique_default_large_n(self):
+-
+         n = 24
+         x = pd.Series(np.arange(n))
+         mapping = self.prop().get_mapping(Nominal(), x)
+         assert len({self.unpack(x_i) for x_i in mapping(x)}) == n
+ 
+     def test_bad_scale_values(self, cat_vector):
+-
+         var_name = self.prop.__name__.lower()
+         with pytest.raises(TypeError, match=f"Scale values for a {var_name} variable"):
+             self.prop().get_mapping(Nominal(("o", "s")), cat_vector)
+ 
+ 
+ class TestMarker(ObjectPropertyBase):
+-
+     prop = Marker
+     values = ["o", (5, 2, 0), MarkerStyle("^")]
+     standardized_values = [MarkerStyle(x) for x in values]
+@@ -372,39 +330,33 @@ class TestMarker(ObjectPropertyBase):
+ 
+ 
+ class TestLineStyle(ObjectPropertyBase):
+-
+     prop = LineStyle
+-    values = ["solid", "--", (1, .5)]
++    values = ["solid", "--", (1, 0.5)]
+     standardized_values = [LineStyle._get_dash_pattern(x) for x in values]
+ 
+     def test_bad_type(self):
+-
+         p = LineStyle()
+         with pytest.raises(TypeError, match="^Linestyle must be .+, not list.$"):
+             p.standardize([1, 2])
+ 
+     def test_bad_style(self):
+-
+         p = LineStyle()
+         with pytest.raises(ValueError, match="^Linestyle string must be .+, not 'o'.$"):
+             p.standardize("o")
+ 
+     def test_bad_dashes(self):
+-
+         p = LineStyle()
+         with pytest.raises(TypeError, match="^Invalid dash pattern"):
+             p.standardize((1, 2, "x"))
+ 
+ 
+ class TestFill(DataFixtures):
+-
+     @pytest.fixture
+     def vectors(self):
+-
+         return {
+             "cat": pd.Series(["a", "a", "b"]),
+             "num": pd.Series([1, 1, 2]),
+-            "bool": pd.Series([True, True, False])
++            "bool": pd.Series([True, True, False]),
+         }
+ 
+     @pytest.fixture
+@@ -417,14 +369,12 @@ class TestFill(DataFixtures):
+ 
+     @pytest.mark.parametrize("data_type", ["cat", "num", "bool"])
+     def test_default(self, data_type, vectors):
+-
+         x = vectors[data_type]
+         scale = Fill().default_scale(x)
+         assert isinstance(scale, Nominal)
+ 
+     @pytest.mark.parametrize("data_type", ["cat", "num", "bool"])
+     def test_inference_list(self, data_type, vectors):
+-
+         x = vectors[data_type]
+         scale = Fill().infer_scale([True, False], x)
+         assert isinstance(scale, Nominal)
+@@ -432,7 +382,6 @@ class TestFill(DataFixtures):
+ 
+     @pytest.mark.parametrize("data_type", ["cat", "num", "bool"])
+     def test_inference_dict(self, data_type, vectors):
+-
+         x = vectors[data_type]
+         values = dict(zip(x.unique(), [True, False]))
+         scale = Fill().infer_scale(values, x)
+@@ -440,87 +389,80 @@ class TestFill(DataFixtures):
+         assert scale.values == values
+ 
+     def test_mapping_categorical_data(self, cat_vector):
+-
+         mapping = Fill().get_mapping(Nominal(), cat_vector)
+         assert_array_equal(mapping([0, 1, 0]), [True, False, True])
+ 
+     def test_mapping_numeric_data(self, num_vector):
+-
+         mapping = Fill().get_mapping(Nominal(), num_vector)
+         assert_array_equal(mapping([0, 1, 0]), [True, False, True])
+ 
+     def test_mapping_list(self, cat_vector):
+-
+         mapping = Fill().get_mapping(Nominal([False, True]), cat_vector)
+         assert_array_equal(mapping([0, 1, 0]), [False, True, False])
+ 
+     def test_mapping_truthy_list(self, cat_vector):
+-
+         mapping = Fill().get_mapping(Nominal([0, 1]), cat_vector)
+         assert_array_equal(mapping([0, 1, 0]), [False, True, False])
+ 
+     def test_mapping_dict(self, cat_vector):
+-
+         values = dict(zip(cat_vector.unique(), [False, True]))
+         mapping = Fill().get_mapping(Nominal(values), cat_vector)
+         assert_array_equal(mapping([0, 1, 0]), [False, True, False])
+ 
+     def test_cycle_warning(self):
+-
+         x = pd.Series(["a", "b", "c"])
+         with pytest.warns(UserWarning, match="The variable assigned to fill"):
+             Fill().get_mapping(Nominal(), x)
+ 
+     def test_values_error(self):
+-
+         x = pd.Series(["a", "b"])
+         with pytest.raises(TypeError, match="Scale values for fill must be"):
+             Fill().get_mapping(Nominal("bad_values"), x)
+ 
+ 
+ class IntervalBase(DataFixtures):
+-
+     def norm(self, x):
+         return (x - x.min()) / (x.max() - x.min())
+ 
+-    @pytest.mark.parametrize("data_type,scale_class", [
+-        ("cat", Nominal),
+-        ("num", Continuous),
+-    ])
++    @pytest.mark.parametrize(
++        "data_type,scale_class",
++        [
++            ("cat", Nominal),
++            ("num", Continuous),
++        ],
++    )
+     def test_default(self, data_type, scale_class, vectors):
+-
+         x = vectors[data_type]
+         scale = self.prop().default_scale(x)
+         assert isinstance(scale, scale_class)
+ 
+-    @pytest.mark.parametrize("arg,data_type,scale_class", [
+-        ((1, 3), "cat", Nominal),
+-        ((1, 3), "num", Continuous),
+-        ([1, 2, 3], "cat", Nominal),
+-        ([1, 2, 3], "num", Nominal),
+-        ({"a": 1, "b": 3, "c": 2}, "cat", Nominal),
+-        ({2: 1, 4: 3, 8: 2}, "num", Nominal),
+-    ])
++    @pytest.mark.parametrize(
++        "arg,data_type,scale_class",
++        [
++            ((1, 3), "cat", Nominal),
++            ((1, 3), "num", Continuous),
++            ([1, 2, 3], "cat", Nominal),
++            ([1, 2, 3], "num", Nominal),
++            ({"a": 1, "b": 3, "c": 2}, "cat", Nominal),
++            ({2: 1, 4: 3, 8: 2}, "num", Nominal),
++        ],
++    )
+     def test_inference(self, arg, data_type, scale_class, vectors):
+-
+         x = vectors[data_type]
+         scale = self.prop().infer_scale(arg, x)
+         assert isinstance(scale, scale_class)
+         assert scale.values == arg
+ 
+     def test_mapped_interval_numeric(self, num_vector):
+-
+         mapping = self.prop().get_mapping(Continuous(), num_vector)
+         assert_array_equal(mapping([0, 1]), self.prop().default_range)
+ 
+     def test_mapped_interval_categorical(self, cat_vector):
+-
+         mapping = self.prop().get_mapping(Nominal(), cat_vector)
+         n = cat_vector.nunique()
+         assert_array_equal(mapping([n - 1, 0]), self.prop().default_range)
+ 
+     def test_bad_scale_values_numeric_data(self, num_vector):
+-
+         prop_name = self.prop.__name__.lower()
+         err_stem = (
+             f"Values for {prop_name} variables with Continuous scale must be 2-tuple"
+@@ -533,7 +475,6 @@ class IntervalBase(DataFixtures):
+             self.prop().get_mapping(Continuous((1, 2, 3)), num_vector)
+ 
+     def test_bad_scale_values_categorical_data(self, cat_vector):
+-
+         prop_name = self.prop.__name__.lower()
+         err_text = f"Values for {prop_name} variables with Nominal scale"
+         with pytest.raises(TypeError, match=err_text):
+@@ -548,7 +489,6 @@ class TestLineWidth(IntervalBase):
+     prop = LineWidth
+ 
+     def test_rcparam_default(self):
+-
+         with mpl.rc_context({"lines.linewidth": 2}):
+             assert self.prop().default_range == (1, 4)
+ 
+@@ -557,7 +497,6 @@ class TestEdgeWidth(IntervalBase):
+     prop = EdgeWidth
+ 
+     def test_rcparam_default(self):
+-
+         with mpl.rc_context({"patch.linewidth": 2}):
+             assert self.prop().default_range == (1, 4)
+ 
+@@ -566,7 +505,6 @@ class TestPointSize(IntervalBase):
+     prop = PointSize
+ 
+     def test_areal_scaling_numeric(self, num_vector):
+-
+         limits = 5, 10
+         scale = Continuous(limits)
+         mapping = self.prop().get_mapping(scale, num_vector)
+@@ -575,7 +513,6 @@ class TestPointSize(IntervalBase):
+         assert_array_equal(mapping(x), expected)
+ 
+     def test_areal_scaling_categorical(self, cat_vector):
+-
+         limits = (2, 4)
+         scale = Nominal(limits)
+         mapping = self.prop().get_mapping(scale, cat_vector)

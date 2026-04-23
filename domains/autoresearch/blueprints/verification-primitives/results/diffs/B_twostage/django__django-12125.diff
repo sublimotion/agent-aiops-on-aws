@@ -1,0 +1,53 @@
+diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py
+index 7d226955d5..00e7bea1b7 100644
+--- a/django/db/migrations/serializer.py
++++ b/django/db/migrations/serializer.py
+@@ -267,9 +267,9 @@ class TypeSerializer(BaseSerializer):
+         if hasattr(self.value, "__module__"):
+             module = self.value.__module__
+             if module == builtins.__name__:
+-                return self.value.__name__, set()
++                return self.value.__qualname__, set()
+             else:
+-                return "%s.%s" % (module, self.value.__name__), {"import %s" % module}
++                return "%s.%s" % (module, self.value.__qualname__), {"import %s" % module}
+ 
+ 
+ class UUIDSerializer(BaseSerializer):
+diff --git a/django/utils/deconstruct.py b/django/utils/deconstruct.py
+index aa952f6b73..a4c309c580 100644
+--- a/django/utils/deconstruct.py
++++ b/django/utils/deconstruct.py
+@@ -27,18 +27,21 @@ def deconstructible(*args, path=None):
+                 module_name, _, name = path.rpartition('.')
+             else:
+                 module_name = obj.__module__
+-                name = obj.__class__.__name__
+-            # Make sure it's actually there and not an inner class
++                name = obj.__class__.__qualname__
++            # Make sure it's actually there and not an unresolvable inner class
+             module = import_module(module_name)
+-            if not hasattr(module, name):
+-                raise ValueError(
+-                    "Could not find object %s in %s.\n"
+-                    "Please note that you cannot serialize things like inner "
+-                    "classes. Please move the object into the main module "
+-                    "body to use migrations.\n"
+-                    "For more information, see "
+-                    "https://docs.djangoproject.com/en/%s/topics/migrations/#serializing-values"
+-                    % (name, module_name, get_docs_version()))
++            node = module
++            for part in name.split('.'):
++                if not hasattr(node, part):
++                    raise ValueError(
++                        "Could not find object %s in %s.\n"
++                        "Please note that you cannot serialize things like inner "
++                        "classes. Please move the object into the main module "
++                        "body to use migrations.\n"
++                        "For more information, see "
++                        "https://docs.djangoproject.com/en/%s/topics/migrations/#serializing-values"
++                        % (name, module_name, get_docs_version()))
++                node = getattr(node, part)
+             return (
+                 path or '%s.%s' % (obj.__class__.__module__, name),
+                 obj._constructor_args[0],

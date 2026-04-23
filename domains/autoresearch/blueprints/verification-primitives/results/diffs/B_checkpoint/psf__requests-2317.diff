@@ -1,0 +1,30 @@
+diff --git a/requests/sessions.py b/requests/sessions.py
+index d701ff2e..adcfbac7 100644
+--- a/requests/sessions.py
++++ b/requests/sessions.py
+@@ -425,7 +425,7 @@ class Session(SessionRedirectMixin):
+             If Tuple, ('cert', 'key') pair.
+         """
+ 
+-        method = builtin_str(method)
++        method = to_native_string(method)
+ 
+         # Create the Request.
+         req = Request(
+diff --git a/requests/utils.py b/requests/utils.py
+index 182348da..22fcd4fa 100644
+--- a/requests/utils.py
++++ b/requests/utils.py
+@@ -9,7 +9,11 @@ that are also useful for external consumption.
+ 
+ """
+ 
+-import cgi
++try:
++    import cgi
++except ImportError:
++    # cgi module was removed in Python 3.13
++    cgi = None
+ import codecs
+ import collections
+ import io

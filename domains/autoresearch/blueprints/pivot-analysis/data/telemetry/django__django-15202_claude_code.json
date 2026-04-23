@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 225.8,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 224532,
+    "duration_api_ms": 202897,
+    "num_turns": 31,
+    "result": "All tests pass. Let me summarize the fix:\n\n## Summary\n\nThe bug was in `django/core/validators.py` in the `URLValidator.__call__` method. There were two calls to `urlsplit(value)` that could raise `ValueError: Invalid IPv6 URL` (from Python's `urllib.parse`) but weren't wrapped in try/except:\n\n1. **Line 130** (in the `else` block after successful regex validation): `urlsplit(value).netloc` for IPv6 host matching\n2. **Line 142** (after the entire try/except/else): `urlsplit(value).hostname` for the 253-char hostname length check\n\n**The fix** wraps both `urlsplit(value)` calls in `try/except ValueError` and converts them to `ValidationError`, consistent with how the `except` block at line 117-119 already handled this.\n\nAdditionally, the hostname check was updated from `len(urlsplit(value).hostname) > 253` to `splitted_url.hostname and len(splitted_url.hostname) > 253` to avoid a potential `TypeError` when `.hostname` returns `None` (e.g., for URLs with no host component).",
+    "stop_reason": "end_turn",
+    "session_id": "da3b9080-c5df-4a82-847c-caba39713155",
+    "total_cost_usd": 0.48481395000000005,
+    "usage": {
+      "input_tokens": 31,
+      "cache_creation_input_tokens": 27717,
+      "cache_read_input_tokens": 746774,
+      "output_tokens": 10450,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 27717
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 31,
+        "outputTokens": 10450,
+        "cacheReadInputTokens": 746774,
+        "cacheCreationInputTokens": 27717,
+        "webSearchRequests": 0,
+        "costUSD": 0.48481395000000005,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "3d72d424-0554-4c72-92ea-d3556ba259eb"
+  },
+  "stderr": ""
+}

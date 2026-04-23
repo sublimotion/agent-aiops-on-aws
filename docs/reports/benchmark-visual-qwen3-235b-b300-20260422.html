@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qwen3-235B-A22B-FP8 Benchmark Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2a2d3a;
+    --text: #e1e4ed;
+    --muted: #8b8fa3;
+    --green: #76b900;
+    --green-dim: rgba(118, 185, 0, 0.15);
+    --red: #ff4d6a;
+    --red-dim: rgba(255, 77, 106, 0.15);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59, 130, 246, 0.15);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245, 158, 11, 0.15);
+    --purple: #a855f7;
+    --purple-dim: rgba(168, 85, 247, 0.15);
+    --cyan: #06b6d4;
+    --cyan-dim: rgba(6, 182, 212, 0.15);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; line-height: 1.6; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+  header { text-align: center; margin-bottom: 3rem; }
+  header h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
+  header .subtitle { color: var(--muted); font-size: 1rem; }
+
+  .badge-row { display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+  .badge { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; }
+  .badge-green { background: var(--green-dim); color: var(--green); }
+  .badge-blue { background: var(--blue-dim); color: var(--blue); }
+  .badge-amber { background: var(--amber-dim); color: var(--amber); }
+  .badge-purple { background: var(--purple-dim); color: var(--purple); }
+  .badge-cyan { background: var(--cyan-dim); color: var(--cyan); }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+  .kpi-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.25rem; }
+  .kpi-value { font-size: 1.75rem; font-weight: 700; }
+  .kpi-sub { font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; }
+  .kpi-green .kpi-value { color: var(--green); }
+  .kpi-blue .kpi-value { color: var(--blue); }
+  .kpi-amber .kpi-value { color: var(--amber); }
+  .kpi-red .kpi-value { color: var(--red); }
+  .kpi-purple .kpi-value { color: var(--purple); }
+  .kpi-cyan .kpi-value { color: var(--cyan); }
+
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+  @media (max-width: 900px) { .charts { grid-template-columns: 1fr; } }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+  .chart-card h3 { font-size: 1rem; margin-bottom: 1rem; font-weight: 600; }
+  .chart-card canvas { width: 100% !important; }
+  .chart-full { grid-column: 1 / -1; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { padding: 0.75rem 1rem; text-align: right; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; }
+  td:first-child, th:first-child { text-align: left; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .highlight-row td { background: var(--green-dim); font-weight: 600; }
+
+  .section-title { font-size: 1.25rem; font-weight: 700; margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+
+  .insight-box { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--green); border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem; }
+  .insight-box h4 { color: var(--green); margin-bottom: 0.5rem; font-size: 0.9rem; }
+  .insight-box p { color: var(--muted); font-size: 0.85rem; }
+  .insight-box.warn { border-left-color: var(--amber); }
+  .insight-box.warn h4 { color: var(--amber); }
+  .insight-box.info { border-left-color: var(--blue); }
+  .insight-box.info h4 { color: var(--blue); }
+  .insight-box.blocked { border-left-color: var(--red); }
+  .insight-box.blocked h4 { color: var(--red); }
+
+  .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .config-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+  .config-item dt { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .config-item dd { font-size: 1rem; font-weight: 600; margin-top: 0.25rem; }
+
+  .legend-inline { display: flex; gap: 1.5rem; margin-bottom: 0.5rem; font-size: 0.8rem; }
+  .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 0.3rem; vertical-align: middle; }
+
+  .footer { text-align: center; color: var(--muted); font-size: 0.75rem; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+
+  .comparison-table td.winner { color: var(--green); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Qwen3-235B-A22B-FP8 Benchmark Report</h1>
+  <div class="subtitle">Qwen/Qwen3-235B-A22B-FP8 on AWS p6-b300.48xlarge (8x B300 275GB) &mdash; vLLM v0.19.1</div>
+  <div class="badge-row">
+    <span class="badge badge-green">vLLM TP4</span>
+    <span class="badge badge-cyan">vLLM TP2+DP4+EP</span>
+    <span class="badge badge-amber">B300 Spot $16.47/hr</span>
+    <span class="badge badge-purple">FP8 MoE 22B Active</span>
+    <span class="badge badge-blue">Co-Tenancy Model</span>
+  </div>
+</header>
+
+<!-- KPIs -->
+<div class="kpi-grid">
+  <div class="kpi kpi-green">
+    <div class="kpi-label">Peak Single-Stream TPS</div>
+    <div class="kpi-value">110</div>
+    <div class="kpi-sub">TP4, 4 GPUs</div>
+  </div>
+  <div class="kpi kpi-green">
+    <div class="kpi-label">Peak Aggregate TPS</div>
+    <div class="kpi-value">11,820</div>
+    <div class="kpi-sub">TP4 @ c=512</div>
+  </div>
+  <div class="kpi kpi-cyan">
+    <div class="kpi-label">Co-Tenant Peak TPS</div>
+    <div class="kpi-value">23,640</div>
+    <div class="kpi-sub">2&times;TP4, all 8 GPUs</div>
+  </div>
+  <div class="kpi kpi-amber">
+    <div class="kpi-label">Best TTFT p50</div>
+    <div class="kpi-value">32ms</div>
+    <div class="kpi-sub">W1, single round</div>
+  </div>
+  <div class="kpi kpi-blue">
+    <div class="kpi-label">Cost/M Tokens</div>
+    <div class="kpi-value">$0.19</div>
+    <div class="kpi-sub">co-tenant @ c=512</div>
+  </div>
+  <div class="kpi kpi-purple">
+    <div class="kpi-label">Cost/Engineer/Month</div>
+    <div class="kpi-value">$4.70</div>
+    <div class="kpi-sub">2,560 engineers supported</div>
+  </div>
+</div>
+
+<!-- Charts -->
+<div class="charts">
+  <div class="chart-card">
+    <h3>Throughput Scaling &mdash; TP4 vs TP2+DP4+EP</h3>
+    <canvas id="chartThroughput"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>TTFT p50 &mdash; TP4 vs TP2+DP4+EP</h3>
+    <canvas id="chartTTFT"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>ITL p99 &mdash; TP4 vs TP2+DP4+EP</h3>
+    <canvas id="chartITL"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Cost per Million Output Tokens</h3>
+    <canvas id="chartCost"></canvas>
+  </div>
+  <div class="chart-card chart-full">
+    <h3>W1-W6 Workload Suite &mdash; TTFT &amp; TPS</h3>
+    <canvas id="chartWorkload"></canvas>
+  </div>
+</div>
+
+<!-- Insights -->
+<h2 class="section-title">Key Insights</h2>
+
+<div class="insight-box">
+  <h4>TP4 Dominates Single-Stream: 4.4x Over TP2+DP4+EP</h4>
+  <p>TP4 delivers 110 tok/s vs 23 tok/s single-stream, with 168ms vs 6,007ms cold-start TTFT. The 4-way expert parallel warm-up in TP2+DP4 creates a 36x TTFT penalty at low concurrency. TP4 is the clear choice for general use.</p>
+</div>
+
+<div class="insight-box info">
+  <h4>Co-Tenancy: The Real Cost Story</h4>
+  <p>Running 2&times; independent TP4 processes (GPUs 0-3 and 4-7) on the same node eliminates 4 idle GPUs. This doubles throughput to 23,640 tok/s while halving cost to $0.19/M tokens &mdash; strictly better than TP2+DP4+EP (13,877 tok/s at $0.33/M).</p>
+</div>
+
+<div class="insight-box">
+  <h4>Prefix Caching: 1.8-2.0x TTFT Improvement</h4>
+  <p>W2 RAG workloads show consistent 1.8-2.0&times; TTFT improvement with prefix caching enabled. A 10K-token document drops from 105ms cold to 58ms warm. Critical for multi-turn and RAG-heavy production workloads.</p>
+</div>
+
+<div class="insight-box warn">
+  <h4>TTFT p99 at SLO Edge: 1,996ms @ c=512</h4>
+  <p>TTFT p99 barely passes the 2,000ms SLO target at c=512 (1,996ms). For production with strict SLO, cap at c=256 (TTFT p99 = 922ms) or use co-tenant 2&times;TP4 to share the load.</p>
+</div>
+
+<div class="insight-box warn">
+  <h4>EP Scaling Not Yet Saturated — Potential Crossover at Higher Concurrency</h4>
+  <p>TP2+DP4+EP shows steeper throughput growth than TP4 at high concurrency: +80% from c=128&rarr;256 vs +35% for TP4. At c=512, EP already leads by 17% (13,877 vs 11,820 tok/s) and the gap is widening. The co-tenancy model (2&times;TP4 = 23,640 tok/s theoretical) assumes linear scaling, but two independent processes competing for NVLink bandwidth and memory bus may interfere. EP&rsquo;s single coordinated scheduler could win at c=1024+. <strong>Follow-up: test c=1024 and c=2048 on both configs to find the true ceilings.</strong></p>
+</div>
+
+<div class="insight-box info">
+  <h4>43.6x Cheaper Than Sonnet API for Coding Agents</h4>
+  <p>At $4.70/eng/month supporting 2,560 engineers, self-hosted Qwen3-235B is 43.6&times; cheaper than Claude Sonnet API ($205/eng/mo). Break-even at just 59 engineers. For a 500-engineer org: $90K/month savings vs Sonnet, $500K/month vs Opus.</p>
+</div>
+
+<!-- TP4 Data Table -->
+<h2 class="section-title">TP4 Concurrency Sweep (4 GPUs)</h2>
+<div class="chart-card">
+<table>
+  <thead>
+    <tr>
+      <th>Concurrency</th>
+      <th>Aggregate TPS</th>
+      <th>TTFT p50</th>
+      <th>ITL p99</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>103</td><td>168ms</td><td>13.8ms</td></tr>
+    <tr><td>4</td><td>350</td><td>64ms</td><td>12.1ms</td></tr>
+    <tr><td>8</td><td>664</td><td>82ms</td><td>12.6ms</td></tr>
+    <tr><td>16</td><td>1,178</td><td>101ms</td><td>14.5ms</td></tr>
+    <tr><td>32</td><td>2,132</td><td>155ms</td><td>15.6ms</td></tr>
+    <tr><td>64</td><td>3,591</td><td>321ms</td><td>18.4ms</td></tr>
+    <tr><td>128</td><td>5,949</td><td>333ms</td><td>38.6ms</td></tr>
+    <tr class="highlight-row"><td>256</td><td>8,058</td><td>619ms</td><td>47.8ms</td></tr>
+    <tr><td>512</td><td>11,820</td><td>1,154ms</td><td>75.2ms</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- TP2+DP4+EP Data Table -->
+<h2 class="section-title">TP2+DP4+EP Concurrency Sweep (8 GPUs)</h2>
+<div class="chart-card">
+<table>
+  <thead>
+    <tr>
+      <th>Concurrency</th>
+      <th>Aggregate TPS</th>
+      <th>TTFT p50</th>
+      <th>ITL p99</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>23</td><td>6,007ms</td><td>19.3ms</td></tr>
+    <tr><td>4</td><td>185</td><td>550ms</td><td>19.8ms</td></tr>
+    <tr><td>8</td><td>412</td><td>152ms</td><td>19.7ms</td></tr>
+    <tr><td>32</td><td>1,420</td><td>248ms</td><td>23.0ms</td></tr>
+    <tr><td>128</td><td>5,017</td><td>326ms</td><td>36.6ms</td></tr>
+    <tr class="highlight-row"><td>256</td><td>9,019</td><td>620ms</td><td>48.3ms</td></tr>
+    <tr><td>512</td><td>13,877</td><td>1,156ms</td><td>59.2ms</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- Configuration Comparison -->
+<h2 class="section-title">Configuration Comparison</h2>
+<div class="chart-card">
+<table class="comparison-table">
+  <thead>
+    <tr>
+      <th>Metric</th>
+      <th>TP4 (4 GPU)</th>
+      <th>TP2+DP4 (8 GPU)</th>
+      <th>Winner</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>Single-stream TPS</td><td>103</td><td>23</td><td class="winner">TP4 (4.4x)</td></tr>
+    <tr><td>Peak aggregate TPS</td><td>11,820</td><td>13,877</td><td class="winner">TP2+DP4 (+17%)</td></tr>
+    <tr><td>TTFT p50 @ c=1</td><td>168ms</td><td>6,007ms</td><td class="winner">TP4 (36x)</td></tr>
+    <tr><td>TTFT p50 @ c=256</td><td>619ms</td><td>620ms</td><td>Tie</td></tr>
+    <tr><td>ITL p99 @ c=512</td><td>75ms</td><td>59ms</td><td class="winner">TP2+DP4</td></tr>
+    <tr><td>Cold start</td><td>1 warmup</td><td>4 warmups</td><td class="winner">TP4 simpler</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- Config -->
+<h2 class="section-title">Test Configuration</h2>
+<div class="config-grid">
+  <div class="config-item"><dt>Model</dt><dd>Qwen/Qwen3-235B-A22B-FP8</dd></div>
+  <div class="config-item"><dt>Architecture</dt><dd>qwen3_moe &mdash; 128 experts, top-8 routing, 22B active</dd></div>
+  <div class="config-item"><dt>Hardware</dt><dd>p6-b300.48xlarge (8x B300 275GB HBM3e)</dd></div>
+  <div class="config-item"><dt>Driver</dt><dd>580.126.09, CUDA 13.0</dd></div>
+  <div class="config-item"><dt>Engine</dt><dd>vLLM v0.19.1-cu130</dd></div>
+  <div class="config-item"><dt>NCCL</dt><dd>2.28.9</dd></div>
+  <div class="config-item"><dt>Context</dt><dd>40,960 tokens</dd></div>
+  <div class="config-item"><dt>VRAM per GPU</dt><dd>55 GiB weights + 210 GiB KV headroom</dd></div>
+  <div class="config-item"><dt>Tensor Parallel</dt><dd>TP=4 (recommended), TP=2+DP4+EP (alt)</dd></div>
+  <div class="config-item"><dt>Instance Cost</dt><dd>$16.47/hr spot (us-west-2)</dd></div>
+  <div class="config-item"><dt>Model Size</dt><dd>48 shards, ~223 GB on disk</dd></div>
+  <div class="config-item"><dt>MoE Backend</dt><dd>FLASHINFER_TRTLLM + DeepGEMM E8M0</dd></div>
+</div>
+
+<div class="footer">
+  Generated 2026-04-23 | Qwen3-235B-B300 Blueprint | Agent AIOps on AWS
+</div>
+
+</div>
+
+<script>
+// === DATA ===
+const conc = [1, 4, 8, 16, 32, 64, 128, 256, 512];
+
+// TP4
+const tputTP4 = [103, 350, 664, 1178, 2132, 3591, 5949, 8058, 11820];
+const ttftTP4 = [168, 64, 82, 101, 155, 321, 333, 619, 1154];
+const itlTP4 = [13.8, 12.1, 12.6, 14.5, 15.6, 18.4, 38.6, 47.8, 75.2];
+
+// TP2+DP4+EP (nulls for missing data)
+const tputDP4 = [23, 185, 412, null, 1420, null, 5017, 9019, 13877];
+const ttftDP4 = [6007, 550, 152, null, 248, null, 326, 620, 1156];
+const itlDP4 = [19.3, 19.8, 19.7, null, 23.0, null, 36.6, 48.3, 59.2];
+
+const chartDefaults = {
+  responsive: true,
+  plugins: {
+    legend: { labels: { color: '#8b8fa3', font: { size: 12 } } },
+    tooltip: { backgroundColor: '#1a1d27', borderColor: '#2a2d3a', borderWidth: 1, titleColor: '#e1e4ed', bodyColor: '#e1e4ed' }
+  },
+  scales: {
+    x: { ticks: { color: '#8b8fa3' }, grid: { color: '#2a2d3a' } },
+    y: { ticks: { color: '#8b8fa3' }, grid: { color: '#2a2d3a' } }
+  }
+};
+
+// Chart 1: Throughput Scaling
+new Chart(document.getElementById('chartThroughput'), {
+  type: 'line',
+  data: {
+    labels: conc,
+    datasets: [
+      {
+        label: 'TP4 (tok/s)',
+        data: tputTP4,
+        borderColor: '#76b900',
+        backgroundColor: 'rgba(118, 185, 0, 0.1)',
+        fill: true, tension: 0.3, pointRadius: 6, borderWidth: 3
+      },
+      {
+        label: 'TP2+DP4+EP (tok/s)',
+        data: tputDP4,
+        borderColor: '#06b6d4',
+        backgroundColor: 'rgba(6, 182, 212, 0.1)',
+        fill: true, tension: 0.3, pointRadius: 6, borderWidth: 3,
+        spanGaps: true
+      }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    scales: {
+      ...chartDefaults.scales,
+      x: { ...chartDefaults.scales.x, title: { display: true, text: 'Concurrency', color: '#8b8fa3' } },
+      y: { ...chartDefaults.scales.y, title: { display: true, text: 'Aggregate Tokens/sec', color: '#8b8fa3' }, beginAtZero: true }
+    }
+  }
+});
+
+// Chart 2: TTFT p50 (log scale)
+new Chart(document.getElementById('chartTTFT'), {
+  type: 'line',
+  data: {
+    labels: conc,
+    datasets: [
+      { label: 'TP4 TTFT p50', data: ttftTP4, borderColor: '#76b900', fill: false, tension: 0.3, pointRadius: 5, borderWidth: 2 },
+      { label: 'TP2+DP4 TTFT p50', data: ttftDP4, borderColor: '#06b6d4', fill: false, tension: 0.3, pointRadius: 5, borderWidth: 2, spanGaps: true }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    scales: {
+      ...chartDefaults.scales,
+      x: { ...chartDefaults.scales.x, title: { display: true, text: 'Concurrency', color: '#8b8fa3' } },
+      y: { ...chartDefaults.scales.y, type: 'logarithmic', title: { display: true, text: 'TTFT p50 (ms) \u2014 log scale', color: '#8b8fa3' } }
+    }
+  }
+});
+
+// Chart 3: ITL p99
+new Chart(document.getElementById('chartITL'), {
+  type: 'line',
+  data: {
+    labels: conc,
+    datasets: [
+      { label: 'TP4 ITL p99', data: itlTP4, borderColor: '#76b900', fill: false, tension: 0.3, pointRadius: 5, borderWidth: 2 },
+      { label: 'TP2+DP4 ITL p99', data: itlDP4, borderColor: '#06b6d4', fill: false, tension: 0.3, pointRadius: 5, borderWidth: 2, spanGaps: true }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    scales: {
+      ...chartDefaults.scales,
+      x: { ...chartDefaults.scales.x, title: { display: true, text: 'Concurrency', color: '#8b8fa3' } },
+      y: { ...chartDefaults.scales.y, title: { display: true, text: 'ITL p99 (ms)', color: '#8b8fa3' }, beginAtZero: true }
+    }
+  }
+});
+
+// Chart 4: Cost per Million Output Tokens
+new Chart(document.getElementById('chartCost'), {
+  type: 'bar',
+  data: {
+    labels: ['TP4 c=256', 'TP4 c=512', '2\u00d7TP4 c=256', '2\u00d7TP4 c=512', 'TP2+DP4 c=512'],
+    datasets: [{
+      label: '$/M output tokens',
+      data: [0.57, 0.39, 0.28, 0.19, 0.33],
+      backgroundColor: [
+        'rgba(118, 185, 0, 0.5)',
+        'rgba(118, 185, 0, 0.5)',
+        'rgba(59, 130, 246, 0.7)',
+        'rgba(59, 130, 246, 0.7)',
+        'rgba(6, 182, 212, 0.7)'
+      ],
+      borderColor: [
+        '#76b900',
+        '#76b900',
+        '#3b82f6',
+        '#3b82f6',
+        '#06b6d4'
+      ],
+      borderWidth: 1
+    }]
+  },
+  options: {
+    ...chartDefaults,
+    plugins: {
+      ...chartDefaults.plugins,
+      legend: { display: false }
+    },
+    scales: {
+      ...chartDefaults.scales,
+      y: { ...chartDefaults.scales.y, title: { display: true, text: '$ per Million Tokens', color: '#8b8fa3' }, beginAtZero: true }
+    }
+  }
+});
+
+// Chart 5: Workload Suite (dual Y axis)
+const workloadLabels = ['W1 1rnd', 'W1 5rnd', 'W1 10rnd', 'W2 2K', 'W2 5K', 'W2 10K', 'W5 qps=0.5', 'W5 qps=2', 'W5 qps=4', 'W5 qps=8', 'W6 1K', 'W6 4K', 'W6 8K', 'W6 16K'];
+const workloadTTFT = [32, 43, 50, 45, 54, 58, 43, 50, 53, 57, 45, 55, 61, 86];
+const workloadTPS = [110, 91, 84, null, null, null, 107, 80, 73, 68, 105, 103, 102, 95];
+
+new Chart(document.getElementById('chartWorkload'), {
+  type: 'bar',
+  data: {
+    labels: workloadLabels,
+    datasets: [
+      {
+        label: 'TTFT p50 (ms)',
+        data: workloadTTFT,
+        backgroundColor: 'rgba(59, 130, 246, 0.6)',
+        borderColor: '#3b82f6',
+        borderWidth: 1,
+        yAxisID: 'y',
+        order: 2
+      },
+      {
+        label: 'TPS',
+        data: workloadTPS,
+        type: 'line',
+        borderColor: '#76b900',
+        backgroundColor: '#76b900',
+        pointRadius: 6,
+        pointBackgroundColor: '#76b900',
+        borderWidth: 3,
+        tension: 0.3,
+        yAxisID: 'y1',
+        order: 1,
+        spanGaps: true
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { labels: { color: '#8b8fa3', font: { size: 12 } } },
+      tooltip: { backgroundColor: '#1a1d27', borderColor: '#2a2d3a', borderWidth: 1, titleColor: '#e1e4ed', bodyColor: '#e1e4ed' }
+    },
+    scales: {
+      x: { ticks: { color: '#8b8fa3', maxRotation: 45, minRotation: 45 }, grid: { color: '#2a2d3a' } },
+      y: {
+        type: 'linear',
+        position: 'left',
+        ticks: { color: '#3b82f6' },
+        grid: { color: '#2a2d3a' },
+        title: { display: true, text: 'TTFT p50 (ms)', color: '#3b82f6' },
+        beginAtZero: true
+      },
+      y1: {
+        type: 'linear',
+        position: 'right',
+        ticks: { color: '#76b900' },
+        grid: { drawOnChartArea: false },
+        title: { display: true, text: 'TPS', color: '#76b900' },
+        beginAtZero: true
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>

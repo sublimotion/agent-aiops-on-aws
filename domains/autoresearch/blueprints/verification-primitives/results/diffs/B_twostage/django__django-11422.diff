@@ -1,0 +1,33 @@
+diff --git a/django/utils/autoreload.py b/django/utils/autoreload.py
+index 7ca0d68fae..3ddaeb920c 100644
+--- a/django/utils/autoreload.py
++++ b/django/utils/autoreload.py
+@@ -106,6 +106,20 @@ def iter_all_python_module_files():
+     return iter_modules_and_files(modules, frozenset(_error_files))
+ 
+ 
++def get_main_files():
++    """Return the path of the file used to start the main Python process."""
++    # sys.argv[0] is the path to the script used to start the process, e.g.
++    # manage.py. When the server is started with `python -m django`, the
++    # __main__ module's __spec__.origin is used instead.
++    main_module = sys.modules.get('__main__')
++    if main_module is None:
++        return frozenset()
++    main_file = getattr(main_module, '__file__', None)
++    if not main_file:
++        return frozenset()
++    return frozenset([Path(main_file)])
++
++
+ @functools.lru_cache(maxsize=1)
+ def iter_modules_and_files(modules, extra_files):
+     """Iterate through all modules needed to be watched."""
+@@ -242,6 +256,7 @@ class BaseReloader:
+         files within globs.
+         """
+         yield from iter_all_python_module_files()
++        yield from get_main_files()
+         yield from self.extra_files
+         if include_globs:
+             for directory, patterns in self.directory_globs.items():

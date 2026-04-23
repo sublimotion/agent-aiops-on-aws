@@ -1,0 +1,34 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index 978fd5df8..ccf7c3a8d 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -1261,6 +1261,9 @@ class FunctionDocumenter(DocstringSignatureMixin, ModuleLevelDocumenter):  # typ
+                     documenter.objpath = [None]
+                     sigs.append(documenter.format_signature())
+         if overloaded:
++            if self.env.config.autodoc_typehints in ('none', 'description'):
++                kwargs.setdefault('show_annotation', False)
++
+             __globals__ = safe_getattr(self.object, '__globals__', {})
+             for overload in self.analyzer.overloads.get('.'.join(self.objpath)):
+                 overload = evaluate_signature(overload, __globals__,
+@@ -1478,6 +1481,9 @@ class ClassDocumenter(DocstringSignatureMixin, ModuleLevelDocumenter):  # type:
+             # Use signatures for overloaded methods instead of the implementation method.
+             method = safe_getattr(self._signature_class, self._signature_method_name, None)
+             __globals__ = safe_getattr(method, '__globals__', {})
++            if self.env.config.autodoc_typehints in ('none', 'description'):
++                kwargs.setdefault('show_annotation', False)
++
+             for overload in overloads:
+                 overload = evaluate_signature(overload, __globals__,
+                                               self.env.config.autodoc_type_aliases)
+@@ -1905,6 +1911,9 @@ class MethodDocumenter(DocstringSignatureMixin, ClassLevelDocumenter):  # type:
+                     documenter.objpath = [None]
+                     sigs.append(documenter.format_signature())
+         if overloaded:
++            if self.env.config.autodoc_typehints in ('none', 'description'):
++                kwargs.setdefault('show_annotation', False)
++
+             __globals__ = safe_getattr(self.object, '__globals__', {})
+             for overload in self.analyzer.overloads.get('.'.join(self.objpath)):
+                 overload = evaluate_signature(overload, __globals__,

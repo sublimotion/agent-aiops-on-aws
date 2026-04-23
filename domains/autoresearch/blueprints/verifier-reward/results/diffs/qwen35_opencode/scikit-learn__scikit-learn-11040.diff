@@ -1,0 +1,27 @@
+diff --git a/sklearn/neighbors/base.py b/sklearn/neighbors/base.py
+index 3e5e729c2..e33f39e42 100644
+--- a/sklearn/neighbors/base.py
++++ b/sklearn/neighbors/base.py
+@@ -253,6 +253,10 @@ class NeighborsBase(six.with_metaclass(ABCMeta, BaseEstimator)):
+                              % self.algorithm)
+ 
+         if self.n_neighbors is not None:
++            if not isinstance(self.n_neighbors, (int, np.integer)):
++                raise ValueError(
++                    "n_neighbors must be an integer. Got %s"
++                    % type(self.n_neighbors).__name__)
+             if self.n_neighbors <= 0:
+                 raise ValueError(
+                     "Expected n_neighbors > 0. Got %d" %
+@@ -327,6 +331,11 @@ class KNeighborsMixin(object):
+ 
+         if n_neighbors is None:
+             n_neighbors = self.n_neighbors
++        else:
++            if not isinstance(n_neighbors, (int, np.integer)):
++                raise ValueError(
++                    "n_neighbors must be an integer. Got %s"
++                    % type(n_neighbors).__name__)
+ 
+         if X is not None:
+             query_is_train = False

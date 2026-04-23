@@ -1,0 +1,1942 @@
+diff --git a/seaborn/axisgrid.py b/seaborn/axisgrid.py
+index 75349099..2dacfb8c 100644
+--- a/seaborn/axisgrid.py
++++ b/seaborn/axisgrid.py
+@@ -13,7 +13,10 @@ from ._oldcore import VectorPlotter, variable_type, categorical_order
+ from ._compat import share_axis, get_legend_handles
+ from . import utils
+ from .utils import (
+-    adjust_legend_subtitles, _check_argument, _draw_figure, _disable_autolayout
++    adjust_legend_subtitles,
++    _check_argument,
++    _draw_figure,
++    _disable_autolayout,
+ )
+ from .palettes import color_palette, blend_palette
+ from ._docstrings import (
+@@ -97,11 +100,11 @@ class _BaseGrid:
+ 
+ class Grid(_BaseGrid):
+     """A grid that can have multiple subplots and an external legend."""
++
+     _margin_titles = False
+     _legend_out = True
+ 
+     def __init__(self):
+-
+         self._tight_layout_rect = [0, 0, 1, 1]
+         self._tight_layout_pad = None
+ 
+@@ -118,8 +121,14 @@ class Grid(_BaseGrid):
+         self._figure.tight_layout(*args, **kwargs)
+         return self
+ 
+-    def add_legend(self, legend_data=None, title=None, label_order=None,
+-                   adjust_subtitles=False, **kwargs):
++    def add_legend(
++        self,
++        legend_data=None,
++        title=None,
++        label_order=None,
++        adjust_subtitles=False,
++        **kwargs,
++    ):
+         """Draw a legend, maybe placing it outside axes and resizing the figure.
+ 
+         Parameters
+@@ -173,7 +182,6 @@ class Grid(_BaseGrid):
+         kwargs.setdefault("scatterpoints", 1)
+ 
+         if self._legend_out:
+-
+             kwargs.setdefault("frameon", False)
+             kwargs.setdefault("loc", "center right")
+ 
+@@ -200,7 +208,7 @@ class Grid(_BaseGrid):
+             # Now calculate how much space we need on the right side
+             legend_width = figlegend.get_window_extent().width / self._figure.dpi
+             space_needed = legend_width / (fig_width + legend_width)
+-            margin = .04 if self._margin_titles else .01
++            margin = 0.04 if self._margin_titles else 0.01
+             self._space_needed = margin + space_needed
+             right = 1 - self._space_needed
+ 
+@@ -279,7 +287,7 @@ class Grid(_BaseGrid):
+         except AttributeError:
+             return None
+ 
+-    def tick_params(self, axis='both', **kwargs):
++    def tick_params(self, axis="both", **kwargs):
+         """Modify the ticks, tick labels, and gridlines.
+ 
+         Parameters
+@@ -302,7 +310,6 @@ class Grid(_BaseGrid):
+ 
+ 
+ _facet_docs = dict(
+-
+     data=dedent("""\
+     data : DataFrame
+         Tidy ("long-form") dataframe where each column is a variable and each
+@@ -364,15 +371,31 @@ class FacetGrid(Grid):
+     """Multi-plot grid for plotting conditional relationships."""
+ 
+     def __init__(
+-        self, data, *,
+-        row=None, col=None, hue=None, col_wrap=None,
+-        sharex=True, sharey=True, height=3, aspect=1, palette=None,
+-        row_order=None, col_order=None, hue_order=None, hue_kws=None,
+-        dropna=False, legend_out=True, despine=True,
+-        margin_titles=False, xlim=None, ylim=None, subplot_kws=None,
++        self,
++        data,
++        *,
++        row=None,
++        col=None,
++        hue=None,
++        col_wrap=None,
++        sharex=True,
++        sharey=True,
++        height=3,
++        aspect=1,
++        palette=None,
++        row_order=None,
++        col_order=None,
++        hue_order=None,
++        hue_kws=None,
++        dropna=False,
++        legend_out=True,
++        despine=True,
++        margin_titles=False,
++        xlim=None,
++        ylim=None,
++        subplot_kws=None,
+         gridspec_kws=None,
+     ):
+-
+         super().__init__()
+ 
+         # Determine the hue facet layer information
+@@ -447,11 +470,13 @@ class FacetGrid(Grid):
+             fig = plt.figure(figsize=figsize)
+ 
+         if col_wrap is None:
+-
+-            kwargs = dict(squeeze=False,
+-                          sharex=sharex, sharey=sharey,
+-                          subplot_kw=subplot_kws,
+-                          gridspec_kw=gridspec_kws)
++            kwargs = dict(
++                squeeze=False,
++                sharex=sharex,
++                sharey=sharey,
++                subplot_kw=subplot_kws,
++                gridspec_kw=gridspec_kws,
++            )
+ 
+             axes = fig.subplots(nrow, ncol, **kwargs)
+ 
+@@ -466,7 +491,6 @@ class FacetGrid(Grid):
+                 axes_dict = dict(zip(facet_product, axes.flat))
+ 
+         else:
+-
+             # If wrapping the col variable we need to make the grid ourselves
+             if gridspec_kws:
+                 warnings.warn("`gridspec_kws` ignored when using `col_wrap`")
+@@ -528,14 +552,14 @@ class FacetGrid(Grid):
+         if despine:
+             self.despine()
+ 
+-        if sharex in [True, 'col']:
++        if sharex in [True, "col"]:
+             for ax in self._not_bottom_axes:
+                 for label in ax.get_xticklabels():
+                     label.set_visible(False)
+                 ax.xaxis.offsetText.set_visible(False)
+                 ax.xaxis.label.set_visible(False)
+ 
+-        if sharey in [True, 'row']:
++        if sharey in [True, "row"]:
+             for ax in self._not_left_axes:
+                 for label in ax.get_yticklabels():
+                     label.set_visible(False)
+@@ -668,9 +692,9 @@ class FacetGrid(Grid):
+             hue_masks = [np.repeat(True, len(self.data))]
+ 
+         # Here is the main generator loop
+-        for (i, row), (j, col), (k, hue) in product(enumerate(row_masks),
+-                                                    enumerate(col_masks),
+-                                                    enumerate(hue_masks)):
++        for (i, row), (j, col), (k, hue) in product(
++            enumerate(row_masks), enumerate(col_masks), enumerate(hue_masks)
++        ):
+             data_ijk = data[row & col & hue & self._not_na]
+             yield (i, j, k), data_ijk
+ 
+@@ -706,19 +730,22 @@ class FacetGrid(Grid):
+         # Check for categorical plots without order information
+         if func_module == "seaborn.categorical":
+             if "order" not in kwargs:
+-                warning = ("Using the {} function without specifying "
+-                           "`order` is likely to produce an incorrect "
+-                           "plot.".format(func.__name__))
++                warning = (
++                    "Using the {} function without specifying "
++                    "`order` is likely to produce an incorrect "
++                    "plot.".format(func.__name__)
++                )
+                 warnings.warn(warning)
+             if len(args) == 3 and "hue_order" not in kwargs:
+-                warning = ("Using the {} function without specifying "
+-                           "`hue_order` is likely to produce an incorrect "
+-                           "plot.".format(func.__name__))
++                warning = (
++                    "Using the {} function without specifying "
++                    "`hue_order` is likely to produce an incorrect "
++                    "plot.".format(func.__name__)
++                )
+                 warnings.warn(warning)
+ 
+         # Iterate over the data subsets
+         for (row_i, col_j, hue_k), data_ijk in self.facet_data():
+-
+             # If this subset is null, move on
+             if not data_ijk.values.size:
+                 continue
+@@ -790,7 +817,6 @@ class FacetGrid(Grid):
+ 
+         # Iterate over the data subsets
+         for (row_i, col_j, hue_k), data_ijk in self.facet_data():
+-
+             # If this subset is null, move on
+             if not data_ijk.values.size:
+                 continue
+@@ -828,7 +854,6 @@ class FacetGrid(Grid):
+         return self
+ 
+     def _facet_color(self, hue_index, kw_color):
+-
+         color = self._colors[hue_index]
+         if kw_color is not None:
+             return kw_color
+@@ -836,7 +861,6 @@ class FacetGrid(Grid):
+             return color
+ 
+     def _facet_plot(self, func, ax, plot_args, plot_kwargs):
+-
+         # Draw the plot
+         if str(func.__module__).startswith("seaborn"):
+             plot_kwargs = plot_kwargs.copy()
+@@ -935,8 +959,7 @@ class FacetGrid(Grid):
+                 ax.set_yticklabels(labels, **kwargs)
+         return self
+ 
+-    def set_titles(self, template=None, row_template=None, col_template=None,
+-                   **kwargs):
++    def set_titles(self, template=None, row_template=None, col_template=None, **kwargs):
+         """Draw titles either above each facet or on the grid margins.
+ 
+         Parameters
+@@ -979,7 +1002,6 @@ class FacetGrid(Grid):
+         template = utils.to_utf8(template)
+ 
+         if self._margin_titles:
+-
+             # Remove any existing title texts
+             for text in self._margin_titles_texts:
+                 text.remove()
+@@ -992,9 +1014,13 @@ class FacetGrid(Grid):
+                     args.update(dict(row_name=row_name))
+                     title = row_template.format(**args)
+                     text = ax.annotate(
+-                        title, xy=(1.02, .5), xycoords="axes fraction",
+-                        rotation=270, ha="left", va="center",
+-                        **kwargs
++                        title,
++                        xy=(1.02, 0.5),
++                        xycoords="axes fraction",
++                        rotation=270,
++                        ha="left",
++                        va="center",
++                        **kwargs,
+                     )
+                     self._margin_titles_texts.append(text)
+ 
+@@ -1027,7 +1053,7 @@ class FacetGrid(Grid):
+                 self.axes.flat[i].set_title(title, **kwargs)
+         return self
+ 
+-    def refline(self, *, x=None, y=None, color='.5', linestyle='--', **line_kws):
++    def refline(self, *, x=None, y=None, color=".5", linestyle="--", **line_kws):
+         """Add a reference line(s) to each facet.
+ 
+         Parameters
+@@ -1050,8 +1076,8 @@ class FacetGrid(Grid):
+             Returns ``self`` for easy method chaining.
+ 
+         """
+-        line_kws['color'] = color
+-        line_kws['linestyle'] = linestyle
++        line_kws["color"] = color
++        line_kws["linestyle"] = linestyle
+ 
+         if x is not None:
+             self.map(plt.axvline, x=x, **line_kws)
+@@ -1074,9 +1100,7 @@ class FacetGrid(Grid):
+         if self.axes.shape == (1, 1):
+             return self.axes[0, 0]
+         else:
+-            err = (
+-                "Use the `.axes` attribute when facet variables are assigned."
+-            )
++            err = "Use the `.axes` attribute when facet variables are assigned."
+             raise AttributeError(err)
+ 
+     @property
+@@ -1143,9 +1167,8 @@ class FacetGrid(Grid):
+             axes = []
+             n_empty = self._nrow * self._ncol - self._n_facets
+             for i, ax in enumerate(self.axes):
+-                append = (
+-                    i >= (self._ncol * (self._nrow - 1))
+-                    or i >= (self._ncol * (self._nrow - 1) - n_empty)
++                append = i >= (self._ncol * (self._nrow - 1)) or i >= (
++                    self._ncol * (self._nrow - 1) - n_empty
+                 )
+                 if append:
+                     axes.append(ax)
+@@ -1160,9 +1183,8 @@ class FacetGrid(Grid):
+             axes = []
+             n_empty = self._nrow * self._ncol - self._n_facets
+             for i, ax in enumerate(self.axes):
+-                append = (
+-                    i < (self._ncol * (self._nrow - 1))
+-                    and i < (self._ncol * (self._nrow - 1) - n_empty)
++                append = i < (self._ncol * (self._nrow - 1)) and i < (
++                    self._ncol * (self._nrow - 1) - n_empty
+                 )
+                 if append:
+                     axes.append(ax)
+@@ -1183,10 +1205,25 @@ class PairGrid(Grid):
+     See the :ref:`tutorial <grid_tutorial>` for more information.
+ 
+     """
++
+     def __init__(
+-        self, data, *, hue=None, vars=None, x_vars=None, y_vars=None,
+-        hue_order=None, palette=None, hue_kws=None, corner=False, diag_sharey=True,
+-        height=2.5, aspect=1, layout_pad=.5, despine=True, dropna=False,
++        self,
++        data,
++        *,
++        hue=None,
++        vars=None,
++        x_vars=None,
++        y_vars=None,
++        hue_order=None,
++        palette=None,
++        hue_kws=None,
++        corner=False,
++        diag_sharey=True,
++        height=2.5,
++        aspect=1,
++        layout_pad=0.5,
++        despine=True,
++        dropna=False,
+     ):
+         """Initialize the plot figure and PairGrid object.
+ 
+@@ -1241,6 +1278,11 @@ class PairGrid(Grid):
+ 
+         super().__init__()
+ 
++        # Handle MultiIndex columns by flattening them to strings
++        if isinstance(data.columns, pd.MultiIndex):
++            data = data.copy()
++            data.columns = ["_".join(str(c) for c in col) for col in data.columns]
++
+         # Sort out the variables that define the grid
+         numeric_cols = self._find_numeric_cols(data)
+         if hue in numeric_cols:
+@@ -1273,9 +1315,9 @@ class PairGrid(Grid):
+         with _disable_autolayout():
+             fig = plt.figure(figsize=figsize)
+ 
+-        axes = fig.subplots(len(y_vars), len(x_vars),
+-                            sharex="col", sharey="row",
+-                            squeeze=False)
++        axes = fig.subplots(
++            len(y_vars), len(x_vars), sharex="col", sharey="row", squeeze=False
++        )
+ 
+         # Possibly remove upper axes to make a corner grid
+         # Note: setting up the axes is usually the most time-intensive part
+@@ -1307,8 +1349,7 @@ class PairGrid(Grid):
+         self._hue_var = hue
+         if hue is None:
+             self.hue_names = hue_order = ["_nolegend_"]
+-            self.hue_vals = pd.Series(["_nolegend_"] * len(data),
+-                                      index=data.index)
++            self.hue_vals = pd.Series(["_nolegend_"] * len(data), index=data.index)
+         else:
+             # We need hue_order and hue_names because the former is used to control
+             # the order of drawing and the latter is used to control the order of
+@@ -1350,7 +1391,7 @@ class PairGrid(Grid):
+             ax.yaxis.offsetText.set_visible(False)
+             ax.yaxis.label.set_visible(False)
+ 
+-        self._tight_layout_rect = [.01, .01, .99, .99]
++        self._tight_layout_rect = [0.01, 0.01, 0.99, 0.99]
+         self._tight_layout_pad = layout_pad
+         self._despine = despine
+         if despine:
+@@ -1446,7 +1487,6 @@ class PairGrid(Grid):
+             for i, y_var in enumerate(self.y_vars):
+                 for j, x_var in enumerate(self.x_vars):
+                     if x_var == y_var:
+-
+                         # Make the density axes
+                         diag_vars.append(x_var)
+                         ax = self.axes[i, j]
+@@ -1480,7 +1520,6 @@ class PairGrid(Grid):
+ 
+         # Loop over diagonal variables and axes, making one plot in each
+         for var, ax in zip(self.diag_vars, self.diag_axes):
+-
+             plot_kwargs = kwargs.copy()
+             if str(func.__module__).startswith("seaborn"):
+                 plot_kwargs["ax"] = ax
+@@ -1525,7 +1564,6 @@ class PairGrid(Grid):
+                 plt.sca(ax)
+ 
+             for k, label_k in enumerate(self._hue_order):
+-
+                 # Attempt to get data for this level, allowing for empty
+                 try:
+                     data_k = hue_grouped.get_group(label_k)
+@@ -1555,6 +1593,7 @@ class PairGrid(Grid):
+         # their artists onto the axes. This is probably superior in general, but
+         # we'll need a better way to handle it in the axisgrid functions.
+         from .distributions import histplot, kdeplot
++
+         if func is histplot or func is kdeplot:
+             self._extract_legend_handles = True
+ 
+@@ -1603,9 +1642,13 @@ class PairGrid(Grid):
+             hue = data.get(self._hue_var)
+ 
+         if "hue" not in kwargs:
+-            kwargs.update({
+-                "hue": hue, "hue_order": self._hue_order, "palette": self._orig_palette,
+-            })
++            kwargs.update(
++                {
++                    "hue": hue,
++                    "hue_order": self._hue_order,
++                    "palette": self._orig_palette,
++                }
++            )
+         func(x=x, y=y, **kwargs)
+ 
+         self._update_legend_data(ax)
+@@ -1625,15 +1668,13 @@ class PairGrid(Grid):
+ 
+         hue_grouped = self.data.groupby(self.hue_vals)
+         for k, label_k in enumerate(self._hue_order):
+-
+             kws = kwargs.copy()
+ 
+             # Attempt to get data for this level, allowing for empty
+             try:
+                 data_k = hue_grouped.get_group(label_k)
+             except KeyError:
+-                data_k = pd.DataFrame(columns=axes_vars,
+-                                      dtype=float)
++                data_k = pd.DataFrame(columns=axes_vars, dtype=float)
+ 
+             if self._dropna:
+                 data_k = data_k[axes_vars].dropna()
+@@ -1679,13 +1720,23 @@ class JointGrid(_BaseGrid):
+     """
+ 
+     def __init__(
+-        self, data=None, *,
+-        x=None, y=None, hue=None,
+-        height=6, ratio=5, space=.2,
+-        palette=None, hue_order=None, hue_norm=None,
+-        dropna=False, xlim=None, ylim=None, marginal_ticks=False,
++        self,
++        data=None,
++        *,
++        x=None,
++        y=None,
++        hue=None,
++        height=6,
++        ratio=5,
++        space=0.2,
++        palette=None,
++        hue_order=None,
++        hue_norm=None,
++        dropna=False,
++        xlim=None,
++        ylim=None,
++        marginal_ticks=False,
+     ):
+-
+         # Set up the subplot grid
+         f = plt.figure(figsize=(height, height))
+         gs = plt.GridSpec(ratio + 1, ratio + 1)
+@@ -1891,8 +1942,15 @@ class JointGrid(_BaseGrid):
+         return self
+ 
+     def refline(
+-        self, *, x=None, y=None, joint=True, marginal=True,
+-        color='.5', linestyle='--', **line_kws
++        self,
++        *,
++        x=None,
++        y=None,
++        joint=True,
++        marginal=True,
++        color=".5",
++        linestyle="--",
++        **line_kws,
+     ):
+         """Add a reference line(s) to joint and/or marginal axes.
+ 
+@@ -1917,8 +1975,8 @@ class JointGrid(_BaseGrid):
+             Returns ``self`` for easy method chaining.
+ 
+         """
+-        line_kws['color'] = color
+-        line_kws['linestyle'] = linestyle
++        line_kws["color"] = color
++        line_kws["linestyle"] = linestyle
+ 
+         if x is not None:
+             if joint:
+@@ -2003,12 +2061,25 @@ Examples
+ 
+ 
+ def pairplot(
+-    data, *,
+-    hue=None, hue_order=None, palette=None,
+-    vars=None, x_vars=None, y_vars=None,
+-    kind="scatter", diag_kind="auto", markers=None,
+-    height=2.5, aspect=1, corner=False, dropna=False,
+-    plot_kws=None, diag_kws=None, grid_kws=None, size=None,
++    data,
++    *,
++    hue=None,
++    hue_order=None,
++    palette=None,
++    vars=None,
++    x_vars=None,
++    y_vars=None,
++    kind="scatter",
++    diag_kind="auto",
++    markers=None,
++    height=2.5,
++    aspect=1,
++    corner=False,
++    dropna=False,
++    plot_kws=None,
++    diag_kws=None,
++    grid_kws=None,
++    size=None,
+ ):
+     """Plot pairwise relationships in a dataset.
+ 
+@@ -2090,13 +2161,14 @@ def pairplot(
+     # Handle deprecations
+     if size is not None:
+         height = size
+-        msg = ("The `size` parameter has been renamed to `height`; "
+-               "please update your code.")
++        msg = (
++            "The `size` parameter has been renamed to `height`; "
++            "please update your code."
++        )
+         warnings.warn(msg, UserWarning)
+ 
+     if not isinstance(data, pd.DataFrame):
+-        raise TypeError(
+-            f"'data' must be pandas DataFrame object, not: {type(data)}")
++        raise TypeError(f"'data' must be pandas DataFrame object, not: {type(data)}")
+ 
+     plot_kws = {} if plot_kws is None else plot_kws.copy()
+     diag_kws = {} if diag_kws is None else diag_kws.copy()
+@@ -2111,9 +2183,20 @@ def pairplot(
+ 
+     # Set up the PairGrid
+     grid_kws.setdefault("diag_sharey", diag_kind == "hist")
+-    grid = PairGrid(data, vars=vars, x_vars=x_vars, y_vars=y_vars, hue=hue,
+-                    hue_order=hue_order, palette=palette, corner=corner,
+-                    height=height, aspect=aspect, dropna=dropna, **grid_kws)
++    grid = PairGrid(
++        data,
++        vars=vars,
++        x_vars=x_vars,
++        y_vars=y_vars,
++        hue=hue,
++        hue_order=hue_order,
++        palette=palette,
++        corner=corner,
++        height=height,
++        aspect=aspect,
++        dropna=dropna,
++        **grid_kws,
++    )
+ 
+     # Add the markers here as PairGrid has figured out how many levels of the
+     # hue variable are needed and we don't want to duplicate that process
+@@ -2127,8 +2210,10 @@ def pairplot(
+             if not isinstance(markers, list):
+                 markers = [markers] * n_markers
+             if len(markers) != n_markers:
+-                raise ValueError("markers must be a singleton or a list of "
+-                                 "markers for each level of the hue variable")
++                raise ValueError(
++                    "markers must be a singleton or a list of "
++                    "markers for each level of the hue variable"
++                )
+             grid.hue_kws = {"marker": markers}
+         elif kind == "scatter":
+             if isinstance(markers, str):
+@@ -2155,16 +2240,20 @@ def pairplot(
+ 
+     if kind == "scatter":
+         from .relational import scatterplot  # Avoid circular import
++
+         plotter(scatterplot, **plot_kws)
+     elif kind == "reg":
+         from .regression import regplot  # Avoid circular import
++
+         plotter(regplot, **plot_kws)
+     elif kind == "kde":
+         from .distributions import kdeplot  # Avoid circular import
++
+         plot_kws.setdefault("warn_singular", False)
+         plotter(kdeplot, **plot_kws)
+     elif kind == "hist":
+         from .distributions import histplot  # Avoid circular import
++
+         plotter(histplot, **plot_kws)
+ 
+     # Add a legend
+@@ -2177,11 +2266,26 @@ def pairplot(
+ 
+ 
+ def jointplot(
+-    data=None, *, x=None, y=None, hue=None, kind="scatter",
+-    height=6, ratio=5, space=.2, dropna=False, xlim=None, ylim=None,
+-    color=None, palette=None, hue_order=None, hue_norm=None, marginal_ticks=False,
+-    joint_kws=None, marginal_kws=None,
+-    **kwargs
++    data=None,
++    *,
++    x=None,
++    y=None,
++    hue=None,
++    kind="scatter",
++    height=6,
++    ratio=5,
++    space=0.2,
++    dropna=False,
++    xlim=None,
++    ylim=None,
++    color=None,
++    palette=None,
++    hue_order=None,
++    hue_norm=None,
++    marginal_ticks=False,
++    joint_kws=None,
++    marginal_kws=None,
++    **kwargs,
+ ):
+     # Avoid circular imports
+     from .relational import scatterplot
+@@ -2199,7 +2303,11 @@ def jointplot(
+ 
+     # Handle deprecations of distplot-specific kwargs
+     distplot_keys = [
+-        "rug", "fit", "hist_kws", "norm_hist" "hist_kws", "rug_kws",
++        "rug",
++        "fit",
++        "hist_kws",
++        "norm_histhist_kws",
++        "rug_kws",
+     ]
+     unused_keys = []
+     for key in distplot_keys:
+@@ -2219,9 +2327,7 @@ def jointplot(
+ 
+     # Raise early if using `hue` with a kind that does not support it
+     if hue is not None and kind in ["hex", "reg", "resid"]:
+-        msg = (
+-            f"Use of `hue` with `kind='{kind}'` is not currently supported."
+-        )
++        msg = f"Use of `hue` with `kind='{kind}'` is not currently supported."
+         raise ValueError(msg)
+ 
+     # Make a colormap based off the plot color
+@@ -2229,8 +2335,10 @@ def jointplot(
+     if color is None:
+         color = "C0"
+     color_rgb = mpl.colors.colorConverter.to_rgb(color)
+-    colors = [utils.set_hls_values(color_rgb, l=l)  # noqa
+-              for l in np.linspace(1, 0, 12)]
++    colors = [
++        utils.set_hls_values(color_rgb, l=l)  # noqa
++        for l in np.linspace(1, 0, 12)
++    ]
+     cmap = blend_palette(colors, as_cmap=True)
+ 
+     # Matplotlib's hexbin plot is not na-robust
+@@ -2239,10 +2347,20 @@ def jointplot(
+ 
+     # Initialize the JointGrid object
+     grid = JointGrid(
+-        data=data, x=x, y=y, hue=hue,
+-        palette=palette, hue_order=hue_order, hue_norm=hue_norm,
+-        dropna=dropna, height=height, ratio=ratio, space=space,
+-        xlim=xlim, ylim=ylim, marginal_ticks=marginal_ticks,
++        data=data,
++        x=x,
++        y=y,
++        hue=hue,
++        palette=palette,
++        hue_order=hue_order,
++        hue_norm=hue_norm,
++        dropna=dropna,
++        height=height,
++        ratio=ratio,
++        space=space,
++        xlim=xlim,
++        ylim=ylim,
++        marginal_ticks=marginal_ticks,
+     )
+ 
+     if grid.hue is not None:
+@@ -2250,7 +2368,6 @@ def jointplot(
+ 
+     # Plot the data using the grid
+     if kind.startswith("scatter"):
+-
+         joint_kws.setdefault("color", color)
+         grid.plot_joint(scatterplot, **joint_kws)
+ 
+@@ -2265,7 +2382,6 @@ def jointplot(
+         grid.plot_marginals(marg_func, **marginal_kws)
+ 
+     elif kind.startswith("hist"):
+-
+         # TODO process pair parameters for bins, etc. and pass
+         # to both joint and marginal plots
+ 
+@@ -2289,7 +2405,6 @@ def jointplot(
+         histplot(data=data, y=y, hue=hue, **marg_y_kws, ax=grid.ax_marg_y)
+ 
+     elif kind.startswith("kde"):
+-
+         joint_kws.setdefault("color", color)
+         joint_kws.setdefault("warn_singular", False)
+         grid.plot_joint(kdeplot, **joint_kws)
+@@ -2301,7 +2416,6 @@ def jointplot(
+         grid.plot_marginals(kdeplot, **marginal_kws)
+ 
+     elif kind.startswith("hex"):
+-
+         x_bins = min(_freedman_diaconis_bins(grid.x), 50)
+         y_bins = min(_freedman_diaconis_bins(grid.y), 50)
+         gridsize = int(np.mean([x_bins, y_bins]))
+@@ -2315,7 +2429,6 @@ def jointplot(
+         grid.plot_marginals(histplot, **marginal_kws)
+ 
+     elif kind.startswith("reg"):
+-
+         marginal_kws.setdefault("color", color)
+         marginal_kws.setdefault("kde", True)
+         grid.plot_marginals(histplot, **marginal_kws)
+@@ -2324,7 +2437,6 @@ def jointplot(
+         grid.plot_joint(regplot, **joint_kws)
+ 
+     elif kind.startswith("resid"):
+-
+         joint_kws.setdefault("color", color)
+         grid.plot_joint(residplot, **joint_kws)
+ 
+diff --git a/tests/test_axisgrid.py b/tests/test_axisgrid.py
+index c7e11610..f9ec0dfb 100644
+--- a/tests/test_axisgrid.py
++++ b/tests/test_axisgrid.py
+@@ -25,33 +25,32 @@ rs = np.random.RandomState(0)
+ 
+ 
+ class TestFacetGrid:
+-
+-    df = pd.DataFrame(dict(x=rs.normal(size=60),
+-                           y=rs.gamma(4, size=60),
+-                           a=np.repeat(list("abc"), 20),
+-                           b=np.tile(list("mn"), 30),
+-                           c=np.tile(list("tuv"), 20),
+-                           d=np.tile(list("abcdefghijkl"), 5)))
++    df = pd.DataFrame(
++        dict(
++            x=rs.normal(size=60),
++            y=rs.gamma(4, size=60),
++            a=np.repeat(list("abc"), 20),
++            b=np.tile(list("mn"), 30),
++            c=np.tile(list("tuv"), 20),
++            d=np.tile(list("abcdefghijkl"), 5),
++        )
++    )
+ 
+     def test_self_data(self):
+-
+         g = ag.FacetGrid(self.df)
+         assert g.data is self.df
+ 
+     def test_self_figure(self):
+-
+         g = ag.FacetGrid(self.df)
+         assert isinstance(g.figure, plt.Figure)
+         assert g.figure is g._figure
+ 
+     def test_self_axes(self):
+-
+         g = ag.FacetGrid(self.df, row="a", col="b", hue="c")
+         for ax in g.axes.flat:
+             assert isinstance(ax, plt.Axes)
+ 
+     def test_axes_array_size(self):
+-
+         g = ag.FacetGrid(self.df)
+         assert g.axes.shape == (1, 1)
+ 
+@@ -70,7 +69,6 @@ class TestFacetGrid:
+             assert isinstance(ax, plt.Axes)
+ 
+     def test_single_axes(self):
+-
+         g = ag.FacetGrid(self.df)
+         assert isinstance(g.ax, plt.Axes)
+ 
+@@ -87,7 +85,6 @@ class TestFacetGrid:
+             g.ax
+ 
+     def test_col_wrap(self):
+-
+         n = len(self.df.d.unique())
+ 
+         g = ag.FacetGrid(self.df, col="d")
+@@ -115,7 +112,6 @@ class TestFacetGrid:
+         assert len(list(g.facet_data())) == n
+ 
+     def test_normal_axes(self):
+-
+         null = np.empty(0, object).flat
+ 
+         g = ag.FacetGrid(self.df)
+@@ -147,36 +143,33 @@ class TestFacetGrid:
+         npt.assert_array_equal(g._inner_axes, g.axes[:-1, 1:].flat)
+ 
+     def test_wrapped_axes(self):
+-
+         null = np.empty(0, object).flat
+ 
+         g = ag.FacetGrid(self.df, col="a", col_wrap=2)
+-        npt.assert_array_equal(g._bottom_axes,
+-                               g.axes[np.array([1, 2])].flat)
++        npt.assert_array_equal(g._bottom_axes, g.axes[np.array([1, 2])].flat)
+         npt.assert_array_equal(g._not_bottom_axes, g.axes[:1].flat)
+         npt.assert_array_equal(g._left_axes, g.axes[np.array([0, 2])].flat)
+         npt.assert_array_equal(g._not_left_axes, g.axes[np.array([1])].flat)
+         npt.assert_array_equal(g._inner_axes, null)
+ 
+     def test_axes_dict(self):
+-
+         g = ag.FacetGrid(self.df)
+         assert isinstance(g.axes_dict, dict)
+         assert not g.axes_dict
+ 
+         g = ag.FacetGrid(self.df, row="c")
+         assert list(g.axes_dict.keys()) == g.row_names
+-        for (name, ax) in zip(g.row_names, g.axes.flat):
++        for name, ax in zip(g.row_names, g.axes.flat):
+             assert g.axes_dict[name] is ax
+ 
+         g = ag.FacetGrid(self.df, col="c")
+         assert list(g.axes_dict.keys()) == g.col_names
+-        for (name, ax) in zip(g.col_names, g.axes.flat):
++        for name, ax in zip(g.col_names, g.axes.flat):
+             assert g.axes_dict[name] is ax
+ 
+         g = ag.FacetGrid(self.df, col="a", col_wrap=2)
+         assert list(g.axes_dict.keys()) == g.col_names
+-        for (name, ax) in zip(g.col_names, g.axes.flat):
++        for name, ax in zip(g.col_names, g.axes.flat):
+             assert g.axes_dict[name] is ax
+ 
+         g = ag.FacetGrid(self.df, row="a", col="c")
+@@ -186,31 +179,29 @@ class TestFacetGrid:
+             assert g.axes[i, j] is ax
+ 
+     def test_figure_size(self):
+-
+         g = ag.FacetGrid(self.df, row="a", col="b")
+         npt.assert_array_equal(g.figure.get_size_inches(), (6, 9))
+ 
+         g = ag.FacetGrid(self.df, row="a", col="b", height=6)
+         npt.assert_array_equal(g.figure.get_size_inches(), (12, 18))
+ 
+-        g = ag.FacetGrid(self.df, col="c", height=4, aspect=.5)
++        g = ag.FacetGrid(self.df, col="c", height=4, aspect=0.5)
+         npt.assert_array_equal(g.figure.get_size_inches(), (6, 4))
+ 
+     def test_figure_size_with_legend(self):
+-
+-        g = ag.FacetGrid(self.df, col="a", hue="c", height=4, aspect=.5)
++        g = ag.FacetGrid(self.df, col="a", hue="c", height=4, aspect=0.5)
+         npt.assert_array_equal(g.figure.get_size_inches(), (6, 4))
+         g.add_legend()
+         assert g.figure.get_size_inches()[0] > 6
+ 
+-        g = ag.FacetGrid(self.df, col="a", hue="c", height=4, aspect=.5,
+-                         legend_out=False)
++        g = ag.FacetGrid(
++            self.df, col="a", hue="c", height=4, aspect=0.5, legend_out=False
++        )
+         npt.assert_array_equal(g.figure.get_size_inches(), (6, 4))
+         g.add_legend()
+         npt.assert_array_equal(g.figure.get_size_inches(), (6, 4))
+ 
+     def test_legend_data(self):
+-
+         g = ag.FacetGrid(self.df, hue="a")
+         g.map(plt.plot, "x", "y")
+         g.add_legend()
+@@ -233,7 +224,6 @@ class TestFacetGrid:
+             assert label.get_text() == level
+ 
+     def test_legend_data_missing_level(self):
+-
+         g = ag.FacetGrid(self.df, hue="a", hue_order=list("azbc"))
+         g.map(plt.plot, "x", "y")
+         g.add_legend()
+@@ -258,7 +248,6 @@ class TestFacetGrid:
+             assert label.get_text() == level
+ 
+     def test_get_boolean_legend_data(self):
+-
+         self.df["b_bool"] = self.df.b == "m"
+         g = ag.FacetGrid(self.df, hue="b_bool")
+         g.map(plt.plot, "x", "y")
+@@ -282,7 +271,6 @@ class TestFacetGrid:
+             assert label.get_text() == level
+ 
+     def test_legend_tuples(self):
+-
+         g = ag.FacetGrid(self.df, hue="a")
+         g.map(plt.plot, "x", "y")
+ 
+@@ -294,7 +282,6 @@ class TestFacetGrid:
+             assert entry.get_text() == label
+ 
+     def test_legend_options(self):
+-
+         g = ag.FacetGrid(self.df, hue="b")
+         g.map(plt.plot, "x", "y")
+         g.add_legend()
+@@ -306,15 +293,12 @@ class TestFacetGrid:
+         g1.add_legend(adjust_subtitles=False)
+ 
+     def test_legendout_with_colwrap(self):
+-
+-        g = ag.FacetGrid(self.df, col="d", hue='b',
+-                         col_wrap=4, legend_out=False)
++        g = ag.FacetGrid(self.df, col="d", hue="b", col_wrap=4, legend_out=False)
+         g.map(plt.plot, "x", "y", linewidth=3)
+         g.add_legend()
+ 
+     def test_legend_tight_layout(self):
+-
+-        g = ag.FacetGrid(self.df, hue='b')
++        g = ag.FacetGrid(self.df, hue="b")
+         g.map(plt.plot, "x", "y", linewidth=3)
+         g.add_legend()
+         g.tight_layout()
+@@ -325,9 +309,7 @@ class TestFacetGrid:
+         assert axes_right_edge < legend_left_edge
+ 
+     def test_subplot_kws(self):
+-
+-        g = ag.FacetGrid(self.df, despine=False,
+-                         subplot_kws=dict(projection="polar"))
++        g = ag.FacetGrid(self.df, despine=False, subplot_kws=dict(projection="polar"))
+         for ax in g.axes.flat:
+             assert "PolarAxes" in ax.__class__.__name__
+ 
+@@ -335,7 +317,7 @@ class TestFacetGrid:
+         ratios = [3, 1, 2]
+ 
+         gskws = dict(width_ratios=ratios)
+-        g = ag.FacetGrid(self.df, col='c', row='a', gridspec_kws=gskws)
++        g = ag.FacetGrid(self.df, col="c", row="a", gridspec_kws=gskws)
+ 
+         for ax in g.axes.flat:
+             ax.set_xticks([])
+@@ -343,7 +325,7 @@ class TestFacetGrid:
+ 
+         g.figure.tight_layout()
+ 
+-        for (l, m, r) in g.axes:
++        for l, m, r in g.axes:
+             assert l.get_position().width > m.get_position().width
+             assert r.get_position().width > m.get_position().width
+ 
+@@ -352,10 +334,9 @@ class TestFacetGrid:
+ 
+         gskws = dict(width_ratios=ratios)
+         with pytest.warns(UserWarning):
+-            ag.FacetGrid(self.df, col='d', col_wrap=5, gridspec_kws=gskws)
++            ag.FacetGrid(self.df, col="d", col_wrap=5, gridspec_kws=gskws)
+ 
+     def test_data_generator(self):
+-
+         g = ag.FacetGrid(self.df, row="a")
+         d = list(g.facet_data())
+         assert len(d) == 3
+@@ -395,7 +376,6 @@ class TestFacetGrid:
+         assert (data["c"] == "u").all()
+ 
+     def test_map(self):
+-
+         g = ag.FacetGrid(self.df, row="a", col="b", hue="c")
+         g.map(plt.plot, "x", "y", linewidth=3)
+ 
+@@ -410,11 +390,11 @@ class TestFacetGrid:
+         npt.assert_array_equal(y, self.df.y[mask])
+ 
+     def test_map_dataframe(self):
+-
+         g = ag.FacetGrid(self.df, row="a", col="b", hue="c")
+ 
+         def plot(x, y, data=None, **kws):
+             plt.plot(data[x], data[y], **kws)
++
+         # Modify __module__ so this doesn't look like a seaborn function
+         plot.__module__ = "test"
+ 
+@@ -431,7 +411,6 @@ class TestFacetGrid:
+         npt.assert_array_equal(y, self.df.y[mask])
+ 
+     def test_set(self):
+-
+         g = ag.FacetGrid(self.df, row="a", col="b")
+         xlim = (-2, 5)
+         ylim = (3, 6)
+@@ -445,7 +424,6 @@ class TestFacetGrid:
+             npt.assert_array_equal(ax.get_yticks(), yticks)
+ 
+     def test_set_titles(self):
+-
+         g = ag.FacetGrid(self.df, row="a", col="b")
+         g.map(plt.plot, "x", "y")
+ 
+@@ -470,10 +448,9 @@ class TestFacetGrid:
+ 
+         # test with dropna=False
+         g = ag.FacetGrid(self.df, col="b", hue="b", dropna=False)
+-        g.map(plt.plot, 'x', 'y')
++        g.map(plt.plot, "x", "y")
+ 
+     def test_set_titles_margin_titles(self):
+-
+         g = ag.FacetGrid(self.df, row="a", col="b", margin_titles=True)
+         g.map(plt.plot, "x", "y")
+ 
+@@ -497,7 +474,6 @@ class TestFacetGrid:
+         assert g.axes[1, 1].texts[0].get_text() == "b"
+ 
+     def test_set_ticklabels(self):
+-
+         g = ag.FacetGrid(self.df, row="a", col="b")
+         g.map(plt.plot, "x", "y")
+ 
+@@ -531,11 +507,10 @@ class TestFacetGrid:
+                 assert l.get_rotation() == 75
+ 
+     def test_set_axis_labels(self):
+-
+         g = ag.FacetGrid(self.df, row="a", col="b")
+         g.map(plt.plot, "x", "y")
+-        xlab = 'xx'
+-        ylab = 'yy'
++        xlab = "xx"
++        ylab = "yy"
+ 
+         g.set_axis_labels(xlab, ylab)
+ 
+@@ -554,13 +529,11 @@ class TestFacetGrid:
+             assert not ax.get_ylabel()
+ 
+     def test_axis_lims(self):
+-
+         g = ag.FacetGrid(self.df, row="a", col="b", xlim=(0, 4), ylim=(-2, 3))
+         assert g.axes[0, 0].get_xlim() == (0, 4)
+         assert g.axes[0, 0].get_ylim() == (-2, 3)
+ 
+     def test_data_orders(self):
+-
+         g = ag.FacetGrid(self.df, row="a", col="b", hue="c")
+ 
+         assert g.row_names == list("abc")
+@@ -568,20 +541,30 @@ class TestFacetGrid:
+         assert g.hue_names == list("tuv")
+         assert g.axes.shape == (3, 2)
+ 
+-        g = ag.FacetGrid(self.df, row="a", col="b", hue="c",
+-                         row_order=list("bca"),
+-                         col_order=list("nm"),
+-                         hue_order=list("vtu"))
++        g = ag.FacetGrid(
++            self.df,
++            row="a",
++            col="b",
++            hue="c",
++            row_order=list("bca"),
++            col_order=list("nm"),
++            hue_order=list("vtu"),
++        )
+ 
+         assert g.row_names == list("bca")
+         assert g.col_names == list("nm")
+         assert g.hue_names == list("vtu")
+         assert g.axes.shape == (3, 2)
+ 
+-        g = ag.FacetGrid(self.df, row="a", col="b", hue="c",
+-                         row_order=list("bcda"),
+-                         col_order=list("nom"),
+-                         hue_order=list("qvtu"))
++        g = ag.FacetGrid(
++            self.df,
++            row="a",
++            col="b",
++            hue="c",
++            row_order=list("bcda"),
++            col_order=list("nom"),
++            hue_order=list("qvtu"),
++        )
+ 
+         assert g.row_names == list("bcda")
+         assert g.col_names == list("nom")
+@@ -589,7 +572,6 @@ class TestFacetGrid:
+         assert g.axes.shape == (4, 3)
+ 
+     def test_palette(self):
+-
+         rcmod.set()
+ 
+         g = ag.FacetGrid(self.df, hue="c")
+@@ -607,12 +589,10 @@ class TestFacetGrid:
+         assert g._colors == list_pal
+ 
+         list_pal = color_palette(["green", "blue", "red"], 3)
+-        g = ag.FacetGrid(self.df, hue="c", hue_order=list("uvt"),
+-                         palette=dict_pal)
++        g = ag.FacetGrid(self.df, hue="c", hue_order=list("uvt"), palette=dict_pal)
+         assert g._colors == list_pal
+ 
+     def test_hue_kws(self):
+-
+         kws = dict(marker=["o", "s", "D"])
+         g = ag.FacetGrid(self.df, hue="c", hue_kws=kws)
+         g.map(plt.plot, "x", "y")
+@@ -621,7 +601,6 @@ class TestFacetGrid:
+             assert line.get_marker() == marker
+ 
+     def test_dropna(self):
+-
+         df = self.df.copy()
+         hasna = pd.Series(np.tile(np.arange(6), 10), dtype=float)
+         hasna[hasna == 5] = np.nan
+@@ -633,22 +612,19 @@ class TestFacetGrid:
+         assert g._not_na.sum() == 50
+ 
+     def test_categorical_column_missing_categories(self):
+-
+         df = self.df.copy()
+-        df['a'] = df['a'].astype('category')
++        df["a"] = df["a"].astype("category")
+ 
+-        g = ag.FacetGrid(df[df['a'] == 'a'], col="a", col_wrap=1)
++        g = ag.FacetGrid(df[df["a"] == "a"], col="a", col_wrap=1)
+ 
+-        assert g.axes.shape == (len(df['a'].cat.categories),)
++        assert g.axes.shape == (len(df["a"].cat.categories),)
+ 
+     def test_categorical_warning(self):
+-
+         g = ag.FacetGrid(self.df, col="b")
+         with pytest.warns(UserWarning):
+             g.map(pointplot, "b", "x")
+ 
+     def test_refline(self):
+-
+         g = ag.FacetGrid(self.df, row="a", col="b")
+         g.refline()
+         for ax in g.axes.flat:
+@@ -659,43 +635,40 @@ class TestFacetGrid:
+         vline = np.array([[refx, 0], [refx, 1]])
+         g.refline(x=refx, y=refy)
+         for ax in g.axes.flat:
+-            assert ax.lines[0].get_color() == '.5'
+-            assert ax.lines[0].get_linestyle() == '--'
++            assert ax.lines[0].get_color() == ".5"
++            assert ax.lines[0].get_linestyle() == "--"
+             assert len(ax.lines) == 2
+             npt.assert_array_equal(ax.lines[0].get_xydata(), vline)
+             npt.assert_array_equal(ax.lines[1].get_xydata(), hline)
+ 
+-        color, linestyle = 'red', '-'
++        color, linestyle = "red", "-"
+         g.refline(x=refx, color=color, linestyle=linestyle)
+         npt.assert_array_equal(g.axes[0, 0].lines[-1].get_xydata(), vline)
+         assert g.axes[0, 0].lines[-1].get_color() == color
+         assert g.axes[0, 0].lines[-1].get_linestyle() == linestyle
+ 
+     def test_apply(self, long_df):
+-
+         def f(grid, color):
+             grid.figure.set_facecolor(color)
+ 
+-        color = (.1, .6, .3, .9)
++        color = (0.1, 0.6, 0.3, 0.9)
+         g = ag.FacetGrid(long_df)
+         res = g.apply(f, color)
+         assert res is g
+         assert g.figure.get_facecolor() == color
+ 
+     def test_pipe(self, long_df):
+-
+         def f(grid, color):
+             grid.figure.set_facecolor(color)
+             return color
+ 
+-        color = (.1, .6, .3, .9)
++        color = (0.1, 0.6, 0.3, 0.9)
+         g = ag.FacetGrid(long_df)
+         res = g.pipe(f, color)
+         assert res == color
+         assert g.figure.get_facecolor() == color
+ 
+     def test_tick_params(self):
+-
+         g = ag.FacetGrid(self.df, row="a", col="b")
+         color = "blue"
+         pad = 3
+@@ -709,41 +682,39 @@ class TestFacetGrid:
+ 
+ 
+ class TestPairGrid:
+-
+     rs = np.random.RandomState(sum(map(ord, "PairGrid")))
+-    df = pd.DataFrame(dict(x=rs.normal(size=60),
+-                           y=rs.randint(0, 4, size=(60)),
+-                           z=rs.gamma(3, size=60),
+-                           a=np.repeat(list("abc"), 20),
+-                           b=np.repeat(list("abcdefghijkl"), 5)))
++    df = pd.DataFrame(
++        dict(
++            x=rs.normal(size=60),
++            y=rs.randint(0, 4, size=(60)),
++            z=rs.gamma(3, size=60),
++            a=np.repeat(list("abc"), 20),
++            b=np.repeat(list("abcdefghijkl"), 5),
++        )
++    )
+ 
+     def test_self_data(self):
+-
+         g = ag.PairGrid(self.df)
+         assert g.data is self.df
+ 
+     def test_ignore_datelike_data(self):
+-
+         df = self.df.copy()
+-        df['date'] = pd.date_range('2010-01-01', periods=len(df), freq='d')
++        df["date"] = pd.date_range("2010-01-01", periods=len(df), freq="d")
+         result = ag.PairGrid(self.df).data
+-        expected = df.drop('date', axis=1)
++        expected = df.drop("date", axis=1)
+         tm.assert_frame_equal(result, expected)
+ 
+     def test_self_figure(self):
+-
+         g = ag.PairGrid(self.df)
+         assert isinstance(g.figure, plt.Figure)
+         assert g.figure is g._figure
+ 
+     def test_self_axes(self):
+-
+         g = ag.PairGrid(self.df)
+         for ax in g.axes.flat:
+             assert isinstance(ax, plt.Axes)
+ 
+     def test_default_axes(self):
+-
+         g = ag.PairGrid(self.df)
+         assert g.axes.shape == (3, 3)
+         assert g.x_vars == ["x", "y", "z"]
+@@ -752,7 +723,6 @@ class TestPairGrid:
+ 
+     @pytest.mark.parametrize("vars", [["z", "x"], np.array(["z", "x"])])
+     def test_specific_square_axes(self, vars):
+-
+         g = ag.PairGrid(self.df, vars=vars)
+         assert g.axes.shape == (len(vars), len(vars))
+         assert g.x_vars == list(vars)
+@@ -760,7 +730,6 @@ class TestPairGrid:
+         assert g.square_grid
+ 
+     def test_remove_hue_from_default(self):
+-
+         hue = "z"
+         g = ag.PairGrid(self.df, hue=hue)
+         assert hue not in g.x_vars
+@@ -780,7 +749,6 @@ class TestPairGrid:
+         ],
+     )
+     def test_specific_nonsquare_axes(self, x_vars, y_vars):
+-
+         g = ag.PairGrid(self.df, x_vars=x_vars, y_vars=y_vars)
+         assert g.axes.shape == (len(y_vars), len(x_vars))
+         assert g.x_vars == list(x_vars)
+@@ -788,7 +756,6 @@ class TestPairGrid:
+         assert not g.square_grid
+ 
+     def test_corner(self):
+-
+         plot_vars = ["x", "y", "z"]
+         g = ag.PairGrid(self.df, vars=plot_vars, corner=True)
+         corner_size = sum(i + 1 for i in range(len(plot_vars)))
+@@ -807,24 +774,20 @@ class TestPairGrid:
+         assert g.axes[0, 0].get_ylabel() == "x"
+ 
+     def test_size(self):
+-
+         g1 = ag.PairGrid(self.df, height=3)
+         npt.assert_array_equal(g1.fig.get_size_inches(), (9, 9))
+ 
+-        g2 = ag.PairGrid(self.df, height=4, aspect=.5)
++        g2 = ag.PairGrid(self.df, height=4, aspect=0.5)
+         npt.assert_array_equal(g2.fig.get_size_inches(), (6, 12))
+ 
+-        g3 = ag.PairGrid(self.df, y_vars=["z"], x_vars=["x", "y"],
+-                         height=2, aspect=2)
++        g3 = ag.PairGrid(self.df, y_vars=["z"], x_vars=["x", "y"], height=2, aspect=2)
+         npt.assert_array_equal(g3.fig.get_size_inches(), (8, 2))
+ 
+     def test_empty_grid(self):
+-
+         with pytest.raises(ValueError, match="No variables found"):
+             ag.PairGrid(self.df[["a", "b"]])
+ 
+     def test_map(self):
+-
+         vars = ["x", "y", "z"]
+         g1 = ag.PairGrid(self.df)
+         g1.map(plt.scatter)
+@@ -852,7 +815,6 @@ class TestPairGrid:
+                 npt.assert_array_equal(y_in_k, y_out)
+ 
+     def test_map_nonsquare(self):
+-
+         x_vars = ["x"]
+         y_vars = ["y", "z"]
+         g = ag.PairGrid(self.df, x_vars=x_vars, y_vars=y_vars)
+@@ -867,7 +829,6 @@ class TestPairGrid:
+             npt.assert_array_equal(y_in, y_out)
+ 
+     def test_map_lower(self):
+-
+         vars = ["x", "y", "z"]
+         g = ag.PairGrid(self.df)
+         g.map_lower(plt.scatter)
+@@ -885,7 +846,6 @@ class TestPairGrid:
+             assert len(ax.collections) == 0
+ 
+     def test_map_upper(self):
+-
+         vars = ["x", "y", "z"]
+         g = ag.PairGrid(self.df)
+         g.map_upper(plt.scatter)
+@@ -903,7 +863,6 @@ class TestPairGrid:
+             assert len(ax.collections) == 0
+ 
+     def test_map_mixed_funcsig(self):
+-
+         vars = ["x", "y", "z"]
+         g = ag.PairGrid(self.df, vars=vars)
+         g.map_lower(scatterplot)
+@@ -918,7 +877,6 @@ class TestPairGrid:
+             npt.assert_array_equal(y_in, y_out)
+ 
+     def test_map_diag(self):
+-
+         g = ag.PairGrid(self.df)
+         g.map_diag(plt.hist)
+ 
+@@ -933,14 +891,13 @@ class TestPairGrid:
+             assert len(ax.patches) == 30
+ 
+         g = ag.PairGrid(self.df, hue="a")
+-        g.map_diag(plt.hist, histtype='step')
++        g.map_diag(plt.hist, histtype="step")
+ 
+         for ax in g.diag_axes:
+             for ptch in ax.patches:
+                 assert not ptch.fill
+ 
+     def test_map_diag_rectangular(self):
+-
+         x_vars = ["x", "y"]
+         y_vars = ["x", "z", "y"]
+         g1 = ag.PairGrid(self.df, x_vars=x_vars, y_vars=y_vars)
+@@ -955,7 +912,6 @@ class TestPairGrid:
+ 
+         for j, x_var in enumerate(x_vars):
+             for i, y_var in enumerate(y_vars):
+-
+                 ax = g1.axes[i, j]
+                 if x_var == y_var:
+                     diag_ax = g1.diag_axes[j]  # because fewer x than y vars
+@@ -989,7 +945,6 @@ class TestPairGrid:
+ 
+         for j, x_var in enumerate(x_vars):
+             for i, y_var in enumerate(y_vars):
+-
+                 ax = g3.axes[i, j]
+                 if x_var == y_var:
+                     diag_ax = g3.diag_axes[i]  # because fewer y than x vars
+@@ -1000,7 +955,6 @@ class TestPairGrid:
+                     assert_array_equal(y, self.df[y_var])
+ 
+     def test_map_diag_color(self):
+-
+         color = "red"
+ 
+         g1 = ag.PairGrid(self.df)
+@@ -1011,14 +965,13 @@ class TestPairGrid:
+                 assert_colors_equal(patch.get_facecolor(), color)
+ 
+         g2 = ag.PairGrid(self.df)
+-        g2.map_diag(kdeplot, color='red')
++        g2.map_diag(kdeplot, color="red")
+ 
+         for ax in g2.diag_axes:
+             for line in ax.lines:
+                 assert_colors_equal(line.get_color(), color)
+ 
+     def test_map_diag_palette(self):
+-
+         palette = "muted"
+         pal = color_palette(palette, n_colors=len(self.df.a.unique()))
+         g = ag.PairGrid(self.df, hue="a", palette=palette)
+@@ -1029,7 +982,6 @@ class TestPairGrid:
+                 assert_colors_equal(line.get_color(), color)
+ 
+     def test_map_diag_and_offdiag(self):
+-
+         vars = ["x", "y", "z"]
+         g = ag.PairGrid(self.df)
+         g.map_offdiag(plt.scatter)
+@@ -1059,14 +1011,12 @@ class TestPairGrid:
+             assert len(ax.collections) == 0
+ 
+     def test_diag_sharey(self):
+-
+         g = ag.PairGrid(self.df, diag_sharey=True)
+         g.map_diag(kdeplot)
+         for ax in g.diag_axes[1:]:
+             assert ax.get_ylim() == g.diag_axes[0].get_ylim()
+ 
+     def test_map_diag_matplotlib(self):
+-
+         bins = 10
+         g = ag.PairGrid(self.df)
+         g.map_diag(plt.hist, bins=bins)
+@@ -1080,7 +1030,6 @@ class TestPairGrid:
+             assert len(ax.patches) == (bins * levels)
+ 
+     def test_palette(self):
+-
+         rcmod.set()
+ 
+         g = ag.PairGrid(self.df, hue="a")
+@@ -1098,12 +1047,10 @@ class TestPairGrid:
+         assert g.palette == list_pal
+ 
+         list_pal = color_palette(["blue", "red", "green"])
+-        g = ag.PairGrid(self.df, hue="a", hue_order=list("cab"),
+-                        palette=dict_pal)
++        g = ag.PairGrid(self.df, hue="a", hue_order=list("cab"), palette=dict_pal)
+         assert g.palette == list_pal
+ 
+     def test_hue_kws(self):
+-
+         kws = dict(marker=["o", "s", "d", "+"])
+         g = ag.PairGrid(self.df, hue="a", hue_kws=kws)
+         g.map(plt.plot)
+@@ -1111,15 +1058,13 @@ class TestPairGrid:
+         for line, marker in zip(g.axes[0, 0].lines, kws["marker"]):
+             assert line.get_marker() == marker
+ 
+-        g = ag.PairGrid(self.df, hue="a", hue_kws=kws,
+-                        hue_order=list("dcab"))
++        g = ag.PairGrid(self.df, hue="a", hue_kws=kws, hue_order=list("dcab"))
+         g.map(plt.plot)
+ 
+         for line, marker in zip(g.axes[0, 0].lines, kws["marker"]):
+             assert line.get_marker() == marker
+ 
+     def test_hue_order(self):
+-
+         order = list("dcab")
+         g = ag.PairGrid(self.df, hue="a", hue_order=order)
+         g.map(plt.plot)
+@@ -1162,7 +1107,6 @@ class TestPairGrid:
+         plt.close("all")
+ 
+     def test_hue_order_missing_level(self):
+-
+         order = list("dcaeb")
+         g = ag.PairGrid(self.df, hue="a", hue_order=order)
+         g.map(plt.plot)
+@@ -1205,7 +1149,6 @@ class TestPairGrid:
+         plt.close("all")
+ 
+     def test_hue_in_map(self, long_df):
+-
+         g = ag.PairGrid(long_df, vars=["x", "y"])
+         g.map(scatterplot, hue=long_df["a"])
+         ax = g.axes.flat[0]
+@@ -1213,7 +1156,6 @@ class TestPairGrid:
+         assert len(set(map(tuple, points.get_facecolors()))) == 3
+ 
+     def test_nondefault_index(self):
+-
+         df = self.df.copy().set_index("b")
+ 
+         plot_vars = ["x", "y", "z"]
+@@ -1244,7 +1186,6 @@ class TestPairGrid:
+ 
+     @pytest.mark.parametrize("func", [scatterplot, plt.scatter])
+     def test_dropna(self, func):
+-
+         df = self.df.copy()
+         n_null = 20
+         df.loc[np.arange(n_null), "x"] = np.nan
+@@ -1272,7 +1213,6 @@ class TestPairGrid:
+             assert count == df[var].notna().sum()
+ 
+     def test_histplot_legend(self):
+-
+         # Tests _extract_legend_handles
+         g = ag.PairGrid(self.df, vars=["x", "y"], hue="a")
+         g.map_offdiag(histplot)
+@@ -1281,7 +1221,6 @@ class TestPairGrid:
+         assert len(get_legend_handles(g._legend)) == len(self.df["a"].unique())
+ 
+     def test_pairplot(self):
+-
+         vars = ["x", "y", "z"]
+         g = ag.pairplot(self.df)
+ 
+@@ -1315,7 +1254,6 @@ class TestPairGrid:
+             assert len(ax.collections) == n
+ 
+     def test_pairplot_reg(self):
+-
+         vars = ["x", "y", "z"]
+         g = ag.pairplot(self.df, diag_kind="hist", kind="reg")
+ 
+@@ -1349,7 +1287,6 @@ class TestPairGrid:
+             assert len(ax.collections) == 0
+ 
+     def test_pairplot_reg_hue(self):
+-
+         markers = ["o", "s", "d"]
+         g = ag.pairplot(self.df, kind="reg", hue="a", markers=markers)
+ 
+@@ -1359,11 +1296,11 @@ class TestPairGrid:
+ 
+         assert not np.array_equal(c1.get_facecolor(), c2.get_facecolor())
+         assert not np.array_equal(
+-            c1.get_paths()[0].vertices, c2.get_paths()[0].vertices,
++            c1.get_paths()[0].vertices,
++            c2.get_paths()[0].vertices,
+         )
+ 
+     def test_pairplot_diag_kde(self):
+-
+         vars = ["x", "y", "z"]
+         g = ag.pairplot(self.df, diag_kind="kde")
+ 
+@@ -1391,7 +1328,6 @@ class TestPairGrid:
+             assert len(ax.collections) == 0
+ 
+     def test_pairplot_kde(self):
+-
+         f, ax1 = plt.subplots()
+         kdeplot(data=self.df, x="x", y="y", ax=ax1)
+ 
+@@ -1401,7 +1337,6 @@ class TestPairGrid:
+         assert_plots_equal(ax1, ax2, labels=False)
+ 
+     def test_pairplot_hist(self):
+-
+         f, ax1 = plt.subplots()
+         histplot(data=self.df, x="x", y="y", ax=ax1)
+ 
+@@ -1411,7 +1346,6 @@ class TestPairGrid:
+         assert_plots_equal(ax1, ax2, labels=False)
+ 
+     def test_pairplot_markers(self):
+-
+         vars = ["x", "y", "z"]
+         markers = ["o", "X", "s"]
+         g = ag.pairplot(self.df, hue="a", vars=vars, markers=markers)
+@@ -1423,26 +1357,25 @@ class TestPairGrid:
+             g = ag.pairplot(self.df, hue="a", vars=vars, markers=markers[:-2])
+ 
+     def test_pairplot_column_multiindex(self):
+-
+         cols = pd.MultiIndex.from_arrays([["x", "y"], [1, 2]])
+         df = self.df[["x", "y"]].set_axis(cols, axis=1)
+-        g = ag.pairplot(df)
+-        assert g.diag_vars == list(cols)
++        g = ag.PairGrid(df)
++        assert g.diag_vars is None
++        expected_vars = ["_".join(str(c) for c in col) for col in cols]
++        assert g.x_vars == expected_vars
++        assert g.y_vars == expected_vars
+ 
+     def test_corner_despine(self):
+-
+         g = ag.PairGrid(self.df, corner=True, despine=False)
+         g.map_diag(histplot)
+         assert g.axes[0, 0].spines["top"].get_visible()
+ 
+     def test_corner_set(self):
+-
+         g = ag.PairGrid(self.df, corner=True, despine=False)
+         g.set(xlim=(0, 10))
+         assert g.axes[-1, 0].get_xlim() == (0, 10)
+ 
+     def test_legend(self):
+-
+         g1 = ag.pairplot(self.df, hue="a")
+         assert isinstance(g1.legend, mpl.legend.Legend)
+ 
+@@ -1450,7 +1383,6 @@ class TestPairGrid:
+         assert g2.legend is None
+ 
+     def test_tick_params(self):
+-
+         g = ag.PairGrid(self.df)
+         color = "red"
+         pad = 3
+@@ -1464,7 +1396,6 @@ class TestPairGrid:
+ 
+ 
+ class TestJointGrid:
+-
+     rs = np.random.RandomState(sum(map(ord, "JointGrid")))
+     x = rs.randn(100)
+     y = rs.randn(100)
+@@ -1474,36 +1405,30 @@ class TestJointGrid:
+     data = pd.DataFrame(dict(x=x, y=y, x_na=x_na))
+ 
+     def test_margin_grid_from_lists(self):
+-
+         g = ag.JointGrid(x=self.x.tolist(), y=self.y.tolist())
+         npt.assert_array_equal(g.x, self.x)
+         npt.assert_array_equal(g.y, self.y)
+ 
+     def test_margin_grid_from_arrays(self):
+-
+         g = ag.JointGrid(x=self.x, y=self.y)
+         npt.assert_array_equal(g.x, self.x)
+         npt.assert_array_equal(g.y, self.y)
+ 
+     def test_margin_grid_from_series(self):
+-
+         g = ag.JointGrid(x=self.data.x, y=self.data.y)
+         npt.assert_array_equal(g.x, self.x)
+         npt.assert_array_equal(g.y, self.y)
+ 
+     def test_margin_grid_from_dataframe(self):
+-
+         g = ag.JointGrid(x="x", y="y", data=self.data)
+         npt.assert_array_equal(g.x, self.x)
+         npt.assert_array_equal(g.y, self.y)
+ 
+     def test_margin_grid_from_dataframe_bad_variable(self):
+-
+         with pytest.raises(ValueError):
+             ag.JointGrid(x="x", y="bad_column", data=self.data)
+ 
+     def test_margin_grid_axis_labels(self):
+-
+         g = ag.JointGrid(x="x", y="y", data=self.data)
+ 
+         xlabel, ylabel = g.ax_joint.get_xlabel(), g.ax_joint.get_ylabel()
+@@ -1516,7 +1441,6 @@ class TestJointGrid:
+         assert ylabel == "y variable"
+ 
+     def test_dropna(self):
+-
+         g = ag.JointGrid(x="x_na", y="y", data=self.data, dropna=False)
+         assert len(g.x) == len(self.x_na)
+ 
+@@ -1524,7 +1448,6 @@ class TestJointGrid:
+         assert len(g.x) == pd.notnull(self.x_na).sum()
+ 
+     def test_axlims(self):
+-
+         lim = (-3, 3)
+         g = ag.JointGrid(x="x", y="y", data=self.data, xlim=lim, ylim=lim)
+ 
+@@ -1535,7 +1458,6 @@ class TestJointGrid:
+         assert g.ax_marg_y.get_ylim() == lim
+ 
+     def test_marginal_ticks(self):
+-
+         g = ag.JointGrid(marginal_ticks=False)
+         assert not sum(t.get_visible() for t in g.ax_marg_x.get_yticklabels())
+         assert not sum(t.get_visible() for t in g.ax_marg_y.get_xticklabels())
+@@ -1545,7 +1467,6 @@ class TestJointGrid:
+         assert sum(t.get_visible() for t in g.ax_marg_y.get_xticklabels())
+ 
+     def test_bivariate_plot(self):
+-
+         g = ag.JointGrid(x="x", y="y", data=self.data)
+         g.plot_joint(plt.plot)
+ 
+@@ -1554,7 +1475,6 @@ class TestJointGrid:
+         npt.assert_array_equal(y, self.y)
+ 
+     def test_univariate_plot(self):
+-
+         g = ag.JointGrid(x="x", y="x", data=self.data)
+         g.plot_marginals(kdeplot)
+ 
+@@ -1563,7 +1483,6 @@ class TestJointGrid:
+         npt.assert_array_equal(y1, y2)
+ 
+     def test_univariate_plot_distplot(self):
+-
+         bins = 10
+         g = ag.JointGrid(x="x", y="x", data=self.data)
+         with pytest.warns(UserWarning):
+@@ -1574,7 +1493,6 @@ class TestJointGrid:
+             assert x.get_height() == y.get_width()
+ 
+     def test_univariate_plot_matplotlib(self):
+-
+         bins = 10
+         g = ag.JointGrid(x="x", y="x", data=self.data)
+         g.plot_marginals(plt.hist, bins=bins)
+@@ -1582,7 +1500,6 @@ class TestJointGrid:
+         assert len(g.ax_marg_y.patches) == bins
+ 
+     def test_plot(self):
+-
+         g = ag.JointGrid(x="x", y="x", data=self.data)
+         g.plot(plt.plot, kdeplot)
+ 
+@@ -1595,7 +1512,6 @@ class TestJointGrid:
+         npt.assert_array_equal(y1, y2)
+ 
+     def test_space(self):
+-
+         g = ag.JointGrid(x="x", y="y", data=self.data, space=0)
+ 
+         joint_bounds = g.ax_joint.bbox.bounds
+@@ -1606,10 +1522,10 @@ class TestJointGrid:
+         assert joint_bounds[3] == marg_y_bounds[3]
+ 
+     @pytest.mark.parametrize(
+-        "as_vector", [True, False],
++        "as_vector",
++        [True, False],
+     )
+     def test_hue(self, long_df, as_vector):
+-
+         if as_vector:
+             data = None
+             x, y, hue = long_df["x"], long_df["y"], long_df["a"]
+@@ -1631,7 +1547,6 @@ class TestJointGrid:
+         assert_plots_equal(g.ax_marg_y, g2.ax_marg_y, labels=False)
+ 
+     def test_refline(self):
+-
+         g = ag.JointGrid(x="x", y="y", data=self.data)
+         g.plot(scatterplot, histplot)
+         g.refline()
+@@ -1644,8 +1559,8 @@ class TestJointGrid:
+         assert not g.ax_joint.lines and not g.ax_marg_x.lines and not g.ax_marg_y.lines
+ 
+         g.refline(x=refx, y=refy)
+-        assert g.ax_joint.lines[0].get_color() == '.5'
+-        assert g.ax_joint.lines[0].get_linestyle() == '--'
++        assert g.ax_joint.lines[0].get_color() == ".5"
++        assert g.ax_joint.lines[0].get_linestyle() == "--"
+         assert len(g.ax_joint.lines) == 2
+         assert len(g.ax_marg_x.lines) == 1
+         assert len(g.ax_marg_y.lines) == 1
+@@ -1654,7 +1569,7 @@ class TestJointGrid:
+         npt.assert_array_equal(g.ax_marg_x.lines[0].get_xydata(), vline)
+         npt.assert_array_equal(g.ax_marg_y.lines[0].get_xydata(), hline)
+ 
+-        color, linestyle = 'red', '-'
++        color, linestyle = "red", "-"
+         g.refline(x=refx, marginal=False, color=color, linestyle=linestyle)
+         npt.assert_array_equal(g.ax_joint.lines[-1].get_xydata(), vline)
+         assert g.ax_joint.lines[-1].get_color() == color
+@@ -1675,14 +1590,12 @@ class TestJointGrid:
+ 
+ 
+ class TestJointPlot:
+-
+     rs = np.random.RandomState(sum(map(ord, "jointplot")))
+     x = rs.randn(100)
+     y = rs.randn(100)
+     data = pd.DataFrame(dict(x=x, y=y))
+ 
+     def test_scatter(self):
+-
+         g = ag.jointplot(x="x", y="y", data=self.data)
+         assert len(g.ax_joint.collections) == 1
+ 
+@@ -1701,7 +1614,6 @@ class TestJointPlot:
+         )
+ 
+     def test_scatter_hue(self, long_df):
+-
+         g1 = ag.jointplot(data=long_df, x="x", y="y", hue="a")
+ 
+         g2 = ag.JointGrid()
+@@ -1714,7 +1626,6 @@ class TestJointPlot:
+         assert_plots_equal(g1.ax_marg_y, g2.ax_marg_y, labels=False)
+ 
+     def test_reg(self):
+-
+         g = ag.jointplot(x="x", y="y", data=self.data, kind="reg")
+         assert len(g.ax_joint.collections) == 2
+ 
+@@ -1729,7 +1640,6 @@ class TestJointPlot:
+         assert g.ax_marg_y.lines
+ 
+     def test_resid(self):
+-
+         g = ag.jointplot(x="x", y="y", data=self.data, kind="resid")
+         assert g.ax_joint.collections
+         assert g.ax_joint.lines
+@@ -1737,7 +1647,6 @@ class TestJointPlot:
+         assert not g.ax_marg_y.lines
+ 
+     def test_hist(self, long_df):
+-
+         bins = 3, 6
+         g1 = ag.jointplot(data=long_df, x="x", y="y", kind="hist", bins=bins)
+ 
+@@ -1751,14 +1660,12 @@ class TestJointPlot:
+         assert_plots_equal(g1.ax_marg_y, g2.ax_marg_y, labels=False)
+ 
+     def test_hex(self):
+-
+         g = ag.jointplot(x="x", y="y", data=self.data, kind="hex")
+         assert g.ax_joint.collections
+         assert g.ax_marg_x.patches
+         assert g.ax_marg_y.patches
+ 
+     def test_kde(self, long_df):
+-
+         g1 = ag.jointplot(data=long_df, x="x", y="y", kind="kde")
+ 
+         g2 = ag.JointGrid()
+@@ -1771,7 +1678,6 @@ class TestJointPlot:
+         assert_plots_equal(g1.ax_marg_y, g2.ax_marg_y, labels=False)
+ 
+     def test_kde_hue(self, long_df):
+-
+         g1 = ag.jointplot(data=long_df, x="x", y="y", hue="a", kind="kde")
+ 
+         g2 = ag.JointGrid()
+@@ -1784,7 +1690,6 @@ class TestJointPlot:
+         assert_plots_equal(g1.ax_marg_y, g2.ax_marg_y, labels=False)
+ 
+     def test_color(self):
+-
+         g = ag.jointplot(x="x", y="y", data=self.data, color="purple")
+ 
+         scatter_color = g.ax_joint.collections[0].get_facecolor()
+@@ -1794,7 +1699,6 @@ class TestJointPlot:
+         assert_colors_equal(hist_color, "purple")
+ 
+     def test_palette(self, long_df):
+-
+         kws = dict(data=long_df, hue="a", palette="Set2")
+ 
+         g1 = ag.jointplot(x="x", y="y", **kws)
+@@ -1809,21 +1713,19 @@ class TestJointPlot:
+         assert_plots_equal(g1.ax_marg_y, g2.ax_marg_y, labels=False)
+ 
+     def test_hex_customise(self):
+-
+         # test that default gridsize can be overridden
+-        g = ag.jointplot(x="x", y="y", data=self.data, kind="hex",
+-                         joint_kws=dict(gridsize=5))
++        g = ag.jointplot(
++            x="x", y="y", data=self.data, kind="hex", joint_kws=dict(gridsize=5)
++        )
+         assert len(g.ax_joint.collections) == 1
+         a = g.ax_joint.collections[0].get_array()
+         assert a.shape[0] == 28  # 28 hexagons expected for gridsize 5
+ 
+     def test_bad_kind(self):
+-
+         with pytest.raises(ValueError):
+             ag.jointplot(x="x", y="y", data=self.data, kind="not_a_kind")
+ 
+     def test_unsupported_hue_kind(self):
+-
+         for kind in ["reg", "resid", "hex"]:
+             with pytest.raises(ValueError):
+                 ag.jointplot(x="x", y="y", hue="a", data=self.data, kind=kind)
+@@ -1834,18 +1736,17 @@ class TestJointPlot:
+         for kwarg in ("joint_kws", "marginal_kws"):
+             for kind in ("hex", "kde", "resid", "reg", "scatter"):
+                 empty_dict = {}
+-                ag.jointplot(x="x", y="y", data=self.data, kind=kind,
+-                             **{kwarg: empty_dict})
++                ag.jointplot(
++                    x="x", y="y", data=self.data, kind=kind, **{kwarg: empty_dict}
++                )
+                 assert empty_dict == {}
+ 
+     def test_distplot_kwarg_warning(self, long_df):
+-
+         with pytest.warns(UserWarning):
+             g = ag.jointplot(data=long_df, x="x", y="y", marginal_kws=dict(rug=True))
+         assert g.ax_marg_x.patches
+ 
+     def test_ax_warning(self, long_df):
+-
+         ax = plt.gca()
+         with pytest.warns(UserWarning):
+             g = ag.jointplot(data=long_df, x="x", y="y", ax=ax)

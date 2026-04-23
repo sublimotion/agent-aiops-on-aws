@@ -1,0 +1,18 @@
+diff --git a/pylint/lint/expand_modules.py b/pylint/lint/expand_modules.py
+index 289e1afc..23d329a5 100644
+--- a/pylint/lint/expand_modules.py
++++ b/pylint/lint/expand_modules.py
+@@ -32,6 +32,13 @@ def get_python_path(filepath: str) -> str:
+     dirname = os.path.realpath(os.path.expanduser(filepath))
+     if not os.path.isdir(dirname):
+         dirname = os.path.dirname(dirname)
++    else:
++        # If the filepath is a directory (package/namespace), we want to check
++        # whether the *parent* directory is a package, not the directory itself.
++        # This avoids the case where a module inside the package has the same
++        # name as the package (e.g. a/a.py), which would confuse modutils into
++        # thinking the directory is that module rather than a namespace package.
++        dirname = os.path.dirname(dirname)
+     while True:
+         if not os.path.exists(os.path.join(dirname, "__init__.py")):
+             return dirname

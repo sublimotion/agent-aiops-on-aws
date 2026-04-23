@@ -1,0 +1,21 @@
+diff --git a/sympy/physics/units/util.py b/sympy/physics/units/util.py
+index b03ed4cd88..688e0f375c 100644
+--- a/sympy/physics/units/util.py
++++ b/sympy/physics/units/util.py
+@@ -31,6 +31,8 @@ def _get_conversion_matrix_for_expr(expr, target_units, unit_system):
+     exprmat = Matrix([dim_dependencies.get(k, 0) for k in canon_dim_units])
+ 
+     res_exponents = camat.solve_least_squares(exprmat, method=None)
++    if camat * res_exponents != exprmat:
++        return None
+     return res_exponents
+ 
+ 
+@@ -106,6 +108,7 @@ def get_total_scale_factor(expr):
+         return expr
+ 
+     expr_scale_factor = get_total_scale_factor(expr)
++
+     return expr_scale_factor * Mul.fromiter((1/get_total_scale_factor(u) * u) ** p for u, p in zip(target_units, depmat))
+ 
+ 

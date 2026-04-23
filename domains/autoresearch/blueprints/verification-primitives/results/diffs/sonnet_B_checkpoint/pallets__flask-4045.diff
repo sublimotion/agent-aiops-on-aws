@@ -1,0 +1,14 @@
+diff --git a/src/flask/blueprints.py b/src/flask/blueprints.py
+index 5fb84d86..4b2dcb37 100644
+--- a/src/flask/blueprints.py
++++ b/src/flask/blueprints.py
+@@ -188,6 +188,9 @@ class Blueprint(Scaffold):
+             template_folder=template_folder,
+             root_path=root_path,
+         )
++        if "." in name:
++            raise ValueError("'.' is not allowed in blueprint name.")
++
+         self.name = name
+         self.url_prefix = url_prefix
+         self.subdomain = subdomain

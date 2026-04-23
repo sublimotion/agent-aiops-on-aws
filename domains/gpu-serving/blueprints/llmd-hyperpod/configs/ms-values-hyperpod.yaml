@@ -1,0 +1,149 @@
+# llm-d model service values — Qwen3-0.6B on HyperPod g5.2xlarge
+# Overlay for guides/inference-scheduling/ms-inference-scheduling/values.yaml
+#
+# Deploy into llmd-validation namespace to isolate from existing workloads.
+# The finetune-runner job runs on the g5-workers instance group — we target
+# the llmd-validation instance group (g5.2xlarge) via nodeSelector.
+#
+# Three configs: baseline → L2 → L2+L3
+# Toggle L2/L3 by uncommenting sections below.
+
+multinode: false
+
+modelArtifacts:
+  uri: "hf://Qwen/Qwen3-0.6B"
+  name: "Qwen/Qwen3-0.6B"
+  size: 5Gi
+  labels:
+    llm-d.ai/inference-serving: "true"
+    llm-d.ai/guide: "inference-scheduling"
+    llm-d.ai/accelerator-variant: "gpu"
+    llm-d.ai/accelerator-vendor: "nvidia"
+    llm-d.ai/model: "Qwen3-0.6B"
+
+routing:
+  proxy:
+    enabled: false  # no P/D disaggregation
+    targetPort: 8000
+
+accelerator:
+  type: nvidia
+
+decode:
+  create: true
+  parallelism:
+    tensor: 1
+    data: 1
+  replicas: 1  # Single GPU on g5.2xlarge
+  monitoring:
+    podmonitor:
+      enabled: true
+      portName: "vllm"
+      path: "/metrics"
+      interval: "30s"
+  nodeSelector:
+    sagemaker.amazonaws.com/instance-group-name: gpu-workers
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  containers:
+    - name: "vllm"
+      image: ghcr.io/llm-d/llm-d-cuda:v0.5.1
+      modelCommand: vllmServe
+      args:
+        - "--disable-uvicorn-access-log"
+        - "--gpu-memory-utilization=0.90"
+        - "--enable-prefix-caching"
+        - "--max-model-len"
+        - "8192"
+        # --- L2 Integration ---
+        - "--kv-transfer-config"
+        - '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both","kv_connector_extra_config":{"sagemaker_hyperpod_shared_memory_name":"ai_toolkit_cache"}}'
+      env:
+        # HF_HOME is injected by the chart automatically
+        # --- LMCache config file for HyperPod shared memory name ---
+        - name: LMCACHE_CONFIG_FILE
+          value: "/etc/lmcache/config.yaml"
+        # --- L1 CPU offload ---
+        - name: LMCACHE_LOCAL_CPU
+          value: "True"
+        # --- L2 daemon (NODE_IP must be defined before LMCACHE_REMOTE_URL for $(NODE_IP) substitution) ---
+        - name: NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: LMCACHE_REMOTE_URL
+          value: "sagemaker-hyperpod://$(NODE_IP):9200"
+        # --- L3 FSx (uncomment for Stage 5, replaces L2 URL) ---
+        # - name: LMCACHE_REMOTE_URL
+        #   value: "file:///mnt/fsx/kvcache"
+      ports:
+        - containerPort: 8000
+          name: vllm
+          protocol: TCP
+      resources:
+        limits:
+          # nvidia.com/gpu: '1'  # added automatically from parallelism
+          cpu: '6'
+          memory: 24Gi
+        requests:
+          # nvidia.com/gpu: '1'  # added automatically from parallelism
+          cpu: '2'
+          memory: 8Gi
+      mountModelVolume: true
+      volumeMounts:
+        - name: metrics-volume
+          mountPath: /.config
+        - name: shm
+          mountPath: /dev/shm
+        - name: torch-compile-cache
+          mountPath: /.cache
+        # --- LMCache config mount ---
+        - name: lmcache-config
+          mountPath: /etc/lmcache
+        # --- L3 FSx mount ---
+        - name: fsx-cache
+          mountPath: /mnt/fsx
+      startupProbe:
+        httpGet:
+          path: /v1/models
+          port: vllm
+        initialDelaySeconds: 15
+        periodSeconds: 30
+        timeoutSeconds: 5
+        failureThreshold: 120
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: vllm
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+      readinessProbe:
+        httpGet:
+          path: /v1/models
+          port: vllm
+        periodSeconds: 5
+        timeoutSeconds: 2
+        failureThreshold: 3
+  volumes:
+    - name: metrics-volume
+      emptyDir: {}
+    - name: torch-compile-cache
+      emptyDir: {}
+    - name: shm
+      hostPath:
+        path: /dev/shm
+        type: Directory
+    # --- LMCache config volume ---
+    - name: lmcache-config
+      configMap:
+        name: lmcache-config
+    # --- L3 FSx volume ---
+    - name: fsx-cache
+      persistentVolumeClaim:
+        claimName: fsx-kvcache
+
+prefill:
+  create: false

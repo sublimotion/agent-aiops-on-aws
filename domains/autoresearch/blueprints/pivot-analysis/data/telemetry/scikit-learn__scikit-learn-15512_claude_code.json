@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 145.1,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 143864,
+    "duration_api_ms": 119856,
+    "num_turns": 20,
+    "result": "The existing tests at lines 96-107 and 139-152 already test the non-convergence behavior. The fix is correct. The tests expect `ConvergenceWarning` when `max_iter=1`, and the `cluster_centers_` should be empty while `labels_` should all be -1.\n\nThe fix is complete and aligns with the documented behavior. Here's a summary of what was changed:\n\n**Root cause**: In `affinity_propagation()`, when the `for` loop runs to completion without converging (the `else` branch), the code printed a message but continued executing, using the last iteration's `E` array to identify exemplars. This meant non-convergent runs could still return valid-looking cluster centers.\n\n**Fix**: Added an early return in the `for...else` branch that issues the `ConvergenceWarning` and returns `np.array([])` for `cluster_centers_indices` and `np.array([-1] * n_samples)` for `labels`, matching the documented behavior.\n\nThe change is minimal \u2014 6 lines added in the `else` clause of the for loop at `_affinity_propagation.py:200`.",
+    "stop_reason": "end_turn",
+    "session_id": "d27a7155-5d94-4005-bd9b-60ad66bc13ed",
+    "total_cost_usd": 0.37929555000000004,
+    "usage": {
+      "input_tokens": 86,
+      "cache_creation_input_tokens": 31811,
+      "cache_read_input_tokens": 534071,
+      "output_tokens": 6635,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 31811
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 86,
+        "outputTokens": 6635,
+        "cacheReadInputTokens": 534071,
+        "cacheCreationInputTokens": 31811,
+        "webSearchRequests": 0,
+        "costUSD": 0.37929555000000004,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "0411d0d0-d670-4d03-9655-2fded568d23a"
+  },
+  "stderr": ""
+}

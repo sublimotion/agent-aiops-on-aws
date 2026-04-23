@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-gemma4-4b
+  namespace: gemma4-4b
+  labels:
+    app: vllm-gemma4-4b
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vllm-gemma4-4b
+  template:
+    metadata:
+      labels:
+        app: vllm-gemma4-4b
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: ml.g5.4xlarge
+      tolerations:
+        - key: sagemaker.amazonaws.com/RestrictedNode
+          operator: Exists
+          effect: NoSchedule
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: node.kubernetes.io/disk-pressure
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:gemma4
+          command:
+            - python3
+            - -m
+            - vllm.entrypoints.openai.api_server
+          args:
+            - --model
+            - google/gemma-4-E4B-it
+            - --dtype
+            - bfloat16
+            - --max-model-len
+            - "32768"
+            - --gpu-memory-utilization
+            - "0.90"
+            - --enable-prefix-caching
+            - --tool-call-parser
+            - pythonic
+            - --enable-auto-tool-choice
+            - --port
+            - "8000"
+            - --trust-remote-code
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: HF_HOME
+              value: /tmp/hf-cache
+          resources:
+            requests:
+              cpu: "4"
+              memory: "16Gi"
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "8"
+              memory: "32Gi"
+              nvidia.com/gpu: "1"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 120
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 180
+            periodSeconds: 30
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: cache
+              mountPath: /tmp/hf-cache
+            - name: shm
+              mountPath: /dev/shm
+      volumes:
+        - name: cache
+          emptyDir:
+            sizeLimit: 20Gi
+          # Model weights (~8GB) downloaded to emptyDir on startup
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 4Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-gemma4-4b
+  namespace: gemma4-4b
+spec:
+  selector:
+    app: vllm-gemma4-4b
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
+  type: ClusterIP

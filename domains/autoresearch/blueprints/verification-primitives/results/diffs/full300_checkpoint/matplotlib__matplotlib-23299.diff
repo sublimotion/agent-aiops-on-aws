@@ -1,0 +1,24 @@
+diff --git a/lib/matplotlib/pyplot.py b/lib/matplotlib/pyplot.py
+index e3c66ea67c..1fa40f7f9a 100644
+--- a/lib/matplotlib/pyplot.py
++++ b/lib/matplotlib/pyplot.py
+@@ -222,7 +222,6 @@ def switch_backend(newbackend):
+     global _backend_mod
+     # make sure the init is pulled up so we can assign to it later
+     import matplotlib.backends
+-    close("all")
+ 
+     if newbackend is rcsetup._auto_backend_sentinel:
+         current_framework = cbook._get_running_interactive_framework()
+@@ -260,6 +259,11 @@ def switch_backend(newbackend):
+             rcParamsOrig["backend"] = "agg"
+             return
+ 
++    # Only close existing figures if we are actually switching to a different
++    # backend (not during the initial backend resolution).
++    if _backend_mod is not None and newbackend != get_backend():
++        close("all")
++
+     backend_mod = importlib.import_module(
+         cbook._backend_module_name(newbackend))
+     canvas_class = backend_mod.FigureCanvas

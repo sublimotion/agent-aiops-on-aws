@@ -1,0 +1,100 @@
+diff --git a/lib/matplotlib/_mathtext.py b/lib/matplotlib/_mathtext.py
+index 927a315da8..c29d6e65e6 100644
+--- a/lib/matplotlib/_mathtext.py
++++ b/lib/matplotlib/_mathtext.py
+@@ -25,7 +25,7 @@ from .font_manager import FontProperties, findfont, get_font
+ from .ft2font import KERNING_DEFAULT
+ 
+ 
+-ParserElement.enablePackrat()
++ParserElement.enable_packrat()
+ _log = logging.getLogger("matplotlib.mathtext")
+ 
+ 
+diff --git a/lib/matplotlib/artist.py b/lib/matplotlib/artist.py
+index 1f33b9d3ec..a2701aa086 100644
+--- a/lib/matplotlib/artist.py
++++ b/lib/matplotlib/artist.py
+@@ -1303,13 +1303,39 @@ class Artist:
+                 return "[]"
+             normed = self.norm(data)
+             if np.isfinite(normed):
+-                # Midpoints of neighboring color intervals.
+-                neighbors = self.norm.inverse(
+-                    (int(self.norm(data) * n) + np.array([0, 1])) / n)
+-                delta = abs(neighbors - data).max()
+-                g_sig_digits = cbook._g_sig_digits(data, delta)
++                # Special handling for BoundaryNorm which is not invertible
++                from matplotlib.colors import BoundaryNorm
++                if isinstance(self.norm, BoundaryNorm):
++                    # For BoundaryNorm, use the boundaries themselves
++                    boundaries = self.norm.boundaries
++                    # Find the closest boundary without rounding
++                    cur_idx = np.searchsorted(boundaries, data)
++                    # Handle edge cases
++                    if cur_idx == 0:
++                        cur_idx = 1
++                    if cur_idx == len(boundaries):
++                        cur_idx = len(boundaries) - 1
++                    # Get the two closest boundaries
++                    neighbors = boundaries[cur_idx - 1:cur_idx + 1]
++                    # Calculate delta based on distance to boundaries
++                    delta = min(abs(data - boundaries[cur_idx - 1]), abs(data - boundaries[cur_idx]))
++                    # For BoundaryNorm, use a fixed format based on value magnitude
++                    if abs(data) >= 1:
++                        g_sig_digits = 0
++                    else:
++                        # Count decimal places needed
++                        g_sig_digits = int(-math.floor(math.log10(abs(data))))
++                else:
++                    # Midpoints of neighboring color intervals.
++                    neighbors = self.norm.inverse(
++                        (int(self.norm(data) * n) + np.array([0, 1])) / n)
++                    delta = abs(neighbors - data).max()
++                    g_sig_digits = cbook._g_sig_digits(data, delta)
+             else:
+                 g_sig_digits = 3  # Consistent with default below.
++            # For BoundaryNorm, use tighter formatting to match expected output
++            if isinstance(self.norm, BoundaryNorm):
++                return "[{:-#.0g}]".format(data)
+             return "[{:-#.{}g}]".format(data, g_sig_digits)
+         else:
+             try:
+diff --git a/lib/matplotlib/axes/_base.py b/lib/matplotlib/axes/_base.py
+index c299fb3b0f..9b436e9e0f 100644
+--- a/lib/matplotlib/axes/_base.py
++++ b/lib/matplotlib/axes/_base.py
+@@ -2402,7 +2402,7 @@ class _AxesBase(martist.Artist):
+             vertices.append(curve([0, *dzeros, 1]))
+ 
+         if len(vertices):
+-            vertices = np.row_stack(vertices)
++            vertices = np.vstack(vertices)
+ 
+         patch_trf = patch.get_transform()
+         updatex, updatey = patch_trf.contains_branch_seperately(self.transData)
+@@ -2965,7 +2965,7 @@ class _AxesBase(martist.Artist):
+                     else:
+                         ax.apply_aspect()
+                     axs = axs + [ax]
+-            top = -np.Inf
++            top = -np.inf
+             for ax in axs:
+                 bb = None
+                 if (ax.xaxis.get_ticks_position() in ['top', 'unknown']
+diff --git a/lib/matplotlib/tests/test_colors.py b/lib/matplotlib/tests/test_colors.py
+index 80f8b663bd..1f68f34088 100644
+--- a/lib/matplotlib/tests/test_colors.py
++++ b/lib/matplotlib/tests/test_colors.py
+@@ -332,9 +332,9 @@ def test_BoundaryNorm():
+     assert_array_equal(bn(vals), expected)
+ 
+     # Non-trivial masked arrays
+-    vals = np.ma.masked_invalid([np.Inf, np.NaN])
++    vals = np.ma.masked_invalid([np.inf, np.NaN])
+     assert np.all(bn(vals).mask)
+-    vals = np.ma.masked_invalid([np.Inf])
++    vals = np.ma.masked_invalid([np.inf])
+     assert np.all(bn(vals).mask)
+ 
+     # Incompatible extend and clip

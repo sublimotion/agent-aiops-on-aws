@@ -1,0 +1,142 @@
+2026-03-23 21:56:04,419 INFO 
+======================================================================
+2026-03-23 21:56:04,419 INFO AUTORESEARCH ITERATION 2
+2026-03-23 21:56:04,419 INFO Started: 20260324_015604
+2026-03-23 21:56:04,419 INFO Verifier model: haiku
+2026-03-23 21:56:04,419 INFO ======================================================================
+
+2026-03-23 21:56:04,419 INFO Available versions: ['v001_baseline', 'v002_minimal', 'v003_fewshot', 'v004_cot', 'v005_binary', 'v006_reformat_aware', 'v007_strict_logic']
+2026-03-23 21:56:04,419 INFO Versions to test: ['v006_reformat_aware', 'v007_strict_logic', 'v001_baseline', 'v004_cot']
+2026-03-23 21:56:04,419 INFO 
+--- Phase 2: Smoke Tests ---
+2026-03-23 21:56:04,419 INFO >>> Smoke test v006_reformat_aware × haiku
+2026-03-23 21:56:04,419 INFO     cmd: /opt/homebrew/opt/python@3.14/bin/python3.14 smoke_test.py --rubric /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/autoresearch/blueprints/verifier-reward/skills/patch-verifier/versions/v006_reformat_aware.md --model haiku --patch-source sonnet
+2026-03-23 21:56:26,725 INFO     exit=1 elapsed=22.3s
+2026-03-23 21:56:26,725 WARNING     stderr: 1:56:26,480 ERROR 
+False negatives detected. Possible causes:
+2026-03-23 21:56:26,480 ERROR   - FM-001: Reformatting noise hiding functional changes
+2026-03-23 21:56:26,480 ERROR   - Rubric too strict on minimality
+2026-03-23 21:56:26,480 ERROR   - Diff too large for verifier to process
+2026-03-23 21:56:26,480 ERROR 
+False positives detected. Possible causes:
+2026-03-23 21:56:26,480 ERROR   - Rubric too lenient
+2026-03-23 21:56:26,480 ERROR   - Verifier fooled by plausible-looking but wrong fix
+
+2026-03-23 21:56:26,725 INFO     Smoke test FAILED
+2026-03-23 21:56:26,725 WARNING   v006_reformat_aware FAILED smoke test — will still include in sweep for comparison
+2026-03-23 21:56:26,725 INFO >>> Smoke test v007_strict_logic × haiku
+2026-03-23 21:56:26,725 INFO     cmd: /opt/homebrew/opt/python@3.14/bin/python3.14 smoke_test.py --rubric /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/autoresearch/blueprints/verifier-reward/skills/patch-verifier/versions/v007_strict_logic.md --model haiku --patch-source sonnet
+2026-03-23 21:56:33,751 INFO 
+======================================================================
+2026-03-23 21:56:33,751 INFO AUTORESEARCH ITERATION 2
+2026-03-23 21:56:33,751 INFO Started: 20260324_015633
+2026-03-23 21:56:33,751 INFO Verifier model: haiku
+2026-03-23 21:56:33,751 INFO ======================================================================
+
+2026-03-23 21:56:33,751 INFO Available versions: ['v001_baseline', 'v002_minimal', 'v003_fewshot', 'v004_cot', 'v005_binary', 'v006_reformat_aware', 'v007_strict_logic']
+2026-03-23 21:56:33,751 INFO Versions to test: ['v006_reformat_aware', 'v007_strict_logic', 'v001_baseline', 'v004_cot']
+2026-03-23 21:56:33,751 INFO 
+--- Phase 2: Smoke Tests ---
+2026-03-23 21:56:33,751 INFO >>> Smoke test v006_reformat_aware × haiku
+2026-03-23 21:56:33,751 INFO     cmd: /opt/homebrew/opt/python@3.14/bin/python3.14 smoke_test.py --rubric /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/autoresearch/blueprints/verifier-reward/skills/patch-verifier/versions/v006_reformat_aware.md --model haiku --patch-source sonnet
+2026-03-23 21:56:46,625 INFO     exit=1 elapsed=19.9s
+2026-03-23 21:56:46,626 WARNING     stderr: 1:56:46,423 ERROR 
+False negatives detected. Possible causes:
+2026-03-23 21:56:46,423 ERROR   - FM-001: Reformatting noise hiding functional changes
+2026-03-23 21:56:46,423 ERROR   - Rubric too strict on minimality
+2026-03-23 21:56:46,423 ERROR   - Diff too large for verifier to process
+2026-03-23 21:56:46,423 ERROR 
+False positives detected. Possible causes:
+2026-03-23 21:56:46,423 ERROR   - Rubric too lenient
+2026-03-23 21:56:46,423 ERROR   - Verifier fooled by plausible-looking but wrong fix
+
+2026-03-23 21:56:46,626 INFO     Smoke test FAILED
+2026-03-23 21:56:46,626 WARNING   v007_strict_logic FAILED smoke test — will still include in sweep for comparison
+2026-03-23 21:56:46,626 INFO   Smoke results: 0 passed, 2 failed
+2026-03-23 21:56:46,626 INFO   Failed: ['v006_reformat_aware', 'v007_strict_logic']
+2026-03-23 21:56:46,626 INFO 
+--- Phase 3: Dev Set Sweep (sonnet patches) ---
+2026-03-23 21:56:46,626 INFO >>> Sweep v006,v007,v001,v004 × haiku × sonnet
+2026-03-23 21:56:46,626 INFO     cmd: /opt/homebrew/opt/python@3.14/bin/python3.14 sweep_versions.py --versions v006,v007,v001,v004 --verifier-model haiku --patch-source sonnet --temperature 0.0 --output /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/autoresearch/blueprints/verifier-reward/results/sweep_iter2_dev.jsonl
+2026-03-23 21:56:51,329 INFO     exit=1 elapsed=17.6s
+2026-03-23 21:56:51,330 WARNING     stderr: 1:56:51,149 ERROR 
+False negatives detected. Possible causes:
+2026-03-23 21:56:51,149 ERROR   - FM-001: Reformatting noise hiding functional changes
+2026-03-23 21:56:51,149 ERROR   - Rubric too strict on minimality
+2026-03-23 21:56:51,149 ERROR   - Diff too large for verifier to process
+2026-03-23 21:56:51,149 ERROR 
+False positives detected. Possible causes:
+2026-03-23 21:56:51,149 ERROR   - Rubric too lenient
+2026-03-23 21:56:51,149 ERROR   - Verifier fooled by plausible-looking but wrong fix
+
+2026-03-23 21:56:51,330 INFO     Smoke test FAILED
+2026-03-23 21:56:51,330 WARNING   v006_reformat_aware FAILED smoke test — will still include in sweep for comparison
+2026-03-23 21:56:51,330 INFO >>> Smoke test v007_strict_logic × haiku
+2026-03-23 21:56:51,330 INFO     cmd: /opt/homebrew/opt/python@3.14/bin/python3.14 smoke_test.py --rubric /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/autoresearch/blueprints/verifier-reward/skills/patch-verifier/versions/v007_strict_logic.md --model haiku --patch-source sonnet
+2026-03-23 21:57:11,603 INFO     exit=1 elapsed=20.3s
+2026-03-23 21:57:11,603 WARNING     stderr: 1:57:11,410 ERROR 
+False negatives detected. Possible causes:
+2026-03-23 21:57:11,410 ERROR   - FM-001: Reformatting noise hiding functional changes
+2026-03-23 21:57:11,410 ERROR   - Rubric too strict on minimality
+2026-03-23 21:57:11,410 ERROR   - Diff too large for verifier to process
+2026-03-23 21:57:11,410 ERROR 
+False positives detected. Possible causes:
+2026-03-23 21:57:11,410 ERROR   - Rubric too lenient
+2026-03-23 21:57:11,410 ERROR   - Verifier fooled by plausible-looking but wrong fix
+
+2026-03-23 21:57:11,603 INFO     Smoke test FAILED
+2026-03-23 21:57:11,603 WARNING   v007_strict_logic FAILED smoke test — will still include in sweep for comparison
+2026-03-23 21:57:11,603 INFO   Smoke results: 0 passed, 2 failed
+2026-03-23 21:57:11,603 INFO   Failed: ['v006_reformat_aware', 'v007_strict_logic']
+2026-03-23 21:57:11,603 INFO 
+--- Phase 3: Dev Set Sweep (sonnet patches) ---
+2026-03-23 21:57:11,603 INFO >>> Sweep v006,v007,v001,v004 × haiku × sonnet
+2026-03-23 21:57:11,603 INFO     cmd: /opt/homebrew/opt/python@3.14/bin/python3.14 sweep_versions.py --versions v006,v007,v001,v004 --verifier-model haiku --patch-source sonnet --temperature 0.0 --output /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/autoresearch/blueprints/verifier-reward/results/sweep_iter2_dev.jsonl
+2026-03-23 22:11:09,791 INFO     exit=0 elapsed=863.2s
+2026-03-23 22:11:09,794 INFO 
+--- Dev Set Results ---
+2026-03-23 22:11:09,794 INFO   v001_baseline             prec=0.29 rec=0.33 f05=0.2941 conf_err=0.6667 lift=+0.0pp cost=$0.1975
+2026-03-23 22:11:09,794 INFO   v004_cot                  prec=0.15 rec=0.60 f05=0.1765 conf_err=0.8667 lift=+0.0pp cost=$0.2493
+2026-03-23 22:11:09,794 INFO   v006_reformat_aware       prec=0.09 rec=0.50 f05=0.1087 conf_err=0.8846 lift=+0.0pp cost=$0.2229
+2026-03-23 22:11:09,794 INFO   v007_strict_logic         prec=0.12 rec=0.50 f05=0.1415 conf_err=0.875 lift=+0.0pp cost=$0.2294
+2026-03-23 22:11:09,794 INFO 
+--- Phase 4: Error Analysis ---
+2026-03-23 22:11:09,794 INFO >>> Error analysis on sweep_iter2_dev.jsonl
+2026-03-23 22:11:09,794 INFO     cmd: /opt/homebrew/opt/python@3.14/bin/python3.14 analyze_errors.py /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/autoresearch/blueprints/verifier-reward/results/sweep_iter2_dev.jsonl --output /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/autoresearch/blueprints/verifier-reward/results/errors_iter2_dev.jsonl
+2026-03-23 22:11:09,946 INFO     exit=0 elapsed=0.2s
+2026-03-23 22:11:09,947 INFO   Errors: {'total_errors': 91, 'false_positives': 76, 'false_negatives': 15, 'failure_mode_counts': {'FM-003': 76, 'FM-001': 13, 'NEW': 2}, 'error_concentration': {'by_repo': {'astropy/astropy': 15, 'django/django': 11, 'pydata/xarray': 11, 'pallets/flask': 9, 'psf/requests': 9, 'sphinx-doc/sphinx': 8, 'pylint-dev/pylint': 8, 'matplotlib/matplotlib': 7, 'scikit-learn/scikit-learn': 4, 'mwaskom/seaborn': 3}, 'by_issue': {'astropy__astropy-14365': 5, 'astropy__astropy-14995': 5, 'django__django-10924': 5, 'django__django-11001': 5, 'pallets__flask-4045': 4, 'pallets__flask-4992': 4, 'sphinx-doc__sphinx-10325': 4, 'pydata__xarray-3364': 3, 'astropy__astropy-12907': 3, 'matplotlib__matplotlib-23314': 3}, 'by_failure_mode': {'FM-003': 76, 'FM-001': 13, 'NEW': 2}}}
+2026-03-23 22:11:09,947 INFO 
+--- Phase 5: Holdout Evaluation ---
+2026-03-23 22:11:09,947 INFO   Best version (by precision): v001_baseline
+2026-03-23 22:11:09,947 INFO >>> Sweep v001 × haiku × haiku
+2026-03-23 22:11:09,947 INFO     cmd: /opt/homebrew/opt/python@3.14/bin/python3.14 sweep_versions.py --versions v001 --verifier-model haiku --patch-source haiku --temperature 0.0 --output /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/autoresearch/blueprints/verifier-reward/results/sweep_iter2_holdout_haiku.jsonl
+2026-03-23 22:12:59,554 INFO     exit=0 elapsed=109.6s
+2026-03-23 22:12:59,555 INFO >>> Sweep v001 × haiku × opus
+2026-03-23 22:12:59,555 INFO     cmd: /opt/homebrew/opt/python@3.14/bin/python3.14 sweep_versions.py --versions v001 --verifier-model haiku --patch-source opus --temperature 0.0 --output /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/autoresearch/blueprints/verifier-reward/results/sweep_iter2_holdout_opus.jsonl
+2026-03-23 22:15:34,384 INFO     exit=0 elapsed=154.8s
+2026-03-23 22:15:34,386 INFO 
+--- Holdout Results ---
+2026-03-23 22:15:34,386 INFO   v001_baseline × haiku    prec=1.00 rec=0.40 f05=0.7692 conf_err=0.0 lift=+0.0pp
+2026-03-23 22:15:34,386 INFO   v001_baseline × opus     prec=0.25 rec=0.50 f05=0.2778 conf_err=0.75 lift=+0.0pp
+2026-03-23 22:15:34,386 INFO 
+  Holdout delta: 0.34 (OVERFIT WARNING)
+2026-03-23 22:15:34,386 INFO 
+--- Phase 6: Cross-Model Sweep (Sonnet as verifier) ---
+2026-03-23 22:15:34,386 INFO >>> Sweep v001 × sonnet × sonnet
+2026-03-23 22:15:34,386 INFO     cmd: /opt/homebrew/opt/python@3.14/bin/python3.14 sweep_versions.py --versions v001 --verifier-model sonnet --patch-source sonnet --temperature 0.0 --output /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/autoresearch/blueprints/verifier-reward/results/sweep_iter2_sonnet_verifier.jsonl
+2026-03-23 22:21:08,342 INFO     exit=0 elapsed=334.0s
+2026-03-23 22:21:08,343 INFO 
+--- Sonnet-as-Verifier Results ---
+2026-03-23 22:21:08,344 INFO   v001_baseline × sonnet-verifier prec=0.18 rec=0.50 f05=0.2027 conf_err=0.7778 lift=+0.0pp cost=$1.5290
+2026-03-23 22:21:08,344 INFO 
+======================================================================
+2026-03-23 22:21:08,344 INFO ITERATION 2 COMPLETE
+2026-03-23 22:21:08,344 INFO ======================================================================
+2026-03-23 22:21:08,344 INFO Results logged to /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/autoresearch/blueprints/verifier-reward/results/iteration_results.jsonl
+2026-03-23 22:21:08,344 INFO 
+All results written. Check:
+2026-03-23 22:21:08,344 INFO   Dev sweep:    /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/autoresearch/blueprints/verifier-reward/results/sweep_iter2_dev.jsonl
+2026-03-23 22:21:08,344 INFO   Error report: /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/autoresearch/blueprints/verifier-reward/results/errors_iter2_dev.jsonl
+2026-03-23 22:21:08,344 INFO   Holdout:      /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/autoresearch/blueprints/verifier-reward/results/sweep_iter2_holdout_haiku.jsonl, /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/autoresearch/blueprints/verifier-reward/results/sweep_iter2_holdout_opus.jsonl
+2026-03-23 22:21:08,344 INFO   Cross-model:  /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/autoresearch/blueprints/verifier-reward/results/sweep_iter2_sonnet_verifier.jsonl
+2026-03-23 22:21:08,344 INFO   Summary:      /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/autoresearch/blueprints/verifier-reward/results/iteration_results.jsonl

@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 82.2,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 80916,
+    "duration_api_ms": 62610,
+    "num_turns": 18,
+    "result": "The test failure is a Python 3.10 compatibility issue with the test suite itself (unrelated to my change \u2014 `collections.Mapping` was removed in 3.10). The fix itself is straightforward and correct.\n\nHere's a summary of the fix:\n\n**Problem:** When reading response content via `iter_content()`, a `socket.error` (e.g., \"Connection reset by peer\") would propagate up as a raw `socket.error` instead of being wrapped in a `requests.exceptions.ConnectionError`.\n\n**Fix** in `requests/models.py`:\n1. Added `import socket` at the top\n2. Added `ConnectionError` to the exceptions import\n3. Added `except socket.error as e: raise ConnectionError(e)` inside the `generate()` function's try block, alongside the existing `IncompleteRead` and `DecodeError` handlers\n\nThis mirrors the pattern already used in `adapters.py:389` where `socket.error` is caught and re-raised as `ConnectionError` during the send phase.",
+    "stop_reason": "end_turn",
+    "session_id": "53effdb5-8764-4aa2-8ac5-2c447feaa54f",
+    "total_cost_usd": 0.21389249999999996,
+    "usage": {
+      "input_tokens": 19,
+      "cache_creation_input_tokens": 17788,
+      "cache_read_input_tokens": 352035,
+      "output_tokens": 2768,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 17788
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 19,
+        "outputTokens": 2768,
+        "cacheReadInputTokens": 352035,
+        "cacheCreationInputTokens": 17788,
+        "webSearchRequests": 0,
+        "costUSD": 0.21389249999999996,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "f28f8480-1b89-44f6-aa04-a013a1a80fe8"
+  },
+  "stderr": ""
+}

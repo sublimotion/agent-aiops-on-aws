@@ -1,0 +1,77 @@
+diff --git a/sphinx/util/rst.py b/sphinx/util/rst.py
+index 7a1538325..eb04467e5 100644
+--- a/sphinx/util/rst.py
++++ b/sphinx/util/rst.py
+@@ -94,7 +94,72 @@ def prepend_prolog(content: StringList, prolog: str) -> None:
+         for lineno, line in enumerate(prolog.splitlines()):
+             content.insert(pos + lineno, line, '<rst_prolog>', lineno)
+ 
++        # Always ensure there's a blank line after prolog before content starts
+         content.insert(pos + lineno + 1, '', '<generated>', 0)
++        # Find the first non-empty line after the prolog
++        i = pos + lineno + 2
++        while i < len(content) and not content[i]:
++            i += 1
++        # If we found a non-empty line, check if it's a heading or docinfo
++        if i < len(content):
++            # Check if this is a domain directive followed by a heading
++            if (i + 1 < len(content) and 
++                docinfo_re.match(content[i]) and 
++                content[i+1][0] in SECTIONING_CHARS):
++                # Only insert if there's no blank line already between directive and underline
++                if content[i+1] != '' and content[i+2] != '':
++                    # Insert blank line between domain directive and heading underline
++                    content.insert(i + 1, '', '<generated>', 0)
++            # If first line is a domain directive, ensure it's separated from prolog
++            elif (i + 1 < len(content) and 
++                  docinfo_re.match(content[i]) and 
++                  content[i+1][0] in SECTIONING_CHARS):
++                if content[i+1] != '' and content[i+2] != '':
++                    content.insert(i + 1, '', '<generated>', 0)
++        # If content starts with a domain directive, ensure it's separated from prolog
++        elif (len(content) > 0 and 
++              docinfo_re.match(content[0]) and 
++              len(content) > 1 and 
++              content[1][0] in SECTIONING_CHARS):
++            if content[1] != '' and content[2] != '':
++                content.insert(1, '', '<generated>', 0)
++        # If content starts with a domain directive after prolog insertion
++        elif (len(content) > pos + lineno + 2 and 
++              docinfo_re.match(content[pos + lineno + 2]) and 
++              len(content) > pos + lineno + 3 and 
++              content[pos + lineno + 3][0] in SECTIONING_CHARS):
++            if content[pos + lineno + 3] != '' and content[pos + lineno + 4] != '':
++                content.insert(pos + lineno + 3, '', '<generated>', 0)
++        # If content starts with a domain directive and no docinfo
++        elif (len(content) > 0 and 
++              docinfo_re.match(content[0]) and 
++              len(content) > 1 and 
++              content[1][0] in SECTIONING_CHARS and
++              pos == 0):
++            if content[1] != '' and content[2] != '':
++                content.insert(1, '', '<generated>', 0)
++        # If content starts with a domain directive and no docinfo, and prolog is inserted
++        elif (len(content) > pos + lineno + 2 and 
++              docinfo_re.match(content[pos + lineno + 2]) and 
++              len(content) > pos + lineno + 3 and 
++              content[pos + lineno + 3][0] in SECTIONING_CHARS and
++              pos == 0):
++            if content[pos + lineno + 3] != '' and content[pos + lineno + 4] != '':
++                content.insert(pos + lineno + 3, '', '<generated>', 0)
++        # Find the first non-empty line after the prolog
++        i = pos + lineno + 2
++        while i < len(content) and not content[i]:
++            i += 1
++        # If we found a non-empty line, check if it's a heading or docinfo
++        if i < len(content):
++            # Check if this is a domain directive followed by a heading
++            if (i + 1 < len(content) and 
++                docinfo_re.match(content[i]) and 
++                content[i+1][0] in SECTIONING_CHARS and
++                # Only insert if there's no blank line already between directive and underline
++                content[i+1] != '' and content[i+2] != ''):
++                # Insert blank line between domain directive and heading underline
++                content.insert(i + 1, '', '<generated>', 0)
+ 
+ 
+ def append_epilog(content: StringList, epilog: str) -> None:

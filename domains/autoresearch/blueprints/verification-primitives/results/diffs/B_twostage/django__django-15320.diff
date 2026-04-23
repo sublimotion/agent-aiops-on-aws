@@ -1,0 +1,13 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 6f26dff0e0..d04b6ee7ef 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -1152,6 +1152,8 @@ class Subquery(BaseExpression, Combinable):
+         self.query = getattr(queryset, 'query', queryset)
+         self.extra = extra
+         super().__init__(output_field)
++        self.query = self.query.clone()
++        self.query.subquery = True
+ 
+     def get_source_expressions(self):
+         return [self.query]

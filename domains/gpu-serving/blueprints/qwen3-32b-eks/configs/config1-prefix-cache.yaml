@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qwen3-32b-prefix-cache
+  namespace: default
+  labels:
+    app: qwen3-32b
+    config: prefix-cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qwen3-32b
+      config: prefix-cache
+  template:
+    metadata:
+      labels:
+        app: qwen3-32b
+        config: prefix-cache
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: g6e.2xlarge
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: vllm
+          image: lmcache/vllm-openai:latest-nightly
+          args:
+            - "/opt/ml/model"
+            - "--max-model-len"
+            - "24000"
+            - "--gpu-memory-utilization"
+            - "0.95"
+            - "--trust-remote-code"
+            - "--enable-prefix-caching"
+          ports:
+            - containerPort: 8000
+              name: http
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+            requests:
+              cpu: "2"
+              memory: 16Gi
+              nvidia.com/gpu: "1"
+          env:
+            - name: HF_HOME
+              value: /scratch/hf-cache
+            - name: VLLM_USAGE_SOURCE
+              value: benchmark
+          volumeMounts:
+            - name: model-weights
+              mountPath: /opt/ml/model
+            - name: scratch
+              mountPath: /scratch
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 120
+            periodSeconds: 10
+            failureThreshold: 60
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            failureThreshold: 10
+      initContainers:
+        - name: download-model
+          image: python:3.11-slim
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              pip install --no-cache-dir huggingface_hub[hf_xfer]
+              echo "Downloading Qwen/Qwen3-32B-FP8 from HuggingFace..."
+              python -c "from huggingface_hub import snapshot_download; snapshot_download('Qwen/Qwen3-32B-FP8', local_dir='/opt/ml/model')"
+              echo "Download complete: $(du -sh /opt/ml/model/)"
+          volumeMounts:
+            - name: model-weights
+              mountPath: /opt/ml/model
+          resources:
+            requests:
+              cpu: "1"
+              memory: 4Gi
+      volumes:
+        - name: model-weights
+          emptyDir:
+            sizeLimit: 50Gi
+        - name: scratch
+          emptyDir:
+            sizeLimit: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qwen3-32b-prefix-cache
+  namespace: default
+spec:
+  selector:
+    app: qwen3-32b
+    config: prefix-cache
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: http
+  type: ClusterIP

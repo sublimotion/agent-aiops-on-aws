@@ -1,0 +1,16 @@
+diff --git a/lib/matplotlib/offsetbox.py b/lib/matplotlib/offsetbox.py
+index 77768e7383..841ff0b821 100644
+--- a/lib/matplotlib/offsetbox.py
++++ b/lib/matplotlib/offsetbox.py
+@@ -1558,6 +1558,11 @@ class DraggableBase:
+ 
+     def disconnect(self):
+         """Disconnect the callbacks."""
++        # canvas property requires ref_artist.figure, which may be None if the
++        # artist has been removed from its figure (e.g. by mplcursors).
++        # In that case, the callbacks have already been cleaned up, so skip.
++        if self.ref_artist.figure is None:
++            return
+         for cid in self.cids:
+             self.canvas.mpl_disconnect(cid)
+         try:

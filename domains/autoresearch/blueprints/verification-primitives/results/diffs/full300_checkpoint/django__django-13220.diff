@@ -1,0 +1,67 @@
+diff --git a/django/core/exceptions.py b/django/core/exceptions.py
+index dc084b8692..606fd239b4 100644
+--- a/django/core/exceptions.py
++++ b/django/core/exceptions.py
+@@ -182,6 +182,62 @@ class ValidationError(Exception):
+     def __repr__(self):
+         return 'ValidationError(%s)' % self
+ 
++    def __eq__(self, other):
++        if not isinstance(other, ValidationError):
++            return NotImplemented
++        # Compare dict errors: order of fields is irrelevant.
++        if hasattr(self, 'error_dict') and hasattr(other, 'error_dict'):
++            if self.error_dict.keys() != other.error_dict.keys():
++                return False
++            return all(
++                ValidationError(self.error_dict[field]) ==
++                ValidationError(other.error_dict[field])
++                for field in self.error_dict
++            )
++        # Compare list errors: order of items is irrelevant.
++        if hasattr(self, 'error_list') and hasattr(other, 'error_list'):
++            # If both are leaf errors (error_list = [self]), compare directly.
++            if hasattr(self, 'message') and hasattr(other, 'message'):
++                return (
++                    self.message == other.message and
++                    self.code == other.code and
++                    self.params == other.params
++                )
++            # One is a leaf error and the other is a list error - not equal.
++            if hasattr(self, 'message') or hasattr(other, 'message'):
++                return False
++            if len(self.error_list) != len(other.error_list):
++                return False
++            # Order-independent comparison of error lists.
++            other_list = list(other.error_list)
++            for error in self.error_list:
++                for i, other_error in enumerate(other_list):
++                    if ValidationError(error) == ValidationError(other_error):
++                        other_list.pop(i)
++                        break
++                else:
++                    return False
++            return True
++        return False
++
++    def __hash__(self):
++        if hasattr(self, 'error_dict'):
++            return hash(
++                tuple(
++                    (field, tuple(sorted(hash(ValidationError(e)) for e in errors)))
++                    for field, errors in sorted(self.error_dict.items())
++                )
++            )
++        if hasattr(self, 'message'):
++            return hash((
++                self.message,
++                self.code,
++                tuple(sorted(self.params.items())) if self.params else None,
++            ))
++        return hash(
++            tuple(sorted(hash(ValidationError(e)) for e in self.error_list))
++        )
++
+ 
+ class EmptyResultSet(Exception):
+     """A database query predicate is impossible."""

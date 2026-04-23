@@ -1,0 +1,314 @@
+{
+  "pivots": [
+    {
+      "name": "Tool Usage (used vs not)",
+      "n_used": 249,
+      "n_unused": 33,
+      "rate_used": 0.6746987951807228,
+      "rate_unused": 0.21212121212121213,
+      "risk_difference": 0.4625775830595107,
+      "rd_ci": [
+        0.3114430849457679,
+        0.6137120811732535
+      ],
+      "odds_ratio": 7.703703703703703,
+      "p_value": 4.860170083017917e-07,
+      "mutual_information": 0.06684105185693752
+    },
+    {
+      "name": "Adversarial Review vs Tests Only",
+      "n_reviewed": 213,
+      "n_tests_only": 36,
+      "rate_reviewed": 0.6807511737089202,
+      "rate_tests_only": 0.6388888888888888,
+      "risk_difference": 0.041862284820031403,
+      "rd_ci": [
+        -0.12707256644023215,
+        0.21079713608029496
+      ],
+      "odds_ratio": 1.2052429667519182,
+      "p_value": 0.7009427530948208,
+      "mutual_information": 0.0007019568143499895
+    },
+    {
+      "name": "Revised After Failure vs Submitted Despite",
+      "n_revised": 55,
+      "n_submitted": 152,
+      "rate_revised": 0.7272727272727273,
+      "rate_submitted": 0.6710526315789473,
+      "risk_difference": 0.05622009569377995,
+      "rd_ci": [
+        -0.08318199454949576,
+        0.19562218593705566
+      ],
+      "odds_ratio": 1.3071895424836601,
+      "p_value": 0.5001351034793813,
+      "mutual_information": 0.0021000589276119804
+    },
+    {
+      "name": "Early vs Late First Edit",
+      "n_early": 151,
+      "n_late": 131,
+      "rate_early": 0.6291390728476821,
+      "rate_late": 0.6106870229007634,
+      "risk_difference": 0.018452049946918736,
+      "rd_ci": [
+        -0.09516134535700992,
+        0.1320654452508474
+      ],
+      "odds_ratio": 1.0814732142857142,
+      "p_value": 0.8059290233612946,
+      "mutual_information": 0.00025935772903467116,
+      "median_pct": 0.3333333333333333,
+      "timing_distribution": {
+        "mean": 0.35374790143124407,
+        "std": 0.15276225167950258,
+        "median": 0.3333333333333333,
+        "q25": 0.23599439775910364,
+        "q75": 0.42857142857142855
+      }
+    },
+    {
+      "name": "Large vs Small Patch",
+      "n_large": 141,
+      "n_small": 141,
+      "rate_large": 0.5673758865248227,
+      "rate_small": 0.6737588652482269,
+      "risk_difference": -0.10638297872340419,
+      "rd_ci": [
+        -0.21897257678857474,
+        0.006206619341766348
+      ],
+      "odds_ratio": 0.635030198446937,
+      "p_value": 0.0855598216570845,
+      "mutual_information": 0.008689524243998152,
+      "median_patch_len": 767.0
+    },
+    {
+      "name": "High vs Low Explore Ratio",
+      "n_high_explore": 140,
+      "n_low_explore": 142,
+      "rate_high_explore": 0.5357142857142857,
+      "rate_low_explore": 0.704225352112676,
+      "risk_difference": -0.1685110663983903,
+      "rd_ci": [
+        -0.2801355806092156,
+        -0.056886552187565026
+      ],
+      "odds_ratio": 0.4846153846153846,
+      "p_value": 0.00467422350919516,
+      "mutual_information": 0.021876298890568954,
+      "median_explore_ratio": 0.23809523809523808
+    },
+    {
+      "name": "Many vs Few Actions",
+      "n_many": 135,
+      "n_few": 147,
+      "rate_many": 0.4962962962962963,
+      "rate_few": 0.7346938775510204,
+      "risk_difference": -0.23839758125472416,
+      "rd_ci": [
+        -0.3488854144224288,
+        -0.12790974808701952
+      ],
+      "odds_ratio": 0.35580065359477125,
+      "p_value": 4.709180480700725e-05,
+      "mutual_information": 0.043853243627829414,
+      "median_action_count": 23.0
+    }
+  ],
+  "patterns": {
+    "patterns": {
+      "full_pipeline": {
+        "n": 208,
+        "n_evaluated": 208,
+        "pass": 140,
+        "fail": 68,
+        "pass_rate": 0.6730769230769231
+      },
+      "gen_run_iterate": {
+        "n": 7,
+        "n_evaluated": 7,
+        "pass": 3,
+        "fail": 4,
+        "pass_rate": 0.42857142857142855
+      },
+      "generate_only": {
+        "n": 4,
+        "n_evaluated": 4,
+        "pass": 3,
+        "fail": 1,
+        "pass_rate": 0.75
+      },
+      "generate_run": {
+        "n": 27,
+        "n_evaluated": 27,
+        "pass": 19,
+        "fail": 8,
+        "pass_rate": 0.7037037037037037
+      },
+      "ignore": {
+        "n": 33,
+        "n_evaluated": 33,
+        "pass": 7,
+        "fail": 26,
+        "pass_rate": 0.21212121212121213
+      },
+      "other": {
+        "n": 3,
+        "n_evaluated": 3,
+        "pass": 3,
+        "fail": 0,
+        "pass_rate": 1.0
+      }
+    },
+    "pairwise": [
+      {
+        "a": "full_pipeline",
+        "b": "gen_run_iterate",
+        "rate_a": 0.6730769230769231,
+        "rate_b": 0.42857142857142855,
+        "odds_ratio": 2.7450980392156863,
+        "p_value": 0.22679578097848857
+      },
+      {
+        "a": "full_pipeline",
+        "b": "generate_run",
+        "rate_a": 0.6730769230769231,
+        "rate_b": 0.7037037037037037,
+        "odds_ratio": 0.8668730650154799,
+        "p_value": 0.8297618089716178
+      },
+      {
+        "a": "full_pipeline",
+        "b": "ignore",
+        "rate_a": 0.6730769230769231,
+        "rate_b": 0.21212121212121213,
+        "odds_ratio": 7.647058823529412,
+        "p_value": 1.1402560462403229e-06
+      },
+      {
+        "a": "gen_run_iterate",
+        "b": "generate_run",
+        "rate_a": 0.42857142857142855,
+        "rate_b": 0.7037037037037037,
+        "odds_ratio": 0.3157894736842105,
+        "p_value": 0.2113377609108159
+      },
+      {
+        "a": "gen_run_iterate",
+        "b": "ignore",
+        "rate_a": 0.42857142857142855,
+        "rate_b": 0.21212121212121213,
+        "odds_ratio": 2.7857142857142856,
+        "p_value": 0.33754497531587313
+      },
+      {
+        "a": "generate_run",
+        "b": "ignore",
+        "rate_a": 0.7037037037037037,
+        "rate_b": 0.21212121212121213,
+        "odds_ratio": 8.821428571428571,
+        "p_value": 0.00020351240553415667
+      }
+    ]
+  },
+  "early_stopping": [
+    {
+      "rule": "No edit by 30% of actions",
+      "n_abort": 165,
+      "n_continue": 117,
+      "abort_pass_rate": 0.6181818181818182,
+      "continue_pass_rate": 0.6239316239316239,
+      "false_aborts": 102,
+      "correct_aborts": 63,
+      "precision_doomed": 0.38181818181818183,
+      "recall_doomed": 0.5887850467289719
+    },
+    {
+      "rule": "No edit by 40% of actions",
+      "n_abort": 85,
+      "n_continue": 197,
+      "abort_pass_rate": 0.5882352941176471,
+      "continue_pass_rate": 0.6345177664974619,
+      "false_aborts": 50,
+      "correct_aborts": 35,
+      "precision_doomed": 0.4117647058823529,
+      "recall_doomed": 0.32710280373831774
+    },
+    {
+      "rule": "No edit by 50% of actions",
+      "n_abort": 35,
+      "n_continue": 247,
+      "abort_pass_rate": 0.42857142857142855,
+      "continue_pass_rate": 0.6477732793522267,
+      "false_aborts": 15,
+      "correct_aborts": 20,
+      "precision_doomed": 0.5714285714285714,
+      "recall_doomed": 0.18691588785046728
+    },
+    {
+      "rule": "No edit by 60% of actions",
+      "n_abort": 20,
+      "n_continue": 262,
+      "abort_pass_rate": 0.35,
+      "continue_pass_rate": 0.6412213740458015,
+      "false_aborts": 7,
+      "correct_aborts": 13,
+      "precision_doomed": 0.65,
+      "recall_doomed": 0.12149532710280374
+    },
+    {
+      "rule": "No VP verification tool used (end of session)",
+      "n_abort": 33,
+      "n_continue": 249,
+      "abort_pass_rate": 0.21212121212121213,
+      "continue_pass_rate": 0.6746987951807228,
+      "false_aborts": 7,
+      "correct_aborts": 26,
+      "precision_doomed": 0.7878787878787878,
+      "recall_doomed": 0.24299065420560748
+    },
+    {
+      "rule": "No VP tools AND late edit (>40% of actions)",
+      "n_abort": 15,
+      "n_continue": 267,
+      "abort_pass_rate": 0.13333333333333333,
+      "continue_pass_rate": 0.6479400749063671,
+      "false_aborts": 2,
+      "correct_aborts": 13,
+      "precision_doomed": 0.8666666666666667,
+      "recall_doomed": 0.12149532710280374
+    }
+  ],
+  "timing": {
+    "first_edit": {
+      "n": 285,
+      "all": {
+        "median": 0.3333333333333333,
+        "q25": 0.23809523809523808,
+        "q75": 0.42857142857142855
+      },
+      "pass": {
+        "n": 175,
+        "median": 0.3235294117647059
+      },
+      "fail": {
+        "n": 107,
+        "median": 0.3333333333333333
+      }
+    },
+    "action_counts": {
+      "pass": {
+        "n": 175,
+        "median": 21.0,
+        "mean": 21.725714285714286
+      },
+      "fail": {
+        "n": 107,
+        "median": 30.0,
+        "mean": 25.813084112149532
+      }
+    }
+  }
+}

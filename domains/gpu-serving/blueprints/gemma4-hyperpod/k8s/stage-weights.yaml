@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: stage-gemma4-31b
+  namespace: default
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    sagemaker.amazonaws.com/node-health-status: Schedulable
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: sagemaker.amazonaws.com/RestrictedNode
+      operator: Exists
+      effect: NoSchedule
+    - key: node.kubernetes.io/disk-pressure
+      operator: Exists
+      effect: NoSchedule
+  containers:
+    - name: download
+      image: python:3.11-slim
+      command:
+        - /bin/bash
+        - -c
+        - |
+          pip install -q "huggingface_hub[cli]" 2>&1 | tail -5
+          echo "Downloading google/gemma-4-31B-it to /models/gemma-4-31B-it ..."
+          python3 -c "
+          from huggingface_hub import snapshot_download
+          snapshot_download('google/gemma-4-31B-it', local_dir='/models/gemma-4-31B-it', local_dir_use_symlinks=False)
+          print('Download complete')
+          "
+          echo "Download complete. Files:"
+          ls -lh /models/gemma-4-31B-it/
+          du -sh /models/gemma-4-31B-it/
+      resources:
+        requests:
+          cpu: "4"
+          memory: 8Gi
+        limits:
+          cpu: "8"
+          memory: 16Gi
+      volumeMounts:
+        - name: model-store
+          mountPath: /models
+  volumes:
+    - name: model-store
+      hostPath:
+        path: /opt/dlami/nvme/models
+        type: DirectoryOrCreate

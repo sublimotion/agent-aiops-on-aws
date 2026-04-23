@@ -1,0 +1,16 @@
+catalog_id: batch-throughput
+use_case: batch
+description: Maximum throughput. Latency not primary concern. Measures system ceiling.
+
+dataset:
+  type: synthetic
+  input_tokens: {mean: 2048, std_dev: 0}
+  output_tokens: {mean: 512, std_dev: 0}
+
+load:
+  type: open-loop
+  request_rate: null  # max rate
+  num_prompts: 500
+
+slo:
+  error_rate_max: 0.001

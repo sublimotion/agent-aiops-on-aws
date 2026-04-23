@@ -1,0 +1,64 @@
+diff --git a/sympy/assumptions/sathandlers.py b/sympy/assumptions/sathandlers.py
+index 61d62d04cf..6723e560e2 100644
+--- a/sympy/assumptions/sathandlers.py
++++ b/sympy/assumptions/sathandlers.py
+@@ -1,6 +1,10 @@
+ from __future__ import print_function, division
+ 
+-from collections import MutableMapping, defaultdict
++try:
++    from collections.abc import MutableMapping
++except ImportError:
++    from collections import MutableMapping
++from collections import defaultdict
+ 
+ from sympy.core import (Add, Mul, Pow, Integer, Number, NumberSymbol,)
+ from sympy.core.numbers import ImaginaryUnit
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index b992b45c26..394c634b73 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,9 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping
++try:
++    from collections.abc import Mapping
++except ImportError:
++    from collections import Mapping
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+ from .cache import cacheit
+diff --git a/sympy/matrices/expressions/matexpr.py b/sympy/matrices/expressions/matexpr.py
+index b4d759836e..1cb0cf4df5 100644
+--- a/sympy/matrices/expressions/matexpr.py
++++ b/sympy/matrices/expressions/matexpr.py
+@@ -476,10 +476,8 @@ def conjugate(self):
+         return self
+ 
+     def _entry(self, i, j):
+-        if i == j:
+-            return S.One
+-        else:
+-            return S.Zero
++        from sympy.functions.special.tensor_functions import KroneckerDelta
++        return KroneckerDelta(i, j)
+ 
+     def _eval_determinant(self):
+         return S.One
+diff --git a/sympy/plotting/plot.py b/sympy/plotting/plot.py
+index 664602d6ba..87b607fc88 100644
+--- a/sympy/plotting/plot.py
++++ b/sympy/plotting/plot.py
+@@ -25,7 +25,10 @@
+ from __future__ import print_function, division
+ 
+ import inspect
+-from collections import Callable
++try:
++    from collections.abc import Callable
++except ImportError:
++    from collections import Callable
+ import warnings
+ import sys
+ 

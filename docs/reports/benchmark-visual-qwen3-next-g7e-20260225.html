@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qwen3-Next g7e Benchmark — 2026-02-25</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --orange: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --pink: #f778ba;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 2rem;
+  }
+  .container { max-width: 1400px; margin: 0 auto; }
+  h1 { font-size: 2rem; font-weight: 600; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 2rem; }
+  .subtitle span { margin-right: 1.5rem; }
+
+  /* KPI Cards */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+  }
+  .kpi-label { color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .kpi-value { font-size: 1.8rem; font-weight: 700; margin: 0.25rem 0; }
+  .kpi-detail { color: var(--text-muted); font-size: 0.85rem; }
+  .kpi-value.green { color: var(--green); }
+  .kpi-value.accent { color: var(--accent); }
+  .kpi-value.orange { color: var(--orange); }
+  .kpi-value.purple { color: var(--purple); }
+  .kpi-value.pink { color: var(--pink); }
+
+  /* Chart Grid */
+  .chart-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+  }
+  .chart-card.full { grid-column: 1 / -1; }
+  .chart-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
+  .chart-desc { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem; }
+  .chart-wrap { position: relative; height: 320px; }
+  .chart-wrap.tall { height: 400px; }
+
+  /* Comparison Table */
+  .table-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  th, td {
+    padding: 0.6rem 1rem;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+  }
+  th { color: var(--text-muted); font-weight: 500; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  td:first-child, th:first-child { text-align: left; }
+  tr:last-child td { border-bottom: none; }
+  .highlight { color: var(--green); font-weight: 600; }
+  .dim { color: var(--text-muted); }
+
+  /* Finding Cards */
+  .findings {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .finding {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    border-left: 3px solid var(--accent);
+  }
+  .finding.warn { border-left-color: var(--orange); }
+  .finding.good { border-left-color: var(--green); }
+  .finding.bad { border-left-color: var(--red); }
+  .finding-title { font-weight: 600; margin-bottom: 0.5rem; }
+  .finding-body { color: var(--text-muted); font-size: 0.9rem; }
+
+  .footer { color: var(--text-muted); font-size: 0.8rem; text-align: center; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+
+  @media (max-width: 900px) {
+    .chart-grid, .findings { grid-template-columns: 1fr; }
+    body { padding: 1rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Qwen3-Next on g7e (Blackwell)</h1>
+<div class="subtitle">
+  <span>g7e.24xlarge &middot; 4x RTX PRO 6000 &middot; 96 GB GDDR7 each</span>
+  <span>vLLM 0.15.0 &middot; FP8 &middot; TP=4</span>
+  <span>2026-02-25</span>
+</div>
+
+<!-- KPI Cards -->
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="kpi-label">Peak Output Throughput</div>
+    <div class="kpi-value accent">3,389</div>
+    <div class="kpi-detail">tok/s @ QPS 16 (1024/512)</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Per-GPU Throughput</div>
+    <div class="kpi-value green">455.2</div>
+    <div class="kpi-detail">tok/s &mdash; matches H200 (451.6)</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Cost Efficiency</div>
+    <div class="kpi-value green">4.6x</div>
+    <div class="kpi-detail">cheaper than p5en H200</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Best Latency (TPOT)</div>
+    <div class="kpi-value purple">10.0 ms</div>
+    <div class="kpi-detail">@ QPS 0.5 (low load)</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">KV Cache</div>
+    <div class="kpi-value orange">2.76M</div>
+    <div class="kpi-detail">tokens (FP8, 63.2 GiB)</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Cost per M Tokens</div>
+    <div class="kpi-value green">$1.06</div>
+    <div class="kpi-detail">vs $4.88 on p5en H200</div>
+  </div>
+</div>
+
+<!-- Charts -->
+<div class="chart-grid">
+
+  <!-- QPS Sweep: Throughput -->
+  <div class="chart-card">
+    <div class="chart-title">QPS Sweep &mdash; Output Throughput</div>
+    <div class="chart-desc">Baseline (FP8, prefix caching) vs MTP speculative decoding</div>
+    <div class="chart-wrap"><canvas id="chartThroughput"></canvas></div>
+  </div>
+
+  <!-- QPS Sweep: Latency -->
+  <div class="chart-card">
+    <div class="chart-title">QPS Sweep &mdash; Inter-Token Latency (TPOT)</div>
+    <div class="chart-desc">Mean time per output token excluding first token</div>
+    <div class="chart-wrap"><canvas id="chartTPOT"></canvas></div>
+  </div>
+
+  <!-- MTP Delta -->
+  <div class="chart-card">
+    <div class="chart-title">MTP Impact on Throughput</div>
+    <div class="chart-desc">Percentage change vs baseline &mdash; negative = MTP is slower</div>
+    <div class="chart-wrap"><canvas id="chartMTPDelta"></canvas></div>
+  </div>
+
+  <!-- Context Scaling -->
+  <div class="chart-card">
+    <div class="chart-title">Context Scaling @ QPS 2</div>
+    <div class="chart-desc">TTFT and output throughput across context lengths</div>
+    <div class="chart-wrap"><canvas id="chartContext"></canvas></div>
+  </div>
+
+  <!-- Customer Comparison -->
+  <div class="chart-card full">
+    <div class="chart-title">Customer Comparison &mdash; 1000 Concurrent, 10K/1K Tokens</div>
+    <div class="chart-desc">g7e.24xlarge (4 GPU) vs Customer H200 (8 GPU) &mdash; per-GPU throughput is nearly identical</div>
+    <div class="chart-wrap"><canvas id="chartCustomer"></canvas></div>
+  </div>
+
+  <!-- Cost Efficiency -->
+  <div class="chart-card full">
+    <div class="chart-title">Cost Efficiency &mdash; $/Million Output Tokens</div>
+    <div class="chart-desc">On-demand pricing at sustained QPS 8 throughput</div>
+    <div class="chart-wrap"><canvas id="chartCost"></canvas></div>
+  </div>
+
+</div>
+
+<!-- Data Table -->
+<div class="table-card">
+  <div class="chart-title" style="margin-bottom:1rem;">Full QPS Sweep Results &mdash; Baseline (1024 in / 512 out)</div>
+  <table>
+    <thead>
+      <tr><th>QPS</th><th>Output tok/s</th><th>Peak tok/s</th><th>Total tok/s</th><th>Mean TTFT</th><th>Mean TPOT</th><th>Mean E2E</th><th>Peak Conc</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>0.5</td><td>230.9</td><td>465</td><td>692.6</td><td>196.3 ms</td><td>10.0 ms</td><td>5.3 s</td><td>6</td></tr>
+      <tr><td>1.0</td><td>484.7</td><td>1,211</td><td>1,454</td><td>148.7 ms</td><td>12.3 ms</td><td>6.4 s</td><td>16</td></tr>
+      <tr><td>2.0</td><td>911.3</td><td>1,446</td><td>2,734</td><td>70.5 ms</td><td>13.2 ms</td><td>6.8 s</td><td>26</td></tr>
+      <tr><td class="highlight">4.0</td><td class="highlight">1,532.6</td><td>3,029</td><td>4,598</td><td>138.5 ms</td><td class="highlight">21.1 ms</td><td>10.9 s</td><td>64</td></tr>
+      <tr><td class="highlight">8.0</td><td class="highlight">2,172.4</td><td>3,843</td><td>6,517</td><td>161.0 ms</td><td class="highlight">26.5 ms</td><td>13.7 s</td><td>100</td></tr>
+      <tr><td>16.0</td><td>3,389.0</td><td>5,800</td><td>10,167</td><td>304.4 ms</td><td>42.8 ms</td><td>22.2 s</td><td>200</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Findings -->
+<div class="chart-title" style="margin-bottom:1rem;">Key Findings</div>
+<div class="findings">
+  <div class="finding good">
+    <div class="finding-title">Blackwell Works Out of the Box</div>
+    <div class="finding-body">vLLM 0.15.0 (cu130) runs on RTX PRO 6000 Blackwell (sm_120) without custom builds. FP8 quantization, prefix caching, and TRITON MoE backend all functional.</div>
+  </div>
+  <div class="finding good">
+    <div class="finding-title">Per-GPU Parity with H200</div>
+    <div class="finding-body">455.2 tok/s per GPU on g7e vs 451.6 on H200. Blackwell GDDR7 achieves equivalent per-GPU throughput despite lower memory bandwidth (1.5 vs 4.8 TB/s).</div>
+  </div>
+  <div class="finding bad">
+    <div class="finding-title">MTP Hurts on PCIe GPUs</div>
+    <div class="finding-body">Speculative decoding (MTP, 2 tokens) degrades throughput 2&ndash;41% across all QPS levels. PCIe inter-GPU overhead exceeds speculative gains. Use baseline config on g7e.</div>
+  </div>
+  <div class="finding warn">
+    <div class="finding-title">Mamba Hybrid Architecture Constraints</div>
+    <div class="finding-body">Qwen3-Next is attention+mamba hybrid. MTP incompatible with mamba cache 'align' mode in v0.15.0. Prefix caching works but is experimental for mamba layers.</div>
+  </div>
+  <div class="finding good">
+    <div class="finding-title">4.6x Cost Efficiency</div>
+    <div class="finding-body">$1.06/M output tokens on g7e.24xlarge vs $4.88/M on p5en.48xlarge. At $8.27/hr vs $63.30/hr, Blackwell delivers massive savings for equivalent per-GPU work.</div>
+  </div>
+  <div class="finding warn">
+    <div class="finding-title">Concurrency Limited by GPU Count</div>
+    <div class="finding-body">4 GPUs can't match 8-GPU H200 at 1000 concurrent 10K-token requests (10M total tokens vs 2.76M KV cache). Scale to g7e.48xlarge for high-concurrency workloads.</div>
+  </div>
+</div>
+
+<!-- Hardware -->
+<div class="table-card">
+  <div class="chart-title" style="margin-bottom:1rem;">Hardware &amp; Configuration</div>
+  <table>
+    <thead><tr><th>Component</th><th>Specification</th></tr></thead>
+    <tbody>
+      <tr><td>Instance</td><td>g7e.24xlarge (us-west-2d, on-demand)</td></tr>
+      <tr><td>GPUs</td><td>4x NVIDIA RTX PRO 6000 Blackwell Server Edition (GB202, sm_120)</td></tr>
+      <tr><td>VRAM</td><td>96 GB GDDR7 per GPU (384 GB total)</td></tr>
+      <tr><td>Interconnect</td><td>PCIe (no NVLink)</td></tr>
+      <tr><td>Storage</td><td>7 TB NVMe RAID0 (4x 1.75 TB)</td></tr>
+      <tr><td>Driver</td><td>NVIDIA 580.126.09, CUDA compute cap 12.0</td></tr>
+      <tr><td>vLLM</td><td>v0.15.0 (cu130, TRITON Fp8 MoE)</td></tr>
+      <tr><td>Model</td><td>Qwen3-Next-80B-A3B-Instruct (MoE 80B/3B active, FP8)</td></tr>
+      <tr><td>Config</td><td>TP=4, FP8 quant, FP8 KV cache, prefix caching, max-model-len 32768</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="footer">
+  Generated 2026-02-25 &middot; Instance i-03955d59a22d67ad1 &middot; Qwen3-Next g7e Benchmark Suite
+</div>
+
+</div>
+
+<script>
+const COLORS = {
+  accent: '#58a6ff',
+  green: '#3fb950',
+  orange: '#d29922',
+  red: '#f85149',
+  purple: '#bc8cff',
+  pink: '#f778ba',
+  text: '#8b949e',
+  grid: '#21262d',
+};
+
+Chart.defaults.color = COLORS.text;
+Chart.defaults.borderColor = COLORS.grid;
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
+
+const commonScaleOpts = {
+  grid: { color: COLORS.grid },
+  ticks: { color: COLORS.text },
+};
+
+// --- QPS Sweep: Throughput ---
+new Chart(document.getElementById('chartThroughput'), {
+  type: 'line',
+  data: {
+    labels: ['0.5', '1', '2', '4', '8', '16'],
+    datasets: [
+      {
+        label: 'Baseline',
+        data: [230.9, 484.7, 911.3, 1532.6, 2172.4, 3389.0],
+        borderColor: COLORS.accent,
+        backgroundColor: COLORS.accent + '22',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+      },
+      {
+        label: 'MTP (spec 2)',
+        data: [null, 476.4, 856.3, 1329.9, 1708.3, 2009.6],
+        borderColor: COLORS.orange,
+        backgroundColor: COLORS.orange + '22',
+        fill: true,
+        tension: 0.3,
+        borderDash: [6, 3],
+        pointRadius: 5,
+        pointHoverRadius: 7,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top' },
+      tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()} tok/s` } }
+    },
+    scales: {
+      x: { ...commonScaleOpts, title: { display: true, text: 'Request Rate (QPS)', color: COLORS.text } },
+      y: { ...commonScaleOpts, title: { display: true, text: 'Output tok/s', color: COLORS.text }, beginAtZero: true }
+    }
+  }
+});
+
+// --- QPS Sweep: TPOT ---
+new Chart(document.getElementById('chartTPOT'), {
+  type: 'line',
+  data: {
+    labels: ['0.5', '1', '2', '4', '8', '16'],
+    datasets: [
+      {
+        label: 'Baseline',
+        data: [10.0, 12.3, 13.2, 21.1, 26.5, 42.8],
+        borderColor: COLORS.accent,
+        backgroundColor: COLORS.accent + '22',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 5,
+      },
+      {
+        label: 'MTP (spec 2)',
+        data: [null, 15.9, 22.0, 32.5, 37.7, 39.6],
+        borderColor: COLORS.orange,
+        backgroundColor: COLORS.orange + '22',
+        fill: true,
+        tension: 0.3,
+        borderDash: [6, 3],
+        pointRadius: 5,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top' },
+      tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y} ms` } }
+    },
+    scales: {
+      x: { ...commonScaleOpts, title: { display: true, text: 'Request Rate (QPS)', color: COLORS.text } },
+      y: { ...commonScaleOpts, title: { display: true, text: 'TPOT (ms)', color: COLORS.text }, beginAtZero: true }
+    }
+  }
+});
+
+// --- MTP Delta ---
+new Chart(document.getElementById('chartMTPDelta'), {
+  type: 'bar',
+  data: {
+    labels: ['QPS 1', 'QPS 2', 'QPS 4', 'QPS 8', 'QPS 16'],
+    datasets: [{
+      label: 'MTP vs Baseline',
+      data: [-1.7, -6.0, -13.2, -21.4, -40.7],
+      backgroundColor: ctx => ctx.parsed.y < -10 ? COLORS.red + 'cc' : COLORS.orange + 'cc',
+      borderColor: ctx => ctx.parsed.y < -10 ? COLORS.red : COLORS.orange,
+      borderWidth: 1,
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => `${ctx.parsed.y}% throughput change` } }
+    },
+    scales: {
+      x: { ...commonScaleOpts },
+      y: {
+        ...commonScaleOpts,
+        title: { display: true, text: 'Throughput Change (%)', color: COLORS.text },
+        max: 5,
+        min: -50,
+      }
+    }
+  }
+});
+
+// --- Context Scaling ---
+new Chart(document.getElementById('chartContext'), {
+  type: 'bar',
+  data: {
+    labels: ['4K (4096/256)', '16K (16384/512)', '32K (24576/512)'],
+    datasets: [
+      {
+        label: 'Output tok/s',
+        data: [451.8, 676.6, 717.9],
+        backgroundColor: COLORS.accent + 'cc',
+        borderColor: COLORS.accent,
+        borderWidth: 1,
+        borderRadius: 4,
+        yAxisID: 'y',
+      },
+      {
+        label: 'Mean TTFT (ms)',
+        data: [250.7, 1335.8, 744.6],
+        backgroundColor: COLORS.purple + 'cc',
+        borderColor: COLORS.purple,
+        borderWidth: 1,
+        borderRadius: 4,
+        yAxisID: 'y1',
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { position: 'top' } },
+    scales: {
+      x: { ...commonScaleOpts },
+      y: {
+        ...commonScaleOpts,
+        position: 'left',
+        title: { display: true, text: 'Output tok/s', color: COLORS.accent },
+        beginAtZero: true,
+      },
+      y1: {
+        ...commonScaleOpts,
+        position: 'right',
+        title: { display: true, text: 'TTFT (ms)', color: COLORS.purple },
+        beginAtZero: true,
+        grid: { drawOnChartArea: false },
+      }
+    }
+  }
+});
+
+// --- Customer Comparison ---
+new Chart(document.getElementById('chartCustomer'), {
+  type: 'bar',
+  data: {
+    labels: ['Total Output tok/s', 'Per-GPU tok/s', 'Requests/min', '$/hr'],
+    datasets: [
+      {
+        label: 'g7e.24xlarge (4x Blackwell)',
+        data: [1820.7, 455.2, 109.2, 8.27],
+        backgroundColor: COLORS.accent + 'cc',
+        borderColor: COLORS.accent,
+        borderWidth: 1,
+        borderRadius: 4,
+      },
+      {
+        label: 'Customer H200 (8x H200)',
+        data: [3612.8, 451.6, 182.7, 63.30],
+        backgroundColor: COLORS.orange + 'cc',
+        borderColor: COLORS.orange,
+        borderWidth: 1,
+        borderRadius: 4,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { position: 'top' } },
+    scales: {
+      x: { ...commonScaleOpts },
+      y: { ...commonScaleOpts, beginAtZero: true }
+    }
+  }
+});
+
+// --- Cost Efficiency ---
+new Chart(document.getElementById('chartCost'), {
+  type: 'bar',
+  data: {
+    labels: ['g7e.24xlarge\n(4x Blackwell)', 'g7e.48xlarge\n(8x Blackwell, projected)', 'p5en.48xlarge\n(8x H200)'],
+    datasets: [
+      {
+        label: '$/hr On-Demand',
+        data: [8.27, 16.54, 63.30],
+        backgroundColor: [COLORS.green + 'cc', COLORS.green + '88', COLORS.orange + 'cc'],
+        borderColor: [COLORS.green, COLORS.green, COLORS.orange],
+        borderWidth: 1,
+        borderRadius: 4,
+        yAxisID: 'y',
+      },
+      {
+        label: '$/M Output Tokens',
+        data: [1.06, 1.07, 4.88],
+        backgroundColor: [COLORS.accent + 'cc', COLORS.accent + '88', COLORS.red + 'cc'],
+        borderColor: [COLORS.accent, COLORS.accent, COLORS.red],
+        borderWidth: 1,
+        borderRadius: 4,
+        yAxisID: 'y1',
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { position: 'top' } },
+    scales: {
+      x: { ...commonScaleOpts },
+      y: {
+        ...commonScaleOpts,
+        position: 'left',
+        title: { display: true, text: '$/hr', color: COLORS.green },
+        beginAtZero: true,
+      },
+      y1: {
+        ...commonScaleOpts,
+        position: 'right',
+        title: { display: true, text: '$/M tokens', color: COLORS.accent },
+        beginAtZero: true,
+        grid: { drawOnChartArea: false },
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>

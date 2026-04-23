@@ -1,0 +1,27 @@
+diff --git a/sympy/parsing/latex/_parse_latex_antlr.py b/sympy/parsing/latex/_parse_latex_antlr.py
+index 2e4a45ad20..ad59e7fda1 100644
+--- a/sympy/parsing/latex/_parse_latex_antlr.py
++++ b/sympy/parsing/latex/_parse_latex_antlr.py
+@@ -388,6 +388,7 @@ def convert_frac(frac):
+     else:
+         return sympy.Mul(expr_top, inverse_denom, evaluate=False)
+ 
++
+ def convert_binom(binom):
+     expr_n = convert_expr(binom.n)
+     expr_k = convert_expr(binom.k)
+diff --git a/sympy/printing/str.py b/sympy/printing/str.py
+index c3fdcdd435..51e1727225 100644
+--- a/sympy/printing/str.py
++++ b/sympy/printing/str.py
+@@ -336,6 +336,10 @@ def apow(i):
+                             isinstance(item.base, Mul)):
+                         # To avoid situations like #14160
+                         pow_paren.append(item)
++                    elif isinstance(item.base, Pow) and item.base.exp is S.NegativeOne:
++                        # To avoid situations like #21612, where denominator
++                        # itself is a fraction (Pow with exp=-1)
++                        pow_paren.append(item)
+                     b.append(item.base)
+             elif item.is_Rational and item is not S.Infinity:
+                 if item.p != 1:

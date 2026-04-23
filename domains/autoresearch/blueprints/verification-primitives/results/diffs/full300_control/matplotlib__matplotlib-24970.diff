@@ -1,0 +1,16 @@
+diff --git a/lib/matplotlib/colors.py b/lib/matplotlib/colors.py
+index 2d3072da04..71f365a9f5 100644
+--- a/lib/matplotlib/colors.py
++++ b/lib/matplotlib/colors.py
+@@ -725,6 +725,11 @@ class Colormap:
+                 # Avoid converting large positive values to negative integers.
+                 np.clip(xa, -1, self.N, out=xa)
+                 xa = xa.astype(int)
++        # Ensure xa is an integer type that can hold the sentinel values
++        # (self._i_over = N+1, self._i_under = N, self._i_bad = N+2).
++        # Integer input types (e.g. uint8) may not be able to hold these values.
++        if xa.dtype.kind in "ui":
++            xa = xa.astype(int)
+         # Set the over-range indices before the under-range;
+         # otherwise the under-range values get converted to over-range.
+         xa[xa > self.N - 1] = self._i_over

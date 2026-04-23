@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 103.4,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 102017,
+    "duration_api_ms": 74508,
+    "num_turns": 23,
+    "result": "The `inherited_members_option` function is correctly handling `None` and `True` (legacy case). In Sphinx, when a flag-type option is used without a value like `:inherited-members:`, the arg passed is `None`. The `True` case in the original function was a safeguard/legacy path. Both are now returning `{'object'}`.\n\nThe fix is correct and all tests pass. Here's a summary of the changes:\n\n**`sphinx/ext/autodoc/__init__.py`:**\n\n1. `inherited_members_option()`: Changed to return a set instead of a string:\n   - Default case (`None`/`True`) now returns `{'object'}` instead of `'object'`\n   - With a value like `\"list,set,tuple\"` now returns `{'list', 'set', 'tuple'}` instead of the raw string\n\n2. `is_filtered_inherited_member()`: Changed `==` to `in` so the check works against the set of class names to ignore\n\nThis allows users to write `:inherited-members: list,set,tuple` to ignore members from multiple base classes simultaneously.",
+    "stop_reason": "end_turn",
+    "session_id": "7a1f4897-b63f-4953-b046-03f9d49416f6",
+    "total_cost_usd": 0.27194475,
+    "usage": {
+      "input_tokens": 89,
+      "cache_creation_input_tokens": 19633,
+      "cache_read_input_tokens": 474030,
+      "output_tokens": 3723,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 19633
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 89,
+        "outputTokens": 3723,
+        "cacheReadInputTokens": 474030,
+        "cacheCreationInputTokens": 19633,
+        "webSearchRequests": 0,
+        "costUSD": 0.27194475,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "eb038242-10a1-49fc-8cc4-9924608db709"
+  },
+  "stderr": ""
+}

@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 131.1,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 129786,
+    "duration_api_ms": 101573,
+    "num_turns": 29,
+    "result": "All values work correctly. The fix is correct \u2014 changing `hasattr(cls, ...)` to `'...' not in cls.__dict__` ensures that child classes with overridden fields get their own `get_FOO_display` method bound to their own field instance (with their choices), rather than inheriting the parent's method.\n\n**Summary of the fix:**\n\nIn `django/db/models/fields/__init__.py:767`, the condition `if not hasattr(cls, 'get_%s_display' % self.name)` prevented child classes from registering their own `get_FOO_display` method when a parent already had one. Changing to `if 'get_%s_display' % self.name not in cls.__dict__` ensures that if a child class overrides a field with new choices, it gets its own method bound to the child's field instance (with the full set of choices), rather than inheriting the parent's method that only knows about the parent's choices.",
+    "stop_reason": "end_turn",
+    "session_id": "bd5931c0-acd0-498f-a34a-c545a5a2c480",
+    "total_cost_usd": 0.3145383,
+    "usage": {
+      "input_tokens": 94,
+      "cache_creation_input_tokens": 17748,
+      "cache_read_input_tokens": 567371,
+      "output_tokens": 5166,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 17748
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 94,
+        "outputTokens": 5166,
+        "cacheReadInputTokens": 567371,
+        "cacheCreationInputTokens": 17748,
+        "webSearchRequests": 0,
+        "costUSD": 0.3145383,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "423d32ff-829f-443e-a7a8-8423612fe9b0"
+  },
+  "stderr": ""
+}

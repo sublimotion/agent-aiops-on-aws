@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 131.4,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 130098,
+    "duration_api_ms": 107239,
+    "num_turns": 26,
+    "result": "All 388 tests pass. The fix is minimal and correct:\n\n**Root cause**: `Query.set_empty()` adds a `NothingNode` to the WHERE clause, but when a query uses a combinator (union/intersect/difference), the SQL compiler calls `get_combinator_sql()` which completely ignores the WHERE clause. So `none()` had no effect.\n\n**Fix**: In `set_empty()`, recursively call `set_empty()` on each sub-query in `combined_queries`. In `get_combinator_sql()` (line 437), sub-queries are already filtered by `if not query.is_empty()`, so marking them all empty causes `parts` to be empty, which raises `EmptyResultSet`, resulting in no rows returned.",
+    "stop_reason": "end_turn",
+    "session_id": "70d4b0bf-af59-4c51-88df-98f935c93a8c",
+    "total_cost_usd": 0.32912925,
+    "usage": {
+      "input_tokens": 27,
+      "cache_creation_input_tokens": 20865,
+      "cache_read_input_tokens": 563115,
+      "output_tokens": 5458,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 20865
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 27,
+        "outputTokens": 5458,
+        "cacheReadInputTokens": 563115,
+        "cacheCreationInputTokens": 20865,
+        "webSearchRequests": 0,
+        "costUSD": 0.32912925,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "87997757-6b53-4a69-bc6c-27ba234eeab2"
+  },
+  "stderr": ""
+}

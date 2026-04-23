@@ -120,6 +120,14 @@ Append-only file in the blueprint root. Created on first deployment, appended af
 
 Created by compound-learner agent after each deployment. See `.claude/agents/compound-learner.md` for the full template.
 
-### 5. Benchmark Report — `results/benchmark-report.md` (if applicable)
+### 5. Progress Tracker — `results/progress.md`
+
+Single source of truth for where the blueprint stands in its lifecycle. Updated by deployer agents at every stage transition. Can be reconstructed from artifacts via `scripts/progress.sh <blueprint-path>`. See `docs/progress-format.md` for the full schema.
+
+### 6. Benchmark Results — `results/benchmarks/<config>/` (if applicable)
+
+JSON files produced by the shared benchmark script (`scripts/benchmark-serving.py`) during Stage 6b. One JSON file per config per run. The benchmark must be run from an **in-cluster bench-runner pod** (not via port-forward) to avoid network latency noise in TTFT measurements. See `scripts/bench-runner-pod.yaml` for the pod template.
+
+### 7. Benchmark Report — `results/benchmark-report.md` (if applicable)
 
 Created by benchmark-analyst agent after benchmark runs. See `.claude/agents/benchmark-analyst.md` for the full template.

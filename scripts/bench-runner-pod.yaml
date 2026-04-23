@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bench-runner
+  namespace: default
+spec:
+  restartPolicy: Never
+  containers:
+    - name: runner
+      image: python:3.11-slim
+      command:
+        - /bin/bash
+        - -c
+        - |
+          pip install aiohttp -q
+          echo "bench-runner ready"
+          echo "  API_URL=$BENCHMARK_API_URL"
+          echo "  MODEL=$BENCHMARK_MODEL"
+          sleep infinity
+      env:
+        - name: BENCHMARK_API_URL
+          value: "REPLACE_ME"
+        - name: BENCHMARK_MODEL
+          value: "REPLACE_ME"
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+        - name: results
+          mountPath: /results
+      resources:
+        requests:
+          cpu: "500m"
+          memory: 1Gi
+  volumes:
+    - name: scripts
+      configMap:
+        name: benchmark-scripts
+    - name: results
+      emptyDir: {}

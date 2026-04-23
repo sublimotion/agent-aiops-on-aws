@@ -1,0 +1,15 @@
+diff --git a/sympy/core/function.py b/sympy/core/function.py
+index 69df976b8b..7a24027051 100644
+--- a/sympy/core/function.py
++++ b/sympy/core/function.py
+@@ -1676,6 +1676,10 @@ def _wrt_variables(self):
+         # respect to the type of count (int or symbolic)
+         return [i[0] for i in self.variable_count]
+ 
++    @property
++    def kind(self):
++        return self.expr.kind
++
+     @property
+     def variables(self):
+         # TODO: deprecate?  YES, make this 'enumerated_variables' and

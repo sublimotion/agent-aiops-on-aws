@@ -67,7 +67,8 @@ agent-aiops-on-aws/
 │       │   ├── _template.md
 │       │   ├── training-recipes.md  # GPT-2 training recipe optimization
 │       │   ├── agent-harness.md     # Turn degradation + multi-harness comparison
-│       │   └── finetuning-recipes.md # LoRA/QLoRA fine-tuning with Unsloth
+│       │   ├── finetuning-recipes.md # LoRA/QLoRA fine-tuning with Unsloth (Qwen3-0.6B)
+│       │   └── finetuning-recipes-1.7b.md # LoRA/QLoRA fine-tuning with Unsloth (Qwen3-1.7B)
 │       └── blueprints/
 │           ├── training-recipes/    # autoresearch-colab on g7e
 │           │   ├── program.md       # Agent loop instructions

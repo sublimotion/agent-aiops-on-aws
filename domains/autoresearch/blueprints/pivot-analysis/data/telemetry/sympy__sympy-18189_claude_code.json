@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 191.0,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 189572,
+    "duration_api_ms": 98299,
+    "num_turns": 20,
+    "result": "All 44 relevant tests pass. The two failing tests (`test_fail_holzer`, `test_not_implemented`) are pre-existing failures unrelated to my change.\n\n**Summary of the fix:**\n\nThe bug was on line 185 of `sympy/solvers/diophantine.py`. When `syms` were provided in a different order than the internally-sorted `var`, the function would recurse to compute the base solutions, then reorder them for the requested `syms` order. However, the recursive call didn't pass `permute=permute`, so the permutations were never generated \u2014 only the base solution was returned.\n\n**Fix:** Added `permute=permute` to the recursive call:\n```python\nfor t in diophantine(eq, param, permute=permute)\n```",
+    "stop_reason": "end_turn",
+    "session_id": "50aebd5b-df1f-458a-a5b0-089fbd035782",
+    "total_cost_usd": 0.30875684999999997,
+    "usage": {
+      "input_tokens": 86,
+      "cache_creation_input_tokens": 23097,
+      "cache_read_input_tokens": 459717,
+      "output_tokens": 5598,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 23097
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 86,
+        "outputTokens": 5598,
+        "cacheReadInputTokens": 459717,
+        "cacheCreationInputTokens": 23097,
+        "webSearchRequests": 0,
+        "costUSD": 0.30875684999999997,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "3a6b8155-5fbf-4392-80ad-c57247a65dec"
+  },
+  "stderr": ""
+}

@@ -1,0 +1,92 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index b657a35cf7..e1a1b0c368 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -130,6 +130,76 @@ __bibtex__ = r"""@Article{Hunter:2007,
+ }"""
+ 
+ 
++def _parse_to_version_info(version_str):
++    """
++    Parse a version string to a version info tuple.
++
++    Parameters
++    ----------
++    version_str : str
++        A version string (e.g., '3.5.0', '3.5.0rc2', '3.5.0.dev820+g6768ef8c4c')
++
++    Returns
++    -------
++    tuple
++        A tuple of (major, minor, patch, releasetype, releasenumber)
++        where releasetype is one of ('alpha', 'beta', 'candidate', 'final')
++    """
++    # Remove any local version identifier (after '+')
++    version_str = version_str.split('+')[0]
++
++    # Parse the main version numbers
++    parts = version_str.split('.')
++    major = int(parts[0])
++    minor = int(parts[1]) if len(parts) > 1 else 0
++    patch_and_rest = parts[2] if len(parts) > 2 else '0'
++
++    # Extract patch version and release info
++    # The patch_and_rest may contain release info like:
++    # '0' -> patch=0, no release info
++    # '0rc2' -> patch=0, rc2
++    # '0.dev820' -> patch=0, dev820
++    # '0.post820' -> patch=0, post820
++
++    # Try to match pattern: \d+([a-z]+\d+)?
++    match = re.match(r'(\d+)([a-z]+)(\d+)', patch_and_rest)
++    if match:
++        patch = int(match.group(1))
++        release_type = match.group(2)
++        release_number = int(match.group(3))
++    else:
++        patch = int(patch_and_rest)
++        release_type = None
++        release_number = 0
++
++    # Check for version modifiers in version_str
++    if '.post' in version_str:
++        # Extract post-release version
++        post_match = re.search(r'\.post(\d+)', version_str)
++        if post_match:
++            release_number = int(post_match.group(1))
++        # Post-release increments patch
++        patch += 1
++        releasetype = 'alpha'
++    elif '.dev' in version_str:
++        # Extract dev version
++        dev_match = re.search(r'\.dev(\d+)', version_str)
++        if dev_match:
++            release_number = int(dev_match.group(1))
++        releasetype = 'alpha'
++    elif release_type == 'rc':
++        releasetype = 'candidate'
++    elif release_type in ('a', 'alpha'):
++        releasetype = 'alpha'
++    elif release_type in ('b', 'beta'):
++        releasetype = 'beta'
++    else:
++        releasetype = 'final'
++        release_number = 0
++
++    return (major, minor, patch, releasetype, release_number)
++
++
+ def __getattr__(name):
+     if name == "__version__":
+         import setuptools_scm
+@@ -148,6 +218,10 @@ def __getattr__(name):
+         else:  # Get the version from the _version.py setuptools_scm file.
+             __version__ = _version.version
+         return __version__
++    elif name == "version_info":
++        global version_info  # cache it.
++        version_info = _parse_to_version_info(__version__)
++        return version_info
+     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+ 
+ 

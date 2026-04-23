@@ -1,0 +1,28 @@
+diff --git a/pylint/config/option.py b/pylint/config/option.py
+index 5043fe76..140bb7ea 100644
+--- a/pylint/config/option.py
++++ b/pylint/config/option.py
+@@ -23,12 +23,21 @@ def _csv_validator(_, name, value):
+ def _regexp_validator(_, name, value):
+     if hasattr(value, "pattern"):
+         return value
+-    return re.compile(value)
++    try:
++        return re.compile(value)
++    except re.error as e:
++        raise optparse.OptionValueError(
++            f"Invalid regex pattern '{value}': {e}"
++        ) from e
+ 
+ 
+ # pylint: disable=unused-argument
+ def _regexp_csv_validator(_, name, value):
+-    return [_regexp_validator(_, name, val) for val in _csv_validator(_, name, value)]
++    try:
++        return [_regexp_validator(_, name, val) for val in _csv_validator(_, name, value)]
++    except optparse.OptionValueError as e:
++        # Re-raise with the original error message
++        raise e
+ 
+ 
+ def _regexp_paths_csv_validator(

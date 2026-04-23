@@ -1,0 +1,16 @@
+diff --git a/seaborn/_oldcore.py b/seaborn/_oldcore.py
+index c9218c1f..0b6e67c6 100644
+--- a/seaborn/_oldcore.py
++++ b/seaborn/_oldcore.py
+@@ -164,6 +164,11 @@ class HueMapping(SemanticMapping):
+                 value = self.cmap(normed)
+         return value
+ 
++    # Override the above method to handle the case where hue_order is a subset
++    # of the actual hue values. When a value is not in the lookup table for a
++    # categorical mapping (norm is None), return a transparent color so points
++    # with hue values not in hue_order are not displayed (matching pre-0.11.1 behavior).
++
+     def infer_map_type(self, palette, norm, input_format, var_type):
+         """Determine how to implement the mapping."""
+         if palette in QUAL_PALETTES:

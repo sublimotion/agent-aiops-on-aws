@@ -1,0 +1,45 @@
+diff --git a/lib/matplotlib/axes/_base.py b/lib/matplotlib/axes/_base.py
+index 38f77e537a..46d0d7ca13 100644
+--- a/lib/matplotlib/axes/_base.py
++++ b/lib/matplotlib/axes/_base.py
+@@ -2965,7 +2965,7 @@ class _AxesBase(martist.Artist):
+                     else:
+                         ax.apply_aspect()
+                     axs = axs + [ax]
+-            top = -np.Inf
++            top = -np.inf
+             for ax in axs:
+                 bb = None
+                 if (ax.xaxis.get_ticks_position() in ['top', 'unknown']
+diff --git a/lib/matplotlib/tests/test_colors.py b/lib/matplotlib/tests/test_colors.py
+index 80f8b663bd..1f68f34088 100644
+--- a/lib/matplotlib/tests/test_colors.py
++++ b/lib/matplotlib/tests/test_colors.py
+@@ -332,9 +332,9 @@ def test_BoundaryNorm():
+     assert_array_equal(bn(vals), expected)
+ 
+     # Non-trivial masked arrays
+-    vals = np.ma.masked_invalid([np.Inf, np.NaN])
++    vals = np.ma.masked_invalid([np.inf, np.NaN])
+     assert np.all(bn(vals).mask)
+-    vals = np.ma.masked_invalid([np.Inf])
++    vals = np.ma.masked_invalid([np.inf])
+     assert np.all(bn(vals).mask)
+ 
+     # Incompatible extend and clip
+diff --git a/lib/matplotlib/widgets.py b/lib/matplotlib/widgets.py
+index da5b40a5ef..3d07d3f04a 100644
+--- a/lib/matplotlib/widgets.py
++++ b/lib/matplotlib/widgets.py
+@@ -693,6 +693,11 @@ class RangeSlider(SliderBase):
+                                 valmin + extent * 0.75])
+         else:
+             valinit = self._value_in_bounds(valinit)
++            if valinit[0] == valinit[1]:
++                raise ValueError(
++                    "valinit[0] and valinit[1] must be different values. "
++                    "Got valinit={}".format(valinit)
++                )
+         self.val = valinit
+         self.valinit = valinit
+ 

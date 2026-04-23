@@ -1,0 +1,16 @@
+diff --git a/django/contrib/auth/management/__init__.py b/django/contrib/auth/management/__init__.py
+index 0b5a982617..286894a1fa 100644
+--- a/django/contrib/auth/management/__init__.py
++++ b/django/contrib/auth/management/__init__.py
+@@ -100,8 +100,9 @@ def create_permissions(
+         for ct, (codename, name) in searched_perms
+         if (ct.pk, codename) not in all_perms
+     ]
+-    Permission.objects.using(using).bulk_create(perms)
+-    if verbosity >= 2:
++    for perm in perms:
++        perm._state.db = using
++    Permission.objects.using(using).bulk_create(perms)    if verbosity >= 2:
+         for perm in perms:
+             print("Adding permission '%s'" % perm)
+ 

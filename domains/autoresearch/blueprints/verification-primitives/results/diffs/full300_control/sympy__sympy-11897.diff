@@ -1,0 +1,31 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index 2501524c30..0348bac150 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,9 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping
++try:
++    from collections import Mapping
++except ImportError:
++    from collections.abc import Mapping
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+ from .cache import cacheit
+diff --git a/sympy/core/cache.py b/sympy/core/cache.py
+index b6c64c118e..d71d20c44a 100644
+--- a/sympy/core/cache.py
++++ b/sympy/core/cache.py
+@@ -1,7 +1,10 @@
+ """ Caching facility for SymPy """
+ from __future__ import print_function, division
+ 
+-from distutils.version import LooseVersion as V
++try:
++    from distutils.version import LooseVersion as V
++except ImportError:
++    from packaging.version import Version as V
+ 
+ class _cache(list):
+     """ List of cached functions """

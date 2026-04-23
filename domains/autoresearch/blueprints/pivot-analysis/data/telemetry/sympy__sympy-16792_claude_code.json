@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 178.8,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 177511,
+    "duration_api_ms": 93277,
+    "num_turns": 32,
+    "result": "All 55 existing tests pass. The fix is correct and complete.\n\n**Summary:** The bug was in `sympy/utilities/codegen.py`. When building the argument list for a routine and an argument from `argument_sequence` doesn't appear in the expression (so it's not in `name_arg_dict`), the code fell through to `KeyError` and created a plain `InputArgument(symbol)` without dimension information. For `MatrixSymbol` arguments, this caused them to be treated as scalars (`double`) instead of arrays (`double *`).\n\nThe fix adds a check: if the missing symbol is a `MatrixSymbol`, create the `InputArgument` with proper `dimensions` metadata. This was applied to all 4 language-specific code generators (C, Julia, Octave, Rust).",
+    "stop_reason": "end_turn",
+    "session_id": "efd845f8-b4e3-4218-8ce3-974b501263dd",
+    "total_cost_usd": 0.3495001499999999,
+    "usage": {
+      "input_tokens": 808,
+      "cache_creation_input_tokens": 25041,
+      "cache_read_input_tokens": 601958,
+      "output_tokens": 4839,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 25041
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 808,
+        "outputTokens": 4839,
+        "cacheReadInputTokens": 601958,
+        "cacheCreationInputTokens": 25041,
+        "webSearchRequests": 0,
+        "costUSD": 0.3495001499999999,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "026d7eb5-49c2-41c3-9f5b-41875aad3707"
+  },
+  "stderr": ""
+}

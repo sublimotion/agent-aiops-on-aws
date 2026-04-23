@@ -1,0 +1,18 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 8642e1f151..ab45e1ae75 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -979,7 +979,12 @@ class ExpressionWrapper(SQLiteNumericMixin, Expression):
+         return super().get_group_by_cols()
+ 
+     def as_sql(self, compiler, connection):
+-        return compiler.compile(self.expression)
++        sql, params = compiler.compile(self.expression)
++        if not sql and self.expression.conditional:
++            # When a conditional expression (e.g. ~Q(pk__in=[])) compiles to
++            # an empty string, it means the condition is always True.
++            return compiler.compile(Value(True, output_field=fields.BooleanField()))
++        return sql, params
+ 
+     def __repr__(self):
+         return "{}({})".format(self.__class__.__name__, self.expression)

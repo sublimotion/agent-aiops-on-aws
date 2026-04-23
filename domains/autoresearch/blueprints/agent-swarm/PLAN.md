@@ -16,10 +16,46 @@
 | 6 | Qwen 2.5 Coder 32B | SERA | **DONE** | **24/50 (48%)** | Bare JSON fallback patch |
 | 7 | SWE-agent-LM 32B | OpenCode | FAILED (0%) | 0/46 (0%) | Bare JSON, hermes parser can't extract |
 | 8 | SWE-agent-LM 32B | Claude Code | SKIPPED | — | Anthropic API incompatible with Qwen |
-| 9 | SWE-agent-LM 32B | SERA | **DONE** | **9/50 (18%)** | Finetuning -30pp vs base |
+| 9 | SWE-agent-LM 32B | SERA | **DONE** | **9/50 (18%)** | SWE-smith SFT -30pp vs base Qwen 2.5 |
 | 10 | Qwen3.5-397B-A17B | OpenCode | **DONE** | **44/50 (88%)** | Best config tied with #1 |
 | 11 | Qwen3.5-397B-A17B | Claude Code | FAILED | — | Anthropic API doesn't translate tools to Qwen chat template |
 | 12 | Qwen3.5-397B-A17B | SERA | **DONE** | **36/50 (72%)** | Best SERA result |
+
+## Phase 2: Allen AI SERA-32B (PLANNED)
+
+**Goal**: Compare Allen AI's SVG-trained `allenai/SERA-32B` against Princeton's SWE-smith SFT (`SWE-agent-LM-32B`) and the base Qwen models. This is the critical finetuning comparison — SVG (verification-guided training) vs SWE-smith (trajectory SFT) vs no finetuning.
+
+**Why this matters**: SERA-32B reports 49.5% on SWE-bench Verified. It uses Qwen 3-32B as base (vs SWE-agent-LM's Qwen 2.5 Coder 32B). The SVG training methodology — soft verification via line-level recall, no test execution — is directly relevant to the Learned Verifier Experiment. Allen AI baked verification into the training loop; we use it at inference time. Comparing both approaches on the same harnesses answers: is it better to verify during training or at inference?
+
+| # | Model | Harness | Status | Fix Rate | Notes |
+|---|-------|---------|--------|----------|-------|
+| 13 | allenai/SERA-32B | SERA | PLANNED | — | SVG-trained, Qwen 3-32B base, 49.5% published |
+| 14 | allenai/SERA-32B | OpenCode | PLANNED | — | Check tool calling format compatibility first |
+| 15 | allenai/SERA-32B | Claude Code | PLANNED | — | Likely incompatible (Anthropic API) |
+
+### Setup Notes
+
+- **HF ID**: `allenai/SERA-32B`
+- **Base model**: Qwen 3-32B (newer than SWE-agent-LM's Qwen 2.5)
+- **Size**: 32B dense, TP1 — fits on single GPU same as other 32B models
+- **Training**: SVG on 25K synthetic trajectories, GLM-4.6 teacher, ~$2,000 total cost
+- **Tool calling**: Unknown — need to check if it uses `<tool_call>` tags, bare JSON, or Qwen 3 native format. This determines harness compatibility.
+- **Weights**: Need to download to `/mnt/nvme/models/sera-32b-allenai/`
+
+### Key Comparisons
+
+| Comparison | What It Tests |
+|-----------|---------------|
+| SERA-32B vs Qwen 2.5 Coder 32B | SVG finetuning vs no finetuning (different base, so confounded) |
+| SERA-32B vs SWE-agent-LM 32B | SVG vs SWE-smith SFT (different base + different method) |
+| SERA-32B vs Qwen3.5 397B | Can 32B + SVG training compete with 397B scale? |
+| SERA-32B vs Devstral 24B | 32B SVG-trained vs 24B Mistral-native on same harnesses |
+
+### Open Questions
+
+- Does SERA-32B's Qwen 3 base have native tool calling that works with vLLM hermes parser? If yes, it may be compatible with OpenCode (unlike Qwen 2.5 models).
+- The published 49.5% is on SWE-bench Verified (full 500). Our subset is 50 issues — expect variance.
+- SERA-32B was trained with its own agent scaffold. Does it generalize to SERA harness / OpenCode, or is it scaffold-specific like SWE-agent-LM was?
 
 ## Key Findings So Far
 
@@ -66,6 +102,7 @@ Note: Qwen3.5-397B may have different tool calling behavior (MoE, different trai
 | Qwen 2.5 Coder 32B | `/mnt/nvme/models/qwen25-coder-32b` | Ready (14 shards) |
 | SWE-agent-LM 32B | `/mnt/nvme/models/swe-agent-lm-32b` | Ready (14 shards) |
 | Qwen3.5-397B-A17B FP8 | `/mnt/nvme/models/qwen3-next-fp8` | Ready |
+| allenai/SERA-32B | `/mnt/nvme/models/sera-32b-allenai` | **TODO: download** |
 
 ## Patches Applied to harness_eval.py
 

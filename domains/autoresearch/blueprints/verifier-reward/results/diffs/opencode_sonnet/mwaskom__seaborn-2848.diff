@@ -1,0 +1,663 @@
+diff --git a/seaborn/_oldcore.py b/seaborn/_oldcore.py
+index c9218c1f..f5f1e7ae 100644
+--- a/seaborn/_oldcore.py
++++ b/seaborn/_oldcore.py
+@@ -41,7 +41,6 @@ class SemanticMapping:
+     lookup_table = None
+ 
+     def __init__(self, plotter):
+-
+         # TODO Putting this here so we can continue to use a lot of the
+         # logic that's built into the library, but the idea of this class
+         # is to move towards semantic mappings that are agnostic about the
+@@ -70,6 +69,7 @@ class SemanticMapping:
+ @share_init_params_with_map
+ class HueMapping(SemanticMapping):
+     """Mapping that sets artist colors according to data values."""
++
+     # A specification of the colors that should appear in the plot
+     palette = None
+ 
+@@ -80,7 +80,11 @@ class HueMapping(SemanticMapping):
+     cmap = None
+ 
+     def __init__(
+-        self, plotter, palette=None, order=None, norm=None,
++        self,
++        plotter,
++        palette=None,
++        order=None,
++        norm=None,
+     ):
+         """Map the levels of the `hue` variable to distinct colors.
+ 
+@@ -98,7 +102,6 @@ class HueMapping(SemanticMapping):
+                 msg = "Ignoring `palette` because no `hue` variable has been assigned."
+                 warnings.warn(msg, stacklevel=4)
+         else:
+-
+             map_type = self.infer_map_type(
+                 palette, norm, plotter.input_format, plotter.var_types["hue"]
+             )
+@@ -110,19 +113,21 @@ class HueMapping(SemanticMapping):
+             # --- Option 1: numeric mapping with a matplotlib colormap
+ 
+             if map_type == "numeric":
+-
+                 data = pd.to_numeric(data)
+                 levels, lookup_table, norm, cmap = self.numeric_mapping(
+-                    data, palette, norm,
++                    data,
++                    palette,
++                    norm,
+                 )
+ 
+             # --- Option 2: categorical mapping using seaborn palette
+ 
+             elif map_type == "categorical":
+-
+                 cmap = norm = None
+                 levels, lookup_table = self.categorical_mapping(
+-                    data, palette, order,
++                    data,
++                    palette,
++                    order,
+                 )
+ 
+             # --- Option 3: datetime mapping
+@@ -133,7 +138,9 @@ class HueMapping(SemanticMapping):
+                 levels, lookup_table = self.categorical_mapping(
+                     # Casting data to list to handle differences in the way
+                     # pandas and numpy represent datetime64 data
+-                    list(data), palette, order,
++                    list(data),
++                    palette,
++                    order,
+                 )
+ 
+             self.map_type = map_type
+@@ -154,10 +161,13 @@ class HueMapping(SemanticMapping):
+             try:
+                 normed = self.norm(key)
+             except TypeError as err:
+-                if np.isnan(key):
++                try:
++                    if np.isnan(key):
++                        value = (0, 0, 0, 0)
++                    else:
++                        raise err
++                except (ValueError, TypeError):
+                     value = (0, 0, 0, 0)
+-                else:
+-                    raise err
+             else:
+                 if np.ma.is_masked(normed):
+                     normed = np.nan
+@@ -189,7 +199,6 @@ class HueMapping(SemanticMapping):
+         # -- Identify the set of colors to use
+ 
+         if isinstance(palette, dict):
+-
+             missing = set(levels) - set(palette)
+             if any(missing):
+                 err = "The palette dictionary is missing keys: {}"
+@@ -198,7 +207,6 @@ class HueMapping(SemanticMapping):
+             lookup_table = palette
+ 
+         else:
+-
+             if palette is None:
+                 if n_colors <= len(get_color_cycle()):
+                     colors = color_palette(None, n_colors)
+@@ -219,7 +227,6 @@ class HueMapping(SemanticMapping):
+     def numeric_mapping(self, data, palette, norm):
+         """Determine colors when the hue variable is quantitative."""
+         if isinstance(palette, dict):
+-
+             # The presence of a norm object overrides a dictionary of hues
+             # in specifying a numeric mapping, so we need to process it here.
+             levels = list(sorted(palette))
+@@ -228,7 +235,6 @@ class HueMapping(SemanticMapping):
+             lookup_table = palette.copy()
+ 
+         else:
+-
+             # The levels are the sorted unique values in the data
+             levels = list(np.sort(remove_na(data.unique())))
+ 
+@@ -263,11 +269,16 @@ class HueMapping(SemanticMapping):
+ @share_init_params_with_map
+ class SizeMapping(SemanticMapping):
+     """Mapping that sets artist sizes according to data values."""
++
+     # An object that normalizes data values to [0, 1] range
+     norm = None
+ 
+     def __init__(
+-        self, plotter, sizes=None, order=None, norm=None,
++        self,
++        plotter,
++        sizes=None,
++        order=None,
++        norm=None,
+     ):
+         """Map the levels of the `size` variable to distinct values.
+ 
+@@ -281,25 +292,24 @@ class SizeMapping(SemanticMapping):
+         data = plotter.plot_data.get("size", pd.Series(dtype=float))
+ 
+         if data.notna().any():
+-
+-            map_type = self.infer_map_type(
+-                norm, sizes, plotter.var_types["size"]
+-            )
++            map_type = self.infer_map_type(norm, sizes, plotter.var_types["size"])
+ 
+             # --- Option 1: numeric mapping
+ 
+             if map_type == "numeric":
+-
+                 levels, lookup_table, norm, size_range = self.numeric_mapping(
+-                    data, sizes, norm,
++                    data,
++                    sizes,
++                    norm,
+                 )
+ 
+             # --- Option 2: categorical mapping
+ 
+             elif map_type == "categorical":
+-
+                 levels, lookup_table = self.categorical_mapping(
+-                    data, sizes, order,
++                    data,
++                    sizes,
++                    order,
+                 )
+                 size_range = None
+ 
+@@ -307,11 +317,12 @@ class SizeMapping(SemanticMapping):
+ 
+             # TODO this needs an actual implementation
+             else:
+-
+                 levels, lookup_table = self.categorical_mapping(
+                     # Casting data to list to handle differences in the way
+                     # pandas and numpy represent datetime64 data
+-                    list(data), sizes, order,
++                    list(data),
++                    sizes,
++                    order,
+                 )
+                 size_range = None
+ 
+@@ -323,7 +334,6 @@ class SizeMapping(SemanticMapping):
+             self.lookup_table = lookup_table
+ 
+     def infer_map_type(self, norm, sizes, var_type):
+-
+         if norm is not None:
+             map_type = "numeric"
+         elif isinstance(sizes, (dict, list)):
+@@ -334,7 +344,6 @@ class SizeMapping(SemanticMapping):
+         return map_type
+ 
+     def _lookup_single(self, key):
+-
+         try:
+             value = self.lookup_table[key]
+         except KeyError:
+@@ -345,11 +354,9 @@ class SizeMapping(SemanticMapping):
+         return value
+ 
+     def categorical_mapping(self, data, sizes, order):
+-
+         levels = categorical_order(data, order)
+ 
+         if isinstance(sizes, dict):
+-
+             # Dict inputs map existing data values to the size attribute
+             missing = set(levels) - set(sizes)
+             if any(missing):
+@@ -358,7 +365,6 @@ class SizeMapping(SemanticMapping):
+             lookup_table = sizes.copy()
+ 
+         elif isinstance(sizes, list):
+-
+             # List inputs give size values in the same order as the levels
+             if len(sizes) != len(levels):
+                 err = "The `sizes` list has the wrong number of values."
+@@ -367,21 +373,17 @@ class SizeMapping(SemanticMapping):
+             lookup_table = dict(zip(levels, sizes))
+ 
+         else:
+-
+             if isinstance(sizes, tuple):
+-
+                 # Tuple input sets the min, max size values
+                 if len(sizes) != 2:
+                     err = "A `sizes` tuple must have only 2 values"
+                     raise ValueError(err)
+ 
+             elif sizes is not None:
+-
+                 err = f"Value for `sizes` not understood: {sizes}"
+                 raise ValueError(err)
+ 
+             else:
+-
+                 # Otherwise, we need to get the min, max size values from
+                 # the plotter object we are attached to.
+ 
+@@ -406,7 +408,6 @@ class SizeMapping(SemanticMapping):
+         return levels, lookup_table
+ 
+     def numeric_mapping(self, data, sizes, norm):
+-
+         if isinstance(sizes, dict):
+             # The presence of a norm object overrides a dictionary of sizes
+             # in specifying a numeric mapping, so we need to process it
+@@ -416,12 +417,10 @@ class SizeMapping(SemanticMapping):
+             size_range = min(size_values), max(size_values)
+ 
+         else:
+-
+             # The levels here will be the unique values in the data
+             levels = list(np.sort(remove_na(data.unique())))
+ 
+             if isinstance(sizes, tuple):
+-
+                 # For numeric inputs, the size can be parametrized by
+                 # the minimum and maximum artist values to map to. The
+                 # norm object that gets set up next specifies how to
+@@ -434,12 +433,10 @@ class SizeMapping(SemanticMapping):
+                 size_range = sizes
+ 
+             elif sizes is not None:
+-
+                 err = f"Value for `sizes` not understood: {sizes}"
+                 raise ValueError(err)
+ 
+             else:
+-
+                 # When not provided, we get the size range from the plotter
+                 # object we are attached to. See the note in the categorical
+                 # method about how this is suboptimal for future development.
+@@ -493,7 +490,11 @@ class StyleMapping(SemanticMapping):
+     map_type = "categorical"
+ 
+     def __init__(
+-        self, plotter, markers=None, dashes=None, order=None,
++        self,
++        plotter,
++        markers=None,
++        dashes=None,
++        order=None,
+     ):
+         """Map the levels of the `style` variable to distinct values.
+ 
+@@ -507,7 +508,6 @@ class StyleMapping(SemanticMapping):
+         data = plotter.plot_data.get("style", pd.Series(dtype=float))
+ 
+         if data.notna().any():
+-
+             # Cast to list to handle numpy/pandas datetime quirks
+             if variable_type(data) == "datetime":
+                 data = list(data)
+@@ -516,10 +516,16 @@ class StyleMapping(SemanticMapping):
+             levels = categorical_order(data, order)
+ 
+             markers = self._map_attributes(
+-                markers, levels, unique_markers(len(levels)), "markers",
++                markers,
++                levels,
++                unique_markers(len(levels)),
++                "markers",
+             )
+             dashes = self._map_attributes(
+-                dashes, levels, unique_dashes(len(levels)), "dashes",
++                dashes,
++                levels,
++                unique_dashes(len(levels)),
++                "dashes",
+             )
+ 
+             # Build the paths matplotlib will use to draw the markers
+@@ -600,14 +606,16 @@ class VectorPlotter:
+     # we need a general name for this and separate handling
+     semantics = "x", "y", "hue", "size", "style", "units"
+     wide_structure = {
+-        "x": "@index", "y": "@values", "hue": "@columns", "style": "@columns",
++        "x": "@index",
++        "y": "@values",
++        "hue": "@columns",
++        "style": "@columns",
+     }
+     flat_structure = {"x": "@index", "y": "@values"}
+ 
+     _default_size_range = 1, 2  # Unused but needed in tests, ugh
+ 
+     def __init__(self, data=None, variables={}):
+-
+         self._var_levels = {}
+         # var_ordered is relevant only for categorical axis variables, and may
+         # be better handled by an internal axis information object that tracks
+@@ -617,7 +625,6 @@ class VectorPlotter:
+         self.assign_variables(data, variables)
+ 
+         for var, cls in self._semantic_mappings.items():
+-
+             # Create the mapping function
+             map_func = partial(cls.map, plotter=self)
+             setattr(self, f"map_{var}", map_func)
+@@ -671,20 +678,21 @@ class VectorPlotter:
+         if x is None and y is None:
+             self.input_format = "wide"
+             plot_data, variables = self._assign_variables_wideform(
+-                data, **variables,
++                data,
++                **variables,
+             )
+         else:
+             self.input_format = "long"
+             plot_data, variables = self._assign_variables_longform(
+-                data, **variables,
++                data,
++                **variables,
+             )
+ 
+         self.plot_data = plot_data
+         self.variables = variables
+         self.var_types = {
+             v: variable_type(
+-                plot_data[v],
+-                boolean_type="numeric" if v in "xy" else "categorical"
++                plot_data[v], boolean_type="numeric" if v in "xy" else "categorical"
+             )
+             for v in variables
+         }
+@@ -730,26 +738,20 @@ class VectorPlotter:
+         else:
+             values = np.atleast_1d(np.asarray(data, dtype=object))
+         flat = not any(
+-            isinstance(v, Iterable) and not isinstance(v, (str, bytes))
+-            for v in values
++            isinstance(v, Iterable) and not isinstance(v, (str, bytes)) for v in values
+         )
+ 
+         if empty:
+-
+             # Make an object with the structure of plot_data, but empty
+             plot_data = pd.DataFrame()
+             variables = {}
+ 
+         elif flat:
+-
+             # Handle flat data by converting to pandas Series and using the
+             # index and/or values to define x and/or y
+             # (Could be accomplished with a more general to_series() interface)
+             flat_data = pd.Series(data).copy()
+-            names = {
+-                "@values": flat_data.name,
+-                "@index": flat_data.index.name
+-            }
++            names = {"@values": flat_data.name, "@index": flat_data.index.name}
+ 
+             plot_data = {}
+             variables = {}
+@@ -763,7 +765,6 @@ class VectorPlotter:
+             plot_data = pd.DataFrame(plot_data)
+ 
+         else:
+-
+             # Otherwise assume we have some collection of vectors.
+ 
+             # Handle Python sequences such that entries end up in the columns,
+@@ -814,9 +815,9 @@ class VectorPlotter:
+             plot_data = wide_data.melt(**melt_kws)
+ 
+             if use_index and category_columns:
+-                plot_data["@columns"] = pd.Categorical(plot_data["@columns"],
+-                                                       orig_categories,
+-                                                       orig_ordered)
++                plot_data["@columns"] = pd.Categorical(
++                    plot_data["@columns"], orig_categories, orig_ordered
++                )
+ 
+             # Assign names corresponding to plot semantics
+             for var, attr in self.wide_structure.items():
+@@ -883,22 +884,19 @@ class VectorPlotter:
+ 
+         # The caller will determine the order of variables in plot_data
+         for key, val in kwargs.items():
+-
+             # First try to treat the argument as a key for the data collection.
+             # But be flexible about what can be used as a key.
+             # Usually it will be a string, but allow numbers or tuples too when
+             # taking from the main data object. Only allow strings to reference
+             # fields in the index, because otherwise there is too much ambiguity.
+             try:
+-                val_as_data_key = (
+-                    val in data
+-                    or (isinstance(val, (str, bytes)) and val in index)
++                val_as_data_key = val in data or (
++                    isinstance(val, (str, bytes)) and val in index
+                 )
+             except (KeyError, TypeError):
+                 val_as_data_key = False
+ 
+             if val_as_data_key:
+-
+                 # We know that __getitem__ will work
+ 
+                 if val in data:
+@@ -908,14 +906,12 @@ class VectorPlotter:
+                 variables[key] = val
+ 
+             elif isinstance(val, (str, bytes)):
+-
+                 # This looks like a column name but we don't know what it means!
+ 
+                 err = f"Could not interpret value `{val}` for parameter `{key}`"
+                 raise ValueError(err)
+ 
+             else:
+-
+                 # Otherwise, assume the value is itself data
+ 
+                 # Raise when data object is present and a vector can't matched
+@@ -948,9 +944,14 @@ class VectorPlotter:
+         return plot_data, variables
+ 
+     def iter_data(
+-        self, grouping_vars=None, *,
+-        reverse=False, from_comp_data=False,
+-        by_facet=True, allow_empty=False, dropna=True,
++        self,
++        grouping_vars=None,
++        *,
++        reverse=False,
++        from_comp_data=False,
++        by_facet=True,
++        allow_empty=False,
++        dropna=True,
+     ):
+         """Generator for getting subsets of data defined by semantic variables.
+ 
+@@ -992,14 +993,10 @@ class VectorPlotter:
+         # Always insert faceting variables
+         if by_facet:
+             facet_vars = {"col", "row"}
+-            grouping_vars.extend(
+-                facet_vars & set(self.variables) - set(grouping_vars)
+-            )
++            grouping_vars.extend(facet_vars & set(self.variables) - set(grouping_vars))
+ 
+         # Reduce to the semantics used in this plot
+-        grouping_vars = [
+-            var for var in grouping_vars if var in self.variables
+-        ]
++        grouping_vars = [var for var in grouping_vars if var in self.variables]
+ 
+         if from_comp_data:
+             data = self.comp_data
+@@ -1030,10 +1027,7 @@ class VectorPlotter:
+                     levels[axis] = np.log10(levels[axis])
+ 
+         if grouping_vars:
+-
+-            grouped_data = data.groupby(
+-                grouping_vars, sort=False, as_index=False
+-            )
++            grouped_data = data.groupby(grouping_vars, sort=False, as_index=False)
+ 
+             grouping_keys = []
+             for var in grouping_vars:
+@@ -1044,7 +1038,6 @@ class VectorPlotter:
+                 iter_keys = reversed(list(iter_keys))
+ 
+             for key in iter_keys:
+-
+                 # Pandas fails with singleton tuple inputs
+                 pd_key = key[0] if len(key) == 1 else key
+ 
+@@ -1065,7 +1058,6 @@ class VectorPlotter:
+                 yield sub_vars, data_subset.copy()
+ 
+         else:
+-
+             yield {}, data.copy()
+ 
+     @property
+@@ -1079,11 +1071,8 @@ class VectorPlotter:
+             return self.plot_data
+ 
+         if not hasattr(self, "_comp_data"):
+-
+-            comp_data = (
+-                self.plot_data
+-                .copy(deep=False)
+-                .drop(["x", "y"], axis=1, errors="ignore")
++            comp_data = self.plot_data.copy(deep=False).drop(
++                ["x", "y"], axis=1, errors="ignore"
+             )
+ 
+             for var in "yx":
+@@ -1093,7 +1082,7 @@ class VectorPlotter:
+                 parts = []
+                 grouped = self.plot_data[var].groupby(self.converters[var], sort=False)
+                 for converter, orig in grouped:
+-                    with pd.option_context('mode.use_inf_as_null', True):
++                    with pd.option_context("mode.use_inf_as_null", True):
+                         orig = orig.dropna()
+                         if var in self.var_levels:
+                             # TODO this should happen in some centralized location
+@@ -1151,6 +1140,7 @@ class VectorPlotter:
+ 
+         """
+         from .axisgrid import FacetGrid
++
+         if isinstance(obj, FacetGrid):
+             self.ax = None
+             self.facets = obj
+@@ -1205,7 +1195,6 @@ class VectorPlotter:
+                 converter.loc[:] = getattr(ax_list[0], f"{var}axis")
+ 
+             else:
+-
+                 # Next simplest case is when no axes are shared, and we can
+                 # use the axis objects within each facet
+                 if share_state is False:
+@@ -1217,7 +1206,6 @@ class VectorPlotter:
+                 # "file" of the facetgrid. In that case, we need to subset the data
+                 # for that file and assign it the first axis in the slice of the grid
+                 else:
+-
+                     names = getattr(self.facets, f"{share_state}_names")
+                     for i, level in enumerate(names):
+                         idx = (i, 0) if share_state == "row" else (0, i)
+@@ -1314,20 +1302,17 @@ class VectorPlotter:
+     # time they are called they operate on the store, not the current state.
+ 
+     def scale_native(self, axis, *args, **kwargs):
+-
+         # Default, defer to matplotlib
+ 
+         raise NotImplementedError
+ 
+     def scale_numeric(self, axis, *args, **kwargs):
+-
+         # Feels needed to completeness, what should it do?
+         # Perhaps handle log scaling? Set the ticker/formatter/limits?
+ 
+         raise NotImplementedError
+ 
+     def scale_datetime(self, axis, *args, **kwargs):
+-
+         # Use pd.to_datetime to convert strings or numbers to datetime objects
+         # Note, use day-resolution for numeric->datetime to match matplotlib
+ 
+@@ -1435,6 +1420,7 @@ class VariableType(UserString):
+     them. If that changes, they should be more verbose.
+ 
+     """
++
+     # TODO we can replace this with typing.Literal on Python 3.8+
+     allowed = "numeric", "datetime", "categorical"
+ 
+@@ -1489,7 +1475,7 @@ def variable_type(vector, boolean_type="numeric"):
+     # This is considered a bug by numpy and will likely go away.
+     with warnings.catch_warnings():
+         warnings.simplefilter(
+-            action='ignore', category=(FutureWarning, DeprecationWarning)
++            action="ignore", category=(FutureWarning, DeprecationWarning)
+         )
+         if np.isin(vector, [0, 1, np.nan]).all():
+             return VariableType(boolean_type)
+@@ -1641,16 +1627,12 @@ def unique_dashes(n):
+     # Now programmatically build as many as we need
+     p = 3
+     while len(dashes) < n:
+-
+         # Take combinations of long and short dashes
+         a = itertools.combinations_with_replacement([3, 1.25], p)
+         b = itertools.combinations_with_replacement([4, 1], p)
+ 
+         # Interleave the combinations, reversing one of the streams
+-        segment_list = itertools.chain(*zip(
+-            list(a)[1:-1][::-1],
+-            list(b)[1:-1]
+-        ))
++        segment_list = itertools.chain(*zip(list(a)[1:-1][::-1], list(b)[1:-1]))
+ 
+         # Now insert the gaps
+         for segments in segment_list:
+@@ -1695,12 +1677,14 @@ def unique_markers(n):
+     s = 5
+     while len(markers) < n:
+         a = 360 / (s + 1) / 2
+-        markers.extend([
+-            (s + 1, 1, a),
+-            (s + 1, 0, a),
+-            (s, 1, 0),
+-            (s, 0, 0),
+-        ])
++        markers.extend(
++            [
++                (s + 1, 1, a),
++                (s + 1, 0, a),
++                (s, 1, 0),
++                (s, 0, 0),
++            ]
++        )
+         s += 1
+ 
+     # Convert to MarkerStyle object, using only exactly what we need
+@@ -1735,7 +1719,6 @@ def categorical_order(vector, order=None):
+             try:
+                 order = vector.cat.categories
+             except (TypeError, AttributeError):
+-
+                 try:
+                     order = vector.unique()
+                 except AttributeError:

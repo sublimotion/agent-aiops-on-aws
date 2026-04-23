@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HyperPod Inference — llm-d + Dynamo + Operator Architecture</title>
+<style>
+  :root {
+    --bg: #0c0e14;
+    --surface: #151820;
+    --surface2: #1c2030;
+    --border: #2a3050;
+    --border-light: #3a4570;
+    --text: #e4e8f4;
+    --text-dim: #7c84a0;
+    --text-muted: #505670;
+    --managed: #818cf8;
+    --managed-bg: rgba(129,140,248,0.06);
+    --managed-border: rgba(129,140,248,0.20);
+    --diy: #34d399;
+    --diy-bg: rgba(52,211,153,0.06);
+    --diy-border: rgba(52,211,153,0.20);
+    --oss: #fbbf24;
+    --oss-bg: rgba(251,191,36,0.05);
+    --oss-border: rgba(251,191,36,0.18);
+    --vllm: #f87171;
+    --gateway: #60a5fa;
+    --epp: #22d3ee;
+    --daemon: #a78bfa;
+    --fsx: #fb923c;
+    --shm: #38bdf8;
+    --operator: #c084fc;
+    --green: #4ade80;
+    --dynamo: #f97316;
+    --dynamo-bg: rgba(249,115,22,0.06);
+    --dynamo-border: rgba(249,115,22,0.20);
+    --shared-bg: rgba(96,165,250,0.04);
+    --shared-border: rgba(96,165,250,0.15);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    padding: 2.5rem 2rem; max-width: 1300px; margin: 0 auto; line-height: 1.5;
+  }
+  h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 0.2rem; }
+  .subtitle { color: var(--text-dim); font-size: 0.88rem; margin-bottom: 1.75rem; }
+
+  /* Legend */
+  .legend { display:flex; gap:1.5rem; margin-bottom:1.75rem; flex-wrap:wrap; }
+  .legend-item { display:flex; align-items:center; gap:0.4rem; font-size:0.75rem; }
+  .lg-swatch { width:28px; height:14px; border-radius:3px; }
+
+  /* Layer */
+  .layer {
+    border-radius: 14px; padding: 1.2rem 1.4rem; margin-bottom: 1rem; position: relative;
+  }
+  .layer-managed { background: var(--managed-bg); border: 1.5px dashed var(--managed-border); }
+  .layer-diy { background: var(--diy-bg); border: 1.5px dashed var(--diy-border); }
+  .layer-dynamo { background: var(--dynamo-bg); border: 1.5px dashed var(--dynamo-border); }
+  .layer-oss { background: var(--oss-bg); border: 1.5px dashed var(--oss-border); }
+  .layer-shared { background: var(--shared-bg); border: 1.5px solid var(--shared-border); }
+  .layer-infra { background: var(--surface); border: 1px solid var(--border); }
+
+  .layer-title {
+    position: absolute; top: -0.55rem; left: 1.2rem;
+    font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; padding: 0.1rem 0.55rem; border-radius: 3px;
+  }
+  .lt-managed { background: var(--managed); color: #0c0e14; }
+  .lt-diy { background: var(--diy); color: #0c0e14; }
+  .lt-dynamo { background: var(--dynamo); color: #0c0e14; }
+  .lt-oss { background: var(--oss); color: #0c0e14; }
+  .lt-shared { background: var(--gateway); color: #0c0e14; }
+  .lt-infra { background: var(--border-light); color: #0c0e14; }
+
+  /* Grid */
+  .row { display: flex; gap: 0.7rem; margin-bottom: 0.7rem; flex-wrap: wrap; }
+  .row:last-child { margin-bottom: 0; }
+
+  /* Component box */
+  .c {
+    border-radius: 8px; padding: 0.75rem 0.9rem; flex: 1; min-width: 140px;
+    background: var(--surface2); border: 1px solid var(--border); position: relative;
+  }
+  .c-name { font-weight: 700; font-size: 0.78rem; margin-bottom: 0.15rem; display:flex; align-items:center; gap:0.35rem; }
+  .c-detail { font-size: 0.68rem; color: var(--text-dim); line-height: 1.5; }
+  .c-ns { font-size: 0.6rem; color: var(--text-muted); margin-top: 0.2rem; font-style: italic; }
+
+  .tag {
+    display: inline-block; font-size: 0.55rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 0.12em 0.4em; border-radius: 3px; vertical-align: middle;
+  }
+  .tag-m { background: rgba(129,140,248,0.2); color: var(--managed); }
+  .tag-d { background: rgba(52,211,153,0.2); color: var(--diy); }
+  .tag-o { background: rgba(251,191,36,0.15); color: var(--oss); }
+  .tag-v { background: rgba(248,113,113,0.15); color: var(--vllm); }
+  .tag-dyn { background: rgba(249,115,22,0.15); color: var(--dynamo); }
+  .tag-pass { background: rgba(74,222,128,0.15); color: var(--green); }
+  .tag-skip { background: rgba(124,132,160,0.15); color: var(--text-dim); }
+  .tag-fail { background: rgba(248,113,113,0.12); color: var(--vllm); }
+
+  /* Colored borders */
+  .c-gw { border-color: rgba(96,165,250,0.30); }
+  .c-epp { border-color: rgba(34,211,238,0.25); }
+  .c-vllm { border-color: rgba(248,113,113,0.25); }
+  .c-daemon { border-color: rgba(167,139,250,0.25); }
+  .c-fsx { border-color: rgba(251,146,60,0.25); }
+  .c-shm { border-color: rgba(56,189,248,0.22); }
+  .c-op { border-color: rgba(192,132,252,0.25); }
+  .c-health { border-color: rgba(74,222,128,0.20); }
+
+  /* Connectors */
+  .conn {
+    text-align: center; padding: 0.25rem 0; font-size: 0.65rem; color: var(--text-muted);
+  }
+  .conn-arrow { color: var(--border-light); font-size: 1.1rem; }
+
+  /* Section divider */
+  .divider {
+    display: flex; align-items: center; gap: 0.6rem; margin: 1.2rem 0 0.9rem;
+  }
+  .divider-line { flex:1; height:1px; background:var(--border); }
+  .divider-text {
+    font-size: 0.68rem; font-weight: 600; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap;
+  }
+
+  /* Two-column layout */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .cols-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.8rem; }
+  .full { grid-column: 1 / -1; }
+
+  /* Path comparison */
+  .paths { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.7rem; margin-top: 0.5rem; }
+  .path-card {
+    border-radius: 10px; padding: 0.9rem 1rem; background: var(--surface2); border: 1px solid var(--border);
+  }
+  .path-card h3 { font-size: 0.82rem; font-weight: 700; margin-bottom: 0.4rem; }
+  .path-card ul { font-size: 0.7rem; color: var(--text-dim); padding-left: 1rem; line-height: 1.7; }
+  .path-card .check { color: var(--green); }
+  .path-card .cross { color: var(--vllm); }
+
+  /* Responsibility table */
+  .resp { width:100%; border-collapse:collapse; font-size:0.75rem; }
+  .resp th {
+    text-align:left; font-weight:600; padding:0.55rem 0.75rem; background:var(--surface2);
+    color:var(--text-dim); font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em;
+    border-bottom:1px solid var(--border);
+  }
+  .resp td { padding:0.5rem 0.75rem; border-bottom:1px solid var(--border); vertical-align:top; }
+  .resp tr:last-child td { border-bottom:none; }
+  .cell-m { color:var(--managed); font-weight:600; }
+  .cell-d { color:var(--diy); font-weight:600; }
+  .cell-o { color:var(--oss); font-weight:600; }
+
+  /* Tier row */
+  .tier-strip {
+    display: flex; align-items: stretch; border: 1px solid var(--border);
+    border-bottom: none; background: var(--surface);
+  }
+  .tier-strip:first-child { border-radius: 8px 8px 0 0; }
+  .tier-strip:last-child { border-bottom: 1px solid var(--border); border-radius: 0 0 8px 8px; }
+  .tier-lbl {
+    width: 50px; display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:0.72rem; border-right:1px solid var(--border); padding:0.5rem;
+  }
+  .tier-body { flex:1; padding:0.55rem 0.85rem; }
+  .tier-body .tb-title { font-weight:600; font-size:0.78rem; margin-bottom:0.1rem; }
+  .tier-body .tb-detail { font-size:0.68rem; color:var(--text-dim); }
+  .tier-owner {
+    width:90px; display:flex; align-items:center; justify-content:center;
+    font-size:0.65rem; color:var(--text-muted); border-left:1px solid var(--border);
+    padding:0.4rem; text-align:center;
+  }
+  .tier-sep {
+    display:flex; align-items:center; gap:0.5rem; padding:0.35rem 0;
+  }
+  .tier-sep-line { flex:1; height:1px; background:var(--border); }
+  .tier-sep-text { font-size:0.6rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.08em; }
+
+  /* Validation badge */
+  .vbadge { font-size:0.6rem; margin-left:auto; }
+
+  footer {
+    margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--border);
+    color: var(--text-muted); font-size: 0.7rem; text-align: center;
+  }
+  code {
+    background: rgba(108,140,255,0.08); color: var(--gateway); padding:0.1em 0.3em;
+    border-radius:3px; font-size:0.68rem; font-family:'JetBrains Mono',monospace;
+  }
+
+  .c-dynamo { border-color: rgba(249,115,22,0.25); }
+
+  @media (max-width:1100px) {
+    .cols-3 { grid-template-columns:1fr; }
+  }
+  @media (max-width:850px) {
+    .cols { grid-template-columns:1fr; }
+    .paths { grid-template-columns:1fr; }
+    body { padding:1rem; }
+  }
+</style>
+</head>
+<body>
+
+<h1>HyperPod Inference Architecture</h1>
+<p class="subtitle">Three paths compared: Managed Operator (A) &bull; llm-d (B) &bull; NVIDIA Dynamo (C) &mdash; validated on inference-eks-v132 (2026-03-31)</p>
+
+<div class="legend">
+  <div class="legend-item">
+    <div class="lg-swatch" style="background:var(--managed-border); border:1px dashed var(--managed)"></div>
+    <span style="color:var(--managed); font-weight:600">HyperPod Managed</span>
+  </div>
+  <div class="legend-item">
+    <div class="lg-swatch" style="background:var(--diy-border); border:1px dashed var(--diy)"></div>
+    <span style="color:var(--diy); font-weight:600">Self-Managed (llm-d / Helm)</span>
+  </div>
+  <div class="legend-item">
+    <div class="lg-swatch" style="background:var(--dynamo-border); border:1px dashed var(--dynamo)"></div>
+    <span style="color:var(--dynamo); font-weight:600">NVIDIA Dynamo</span>
+  </div>
+  <div class="legend-item">
+    <div class="lg-swatch" style="background:var(--oss-border); border:1px dashed var(--oss)"></div>
+    <span style="color:var(--oss); font-weight:600">Open Source / K8s SIG</span>
+  </div>
+  <div class="legend-item">
+    <div class="lg-swatch" style="background:var(--shared-border); border:1px solid var(--gateway)"></div>
+    <span style="color:var(--gateway); font-weight:600">Shared Infrastructure</span>
+  </div>
+  <div class="legend-item" style="margin-left:auto;">
+    <span class="tag tag-pass">VALIDATED</span>
+    <span class="tag tag-skip">UNTESTED</span>
+    <span class="tag tag-fail">ISSUE</span>
+  </div>
+</div>
+
+<!-- ============ USER EXPERIENCE LAYER ============ -->
+<div class="divider">
+  <div class="divider-line"></div>
+  <div class="divider-text">User Experience Layer</div>
+  <div class="divider-line"></div>
+</div>
+
+<div class="layer layer-shared" style="padding-top:1.4rem;">
+  <div class="row">
+    <div class="c" style="border-color:rgba(192,132,252,0.25)">
+      <div class="c-name"><span style="color:var(--operator)">SageMaker Studio</span> <span class="tag tag-m">Path A</span></div>
+      <div class="c-detail">Console UI, JupyterLab, 1-click deploy<br/>JumpStart catalog &rarr; IEC CRD</div>
+    </div>
+    <div class="c" style="border-color:rgba(192,132,252,0.25)">
+      <div class="c-name"><span style="color:var(--operator)">HyperPod CLI (hyp)</span> <span class="tag tag-m">Path A</span></div>
+      <div class="c-detail"><code>hyp inference create</code><br/>Wraps kubectl + SageMaker APIs</div>
+    </div>
+    <div class="c c-gw">
+      <div class="c-name"><span style="color:var(--diy)">kubectl / Helm</span> <span class="tag tag-d">Path B</span> <span class="tag tag-pass vbadge">VALIDATED</span></div>
+      <div class="c-detail"><code>helm upgrade</code> llm-d charts<br/><code>kubectl apply</code> HTTPRoute, PV/PVC</div>
+    </div>
+    <div class="c" style="border-color:var(--dynamo-border)">
+      <div class="c-name"><span style="color:var(--dynamo)">kubectl apply</span> <span class="tag tag-dyn">Path C</span> <span class="tag tag-pass vbadge">VALIDATED</span></div>
+      <div class="c-detail"><code>kubectl apply -f</code> raw manifests<br/>No Helm &mdash; etcd + vLLM worker</div>
+    </div>
+    <div class="c" style="border-color:rgba(251,191,36,0.20)">
+      <div class="c-name"><span style="color:var(--oss)">Python SDK</span> <span class="tag tag-m">Path A</span></div>
+      <div class="c-detail"><code>boto3 sagemaker</code><br/><code>create_inference_endpoint</code></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ CONTROL PLANE ============ -->
+<div class="divider">
+  <div class="divider-line"></div>
+  <div class="divider-text">Control Plane &mdash; System Nodes (ml.m5.2xlarge, RestrictedInstanceGroups)</div>
+  <div class="divider-line"></div>
+</div>
+
+<div class="cols">
+  <!-- Left: Inference Operator (Path A ONLY — not used by llm-d) -->
+  <div class="layer layer-managed" style="padding-top:1.4rem; opacity:0.75;">
+    <div class="layer-title lt-managed">Inference Operator (Path A Only &mdash; not used by llm-d or Dynamo)</div>
+    <div class="row">
+      <div class="c c-op">
+        <div class="c-name">
+          <span style="color:var(--operator)">Inference Operator</span>
+          <span class="tag tag-m">Addon v1.0.1</span>
+          <span class="tag tag-pass vbadge">INSTALLED</span>
+        </div>
+        <div class="c-detail">
+          Controller Manager &mdash; watches IEC / JumpStartModel CRDs<br/>
+          Creates: Deployments, Services, ConfigMaps<br/>
+          <strong>Auto-injects</strong>: <code>--kv-transfer-config</code>, <code>LMCACHE_*</code>, volume mounts<br/>
+          <span style="color:var(--vllm)">EnableClusterInference: EnableFailed</span> (non-blocking)<br/>
+          <span style="color:var(--text-muted)">llm-d and Dynamo both bypass this &mdash; configure cache manually</span>
+        </div>
+        <div class="c-ns">ns: hyperpod-inference-system</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Cluster Services -->
+  <div class="layer layer-managed" style="padding-top:1.4rem;">
+    <div class="layer-title lt-managed">HyperPod Managed (Cluster Services)</div>
+    <div class="row">
+      <div class="c">
+        <div class="c-name"><span style="color:var(--managed)">KEDA</span> <span class="tag tag-m">Managed</span> <span class="tag tag-pass vbadge">VALIDATED</span></div>
+        <div class="c-detail">Autoscaling via ScaledObjects<br/>Cluster-wide, any namespace</div>
+      </div>
+      <div class="c">
+        <div class="c-name"><span style="color:var(--managed)">cert-manager</span> <span class="tag tag-m">Managed</span> <span class="tag tag-pass vbadge">VALIDATED</span></div>
+        <div class="c-detail">TLS certificate lifecycle<br/>Cluster-wide</div>
+        <div class="c-ns">ns: cert-manager</div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="c">
+        <div class="c-name"><span style="color:var(--managed)">ALB Controller</span> <span class="tag tag-m">Managed</span> <span class="tag tag-skip vbadge">UNTESTED</span></div>
+        <div class="c-detail">Ingress &rarr; ALB (Path A)<br/>Not used by llm-d (uses Istio NLB)</div>
+      </div>
+      <div class="c">
+        <div class="c-name"><span style="color:var(--managed)">ADOT Collector</span> <span class="tag tag-m">Managed</span> <span class="tag tag-fail vbadge">NOT FOUND</span></div>
+        <div class="c-detail">Expected: scrape &rarr; AMP/AMG<br/><strong>Not auto-installed</strong> on our cluster</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ INGRESS & ROUTING LAYER ============ -->
+<div class="divider">
+  <div class="divider-line"></div>
+  <div class="divider-text">Ingress &amp; Routing Layer</div>
+  <div class="divider-line"></div>
+</div>
+
+<div class="cols-3">
+  <!-- Path A: Operator routing -->
+  <div class="layer layer-managed" style="padding-top:1.4rem; opacity:0.75;">
+    <div class="layer-title lt-managed">Path A: Managed</div>
+    <div class="row">
+      <div class="c c-op">
+        <div class="c-name"><span style="color:var(--operator)">ALB</span> <span class="tag tag-m">Managed</span> <span class="tag tag-skip vbadge">UNTESTED</span></div>
+        <div class="c-detail">AWS-managed ALB via Operator</div>
+      </div>
+    </div>
+    <div class="conn"><span class="conn-arrow">&darr;</span></div>
+    <div class="row">
+      <div class="c c-op">
+        <div class="c-name"><span style="color:var(--operator)">Intelligent Router</span> <span class="tag tag-skip vbadge">UNTESTED</span></div>
+        <div class="c-detail">Closed-source &bull; prefixaware, kvaware, session</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Path B: llm-d routing -->
+  <div class="layer layer-diy" style="padding-top:1.4rem;">
+    <div class="layer-title lt-diy">Path B: llm-d</div>
+    <div class="row">
+      <div class="c c-gw">
+        <div class="c-name"><span style="color:var(--gateway)">NLB + Istio Gateway</span> <span class="tag tag-pass vbadge">VALIDATED</span></div>
+        <div class="c-detail">Envoy proxy &bull; ext-proc filter &rarr; EPP</div>
+        <div class="c-ns">llm-d-infra Helm v1.4.0</div>
+      </div>
+    </div>
+    <div class="conn"><span class="conn-arrow">&darr;</span> HTTPRoute &rarr; InferencePool (GA API)</div>
+    <div class="row">
+      <div class="c c-epp">
+        <div class="c-name"><span style="color:var(--epp)">EPP (Endpoint Picker)</span> <span class="tag tag-pass vbadge">VALIDATED</span></div>
+        <div class="c-detail">PrefixCacheScorer (w:3) + LoadAwareScorer (w:1) &bull; gRPC :9002</div>
+        <div class="c-ns">GAIE Helm v1.4.0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Path C: Dynamo routing -->
+  <div class="layer layer-dynamo" style="padding-top:1.4rem;">
+    <div class="layer-title lt-dynamo">Path C: Dynamo</div>
+    <div class="row">
+      <div class="c c-dynamo">
+        <div class="c-name"><span style="color:var(--dynamo)">NLB Service</span> <span class="tag tag-pass vbadge">VALIDATED</span></div>
+        <div class="c-detail"><code>type: LoadBalancer</code> &bull; direct to worker, no mesh</div>
+      </div>
+    </div>
+    <div class="conn"><span class="conn-arrow">&darr;</span> Direct TCP &rarr; port 8000</div>
+    <div class="row">
+      <div class="c c-dynamo">
+        <div class="c-name"><span style="color:var(--dynamo)">etcd</span> <span class="tag tag-pass vbadge">VALIDATED</span></div>
+        <div class="c-detail">v3.5.17 :2379 &bull; Dynamo service discovery (replaced NATS in v1.0+)</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DATA PLANE ============ -->
+<div class="divider">
+  <div class="divider-line"></div>
+  <div class="divider-text">Data Plane &mdash; GPU Workers (ml.g5.4xlarge, A10G 24GB)</div>
+  <div class="divider-line"></div>
+</div>
+
+<div class="cols">
+  <!-- Left: llm-d full worker architecture -->
+  <div>
+    <div class="layer layer-diy" style="padding-top:1.4rem;">
+      <div class="layer-title lt-diy">Path B: llm-d Worker Pool</div>
+
+      <!-- What we deployed -->
+      <div style="font-size:0.62rem; color:var(--diy); font-weight:700; margin-bottom:0.35rem; margin-top:0.3rem;">DEPLOYED (AGGREGATED MODE)</div>
+      <div class="row">
+        <div class="c c-vllm">
+          <div class="c-name">
+            <span style="color:var(--vllm)">vLLM Worker (Aggregated)</span>
+            <span class="tag tag-pass vbadge">VALIDATED</span>
+          </div>
+          <div class="c-detail">
+            Qwen/Qwen3-0.6B &bull; v0.15.1 &bull; 1x A10G, TP=1<br/>
+            Handles both prefill + decode in single pod<br/>
+            Port 8000 &bull; Image ~3 GB
+          </div>
+          <div style="margin-top:0.5rem; padding-top:0.4rem; border-top:1px dashed rgba(248,113,113,0.15);">
+            <div style="font-size:0.72rem; font-weight:600; color:var(--green); margin-bottom:0.15rem;">
+              LMCache (vLLM plugin) <span class="tag tag-pass">OK</span>
+            </div>
+            <div class="c-detail">
+              <span style="color:var(--green)">L0</span> GPU prefix (162K tok, 17.3 GiB)<br/>
+              <span style="color:var(--oss)">L1</span> CPU offload (5 GB, LRU)<br/>
+              <span style="color:var(--daemon)">L2</span> sagemaker-hyperpod://:9200
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Full architecture (not deployed) -->
+      <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700; margin-bottom:0.35rem; margin-top:0.5rem;">FULL ARCHITECTURE (P/D DISAGGREGATION)</div>
+      <div class="row">
+        <div class="c" style="border-color:rgba(248,113,113,0.15); opacity:0.65;">
+          <div class="c-name">
+            <span style="color:var(--vllm)">Prefill Workers</span>
+            <span class="tag tag-skip vbadge">NOT DEPLOYED</span>
+          </div>
+          <div class="c-detail">
+            Compute-bound &bull; high GPU utilization<br/>
+            Receives full prompt, outputs KV cache<br/>
+            NIXL/EFA transfer to decode workers
+          </div>
+        </div>
+        <div class="c" style="border-color:rgba(248,113,113,0.15); opacity:0.65;">
+          <div class="c-name">
+            <span style="color:var(--vllm)">Decode Workers</span>
+            <span class="tag tag-skip vbadge">NOT DEPLOYED</span>
+          </div>
+          <div class="c-detail">
+            Memory-bound &bull; autoregressive generation<br/>
+            Receives KV cache from prefill via NIXL<br/>
+            EPP routes based on prefix + load
+          </div>
+        </div>
+      </div>
+      <div class="c" style="padding:0.35rem 0.7rem; border-color:rgba(248,113,113,0.10); opacity:0.55; margin-top:0.3rem;">
+        <div class="c-detail" style="font-size:0.62rem;">
+          <span style="color:var(--text-muted)">P/D requires: multi-node GPU (g5.12xlarge+ for EFA), NIXL library, EPP prefix-aware routing.<br/>
+          Our g5.4xlarge (1 GPU, no EFA) can only run aggregated mode.</span>
+        </div>
+      </div>
+      <div class="c-ns" style="font-size:0.6rem; color:var(--text-muted); margin-top:0.3rem;">ns: llmd-validation &bull; 3 Helm charts</div>
+    </div>
+  </div>
+
+  <!-- Right: Dynamo full worker architecture -->
+  <div>
+    <div class="layer layer-dynamo" style="padding-top:1.4rem;">
+      <div class="layer-title lt-dynamo">Path C: Dynamo Component Stack</div>
+
+      <!-- What we deployed -->
+      <div style="font-size:0.62rem; color:var(--dynamo); font-weight:700; margin-bottom:0.35rem; margin-top:0.3rem;">DEPLOYED (WORKER ONLY)</div>
+      <div class="row">
+        <div class="c c-dynamo">
+          <div class="c-name">
+            <span style="color:var(--dynamo)">vLLM Worker (Aggregated)</span>
+            <span class="tag tag-pass vbadge">VALIDATED</span>
+          </div>
+          <div class="c-detail">
+            <code>vllm-runtime:1.0.1</code> (vLLM 0.16.0)<br/>
+            Qwen/Qwen3-0.6B &bull; 1x A10G<br/>
+            Image: 12.3 GB (NGC)
+          </div>
+          <div style="margin-top:0.5rem; padding-top:0.4rem; border-top:1px dashed rgba(249,115,22,0.15);">
+            <div style="font-size:0.72rem; font-weight:600; color:var(--dynamo); margin-bottom:0.15rem;">
+              KVBM (env vars set) <span class="tag tag-skip">NOT ACTIVE</span>
+            </div>
+            <div class="c-detail">
+              <span style="color:var(--dynamo)">G1</span> GPU HBM (vLLM prefix)<br/>
+              <span style="color:var(--oss)">G2</span> CPU DRAM (8 GB configured)<br/>
+              <span style="color:var(--fsx)">G3</span> FSx /mnt/fsx/kv-cache/
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Full Dynamo architecture (not deployed) -->
+      <div style="font-size:0.62rem; color:var(--text-muted); font-weight:700; margin-bottom:0.35rem; margin-top:0.5rem;">FULL ARCHITECTURE (DYNAMO ORCHESTRATION)</div>
+      <div class="row">
+        <div class="c" style="border-color:var(--dynamo-border); opacity:0.65;">
+          <div class="c-name">
+            <span style="color:var(--dynamo)">Frontend</span>
+            <span class="tag tag-skip vbadge">NOT DEPLOYED</span>
+          </div>
+          <div class="c-detail">
+            Rust HTTP API gateway &bull; OpenAI-compatible<br/>
+            Bundled with Router &bull; Activates KVBM
+          </div>
+        </div>
+        <div class="c" style="border-color:var(--dynamo-border); opacity:0.65;">
+          <div class="c-name">
+            <span style="color:var(--dynamo)">Router</span>
+            <span class="tag tag-skip vbadge">NOT DEPLOYED</span>
+          </div>
+          <div class="c-detail">
+            KV-aware request dispatch<br/>
+            Prefix-hash or load-aware routing
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="c" style="border-color:var(--dynamo-border); opacity:0.65;">
+          <div class="c-name">
+            <span style="color:var(--dynamo)">Planner</span>
+            <span class="tag tag-skip vbadge">NOT DEPLOYED</span>
+          </div>
+          <div class="c-detail">
+            SLA-driven autoscaler &bull; throughput/latency targets
+          </div>
+        </div>
+        <div class="c" style="border-color:var(--dynamo-border); opacity:0.65;">
+          <div class="c-name">
+            <span style="color:var(--dynamo)">Prefill + Decode Workers</span>
+            <span class="tag tag-skip vbadge">NOT DEPLOYED</span>
+          </div>
+          <div class="c-detail">
+            Disaggregated P/D with NIXL transfer<br/>
+            Async KV write-back (2x vs 13x sync)
+          </div>
+        </div>
+      </div>
+      <div class="c" style="padding:0.35rem 0.7rem; border-color:var(--dynamo-border); opacity:0.55; margin-top:0.3rem;">
+        <div class="c-detail" style="font-size:0.62rem;">
+          <span style="color:var(--text-muted)">Full stack requires: Frontend + Router + Planner to activate KVBM G2/G3.<br/>
+          P/D disaggregation requires multi-GPU nodes + NIXL (NVLink or EFA).<br/>
+          We deployed worker-only mode &mdash; standard vLLM with prefix caching.</span>
+        </div>
+      </div>
+      <div class="c-ns" style="font-size:0.6rem; color:var(--text-muted); margin-top:0.3rem;">ns: dynamo-validation &bull; 4 raw manifests</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============ MANAGED GPU-NODE SERVICES ============ -->
+<div class="divider">
+  <div class="divider-line"></div>
+  <div class="divider-text">Managed GPU-Node Services (HyperPod)</div>
+  <div class="divider-line"></div>
+</div>
+
+<div class="cols">
+  <div>
+    <!-- Component 1: Inference Operator (Path A ONLY) -->
+    <div class="layer layer-managed" style="padding-top:1.4rem; margin-bottom:0.6rem; opacity:0.7;">
+      <div class="layer-title lt-managed">Managed Component 1 &mdash; Inference Operator (Path A Only)</div>
+
+      <div style="font-size:0.62rem; color:var(--text-muted); font-weight:600; margin-bottom:0.35rem; margin-top:0.3rem;">NOT USED BY llm-d &mdash; MANAGES IEC ENDPOINTS</div>
+      <div class="row">
+        <div class="c c-op" style="opacity:0.85;">
+          <div class="c-name">
+            <span style="color:var(--operator)">Operator Controller</span>
+            <span class="tag tag-m">Path A</span>
+          </div>
+          <div class="c-detail">
+            Watches IEC CRDs &rarr; creates Deployments, Services<br/>
+            Auto-injects: <code>--kv-transfer-config</code>, <code>LMCACHE_*</code><br/>
+            Auto-mounts: /dev/shm, FSx volumes<br/>
+            <span style="color:var(--text-muted)">llm-d does all this manually via Helm values</span>
+          </div>
+          <div class="c-ns">ns: hyperpod-inference-system</div>
+        </div>
+        <div class="c" style="padding:0.45rem 0.7rem; border-color:rgba(192,132,252,0.18); opacity:0.85;">
+          <div class="c-detail">
+            <span style="color:var(--operator)">IEC CRDs</span>: InferenceEndpointConfig, JumpStartModel<br/>
+            <span style="color:var(--text-muted)">(<code>inference.sagemaker.aws.amazon.com</code>)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <!-- Component 2: KV Cache Infrastructure (ALL PATHS) -->
+    <div class="layer layer-shared" style="padding-top:1.4rem; border-width:2px;">
+      <div class="layer-title lt-shared">Managed Component 2 &mdash; KV Cache Infrastructure (All Paths)</div>
+
+      <!-- L2 Daemon -->
+      <div style="font-size:0.62rem; color:var(--text-muted); font-weight:600; margin-bottom:0.35rem; margin-top:0.3rem;">L2: MANAGED TIERED STORAGE DAEMON</div>
+      <div class="row">
+        <div class="c c-daemon">
+          <div class="c-name">
+            <span style="color:var(--daemon)">ai-toolkit DaemonSet</span>
+            <span class="tag tag-m">Managed</span>
+            <span class="tag tag-pass vbadge">VALIDATED</span>
+          </div>
+          <div class="c-detail">
+            Per GPU node &bull; port 9200 &bull; uid 1000<br/>
+            TieredStorageConfig.Mode: Enable<br/>
+            InstanceMemoryAllocation: 20%<br/>
+            Manages SHM &harr; FSx tiering internally
+          </div>
+          <div class="c-ns">ns: aws-hyperpod</div>
+        </div>
+      </div>
+
+      <div class="conn"><span class="conn-arrow">&darr;</span> POSIX shared memory IPC</div>
+
+      <!-- Shared Memory -->
+      <div class="row">
+        <div class="c c-shm">
+          <div class="c-name">
+            <span style="color:var(--shm)">Shared Memory (L2)</span>
+            <span class="tag tag-m">Managed</span>
+            <span class="tag tag-pass vbadge">VALIDATED</span>
+          </div>
+          <div class="c-detail">
+            <code>/dev/shm/ai_toolkit_cache</code> (1 GB)<br/>
+            Zero-copy IPC &bull; same-node cross-pod<br/>
+            hostPath mount required (not emptyDir)
+          </div>
+        </div>
+      </div>
+
+      <div class="conn"><span class="conn-arrow">&darr;</span> daemon evicts cold blocks to FSx</div>
+
+      <!-- FSx -->
+      <div style="font-size:0.62rem; color:var(--text-muted); font-weight:600; margin-bottom:0.35rem;">L3: FSx LUSTRE (CROSS-NODE)</div>
+      <div class="row">
+        <div class="c c-fsx">
+          <div class="c-name">
+            <span style="color:var(--fsx)">FSx Lustre</span>
+            <span class="tag tag-m">Auto-provisioned</span>
+            <span class="tag tag-pass vbadge">VALIDATED</span>
+          </div>
+          <div class="c-detail">
+            1.2 TiB &bull; fs-0ea95350af6e402f6<br/>
+            125 MB/s/TiB &bull; ReadWriteMany<br/>
+            Auto-provisioned via FSxLustreConfig<br/>
+            Mounted at <code>/mnt/fsx</code> via CSI PV/PVC
+          </div>
+        </div>
+      </div>
+
+      <!-- How each path connects -->
+      <div style="margin-top:0.6rem; padding:0.6rem 0.8rem; background:rgba(96,165,250,0.06); border-radius:8px; border:1px dashed rgba(96,165,250,0.15);">
+        <div style="font-size:0.62rem; color:var(--gateway); font-weight:700; margin-bottom:0.35rem;">HOW EACH PATH CONNECTS TO THIS INFRA</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; font-size:0.68rem;">
+          <div>
+            <div style="color:var(--managed); font-weight:600; margin-bottom:0.1rem;">Path A (Operator)</div>
+            <div style="color:var(--text-dim)">Auto-injects <code>LMCACHE_*</code>, mounts shm + FSx</div>
+          </div>
+          <div>
+            <div style="color:var(--diy); font-weight:600; margin-bottom:0.1rem;">Path B (llm-d) <span class="tag tag-pass" style="font-size:0.48rem;">OK</span></div>
+            <div style="color:var(--text-dim)">Manual: <code>sagemaker-hyperpod://</code>, hostPath shm, PV/PVC</div>
+          </div>
+          <div>
+            <div style="color:var(--dynamo); font-weight:600; margin-bottom:0.1rem;">Path C (Dynamo) <span class="tag tag-pass" style="font-size:0.48rem;">FSx ONLY</span></div>
+            <div style="color:var(--text-dim)"><strong>Does NOT use L2 daemon or shm.</strong> Uses FSx at <code>/mnt/fsx/kv-cache/</code> for KVBM G3 disk tier</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Health monitoring -->
+      <div style="font-size:0.62rem; color:var(--text-muted); font-weight:600; margin-bottom:0.35rem; margin-top:0.5rem;">NODE-LEVEL SERVICES</div>
+      <div class="row">
+        <div class="c c-health">
+          <div class="c-name">
+            <span style="color:var(--green)">Health Monitoring</span>
+            <span class="tag tag-m">Managed</span>
+            <span class="tag tag-pass vbadge">VALIDATED</span>
+          </div>
+          <div class="c-detail">DaemonSet &bull; node health + auto-remediation</div>
+          <div class="c-ns">ns: aws-hyperpod</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Key Insight Callout -->
+<div class="layer" style="background:rgba(96,165,250,0.04); border:2px solid rgba(96,165,250,0.25); padding:0.85rem 1.2rem; margin-top:0.5rem;">
+  <div class="layer-title" style="background:var(--gateway); color:#0c0e14;">Key Architecture Insight</div>
+  <div style="font-size:0.78rem; color:var(--text); margin-top:0.15rem; line-height:1.6;">
+    Three independent layers: the <span style="color:var(--operator); font-weight:700;">Inference Operator</span> (Path A only),
+    the <span style="color:var(--gateway); font-weight:700;">KV Cache Infrastructure</span> (L2 daemon + shm + FSx, shared),
+    and <span style="color:var(--dynamo); font-weight:700;">Dynamo KVBM</span> (self-contained per-worker, uses FSx only).
+    llm-d deeply integrates with the L2 daemon; Dynamo brings its own cache hierarchy and only touches FSx for disk-tier persistence.
+  </div>
+  <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center; margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid rgba(96,165,250,0.12); font-size:0.7rem;">
+    <div style="display:flex; align-items:center; gap:0.3rem;">
+      <span style="color:var(--diy); font-weight:600;">llm-d</span>
+      <span style="color:var(--text-muted)">uses L2+L3</span>
+      <span class="tag tag-pass" style="font-size:0.5rem;">OK</span>
+    </div>
+    <span style="color:var(--text-muted)">&bull;</span>
+    <div style="display:flex; align-items:center; gap:0.3rem;">
+      <span style="color:var(--dynamo); font-weight:600;">Dynamo</span>
+      <span style="color:var(--text-muted)">uses FSx only</span>
+      <span class="tag tag-pass" style="font-size:0.5rem;">OK</span>
+    </div>
+    <span style="color:var(--text-muted)">&bull;</span>
+    <div style="display:flex; align-items:center; gap:0.3rem;">
+      <span style="color:var(--dynamo); font-weight:600;">Dynamo</span>
+      <span style="color:var(--text-muted)">skips Operator + L2</span>
+    </div>
+    <span style="color:var(--text-muted)">&bull;</span>
+    <div style="display:flex; align-items:center; gap:0.3rem;">
+      <span style="color:var(--text-muted)">All CRDs coexist</span>
+      <span class="tag tag-pass" style="font-size:0.5rem;">OK</span>
+    </div>
+  </div>
+</div>
+
+<!-- Integration Points -->
+<div class="cols" style="margin-top:0.5rem;">
+  <div class="layer" style="background:rgba(52,211,153,0.03); border:1.5px dashed rgba(52,211,153,0.15); padding:0.75rem 1.2rem;">
+    <div class="layer-title lt-diy">llm-d &harr; HyperPod Integration</div>
+    <div style="display:flex; flex-direction:column; gap:0.35rem; margin-top:0.2rem; font-size:0.68rem;">
+      <div style="display:flex; align-items:center; gap:0.3rem;">
+        <span style="color:var(--vllm); font-weight:600;">LMCache</span>
+        <span style="color:var(--text-muted)">&rarr;</span>
+        <code>sagemaker-hyperpod://:9200</code>
+        <span style="color:var(--text-muted)">&rarr;</span>
+        <span style="color:var(--daemon); font-weight:600;">ai-toolkit</span>
+        <span class="tag tag-pass" style="font-size:0.5rem;">OK</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:0.3rem;">
+        <span style="color:var(--vllm); font-weight:600;">vLLM</span>
+        <span style="color:var(--text-muted)">&rarr;</span>
+        <code>hostPath /dev/shm</code>
+        <span style="color:var(--text-muted)">&rarr;</span>
+        <span style="color:var(--shm); font-weight:600;">SHM IPC</span>
+        <span class="tag tag-pass" style="font-size:0.5rem;">OK</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:0.3rem;">
+        <span style="color:var(--vllm); font-weight:600;">Pod</span>
+        <span style="color:var(--text-muted)">&rarr;</span>
+        <code>PVC fsx-kvcache</code>
+        <span style="color:var(--text-muted)">&rarr;</span>
+        <span style="color:var(--fsx); font-weight:600;">FSx /mnt/fsx/kvcache</span>
+        <span class="tag tag-pass" style="font-size:0.5rem;">OK</span>
+      </div>
+    </div>
+  </div>
+  <div class="layer" style="background:rgba(249,115,22,0.03); border:1.5px dashed rgba(249,115,22,0.15); padding:0.75rem 1.2rem;">
+    <div class="layer-title lt-dynamo">Dynamo &harr; HyperPod Integration</div>
+    <div style="display:flex; flex-direction:column; gap:0.35rem; margin-top:0.2rem; font-size:0.68rem;">
+      <div style="display:flex; align-items:center; gap:0.3rem;">
+        <span style="color:var(--dynamo); font-weight:600;">KVBM G3</span>
+        <span style="color:var(--text-muted)">&rarr;</span>
+        <code>PVC fsx-dynamo</code>
+        <span style="color:var(--text-muted)">&rarr;</span>
+        <span style="color:var(--fsx); font-weight:600;">FSx /mnt/fsx/kv-cache/</span>
+        <span class="tag tag-pass" style="font-size:0.5rem;">OK</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:0.3rem;">
+        <span style="color:var(--dynamo); font-weight:600;">etcd</span>
+        <span style="color:var(--text-muted)">&rarr;</span>
+        <code>etcd.dynamo-validation:2379</code>
+        <span class="tag tag-pass" style="font-size:0.5rem;">OK</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:0.3rem; color:var(--text-muted);">
+        <span style="font-weight:600;">L2 daemon</span>
+        <span>&rarr; NOT USED</span>
+        <span>(KVBM is self-contained)</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:0.3rem; color:var(--text-muted);">
+        <span style="font-weight:600;">Shared memory</span>
+        <span>&rarr; NOT USED</span>
+        <span>(KVBM G2 = CPU pinned DRAM)</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ TIERED CACHE STACK ============ -->
+<div class="divider">
+  <div class="divider-line"></div>
+  <div class="divider-text">Tiered KV Cache Comparison: LMCache (llm-d) vs KVBM (Dynamo)</div>
+  <div class="divider-line"></div>
+</div>
+
+<div class="cols">
+<div>
+  <div style="font-size:0.72rem; font-weight:700; color:var(--diy); margin-bottom:0.4rem; text-align:center;">llm-d LMCache Stack</div>
+  <div class="tier-strip">
+    <div class="tier-lbl" style="color:var(--green)">L0</div>
+    <div class="tier-body">
+      <div class="tb-title" style="color:var(--green)">GPU KV Cache <span class="tag tag-pass" style="font-size:0.52rem">59.5% HIT RATE</span></div>
+      <div class="tb-detail">vLLM prefix cache &mdash; 162K tokens, 17.3 GiB. <code>--enable-prefix-caching</code></div>
+    </div>
+    <div class="tier-owner" style="color:var(--diy)">LMCache<br/>(vLLM)</div>
+  </div>
+  <div class="tier-strip">
+    <div class="tier-lbl" style="color:var(--oss)">L1</div>
+    <div class="tier-body">
+      <div class="tb-title" style="color:var(--oss)">CPU DRAM Offload</div>
+      <div class="tb-detail">LMCache in-process &mdash; 5 GB, LRU. <code>LMCACHE_LOCAL_CPU=True</code></div>
+    </div>
+    <div class="tier-owner" style="color:var(--diy)">LMCache<br/>(vLLM)</div>
+  </div>
+
+  <div class="tier-sep">
+    <div class="tier-sep-line"></div>
+    <div class="tier-sep-text">sagemaker-hyperpod:// boundary</div>
+    <div class="tier-sep-line"></div>
+  </div>
+
+  <div class="tier-strip">
+    <div class="tier-lbl" style="color:var(--daemon)">L2</div>
+    <div class="tier-body">
+      <div class="tb-title" style="color:var(--daemon)">Managed Tiered Storage Daemon <span class="tag tag-pass" style="font-size:0.52rem">CONNECTED</span></div>
+      <div class="tb-detail">ai-toolkit :9200 &bull; IPC via <code>/dev/shm/ai_toolkit_cache</code> &bull; cross-pod same-node</div>
+    </div>
+    <div class="tier-owner" style="color:var(--managed)">HyperPod<br/>(managed)</div>
+  </div>
+  <div class="tier-strip">
+    <div class="tier-lbl" style="color:var(--fsx)">L3</div>
+    <div class="tier-body">
+      <div class="tb-title" style="color:var(--fsx)">FSx Lustre <span class="tag tag-pass" style="font-size:0.52rem">MOUNTED 1.2 TiB</span></div>
+      <div class="tb-detail">POSIX mount at <code>/mnt/fsx</code> &bull; cross-node &bull; framework-agnostic &bull; auto-provisioned</div>
+    </div>
+    <div class="tier-owner" style="color:var(--managed)">HyperPod<br/>(managed)</div>
+  </div>
+  <div class="tier-strip" style="border-top:1px dashed var(--border);">
+    <div class="tier-lbl" style="color:var(--text-muted); font-size:0.65rem;">L3<br/>alt</div>
+    <div class="tier-body">
+      <div class="tb-title" style="color:var(--text-dim)">Redis / Valkey <span class="tag tag-skip" style="font-size:0.52rem">UNTESTED</span></div>
+      <div class="tb-detail">ElastiCache &bull; <code>redis://</code> URL &bull; alternative to FSx for cross-node</div>
+    </div>
+    <div class="tier-owner" style="color:var(--text-muted)">Self-managed</div>
+  </div>
+</div>
+
+<!-- Dynamo KVBM Stack -->
+<div>
+  <div style="font-size:0.72rem; font-weight:700; color:var(--dynamo); margin-bottom:0.4rem; text-align:center;">NVIDIA Dynamo KVBM</div>
+  <div class="tier-strip">
+    <div class="tier-lbl" style="color:var(--green)">G1</div>
+    <div class="tier-body">
+      <div class="tb-title" style="color:var(--green)">GPU HBM (vLLM Prefix) <span class="tag tag-pass" style="font-size:0.52rem">ACTIVE</span></div>
+      <div class="tb-detail">Standard vLLM prefix caching &mdash; <code>--enable-prefix-caching</code></div>
+    </div>
+    <div class="tier-owner" style="color:var(--dynamo)">vLLM<br/>(built-in)</div>
+  </div>
+  <div class="tier-strip">
+    <div class="tier-lbl" style="color:var(--oss)">G2</div>
+    <div class="tier-body">
+      <div class="tb-title" style="color:var(--oss)">CPU Pinned DRAM <span class="tag tag-skip" style="font-size:0.52rem">ENV SET, NOT ACTIVE</span></div>
+      <div class="tb-detail"><code>DYN_KVBM_CPU_CACHE_GB=8</code> &mdash; needs full Dynamo stack to activate</div>
+    </div>
+    <div class="tier-owner" style="color:var(--dynamo)">KVBM<br/>(Dynamo)</div>
+  </div>
+
+  <div class="tier-sep">
+    <div class="tier-sep-line"></div>
+    <div class="tier-sep-text">self-contained (no daemon)</div>
+    <div class="tier-sep-line"></div>
+  </div>
+
+  <div class="tier-strip">
+    <div class="tier-lbl" style="color:var(--fsx)">G3</div>
+    <div class="tier-body">
+      <div class="tb-title" style="color:var(--fsx)">FSx Lustre Disk <span class="tag tag-skip" style="font-size:0.52rem">ENV SET, NOT ACTIVE</span></div>
+      <div class="tb-detail"><code>/mnt/fsx/kv-cache/</code> &bull; 50 GB &bull; ZEROFILL + no O_DIRECT (Lustre compat)</div>
+    </div>
+    <div class="tier-owner" style="color:var(--dynamo)">KVBM<br/>(Dynamo)</div>
+  </div>
+  <div class="tier-strip" style="border-top:1px dashed var(--border);">
+    <div class="tier-lbl" style="color:var(--text-muted); font-size:0.65rem;">G3<br/>alt</div>
+    <div class="tier-body">
+      <div class="tb-title" style="color:var(--text-dim)">NVMe / Local Disk <span class="tag tag-skip" style="font-size:0.52rem">UNTESTED</span></div>
+      <div class="tb-detail">For instances with NVMe (g7e, p5e) &mdash; lower latency than FSx</div>
+    </div>
+    <div class="tier-owner" style="color:var(--dynamo)">KVBM<br/>(Dynamo)</div>
+  </div>
+
+  <!-- Key difference callout -->
+  <div style="margin-top:0.5rem; padding:0.5rem 0.7rem; background:rgba(249,115,22,0.06); border-radius:6px; border:1px dashed rgba(249,115,22,0.15); font-size:0.68rem;">
+    <div style="color:var(--dynamo); font-weight:700; margin-bottom:0.2rem;">KEY DIFFERENCE</div>
+    <div style="color:var(--text-dim)">
+      LMCache uses an <strong>external daemon</strong> (L2 ai-toolkit) for cross-pod cache sharing via shared memory.
+      KVBM is <strong>self-contained per worker</strong> &mdash; no daemon, no shm, each worker manages its own GPU&rarr;CPU&rarr;disk hierarchy.
+      Cross-worker sharing uses NIXL (network) instead.
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ============ THREE PATHS ============ -->
+<div class="divider">
+  <div class="divider-line"></div>
+  <div class="divider-text">Three Paths on Same Cluster</div>
+  <div class="divider-line"></div>
+</div>
+
+<div class="paths">
+  <div class="path-card" style="border-color:var(--managed-border);">
+    <h3 style="color:var(--managed)">Path A: Managed Operator</h3>
+    <ul>
+      <li>IEC CRD &rarr; Operator reconciles</li>
+      <li>Ingress: <strong>ALB</strong> (auto-provisioned)</li>
+      <li>Router: <strong>Intelligent Router</strong> (closed-source)</li>
+      <li>Cache: <strong>Operator auto-injects</strong> LMCache config &rarr; same L2/L3 infra</li>
+      <li><span class="check">+</span> 1-CRD deploy, lowest ops</li>
+      <li><span class="check">+</span> JumpStart catalog, KEDA autoscaling</li>
+      <li><span class="cross">&minus;</span> No P/D disaggregation</li>
+      <li><span class="cross">&minus;</span> No expert parallelism</li>
+    </ul>
+  </div>
+  <div class="path-card" style="border-color:var(--diy-border); border-width:2px;">
+    <h3 style="color:var(--diy)">Path B: llm-d (K8s-Native) <span class="tag tag-pass">VALIDATED</span></h3>
+    <ul>
+      <li>Helmfile + Gateway API + Istio</li>
+      <li>Ingress: <strong>NLB + Istio Gateway</strong></li>
+      <li>Router: <strong>EPP</strong> (Envoy ext-proc, OSS)</li>
+      <li>Cache: <strong>Manual config</strong> &rarr; same L2/L3 infra</li>
+      <li><span class="check">+</span> P/D disaggregation + NIXL/EFA</li>
+      <li><span class="check">+</span> Pluggable scorers, full control</li>
+      <li><span class="check">+</span> Uses managed KV cache w/o operator</li>
+      <li><span class="cross">&minus;</span> Higher ops burden (3 Helm charts)</li>
+    </ul>
+  </div>
+  <div class="path-card" style="border-color:var(--dynamo-border); border-width:2px;">
+    <h3 style="color:var(--dynamo)">Path C: NVIDIA Dynamo <span class="tag tag-pass">VALIDATED</span></h3>
+    <ul>
+      <li><strong>4 raw manifests</strong> (no Helm)</li>
+      <li>Ingress: <strong>NLB direct</strong> (no Istio)</li>
+      <li>Discovery: <strong>etcd</strong> (self-deployed)</li>
+      <li>Cache: KVBM G1&rarr;G2&rarr;G3 (self-contained)</li>
+      <li><span class="check">+</span> Simplest setup (fewest deps)</li>
+      <li><span class="check">+</span> No L2 daemon dependency</li>
+      <li><span class="check">+</span> A10G sm_86 confirmed compatible</li>
+      <li><span class="cross">&minus;</span> KVBM needs full stack (not just vllm-runtime)</li>
+      <li><span class="cross">&minus;</span> 12.3 GB image &rarr; DiskPressure risk</li>
+      <li><span class="cross">&minus;</span> NGC entrypoint needs override</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Shared infra bar -->
+<div class="layer layer-shared" style="margin-top:0.75rem; padding:0.8rem 1.2rem;">
+  <div class="layer-title lt-shared">Shared Managed Infrastructure (All Paths)</div>
+  <div style="font-size:0.65rem; color:var(--gateway); font-weight:600; margin-bottom:0.3rem; margin-top:0.1rem;">KV CACHE INFRASTRUCTURE (independent of operator)</div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:0.4rem; font-size:0.7rem; margin-bottom:0.5rem;">
+    <div><span style="color:var(--daemon)">&#10003;</span> L2 ai-toolkit DaemonSet <span style="color:var(--text-muted); font-size:0.62rem;">(A+B only, not Dynamo)</span></div>
+    <div><span style="color:var(--shm)">&#10003;</span> POSIX shared memory <span style="color:var(--text-muted); font-size:0.62rem;">(A+B only)</span></div>
+    <div><span style="color:var(--fsx)">&#10003;</span> FSx Lustre <span style="color:var(--text-muted); font-size:0.62rem;">(all paths &mdash; Dynamo uses separate PVC)</span></div>
+    <div><span style="color:var(--green)">&#10003;</span> FSx/S3 CSI Drivers (pre-installed)</div>
+  </div>
+  <div style="font-size:0.65rem; color:var(--text-muted); font-weight:600; margin-bottom:0.3rem;">COMPUTE &amp; CLUSTER SERVICES</div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(165px,1fr)); gap:0.4rem; font-size:0.7rem;">
+    <div><span style="color:var(--green)">&#10003;</span> GPU nodes (p5e, p6, g5, g6e, g7e)</div>
+    <div><span style="color:var(--green)">&#10003;</span> Deep Health Checks + Spare Pool</div>
+    <div><span style="color:var(--green)">&#10003;</span> Training Plans (capacity)</div>
+    <div><span style="color:var(--green)">&#10003;</span> Karpenter (scale-to-zero)</div>
+    <div><span style="color:var(--green)">&#10003;</span> Task Governance (train/serve)</div>
+    <div><span style="color:var(--green)">&#10003;</span> EFA Networking (auto on HP nodes)</div>
+    <div><span style="color:var(--green)">&#10003;</span> KEDA Autoscaling</div>
+    <div><span style="color:var(--green)">&#10003;</span> cert-manager, SSM Agent</div>
+  </div>
+</div>
+
+<!-- ============ RESPONSIBILITY MATRIX ============ -->
+<div class="divider">
+  <div class="divider-line"></div>
+  <div class="divider-text">Responsibility Matrix</div>
+  <div class="divider-line"></div>
+</div>
+
+<div style="background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow:hidden;">
+<table class="resp">
+  <thead>
+    <tr>
+      <th>Component</th>
+      <th>Path A (Operator)</th>
+      <th>Path B (llm-d)</th>
+      <th>Path C (Dynamo)</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td colspan="5" style="font-size:0.62rem; font-weight:700; color:var(--operator); text-transform:uppercase; letter-spacing:0.08em; background:rgba(192,132,252,0.05); padding:0.4rem 0.75rem;">Inference Operator</td></tr>
+    <tr>
+      <td style="font-weight:600">Endpoint Lifecycle</td>
+      <td class="cell-m">IEC CRD &rarr; auto</td>
+      <td style="color:var(--text-muted)">N/A (Helm)</td>
+      <td style="color:var(--text-muted)">N/A (kubectl)</td>
+      <td><span class="tag tag-skip">A only</span></td>
+    </tr>
+    <tr>
+      <td style="font-weight:600">Cache Config Inject</td>
+      <td class="cell-m">Auto LMCache env</td>
+      <td class="cell-d">Manual Helm values</td>
+      <td style="color:var(--dynamo)">Manual DYN_KVBM_* env</td>
+      <td><span class="tag tag-pass">B+C</span></td>
+    </tr>
+    <tr>
+      <td style="font-weight:600">Router</td>
+      <td class="cell-m">Intelligent Router</td>
+      <td class="cell-o">EPP ext-proc</td>
+      <td style="color:var(--dynamo)">Dynamo Planner</td>
+      <td><span class="tag tag-pass">B+C</span></td>
+    </tr>
+    <tr><td colspan="5" style="font-size:0.62rem; font-weight:700; color:var(--gateway); text-transform:uppercase; letter-spacing:0.08em; background:rgba(96,165,250,0.05); padding:0.4rem 0.75rem;">KV Cache Infrastructure</td></tr>
+    <tr>
+      <td style="font-weight:600">L2 Daemon</td>
+      <td>Operator auto-connects</td>
+      <td class="cell-d">sagemaker-hyperpod://</td>
+      <td style="color:var(--text-muted)">NOT USED (KVBM built-in)</td>
+      <td><span class="tag tag-pass">B</span></td>
+    </tr>
+    <tr>
+      <td style="font-weight:600">Shared Memory</td>
+      <td>Operator mounts shm</td>
+      <td class="cell-d">hostPath /dev/shm</td>
+      <td style="color:var(--text-muted)">NOT USED (CPU DRAM)</td>
+      <td><span class="tag tag-pass">B</span></td>
+    </tr>
+    <tr>
+      <td style="font-weight:600">FSx Lustre</td>
+      <td>Operator PV/PVC</td>
+      <td class="cell-d">PVC fsx-kvcache</td>
+      <td style="color:var(--dynamo)">PVC fsx-dynamo (separate)</td>
+      <td><span class="tag tag-pass">B+C</span></td>
+    </tr>
+    <tr><td colspan="5" style="font-size:0.62rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.08em; background:rgba(124,132,160,0.05); padding:0.4rem 0.75rem;">Path-Specific Components</td></tr>
+    <tr>
+      <td style="font-weight:600">Ingress</td>
+      <td class="cell-m">ALB (managed)</td>
+      <td class="cell-d">Istio Gateway + NLB</td>
+      <td style="color:var(--dynamo)">NLB direct (no mesh)</td>
+      <td><span class="tag tag-pass">B+C</span></td>
+    </tr>
+    <tr>
+      <td style="font-weight:600">Service Discovery</td>
+      <td class="cell-m">Operator (K8s native)</td>
+      <td class="cell-o">K8s native (EPP watches pods)</td>
+      <td style="color:var(--dynamo)">etcd (self-deployed)</td>
+      <td><span class="tag tag-pass">B+C</span></td>
+    </tr>
+    <tr>
+      <td style="font-weight:600">Serving Engine</td>
+      <td class="cell-m">vLLM DLC</td>
+      <td class="cell-d">vLLM native v0.15.1</td>
+      <td style="color:var(--dynamo)">Dynamo vLLM v0.16.0 (NGC)</td>
+      <td><span class="tag tag-pass">B+C</span></td>
+    </tr>
+    <tr>
+      <td style="font-weight:600">Container Image</td>
+      <td class="cell-m">~3 GB (DLC)</td>
+      <td class="cell-d">~3 GB (vLLM)</td>
+      <td style="color:var(--dynamo)">12.3 GB (NGC)</td>
+      <td><span class="tag tag-fail">C: disk risk</span></td>
+    </tr>
+    <tr><td colspan="5" style="font-size:0.62rem; font-weight:700; color:var(--green); text-transform:uppercase; letter-spacing:0.08em; background:rgba(74,222,128,0.05); padding:0.4rem 0.75rem;">Shared Cluster Services</td></tr>
+    <tr>
+      <td style="font-weight:600">Autoscaling</td>
+      <td>KEDA auto</td>
+      <td>KEDA manual</td>
+      <td style="color:var(--text-muted)">Not configured</td>
+      <td><span class="tag tag-skip">UNTESTED</span></td>
+    </tr>
+    <tr>
+      <td style="font-weight:600">Observability</td>
+      <td>ADOT (expected)</td>
+      <td>vLLM /metrics</td>
+      <td style="color:var(--dynamo)">vLLM /metrics</td>
+      <td><span class="tag tag-fail">PARTIAL</span></td>
+    </tr>
+    <tr>
+      <td style="font-weight:600">Namespace Coexistence</td>
+      <td colspan="3" style="text-align:center">llmd-validation + dynamo-validation + system namespaces &mdash; all active</td>
+      <td><span class="tag tag-pass">YES</span></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ============ EMPIRICAL CORRECTIONS ============ -->
+<div class="divider">
+  <div class="divider-line"></div>
+  <div class="divider-text">Empirical Corrections to Architecture Doc</div>
+  <div class="divider-line"></div>
+</div>
+
+<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:0.7rem;">
+  <div class="c" style="border-color:rgba(248,113,113,0.25);">
+    <div class="c-name"><span style="color:var(--vllm)">ADOT Collector Not Auto-Installed</span></div>
+    <div class="c-detail">
+      Doc claims ADOT collector runs on system nodes and scrapes any Prometheus endpoint.
+      <strong>Not found on our inference cluster.</strong> vLLM /metrics exposed but no scraper configured.
+      May require separate addon installation or AMP workspace setup.
+    </div>
+  </div>
+  <div class="c" style="border-color:rgba(248,113,113,0.25);">
+    <div class="c-name"><span style="color:var(--vllm)">EnableClusterInference Fails</span></div>
+    <div class="c-detail">
+      Inference operator addon installs successfully, but <code>EnableClusterInference</code> goes
+      Enabling &rarr; <span style="color:var(--vllm)">EnableFailed</span> consistently.
+      Non-blocking for llm-d. May be required for Path A managed endpoints.
+    </div>
+  </div>
+  <div class="c" style="border-color:rgba(251,191,36,0.20);">
+    <div class="c-name"><span style="color:var(--oss)">Shared Memory Name Requires Config</span></div>
+    <div class="c-detail">
+      LMCache defaults to <code>shared_memory</code>. ai-toolkit uses <code>ai_toolkit_cache</code>.
+      Doc doesn't emphasize this mismatch. Must set via BOTH <code>kv_connector_extra_config</code>
+      AND <code>LMCACHE_CONFIG_FILE</code> (adapter reads <code>config.extra_config</code>).
+    </div>
+  </div>
+  <div class="c" style="border-color:rgba(251,191,36,0.20);">
+    <div class="c-name"><span style="color:var(--oss)">UID Mismatch on Shared Memory</span></div>
+    <div class="c-detail">
+      ai-toolkit creates shm as uid 1000 with <code>0600</code>. vLLM runs as uid 2000.
+      Permission denied until <code>chmod 666</code>. Production needs unified UIDs or supplemental GID.
+      Not mentioned in the architecture doc.
+    </div>
+  </div>
+  <div class="c" style="border-color:rgba(251,191,36,0.20);">
+    <div class="c-name"><span style="color:var(--oss)">FSx Root Needs Directory Setup</span></div>
+    <div class="c-detail">
+      HyperPod-provisioned FSx root is <code>755 root:root</code>. vLLM (uid 2000) cannot write.
+      Need privileged init to <code>mkdir -p /mnt/fsx/kvcache && chmod 777</code>.
+      Operator path may handle this automatically; llm-d path is manual.
+    </div>
+  </div>
+  <div class="c" style="border-color:rgba(52,211,153,0.20);">
+    <div class="c-name"><span style="color:var(--diy)">CRD Coexistence Confirmed</span></div>
+    <div class="c-detail">
+      Gateway API CRDs (<code>inference.networking.k8s.io</code>) and IEC CRDs
+      (<code>inference.sagemaker.aws.amazon.com</code>) coexist without conflicts.
+      All three paths can run on the same cluster simultaneously.
+    </div>
+  </div>
+</div>
+
+<!-- Dynamo-specific corrections -->
+<div style="font-size:0.68rem; font-weight:600; color:var(--dynamo); margin:0.7rem 0 0.4rem; text-transform:uppercase; letter-spacing:0.06em;">Dynamo-Specific Findings (Path C)</div>
+<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:0.7rem;">
+  <div class="c" style="border-color:var(--dynamo-border);">
+    <div class="c-name"><span style="color:var(--dynamo)">NGC Entrypoint Incompatibility</span></div>
+    <div class="c-detail">
+      <code>vllm-runtime:1.0.1</code> uses <code>/opt/nvidia/nvidia_entrypoint.sh</code> which fails with bare <code>--model</code> args.
+      <strong>Fix:</strong> explicit <code>command: ["python3", "-m", "vllm.entrypoints.openai.api_server"]</code> in pod spec.
+    </div>
+  </div>
+  <div class="c" style="border-color:var(--dynamo-border);">
+    <div class="c-name"><span style="color:var(--dynamo)">KVBM Not Active in vllm-runtime</span></div>
+    <div class="c-detail">
+      The image bundles standard vLLM 0.16.0. <code>DYN_KVBM_*</code> env vars are set but not consumed.
+      <strong>KVBM requires the full Dynamo stack</strong> (Frontend + Router + Planner), not just the worker image.
+    </div>
+  </div>
+  <div class="c" style="border-color:var(--dynamo-border);">
+    <div class="c-name"><span style="color:var(--dynamo)">12.3 GB Image Causes DiskPressure</span></div>
+    <div class="c-detail">
+      g5.4xlarge has ~95 GB ephemeral. Dynamo (12.3 GB) + existing images triggered
+      <code>DiskPressure</code> taint. Fix: scale down other workloads first, let kubelet GC reclaim.
+    </div>
+  </div>
+  <div class="c" style="border-color:rgba(52,211,153,0.20);">
+    <div class="c-name"><span style="color:var(--green)">A10G (sm_86 Ampere) Compatible</span></div>
+    <div class="c-detail">
+      Despite NGC targeting L40S/H100/B200, the vLLM runtime works fine on A10G with FlashAttention backend.
+      Qwen3-0.6B loads in 3.4s, chat completion &lt;1s TTFT.
+    </div>
+  </div>
+  <div class="c" style="border-color:rgba(52,211,153,0.20);">
+    <div class="c-name"><span style="color:var(--green)">FSx Coexistence Confirmed</span></div>
+    <div class="c-detail">
+      Separate PV (<code>fsx-dynamo-pv</code>) with different volumeHandle suffix.
+      Dynamo uses <code>/mnt/fsx/kv-cache/</code>, llm-d uses <code>/mnt/fsx/kvcache</code> &mdash; no conflict.
+    </div>
+  </div>
+  <div class="c" style="border-color:var(--dynamo-border);">
+    <div class="c-name"><span style="color:var(--dynamo)">etcd Health Check Gotcha</span></div>
+    <div class="c-detail">
+      etcd v3.5.17 image doesn't include <code>wget</code> or <code>curl</code>.
+      Use <code>etcdctl endpoint health</code> for health checks instead.
+    </div>
+  </div>
+</div>
+
+<footer>
+  HyperPod Inference Architecture &mdash; Empirically validated with llm-d (Path B) and NVIDIA Dynamo (Path C) on llmd-inference-cluster (inference-eks-v132, K8s 1.32, g5.4xlarge) &mdash; 2026-03-31<br/>
+  llm-d: 21 PASS, 0 FAIL &bull; Dynamo: 29 PASS, 0 FAIL, 5 SKIP &bull; Cross-referenced against <code>HyperPod-Inference-Architecture.md</code> (2026-03-24)
+</footer>
+
+</body>
+</html>

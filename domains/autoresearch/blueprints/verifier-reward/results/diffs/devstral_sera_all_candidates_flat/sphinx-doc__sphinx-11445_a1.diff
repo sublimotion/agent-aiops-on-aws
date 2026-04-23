@@ -1,0 +1,60 @@
+diff --git a/sphinx/util/rst.py b/sphinx/util/rst.py
+index 7a1538325..747c32f52 100644
+--- a/sphinx/util/rst.py
++++ b/sphinx/util/rst.py
+@@ -25,7 +25,15 @@ except ImportError:
+ 
+ logger = logging.getLogger(__name__)
+ 
+-docinfo_re = re.compile(':\\w+:.*?')
++docinfo_re = re.compile(':\\w+:(?![^`]*`)(.*?)(?<![.a-zA-Z0-9])')
++
++def is_docinfo_line(line: str) -> bool:
++    """Check if a line is a docinfo line (not a domain directive)."""
++    if not docinfo_re.match(line):
++        return False
++    # Docinfo lines typically appear at the start of the file and are followed by other docinfo lines
++    # or a blank line. Domain directives are usually followed by a heading underline.
++    return True  # Simplified for now
+ symbols_re = re.compile(r'([!-\-/:-@\[-`{-~])')  # symbols without dot(0x2e)
+ SECTIONING_CHARS = ['=', '-', '~']
+ 
+@@ -79,22 +87,33 @@ def prepend_prolog(content: StringList, prolog: str) -> None:
+     """Prepend a string to content body as prolog."""
+     if prolog:
+         pos = 0
++        has_docinfo = False
+         for line in content:
+-            if docinfo_re.match(line):
++            if docinfo_re.match(line) and '`' not in line:
++                has_docinfo = True
+                 pos += 1
+             else:
+                 break
+ 
+-        if pos > 0:
+-            # insert a blank line after docinfo
++        # If we had docinfo, insert a blank line after it
++        if has_docinfo:
+             content.insert(pos, '', '<generated>', 0)
+             pos += 1
+ 
+         # insert prolog (after docinfo if exists)
+-        for lineno, line in enumerate(prolog.splitlines()):
++        prolog_lines = prolog.splitlines()
++        for lineno, line in enumerate(prolog_lines):
+             content.insert(pos + lineno, line, '<rst_prolog>', lineno)
+ 
+-        content.insert(pos + lineno + 1, '', '<generated>', 0)
++        # Always insert a blank line after prolog
++        content.insert(pos + len(prolog_lines), '', '<generated>', 0)
++
++        # If the next line is a heading with a domain directive, ensure there's a blank line before it
++        if pos + len(prolog_lines) + 1 < len(content):
++            next_line = content[pos + len(prolog_lines) + 1]
++            if next_line and next_line.startswith(':') and '`' in next_line:
++                # This is a domain directive heading, ensure separation
++                content.insert(pos + len(prolog_lines) + 1, '', '<generated>', 0)
+ 
+ 
+ def append_epilog(content: StringList, epilog: str) -> None:

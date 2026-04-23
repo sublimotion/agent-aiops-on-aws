@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kimi K2.6 Benchmark Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2a2d3a;
+    --text: #e1e4ed;
+    --muted: #8b8fa3;
+    --green: #76b900;
+    --green-dim: rgba(118, 185, 0, 0.15);
+    --red: #ff4d6a;
+    --red-dim: rgba(255, 77, 106, 0.15);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59, 130, 246, 0.15);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245, 158, 11, 0.15);
+    --purple: #a855f7;
+    --purple-dim: rgba(168, 85, 247, 0.15);
+    --cyan: #06b6d4;
+    --cyan-dim: rgba(6, 182, 212, 0.15);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; line-height: 1.6; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+  header { text-align: center; margin-bottom: 3rem; }
+  header h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
+  header .subtitle { color: var(--muted); font-size: 1rem; }
+
+  .badge-row { display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+  .badge { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; }
+  .badge-green { background: var(--green-dim); color: var(--green); }
+  .badge-blue { background: var(--blue-dim); color: var(--blue); }
+  .badge-amber { background: var(--amber-dim); color: var(--amber); }
+  .badge-purple { background: var(--purple-dim); color: var(--purple); }
+  .badge-cyan { background: var(--cyan-dim); color: var(--cyan); }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+  .kpi-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.25rem; }
+  .kpi-value { font-size: 1.75rem; font-weight: 700; }
+  .kpi-sub { font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; }
+  .kpi-green .kpi-value { color: var(--green); }
+  .kpi-blue .kpi-value { color: var(--blue); }
+  .kpi-amber .kpi-value { color: var(--amber); }
+  .kpi-red .kpi-value { color: var(--red); }
+  .kpi-purple .kpi-value { color: var(--purple); }
+  .kpi-cyan .kpi-value { color: var(--cyan); }
+
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+  @media (max-width: 900px) { .charts { grid-template-columns: 1fr; } }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+  .chart-card h3 { font-size: 1rem; margin-bottom: 1rem; font-weight: 600; }
+  .chart-card canvas { width: 100% !important; }
+  .chart-full { grid-column: 1 / -1; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { padding: 0.75rem 1rem; text-align: right; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; }
+  td:first-child, th:first-child { text-align: left; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .highlight-row td { background: var(--green-dim); font-weight: 600; }
+
+  .section-title { font-size: 1.25rem; font-weight: 700; margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+
+  .insight-box { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--green); border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem; }
+  .insight-box h4 { color: var(--green); margin-bottom: 0.5rem; font-size: 0.9rem; }
+  .insight-box p { color: var(--muted); font-size: 0.85rem; }
+  .insight-box.warn { border-left-color: var(--amber); }
+  .insight-box.warn h4 { color: var(--amber); }
+  .insight-box.info { border-left-color: var(--blue); }
+  .insight-box.info h4 { color: var(--blue); }
+  .insight-box.blocked { border-left-color: var(--red); }
+  .insight-box.blocked h4 { color: var(--red); }
+
+  .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .config-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+  .config-item dt { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .config-item dd { font-size: 1rem; font-weight: 600; margin-top: 0.25rem; }
+
+  .legend-inline { display: flex; gap: 1.5rem; margin-bottom: 0.5rem; font-size: 0.8rem; }
+  .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 0.3rem; vertical-align: middle; }
+
+  .footer { text-align: center; color: var(--muted); font-size: 0.75rem; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Kimi K2.6 Benchmark Report</h1>
+  <div class="subtitle">Kimi K2.6 on AWS p6-b300.48xlarge (8x B300 268GB HBM3e) &mdash; 3-Way Engine Comparison</div>
+  <div class="badge-row">
+    <span class="badge badge-green">vLLM v0.19.1</span>
+    <span class="badge badge-cyan">SGLang v0.5.10</span>
+    <span class="badge badge-purple">SGLang + HiCache</span>
+    <span class="badge badge-amber">B300 Spot ~$16/hr</span>
+    <span class="badge badge-blue">MLA + Prefix Cache</span>
+  </div>
+</header>
+
+<!-- KPIs -->
+<div class="kpi-grid">
+  <div class="kpi kpi-green">
+    <div class="kpi-label">Peak Throughput (vLLM)</div>
+    <div class="kpi-value">10,437</div>
+    <div class="kpi-sub">tok/s @ c=512</div>
+  </div>
+  <div class="kpi kpi-cyan">
+    <div class="kpi-label">Peak Throughput (SGLang)</div>
+    <div class="kpi-value">3,400</div>
+    <div class="kpi-sub">tok/s @ c=512</div>
+  </div>
+  <div class="kpi kpi-blue">
+    <div class="kpi-label">vLLM Advantage</div>
+    <div class="kpi-value">3.1x</div>
+    <div class="kpi-sub">peak throughput scaling</div>
+  </div>
+  <div class="kpi kpi-amber">
+    <div class="kpi-label">Best TTFT p50</div>
+    <div class="kpi-value">22ms</div>
+    <div class="kpi-sub">vLLM W5 qps=0.5</div>
+  </div>
+  <div class="kpi kpi-purple">
+    <div class="kpi-label">Best ITL p50</div>
+    <div class="kpi-value">6.7ms</div>
+    <div class="kpi-sub">SGLang + HiCache, c=1</div>
+  </div>
+  <div class="kpi kpi-green">
+    <div class="kpi-label">Cost/M Tokens (vLLM)</div>
+    <div class="kpi-value">$0.43</div>
+    <div class="kpi-sub">c=512, $16/hr spot</div>
+  </div>
+</div>
+
+<!-- Charts -->
+<div class="charts">
+  <div class="chart-card">
+    <h3>Throughput Scaling &mdash; Pressure Test</h3>
+    <canvas id="chartThroughput"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>TTFT p50 &mdash; Pressure Test</h3>
+    <canvas id="chartTTFT"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>3-Way Engine Comparison &mdash; Single-Stream</h3>
+    <canvas id="chartSingleStream"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Cost per 1M Output Tokens</h3>
+    <canvas id="chartCost"></canvas>
+  </div>
+  <div class="chart-card chart-full">
+    <h3>W1-W6 Workload Suite &mdash; vLLM vs SGLang vs HiCache (TPS)</h3>
+    <canvas id="chartWorkload"></canvas>
+  </div>
+</div>
+
+<!-- Insights -->
+<h2 class="section-title">Key Insights</h2>
+
+<div class="insight-box">
+  <h4>vLLM Dominates Under Load: 3.1x Peak Throughput</h4>
+  <p>vLLM's batch scheduling + FLASHINFER_MLA provides dramatically better throughput scaling. At c=512: 10,437 vs 3,400 tok/s (3.1x). SGLang saturates around c=128 while vLLM continues scaling near-linearly. This makes vLLM the clear choice for production concurrent workloads.</p>
+</div>
+
+<div class="insight-box info">
+  <h4>vLLM TTFT: 2-3x Lower Across All Workloads</h4>
+  <p>FLASHINFER_MLA + prefix caching delivers 22-54ms TTFT vs SGLang's 82-155ms. The killer feature: 103x TTFT improvement on cold-to-warm prefix cache hit (5,928ms to 57ms). This is transformative for RAG and multi-turn chat.</p>
+</div>
+
+<div class="insight-box info">
+  <h4>HiCache Improves Single-Stream SGLang by 58%</h4>
+  <p>SGLang + HiCache (200GB host memory/rank) boosts single-stream TPS from 86 to 136 (+58%) and ITL from 10.6ms to 6.7ms (-37%). The host memory tier eliminates GPU KV eviction overhead. However, HiCache does NOT help under load &mdash; at high concurrency, it matches or slightly trails base SGLang.</p>
+</div>
+
+<div class="insight-box warn">
+  <h4>SGLang Prefix Caching: No Benefit Observed</h4>
+  <p>RadixAttention showed 1.0x improvement in W2 RAG tests &mdash; effectively no caching benefit. The benchmark's prefix patterns may not trigger RadixAttention's exact radix tree matching. In contrast, vLLM's prefix caching produced 103x improvement on the same workload.</p>
+</div>
+
+<div class="insight-box">
+  <h4>SGLang Cold Start: 2.8x Faster</h4>
+  <p>SGLang starts in 3 min vs vLLM's 8.3 min &mdash; critical for spot instances where preemption restarts are expected. For latency-tolerant batch workloads on spot, SGLang's faster recovery may outweigh vLLM's throughput advantage.</p>
+</div>
+
+<div class="insight-box info">
+  <h4>K2.6 vs K2.5: Generational Leap</h4>
+  <p>B300 + vLLM v0.19 delivers 3.1x single-stream TPS (128 vs 41 tok/s), 25-71x lower TTFT (22-62ms vs 1,216-1,565ms), and ~500x lower cost per token vs K2.5 on H100. Combined hardware + software gains are transformative.</p>
+</div>
+
+<!-- vLLM Pressure Test Table -->
+<h2 class="section-title">vLLM v0.19.1 &mdash; Pressure Test (TP=8, 8x B300)</h2>
+<div class="chart-card">
+<table>
+  <thead>
+    <tr>
+      <th>Concurrency</th>
+      <th>TTFT p50</th>
+      <th>Agg TPS</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td><td>11,937ms</td><td>243 tok/s</td>
+    </tr>
+    <tr>
+      <td>8</td><td>54ms</td><td>937 tok/s</td>
+    </tr>
+    <tr>
+      <td>32</td><td>112ms</td><td>2,155 tok/s</td>
+    </tr>
+    <tr>
+      <td>64</td><td>381ms</td><td>3,185 tok/s</td>
+    </tr>
+    <tr class="highlight-row">
+      <td>128</td><td>388ms</td><td>4,716 tok/s</td>
+    </tr>
+    <tr>
+      <td>256</td><td>658ms</td><td>6,374 tok/s</td>
+    </tr>
+    <tr>
+      <td>512</td><td>874ms</td><td>10,437 tok/s</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- SGLang Pressure Test Table -->
+<h2 class="section-title">SGLang v0.5.10 &mdash; Pressure Test (TP=8, 8x B300)</h2>
+<div class="chart-card">
+<table>
+  <thead>
+    <tr>
+      <th>Concurrency</th>
+      <th>TTFT p50</th>
+      <th>Agg TPS</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td><td>4,646ms</td><td>481 tok/s</td>
+    </tr>
+    <tr>
+      <td>8</td><td>388ms</td><td>925 tok/s</td>
+    </tr>
+    <tr>
+      <td>32</td><td>222ms</td><td>2,170 tok/s</td>
+    </tr>
+    <tr>
+      <td>64</td><td>575ms</td><td>3,112 tok/s</td>
+    </tr>
+    <tr>
+      <td>128</td><td>667ms</td><td>3,270 tok/s</td>
+    </tr>
+    <tr>
+      <td>256</td><td>1,212ms</td><td>3,292 tok/s</td>
+    </tr>
+    <tr>
+      <td>512</td><td>1,371ms</td><td>3,400 tok/s</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- 3-Way Comparison Table -->
+<h2 class="section-title">3-Way Engine Comparison</h2>
+<div class="chart-card">
+<table>
+  <thead>
+    <tr>
+      <th>Metric</th>
+      <th>vLLM v0.19.1</th>
+      <th>SGLang v0.5.10</th>
+      <th>SGLang + HiCache</th>
+      <th>Best</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Single-stream TTFT</td><td>22-54ms</td><td>82-155ms</td><td>83-93ms</td><td style="color: var(--green);">vLLM</td>
+    </tr>
+    <tr>
+      <td>Single-stream TPS</td><td>124-129</td><td>86-143</td><td>136-143</td><td style="color: var(--purple);">HiCache</td>
+    </tr>
+    <tr>
+      <td>Single-stream ITL</td><td>7.7ms</td><td>10.6ms</td><td>6.7ms</td><td style="color: var(--purple);">HiCache</td>
+    </tr>
+    <tr>
+      <td>Under load (qps=8) TPS</td><td>62</td><td>49</td><td>48</td><td style="color: var(--green);">vLLM</td>
+    </tr>
+    <tr>
+      <td>Under load (qps=8) TTFT</td><td>52ms</td><td>91ms</td><td>92ms</td><td style="color: var(--green);">vLLM</td>
+    </tr>
+    <tr>
+      <td>Agentic TTFT</td><td>45-90ms</td><td>162-180ms</td><td>163-304ms</td><td style="color: var(--green);">vLLM</td>
+    </tr>
+    <tr>
+      <td>Long ctx (16K) TTFT</td><td>142ms</td><td>285ms</td><td>288ms</td><td style="color: var(--green);">vLLM</td>
+    </tr>
+    <tr>
+      <td>Prefix caching (W2)</td><td>103x</td><td>1.0x</td><td>1.0x</td><td style="color: var(--green);">vLLM</td>
+    </tr>
+    <tr>
+      <td>Cold start</td><td>8.3 min</td><td>3 min</td><td>3.5 min</td><td style="color: var(--cyan);">SGLang</td>
+    </tr>
+    <tr>
+      <td>Peak agg TPS (c=512)</td><td>10,437</td><td>3,400</td><td>&mdash;</td><td style="color: var(--green);">vLLM (3.1x)</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- Config -->
+<h2 class="section-title">Test Configuration</h2>
+<div class="config-grid">
+  <div class="config-item"><dt>Model</dt><dd>Kimi K2.6</dd></div>
+  <div class="config-item"><dt>Architecture</dt><dd>MLA (Multi-Latent Attention) + MoE</dd></div>
+  <div class="config-item"><dt>Hardware</dt><dd>p6-b300.48xlarge (8x B300 268GB HBM3e)</dd></div>
+  <div class="config-item"><dt>Driver</dt><dd>580.126.09, CUDA 13.0 (sm_103)</dd></div>
+  <div class="config-item"><dt>vLLM Engine</dt><dd>v0.19.1 + FLASHINFER_MLA (block size 32)</dd></div>
+  <div class="config-item"><dt>SGLang Engine</dt><dd>v0.5.10.post1-cu130 + RadixAttention</dd></div>
+  <div class="config-item"><dt>Context</dt><dd>131,072 tokens</dd></div>
+  <div class="config-item"><dt>NCCL</dt><dd>2.28.9</dd></div>
+  <div class="config-item"><dt>Topology</dt><dd>Full NV18 NVSwitch mesh</dd></div>
+  <div class="config-item"><dt>Instance Cost</dt><dd>~$16/hr spot (us-west-2)</dd></div>
+  <div class="config-item"><dt>vLLM Cold Start</dt><dd>8.3 min (weight load 4.4 min + CUDA graphs 14s)</dd></div>
+  <div class="config-item"><dt>SGLang Cold Start</dt><dd>3 min (with FAST_WARMUP)</dd></div>
+</div>
+
+<div class="footer">
+  Generated 2026-04-23 | Kimi K2.6 Blueprint | Agent AIOps on AWS
+</div>
+
+</div>
+
+<script>
+// === DATA ===
+const conc = [1, 8, 32, 64, 128, 256, 512];
+
+// Pressure test
+const tputVllm = [243, 937, 2155, 3185, 4716, 6374, 10437];
+const tputSglang = [481, 925, 2170, 3112, 3270, 3292, 3400];
+const ttftVllm = [11937, 54, 112, 381, 388, 658, 874];
+const ttftSglang = [4646, 388, 222, 575, 667, 1212, 1371];
+
+const chartDefaults = {
+  responsive: true,
+  plugins: {
+    legend: { labels: { color: '#8b8fa3', font: { size: 12 } } },
+    tooltip: { backgroundColor: '#1a1d27', borderColor: '#2a2d3a', borderWidth: 1, titleColor: '#e1e4ed', bodyColor: '#e1e4ed' }
+  },
+  scales: {
+    x: { ticks: { color: '#8b8fa3' }, grid: { color: '#2a2d3a' } },
+    y: { ticks: { color: '#8b8fa3' }, grid: { color: '#2a2d3a' } }
+  }
+};
+
+// Chart 1: Throughput Scaling
+new Chart(document.getElementById('chartThroughput'), {
+  type: 'line',
+  data: {
+    labels: conc,
+    datasets: [
+      {
+        label: 'vLLM Agg TPS',
+        data: tputVllm,
+        borderColor: '#76b900',
+        backgroundColor: 'rgba(118, 185, 0, 0.1)',
+        fill: true, tension: 0.3, pointRadius: 6, borderWidth: 3
+      },
+      {
+        label: 'SGLang Agg TPS',
+        data: tputSglang,
+        borderColor: '#06b6d4',
+        backgroundColor: 'rgba(6, 182, 212, 0.1)',
+        fill: true, tension: 0.3, pointRadius: 6, borderWidth: 3
+      }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    scales: {
+      ...chartDefaults.scales,
+      x: { ...chartDefaults.scales.x, title: { display: true, text: 'Concurrency', color: '#8b8fa3' } },
+      y: { ...chartDefaults.scales.y, title: { display: true, text: 'Tokens/sec', color: '#8b8fa3' }, beginAtZero: true }
+    }
+  }
+});
+
+// Chart 2: TTFT p50
+new Chart(document.getElementById('chartTTFT'), {
+  type: 'line',
+  data: {
+    labels: conc,
+    datasets: [
+      { label: 'vLLM TTFT p50 (ms)', data: ttftVllm, borderColor: '#76b900', fill: false, tension: 0.3, pointRadius: 5, borderWidth: 2 },
+      { label: 'SGLang TTFT p50 (ms)', data: ttftSglang, borderColor: '#06b6d4', fill: false, tension: 0.3, pointRadius: 5, borderWidth: 2 }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    scales: {
+      ...chartDefaults.scales,
+      x: { ...chartDefaults.scales.x, title: { display: true, text: 'Concurrency', color: '#8b8fa3' } },
+      y: { ...chartDefaults.scales.y, type: 'logarithmic', title: { display: true, text: 'TTFT p50 (ms) \u2014 log scale', color: '#8b8fa3' } }
+    }
+  }
+});
+
+// Chart 3: 3-Way Single-Stream Grouped Bar
+new Chart(document.getElementById('chartSingleStream'), {
+  type: 'bar',
+  data: {
+    labels: ['TTFT p50 (ms)', 'TPS', 'ITL p50 (ms)'],
+    datasets: [
+      {
+        label: 'vLLM',
+        data: [54, 124, 7.7],
+        backgroundColor: 'rgba(118, 185, 0, 0.7)',
+        borderColor: '#76b900',
+        borderWidth: 1
+      },
+      {
+        label: 'SGLang',
+        data: [155, 86, 10.6],
+        backgroundColor: 'rgba(6, 182, 212, 0.7)',
+        borderColor: '#06b6d4',
+        borderWidth: 1
+      },
+      {
+        label: 'SGLang + HiCache',
+        data: [93, 136, 6.7],
+        backgroundColor: 'rgba(168, 85, 247, 0.7)',
+        borderColor: '#a855f7',
+        borderWidth: 1
+      }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    scales: {
+      ...chartDefaults.scales,
+      y: { ...chartDefaults.scales.y, title: { display: true, text: 'Value', color: '#8b8fa3' }, beginAtZero: true }
+    }
+  }
+});
+
+// Chart 4: Cost per 1M Output Tokens
+new Chart(document.getElementById('chartCost'), {
+  type: 'bar',
+  data: {
+    labels: ['vLLM c=128', 'vLLM c=256', 'vLLM c=512', 'SGLang c=32', 'SGLang c=64', 'SGLang c=128'],
+    datasets: [{
+      label: 'Cost ($/1M tokens)',
+      data: [0.94, 0.70, 0.43, 2.05, 1.43, 1.36],
+      backgroundColor: [
+        'rgba(118, 185, 0, 0.7)', 'rgba(118, 185, 0, 0.7)', 'rgba(118, 185, 0, 0.7)',
+        'rgba(6, 182, 212, 0.7)', 'rgba(6, 182, 212, 0.7)', 'rgba(6, 182, 212, 0.7)'
+      ],
+      borderColor: [
+        '#76b900', '#76b900', '#76b900',
+        '#06b6d4', '#06b6d4', '#06b6d4'
+      ],
+      borderWidth: 1
+    }]
+  },
+  options: {
+    ...chartDefaults,
+    plugins: {
+      ...chartDefaults.plugins,
+      legend: { display: false }
+    },
+    scales: {
+      ...chartDefaults.scales,
+      x: { ...chartDefaults.scales.x, ticks: { color: '#8b8fa3', maxRotation: 45 } },
+      y: { ...chartDefaults.scales.y, title: { display: true, text: '$/1M Output Tokens', color: '#8b8fa3' }, beginAtZero: true }
+    }
+  }
+});
+
+// Chart 5: W1-W6 Workload Suite
+new Chart(document.getElementById('chartWorkload'), {
+  type: 'bar',
+  data: {
+    labels: ['W1 1rnd', 'W1 5rnd', 'W1 10rnd', 'W5 qps=0.5', 'W5 qps=2', 'W5 qps=4', 'W5 qps=8', 'W6 1K', 'W6 4K', 'W6 8K', 'W6 16K'],
+    datasets: [
+      {
+        label: 'vLLM',
+        data: [124, 126, 95, 129, 94, 73, 62, 126, 121, 117, 106],
+        backgroundColor: 'rgba(118, 185, 0, 0.7)',
+        borderColor: '#76b900',
+        borderWidth: 1
+      },
+      {
+        label: 'SGLang',
+        data: [86, 83, 82, 143, 91, 64, 49, 139, 132, 130, 108],
+        backgroundColor: 'rgba(6, 182, 212, 0.7)',
+        borderColor: '#06b6d4',
+        borderWidth: 1
+      },
+      {
+        label: 'SGLang + HiCache',
+        data: [136, 134, 82, 143, 91, 63, 48, 139, 134, 126, 107],
+        backgroundColor: 'rgba(168, 85, 247, 0.7)',
+        borderColor: '#a855f7',
+        borderWidth: 1
+      }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    scales: {
+      ...chartDefaults.scales,
+      x: { ...chartDefaults.scales.x, ticks: { color: '#8b8fa3', maxRotation: 45 } },
+      y: { ...chartDefaults.scales.y, title: { display: true, text: 'Tokens/sec (single-stream)', color: '#8b8fa3' }, beginAtZero: true }
+    }
+  }
+});
+</script>
+</body>
+</html>

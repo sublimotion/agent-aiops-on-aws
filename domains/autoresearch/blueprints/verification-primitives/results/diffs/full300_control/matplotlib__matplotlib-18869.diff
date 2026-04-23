@@ -1,0 +1,53 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index b657a35cf7..da3c997946 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -148,9 +148,48 @@ def __getattr__(name):
+         else:  # Get the version from the _version.py setuptools_scm file.
+             __version__ = _version.version
+         return __version__
++    if name == "version_info":
++        # Cache it just like __version__.
++        global version_info
++        version_info = _parse_to_version_info(__getattr__("__version__"))
++        return version_info
+     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+ 
+ 
++def _parse_to_version_info(version_str):
++    """
++    Parse a version string to a namedtuple analogous to `sys.version_info`.
++
++    See `matplotlib.version_info` and `sys.version_info`.
++    """
++    v = parse_version(version_str)
++    if v.pre is not None:
++        # rc1 -> ('candidate', 1), a1 -> ('alpha', 1), b1 -> ('beta', 1)
++        _releaselevel = {'a': 'alpha', 'b': 'beta', 'rc': 'candidate'}
++        releaselevel = _releaselevel[v.pre[0]]
++        serial = v.pre[1]
++        micro = v.micro
++    elif v.post is not None:
++        # Post-release in setuptools_scm means development on top of the
++        # tagged release, so treat it as alpha of the next micro release.
++        releaselevel = 'alpha'
++        serial = v.post
++        micro = v.micro + 1
++    elif v.dev is not None:
++        releaselevel = 'alpha'
++        serial = v.dev
++        micro = v.micro
++    else:
++        releaselevel = 'final'
++        serial = 0
++        micro = v.micro
++    return _VersionInfo(v.major, v.minor, micro, releaselevel, serial)
++
++
++_VersionInfo = namedtuple("_VersionInfo",
++                          "major, minor, micro, releaselevel, serial")
++
++
+ def _check_versions():
+ 
+     # Quickfix to ensure Microsoft Visual C++ redistributable

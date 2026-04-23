@@ -1,0 +1,165 @@
+diff --git a/xarray/core/variable.py b/xarray/core/variable.py
+index 64c1895d..18b7bc2f 100644
+--- a/xarray/core/variable.py
++++ b/xarray/core/variable.py
+@@ -218,7 +218,13 @@ def as_compatible_data(data, fastpath=False):
+         data = np.timedelta64(getattr(data, "value", data), "ns")
+ 
+     # we don't want nested self-described arrays
+-    data = getattr(data, "values", data)
++    # use .data instead of .values to avoid computing dask arrays
++    from .dataarray import DataArray
++
++    if isinstance(data, DataArray):
++        data = data.data
++    else:
++        data = getattr(data, "values", data)
+ 
+     if isinstance(data, np.ma.MaskedArray):
+         mask = np.ma.getmaskarray(data)
+@@ -667,7 +673,7 @@ class Variable(
+         return dims, BasicIndexer(key), None
+ 
+     def _validate_indexers(self, key):
+-        """ Make sanity checks """
++        """Make sanity checks"""
+         for dim, k in zip(self.dims, key):
+             if isinstance(k, BASIC_INDEXING_TYPES):
+                 pass
+@@ -687,8 +693,9 @@ class Variable(
+                         )
+                     if k.ndim > 1:
+                         raise IndexError(
+-                            "{}-dimensional boolean indexing is "
+-                            "not supported. ".format(k.ndim)
++                            "{}-dimensional boolean indexing is not supported. ".format(
++                                k.ndim
++                            )
+                         )
+                     if getattr(k, "dims", (dim,)) != (dim,):
+                         raise IndexError(
+@@ -722,7 +729,7 @@ class Variable(
+         return dims, OuterIndexer(tuple(new_key)), None
+ 
+     def _nonzero(self):
+-        """ Equivalent numpy's nonzero but returns a tuple of Varibles. """
++        """Equivalent numpy's nonzero but returns a tuple of Varibles."""
+         # TODO we should replace dask's native nonzero
+         # after https://github.com/dask/dask/issues/1076 is implemented.
+         nonzeros = np.nonzero(self.data)
+@@ -2711,8 +2718,7 @@ def _unified_dims(variables):
+         var_dims = var.dims
+         if len(set(var_dims)) < len(var_dims):
+             raise ValueError(
+-                "broadcasting cannot handle duplicate "
+-                "dimensions: %r" % list(var_dims)
++                "broadcasting cannot handle duplicate dimensions: %r" % list(var_dims)
+             )
+         for d, s in zip(var_dims, var.shape):
+             if d not in all_dims:
+diff --git a/xarray/tests/test_variable.py b/xarray/tests/test_variable.py
+index be6833c2..3972ce75 100644
+--- a/xarray/tests/test_variable.py
++++ b/xarray/tests/test_variable.py
+@@ -336,8 +336,8 @@ class VariableSubclassobjects:
+         assert_identical(base_v, 0 + v)
+         assert_identical(base_v, v * 1)
+         # binary ops with numpy arrays
+-        assert_array_equal((v * x).values, x ** 2)
+-        assert_array_equal((x * v).values, x ** 2)
++        assert_array_equal((v * x).values, x**2)
++        assert_array_equal((x * v).values, x**2)
+         assert_array_equal(v - y, v - 1)
+         assert_array_equal(y - v, 1 - v)
+         # verify attributes are dropped
+@@ -351,7 +351,7 @@ class VariableSubclassobjects:
+         assert_array_equal((v * w).values, x * y)
+ 
+         # something complicated
+-        assert_array_equal((v ** 2 * w - 1 + x).values, x ** 2 * y - 1 + x)
++        assert_array_equal((v**2 * w - 1 + x).values, x**2 * y - 1 + x)
+         # make sure dtype is preserved (for Index objects)
+         assert float == (+v).dtype
+         assert float == (+v).values.dtype
+@@ -436,7 +436,6 @@ class VariableSubclassobjects:
+             expected.copy(deep=True),
+             expected.copy(deep=False),
+         ]:
+-
+             assert_identical(expected.to_base_variable(), actual.to_base_variable())
+             assert expected.encoding == actual.encoding
+ 
+@@ -876,7 +875,7 @@ class VariableSubclassobjects:
+     def test_rolling_window(self):
+         # Just a working test. See test_nputils for the algorithm validation
+         v = self.cls(["x", "y", "z"], np.arange(40 * 30 * 2).reshape(40, 30, 2))
+-        for (d, w) in [("x", 3), ("y", 5)]:
++        for d, w in [("x", 3), ("y", 5)]:
+             v_rolling = v.rolling_window(d, w, d + "_window")
+             assert v_rolling.dims == ("x", "y", "z", d + "_window")
+             assert v_rolling.shape == v.shape + (w,)
+@@ -938,7 +937,7 @@ class TestVariable(VariableSubclassobjects):
+             assert v.values.dtype == np.dtype("datetime64[ns]")
+ 
+     def test_timedelta64_conversion_scalar(self):
+-        expected = np.timedelta64(24 * 60 * 60 * 10 ** 9, "ns")
++        expected = np.timedelta64(24 * 60 * 60 * 10**9, "ns")
+         for values in [
+             np.timedelta64(1, "D"),
+             pd.Timedelta("1 day"),
+@@ -967,7 +966,7 @@ class TestVariable(VariableSubclassobjects):
+         for td in [pd.to_timedelta("1s"), np.timedelta64(1, "s")]:
+             v = Variable([], td)
+             assert v.dtype == np.dtype("timedelta64[ns]")
+-            assert v.values == np.timedelta64(10 ** 9, "ns")
++            assert v.values == np.timedelta64(10**9, "ns")
+ 
+     def test_equals_and_identical(self):
+         d = np.random.rand(10, 3)
+@@ -1103,7 +1102,7 @@ class TestVariable(VariableSubclassobjects):
+         assert isinstance(v._data, LazilyOuterIndexedArray)
+ 
+     def test_detect_indexer_type(self):
+-        """ Tests indexer type was correctly detected. """
++        """Tests indexer type was correctly detected."""
+         data = np.random.random((10, 11))
+         v = Variable(["x", "y"], data)
+ 
+@@ -2319,7 +2318,7 @@ def test_raise_no_warning_for_nan_in_binary_ops():
+ 
+ 
+ class TestBackendIndexing:
+-    """    Make sure all the array wrappers can be indexed. """
++    """Make sure all the array wrappers can be indexed."""
+ 
+     @pytest.fixture(autouse=True)
+     def setUp(self):
+@@ -2391,3 +2390,28 @@ class TestBackendIndexing:
+         v = Variable(dims=("x", "y"), data=CopyOnWriteArray(DaskIndexingAdapter(da)))
+         self.check_orthogonal_indexing(v)
+         self.check_vectorized_indexing(v)
++
++
++@requires_dask
++def test_as_compatible_data_preserves_dask_from_dataarray():
++    import dask.array as da
++
++    dask_array = da.arange(10, chunks=2)
++    dataarray = DataArray(dask_array, dims=["x"])
++
++    result = as_compatible_data(dataarray)
++
++    assert isinstance(result, da.Array)
++    assert result.chunks == ((2, 2, 2, 2, 2),)
++
++
++def test_as_compatible_data_with_dataarray_no_dask():
++    import numpy as np
++
++    numpy_array = np.arange(10)
++    dataarray = DataArray(numpy_array, dims=["x"])
++
++    result = as_compatible_data(dataarray)
++
++    assert isinstance(result, np.ndarray)
++    np.testing.assert_array_equal(result, numpy_array)

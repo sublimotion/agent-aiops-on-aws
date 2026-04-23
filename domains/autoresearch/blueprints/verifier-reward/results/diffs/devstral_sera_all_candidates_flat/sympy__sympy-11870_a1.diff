@@ -1,0 +1,80 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index 2ad720d35a..16f94e0f74 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,7 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping, defaultdict
++from collections import defaultdict
++from collections.abc import Mapping
+ from itertools import chain
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+diff --git a/sympy/core/containers.py b/sympy/core/containers.py
+index 15abd93e3a..a9b8948ebe 100644
+--- a/sympy/core/containers.py
++++ b/sympy/core/containers.py
+@@ -14,6 +14,7 @@
+ from sympy.utilities.iterables import iterable
+ 
+ import collections
++from collections.abc import MutableSet
+ 
+ 
+ class Tuple(Basic):
+@@ -268,7 +269,7 @@ def _sorted_args(self):
+         return tuple(sorted(self.args, key=default_sort_key))
+ 
+ 
+-class OrderedSet(collections.MutableSet):
++class OrderedSet(MutableSet):
+     def __init__(self, iterable=None):
+         if iterable:
+             self.map = collections.OrderedDict((item, None) for item in iterable)
+diff --git a/sympy/functions/elementary/exponential.py b/sympy/functions/elementary/exponential.py
+index fbd80fc02c..b4d7a27971 100644
+--- a/sympy/functions/elementary/exponential.py
++++ b/sympy/functions/elementary/exponential.py
+@@ -451,6 +451,28 @@ def _eval_rewrite_as_cos(self, arg):
+     def _eval_rewrite_as_tanh(self, arg):
+         from sympy import tanh
+         return (1 + tanh(arg/2))/(1 - tanh(arg/2))
++        
++    def _eval_rewrite_as_sinc(self, arg):
++        from sympy import sinc, I, sin
++        # Handle the pattern: exp(I*x) - exp(-I*x)
++        # which should rewrite to: I*sin(x)
++        # and then sinc(x) = sin(x)/x
++        if arg.is_Mul and len(arg.args) == 2 and arg.has(I):
++            coeff, rest = arg.as_coeff_mul()
++            if coeff == I or coeff == -I:
++                # We have a pattern like I*x or -I*x
++                # Check if we can find a matching pair (I*x, -I*x)
++                # in a parent expression that would form sin(x)
++                parent = self._parent
++                if parent.is_Add and len(parent.args) == 2:
++                    # Look for the pattern: I*exp(I*x) - I*exp(-I*x)
++                    # or: -I*exp(I*x) + I*exp(-I*x)
++                    if (parent.args[0].simplify() == -parent.args[1].simplify()):
++                        # This is the pattern we're looking for
++                        # The result should be: I*(sin(x)/x) = I*sinc(x)
++                        x_part = rest
++                        return I * sinc(x_part)
++        return None
+ 
+ 
+ class log(Function):
+diff --git a/sympy/plotting/plot.py b/sympy/plotting/plot.py
+index d5abe84da9..a04226a14b 100644
+--- a/sympy/plotting/plot.py
++++ b/sympy/plotting/plot.py
+@@ -25,7 +25,7 @@
+ from __future__ import print_function, division
+ 
+ import inspect
+-from collections import Callable
++from collections.abc import Callable
+ import warnings
+ import sys
+ 

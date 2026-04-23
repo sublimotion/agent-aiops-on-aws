@@ -1,0 +1,33 @@
+diff --git a/django/db/backends/sqlite3/schema.py b/django/db/backends/sqlite3/schema.py
+index f0c81c123b..922cec99cb 100644
+--- a/django/db/backends/sqlite3/schema.py
++++ b/django/db/backends/sqlite3/schema.py
+@@ -236,7 +236,14 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
+                 if delete_field.name not in index.fields
+             ]
+ 
+-        constraints = list(model._meta.constraints)
++        # Constraints that use expressions cannot be embedded in the CREATE
++        # TABLE statement on SQLite (the "." operator is prohibited in index
++        # expressions). Exclude them here and re-add them as deferred SQL after
++        # the table has been renamed to its final name.
++        constraints = [
++            c for c in model._meta.constraints
++            if not c.contains_expressions
++        ]
+ 
+         # Provide isolated instances of the fields to the new model body so
+         # that the existing model's internals aren't interfered with when
+@@ -302,6 +309,12 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
+         for sql in self.deferred_sql:
+             self.execute(sql)
+         self.deferred_sql = []
++        # Add back any expression-based constraints that were excluded from the
++        # CREATE TABLE statement since SQLite prohibits the "." operator in
++        # index expressions. The model must be using its final table name now.
++        for constraint in model._meta.constraints:
++            if constraint.contains_expressions:
++                self.add_constraint(model, constraint)
+         # Fix any PK-removed field
+         if restore_pk_field:
+             restore_pk_field.primary_key = True

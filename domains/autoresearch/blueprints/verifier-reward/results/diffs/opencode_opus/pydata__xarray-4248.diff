@@ -1,0 +1,99 @@
+diff --git a/xarray/core/formatting.py b/xarray/core/formatting.py
+index 28eaae5f..3503694a 100644
+--- a/xarray/core/formatting.py
++++ b/xarray/core/formatting.py
+@@ -1,5 +1,5 @@
+-"""String formatting routines for __repr__.
+-"""
++"""String formatting routines for __repr__."""
++
+ import contextlib
+ import functools
+ from datetime import datetime, timedelta
+@@ -278,7 +278,12 @@ def summarize_variable(
+             raise TypeError(f"`max_width` value of `{max_width}` is not a valid int")
+         else:
+             max_width = max_width_options
+-    first_col = pretty_print(f"  {marker} {name} ", col_width)
++    units = var.attrs.get("units", None)
++    if units:
++        name_str = f"  {marker} {name}, in {units} "
++    else:
++        name_str = f"  {marker} {name} "
++    first_col = pretty_print(name_str, col_width)
+     if var.dims:
+         dims_str = "({}) ".format(", ".join(map(str, var.dims)))
+     else:
+@@ -347,8 +352,12 @@ def _get_col_items(mapping):
+ 
+     col_items = []
+     for k, v in mapping.items():
+-        col_items.append(k)
+         var = getattr(v, "variable", v)
++        units = var.attrs.get("units", None)
++        if units:
++            col_items.append(f"{k}, in {units}")
++        else:
++            col_items.append(k)
+         if isinstance(var, IndexVariable):
+             level_names = var.to_index_variable().level_names
+             if level_names is not None:
+diff --git a/xarray/core/formatting_html.py b/xarray/core/formatting_html.py
+index 5521b33e..1aab0bee 100644
+--- a/xarray/core/formatting_html.py
++++ b/xarray/core/formatting_html.py
+@@ -12,8 +12,7 @@ STATIC_FILES = ("static/html/icons-svg-inline.html", "static/css/style.css")
+ 
+ @lru_cache(None)
+ def _load_static_files():
+-    """Lazily load the resource files into memory the first time they are needed
+-    """
++    """Lazily load the resource files into memory the first time they are needed"""
+     return [
+         pkg_resources.resource_string("xarray", fname).decode("utf8")
+         for fname in STATIC_FILES
+@@ -39,7 +38,7 @@ def format_dims(dims, coord_names):
+     }
+ 
+     dims_li = "".join(
+-        f"<li><span{dim_css_map[dim]}>" f"{escape(dim)}</span>: {size}</li>"
++        f"<li><span{dim_css_map[dim]}>{escape(dim)}</span>: {size}</li>"
+         for dim, size in dims.items()
+     )
+ 
+@@ -48,7 +47,7 @@ def format_dims(dims, coord_names):
+ 
+ def summarize_attrs(attrs):
+     attrs_dl = "".join(
+-        f"<dt><span>{escape(k)} :</span></dt>" f"<dd>{escape(str(v))}</dd>"
++        f"<dt><span>{escape(k)} :</span></dt><dd>{escape(str(v))}</dd>"
+         for k, v in attrs.items()
+     )
+ 
+@@ -57,11 +56,8 @@ def summarize_attrs(attrs):
+ 
+ def _icon(icon_name):
+     # icon_name should be defined in xarray/static/html/icon-svg-inline.html
+-    return (
+-        "<svg class='icon xr-{0}'>"
+-        "<use xlink:href='#{0}'>"
+-        "</use>"
+-        "</svg>".format(icon_name)
++    return "<svg class='icon xr-{0}'><use xlink:href='#{0}'></use></svg>".format(
++        icon_name
+     )
+ 
+ 
+@@ -102,7 +98,11 @@ def summarize_variable(name, var, is_index=False, dtype=None, preview=None):
+ 
+     cssclass_idx = " class='xr-has-index'" if is_index else ""
+     dims_str = f"({', '.join(escape(dim) for dim in var.dims)})"
+-    name = escape(str(name))
++    units = var.attrs.get("units", None)
++    if units:
++        name = escape(str(name)) + ", in " + escape(str(units))
++    else:
++        name = escape(str(name))
+     dtype = dtype or escape(str(var.dtype))
+ 
+     # "unique" ids required to expand/collapse subsections

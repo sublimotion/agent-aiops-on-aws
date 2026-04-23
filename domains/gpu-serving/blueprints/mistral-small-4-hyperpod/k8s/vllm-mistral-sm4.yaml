@@ -1,0 +1,94 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vllm-mistral-sm4
+  namespace: default
+  labels:
+    app: vllm-mistral-sm4
+    model: mistral-small-4-119b
+spec:
+  restartPolicy: Never
+  # Schedule on the HyperPod p5 node
+  nodeSelector:
+    sagemaker.amazonaws.com/node-health-status: Schedulable
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  containers:
+    - name: vllm
+      image: vllm/vllm-openai:latest
+      command:
+        - /bin/bash
+        - -c
+        - |
+          pip install -q "mistral_common>=1.10.0" 2>&1 | tail -3
+          pip install -q git+https://github.com/huggingface/transformers.git 2>&1 | tail -3
+          pip install -q "mistral_common>=1.10.0" 2>&1 | tail -3
+          # Patch vLLM 0.19 bug: reasoning_effort kwarg breaks MistralCommonTokenizer
+          # Root cause: tokenizers/mistral.py unconditionally passes reasoning_effort=None
+          TOKFILE=/usr/local/lib/python3.12/dist-packages/vllm/tokenizers/mistral.py
+          sed -i 's/version_kwargs\["reasoning_effort"\] = kwargs.get("reasoning_effort")/pass  # reasoning_effort patched out/' "$TOKFILE"
+          find /usr/local/lib/python3.12/dist-packages/vllm/tokenizers/__pycache__ -name 'mistral*' -delete 2>/dev/null
+          echo "Patched reasoning_effort in tokenizers/mistral.py"
+          vllm serve /models/Mistral-Small-4-119B-2603 \
+            --tensor-parallel-size 2 \
+            --max-model-len 32768 \
+            --enable-prefix-caching \
+            --gpu-memory-utilization 0.85 \
+            --max-num-batched-tokens 8192 \
+            --max-num-seqs 64 \
+            --limit-mm-per-prompt '{"image":1}' \
+            --tool-call-parser mistral \
+            --enable-auto-tool-choice \
+            --host 0.0.0.0 \
+            --port 8001
+      ports:
+        - containerPort: 8001
+          name: http
+          protocol: TCP
+      env:
+        - name: HUGGING_FACE_HUB_TOKEN
+          value: ""
+        - name: NCCL_DEBUG
+          value: "WARN"
+        # H100 NVSwitch — use NCCL defaults
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0,1"
+      volumeMounts:
+        - name: model-store
+          mountPath: /models
+        - name: shm
+          mountPath: /dev/shm
+      resources:
+        requests:
+          cpu: "16"
+          memory: 64Gi
+          nvidia.com/gpu: "2"
+        limits:
+          nvidia.com/gpu: "2"
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 8001
+        initialDelaySeconds: 120
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 30
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 8001
+        initialDelaySeconds: 300
+        periodSeconds: 30
+        timeoutSeconds: 10
+        failureThreshold: 5
+  volumes:
+    - name: model-store
+      hostPath:
+        path: /opt/dlami/nvme/models
+        type: DirectoryOrCreate
+    - name: shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 16Gi

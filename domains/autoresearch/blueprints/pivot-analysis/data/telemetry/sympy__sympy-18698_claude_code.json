@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 405.7,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 404521,
+    "duration_api_ms": 301941,
+    "num_turns": 31,
+    "result": "Both issue examples pass. Here's a summary of the fix:\n\n**Root cause:** `_symbolic_factor_list` processes each factor of a `Mul` expression independently, so `(x-2)**3 * (x-3)**3` produces two separate entries `(x-2, 3)` and `(x-3, 3)` in the factors list. The code never merged factors with the same multiplicity.\n\n**Fix:** Added `_combine_factors_by_multiplicity()` in `sympy/polys/polytools.py` that merges factors with the same exponent by multiplying them together. This is called in `_generic_factor_list` after converting factors to `Poly` objects, but only for the `sqf` method (not `factor`).\n\n**Result:** `sqf_list((x**2 + 1) * (x - 1)**2 * (x - 2)**3 * (x - 3)**3)` now correctly returns `(1, [(x**2 + 1, 1), (x - 1, 2), (x**2 - 5*x + 6, 3)])` with `(x-2)*(x-3) = x**2 - 5x + 6` combined at multiplicity 3.\n\nAlso updated the test for `sqf_list(x*(x+y))` to reflect the mathematically correct output `(1, [(x**2 + x*y, 1)])` \u2014 the same-multiplicity merging applies there too (the square-free factorization of `x*(x+y)` is just the product polynomial at multiplicity 1).",
+    "stop_reason": "end_turn",
+    "session_id": "81a759a5-0c5f-42c8-a1b8-d6b0e3e37912",
+    "total_cost_usd": 0.67873095,
+    "usage": {
+      "input_tokens": 96,
+      "cache_creation_input_tokens": 38519,
+      "cache_read_input_tokens": 839689,
+      "output_tokens": 18806,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 38519
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 96,
+        "outputTokens": 18806,
+        "cacheReadInputTokens": 839689,
+        "cacheCreationInputTokens": 38519,
+        "webSearchRequests": 0,
+        "costUSD": 0.67873095,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "44e916f6-2392-4c40-abca-446ca61ff3f5"
+  },
+  "stderr": ""
+}

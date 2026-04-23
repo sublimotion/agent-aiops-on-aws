@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vllm-gemma4-4b
+  namespace: default
+  labels:
+    app: vllm-gemma4-4b
+    model: gemma-4-e4b
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    sagemaker.amazonaws.com/node-health-status: Schedulable
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  containers:
+    - name: vllm
+      image: vllm/vllm-openai:latest
+      command:
+        - /bin/bash
+        - -c
+        - |
+          apt-get update -qq && apt-get install -y -qq git > /dev/null 2>&1
+          pip install -q git+https://github.com/huggingface/transformers.git 2>&1 | tail -3
+          vllm serve google/gemma-4-E4B-it \
+            --dtype bfloat16 \
+            --max-model-len 32768 \
+            --gpu-memory-utilization 0.90 \
+            --enable-prefix-caching \
+            --tool-call-parser pythonic \
+            --enable-auto-tool-choice \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --trust-remote-code
+      ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+      env:
+        - name: HF_HOME
+          value: /tmp/hf-cache
+      resources:
+        requests:
+          cpu: "4"
+          memory: 16Gi
+          nvidia.com/gpu: "1"
+        limits:
+          nvidia.com/gpu: "1"
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        initialDelaySeconds: 120
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 30
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        initialDelaySeconds: 300
+        periodSeconds: 30
+        timeoutSeconds: 5
+      volumeMounts:
+        - name: cache
+          mountPath: /tmp/hf-cache
+        - name: shm
+          mountPath: /dev/shm
+  volumes:
+    - name: cache
+      emptyDir:
+        sizeLimit: 20Gi
+    - name: shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 4Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-gemma4-4b
+  namespace: default
+spec:
+  selector:
+    app: vllm-gemma4-4b
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 30800
+      protocol: TCP
+  type: NodePort

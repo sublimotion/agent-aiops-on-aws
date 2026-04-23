@@ -1,0 +1,94 @@
+diff --git a/requests/cookies.py b/requests/cookies.py
+index 831c49c6..e250590e 100644
+--- a/requests/cookies.py
++++ b/requests/cookies.py
+@@ -7,7 +7,7 @@ requests.utils imports from here, so be careful with imports.
+ """
+ 
+ import time
+-import collections
++import collections.abc as collections
+ from .compat import cookielib, urlparse, urlunparse, Morsel
+ 
+ try:
+diff --git a/requests/models.py b/requests/models.py
+index 3f6a4f92..7a0dda81 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -7,7 +7,8 @@ requests.models
+ This module contains the primary objects that power Requests.
+ """
+ 
+-import collections
++import collections.abc as collections
++from typing import Callable
+ import datetime
+ 
+ from io import BytesIO, UnsupportedOperation
+@@ -166,7 +167,7 @@ class RequestHooksMixin(object):
+         if event not in self.hooks:
+             raise ValueError('Unsupported event specified, with event name "%s"' % (event))
+ 
+-        if isinstance(hook, collections.Callable):
++        if isinstance(hook, Callable):
+             self.hooks[event].append(hook)
+         elif hasattr(hook, '__iter__'):
+             self.hooks[event].extend(h for h in hook if isinstance(h, collections.Callable))
+diff --git a/requests/packages/urllib3/_collections.py b/requests/packages/urllib3/_collections.py
+index d77ebb8d..b82d9c59 100644
+--- a/requests/packages/urllib3/_collections.py
++++ b/requests/packages/urllib3/_collections.py
+@@ -1,4 +1,4 @@
+-from collections import Mapping, MutableMapping
++from collections.abc import Mapping, MutableMapping
+ try:
+     from threading import RLock
+ except ImportError: # Platform-specific: No threads available
+diff --git a/requests/sessions.py b/requests/sessions.py
+index d701ff2e..dad5c260 100644
+--- a/requests/sessions.py
++++ b/requests/sessions.py
+@@ -9,7 +9,7 @@ requests (cookies, auth, proxies).
+ 
+ """
+ import os
+-from collections import Mapping
++from collections.abc import Mapping
+ from datetime import datetime
+ 
+ from .auth import _basic_auth_str
+@@ -425,7 +425,7 @@ class Session(SessionRedirectMixin):
+             If Tuple, ('cert', 'key') pair.
+         """
+ 
+-        method = builtin_str(method)
++        method = to_native_string(method)
+ 
+         # Create the Request.
+         req = Request(
+diff --git a/requests/structures.py b/requests/structures.py
+index 3e5f2faa..1b56d5f3 100644
+--- a/requests/structures.py
++++ b/requests/structures.py
+@@ -8,7 +8,7 @@ Data structures that power Requests.
+ 
+ """
+ 
+-import collections
++import collections.abc as collections
+ 
+ 
+ class CaseInsensitiveDict(collections.MutableMapping):
+diff --git a/requests/utils.py b/requests/utils.py
+index 182348da..7396fb6f 100644
+--- a/requests/utils.py
++++ b/requests/utils.py
+@@ -11,7 +11,7 @@ that are also useful for external consumption.
+ 
+ import cgi
+ import codecs
+-import collections
++import collections.abc as collections
+ import io
+ import os
+ import platform

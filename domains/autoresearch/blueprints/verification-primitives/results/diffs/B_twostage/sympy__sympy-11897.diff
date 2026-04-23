@@ -1,0 +1,36 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index 1edc712358..ee575a7013 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -356,8 +356,29 @@ def _print_Mul(self, expr):
+         else:
+             tex = ""
+ 
+-        from sympy.simplify import fraction
+-        numer, denom = fraction(expr, exact=True)
++        from sympy.core import Mul, Pow, Rational
++
++        # Separate numerator and denominator by looking at args directly,
++        # consistent with the pretty printer: only treat items with negative
++        # rational exponents as denominator terms (avoids assumption-dependent
++        # behavior like exp(-x) with x positive becoming 1/exp(x)).
++        numer_args = []
++        denom_args = []
++        for item in Mul.make_args(expr):
++            if item.is_commutative and item.is_Pow and item.exp.is_Rational and item.exp.is_negative:
++                if item.exp == S.NegativeOne:
++                    denom_args.append(item.base)
++                else:
++                    denom_args.append(Pow(item.base, -item.exp, evaluate=False))
++            elif item.is_Rational and item is not S.Infinity:
++                if item.p != 1:
++                    numer_args.append(Rational(item.p))
++                if item.q != 1:
++                    denom_args.append(Rational(item.q))
++            else:
++                numer_args.append(item)
++        numer = Mul(*numer_args, evaluate=False) if numer_args else S.One
++        denom = Mul(*denom_args, evaluate=False) if denom_args else S.One
+         separator = self._settings['mul_symbol_latex']
+         numbersep = self._settings['mul_symbol_latex_numbers']
+ 

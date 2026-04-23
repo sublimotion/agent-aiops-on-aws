@@ -1,0 +1,28 @@
+diff --git a/sklearn/preprocessing/label.py b/sklearn/preprocessing/label.py
+index 61b8d4a21..bd728dcb7 100644
+--- a/sklearn/preprocessing/label.py
++++ b/sklearn/preprocessing/label.py
+@@ -126,6 +126,11 @@ class LabelEncoder(BaseEstimator, TransformerMixin):
+         """
+         check_is_fitted(self, 'classes_')
+         y = column_or_1d(y, warn=True)
++        # Return early when y is empty to avoid type-casting issues in
++        # np.searchsorted when classes_ has a non-numeric dtype (e.g. strings)
++        # and y is an empty float64 array.
++        if _num_samples(y) == 0:
++            return np.array([])
+ 
+         classes = np.unique(y)
+         if len(np.intersect1d(classes, self.classes_)) < len(classes):
+@@ -153,6 +158,11 @@ class LabelEncoder(BaseEstimator, TransformerMixin):
+             raise ValueError(
+                     "y contains previously unseen labels: %s" % str(diff))
+         y = np.asarray(y)
++        # Return early when y is empty to avoid indexing issues when
++        # classes_ has a non-numeric dtype (e.g. strings) and y is an
++        # empty float64 array.
++        if _num_samples(y) == 0:
++            return np.array([])
+         return self.classes_[y]
+ 
+ 

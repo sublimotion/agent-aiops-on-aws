@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 219.1,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 217758,
+    "duration_api_ms": 182763,
+    "num_turns": 25,
+    "result": "The adversarial review's concern is unfounded. The function maintains a sorted list of statement start positions, and `end = values[insert_index]` gives the start of the NEXT statement (which is then used as the upper bound for `getstatementrange_ast`'s BlockFinder refinement). My fix correctly changes where the decorated function's start is recorded in that list \u2014 from the `def` line to the decorator line \u2014 so the previous statement's range doesn't bleed into the decorator.\n\nAll 7 generated tests pass and all 54 existing tests pass. The fix is complete.\n\n**Summary:** In `src/_pytest/_code/source.py:get_statement_startend2`, when collecting statement line numbers into the `values` list, decorated `FunctionDef`/`AsyncFunctionDef`/`ClassDef` nodes now use the first decorator's line number instead of the `def`/`class` line. This matches the pre-3.8 behavior where `FunctionDef.lineno` pointed to the decorator, preventing the decorator line from being included in the error output of the preceding statement.",
+    "stop_reason": "end_turn",
+    "session_id": "51781cd3-bbee-47b5-8774-4411ad55ce77",
+    "total_cost_usd": 0.4533558,
+    "usage": {
+      "input_tokens": 92,
+      "cache_creation_input_tokens": 26890,
+      "cache_read_input_tokens": 643141,
+      "output_tokens": 10620,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 26890
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 92,
+        "outputTokens": 10620,
+        "cacheReadInputTokens": 643141,
+        "cacheCreationInputTokens": 26890,
+        "webSearchRequests": 0,
+        "costUSD": 0.4533558,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "a908cf45-2a90-4dfe-9e36-80585611eeb5"
+  },
+  "stderr": ""
+}

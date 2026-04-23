@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 85.6,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 84477,
+    "duration_api_ms": 57698,
+    "num_turns": 20,
+    "result": "All relevant tests pass. The fix is clean and correct.\n\n**Summary:** The bug was in `Zero._eval_power` in `sympy/core/numbers.py`. The method used `expt.is_positive` and `expt.is_negative`, but `oo` and `-oo` (infinity objects) return `False` for those properties because they're not finite. They do return `True` for `is_extended_positive` and `is_extended_negative`. Changing to the extended variants fixes `0**-oo` \u2192 `zoo` while keeping `0**oo` \u2192 `0` and other cases working correctly.",
+    "stop_reason": "end_turn",
+    "session_id": "1f4cf1e0-3e0b-4450-b98b-6f1ac2c8d101",
+    "total_cost_usd": 0.2491254,
+    "usage": {
+      "input_tokens": 86,
+      "cache_creation_input_tokens": 20396,
+      "cache_read_input_tokens": 431608,
+      "output_tokens": 2860,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 20396
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 86,
+        "outputTokens": 2860,
+        "cacheReadInputTokens": 431608,
+        "cacheCreationInputTokens": 20396,
+        "webSearchRequests": 0,
+        "costUSD": 0.2491254,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "364a1cc6-5e06-4094-971e-df32e33f78bb"
+  },
+  "stderr": ""
+}

@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 183.9,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 182584,
+    "duration_api_ms": 160078,
+    "num_turns": 24,
+    "result": "The fix is clean. Here's a summary:\n\n**Problem**: `resolve_lookup_value` reconstructed tuples by passing a generator to `type(value)(generator)`. This works for `list` and `tuple` (which accept a single iterable), but not for named tuples (which require positional args like `Range(near=10, far=20)`).\n\n**Fix** (`query.py:1080-1084`): First resolve all sub-values into a list, then:\n- Named tuples (`hasattr(value, '_fields')`): use `type(value)(*values)` \u2014 unpack as positional args\n- Regular `list`/`tuple`: use `type(value)(values)` \u2014 pass as iterable (original behavior preserved)\n\nAll 398 existing query tests pass.",
+    "stop_reason": "end_turn",
+    "session_id": "d5b463fe-259b-476e-8564-d1c3a394f920",
+    "total_cost_usd": 0.28381349999999994,
+    "usage": {
+      "input_tokens": 90,
+      "cache_creation_input_tokens": 19196,
+      "cache_read_input_tokens": 488945,
+      "output_tokens": 4325,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 19196
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 90,
+        "outputTokens": 4325,
+        "cacheReadInputTokens": 488945,
+        "cacheCreationInputTokens": 19196,
+        "webSearchRequests": 0,
+        "costUSD": 0.28381349999999994,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "b7929b1f-3bf3-4771-aeb6-9336b1a74501"
+  },
+  "stderr": ""
+}

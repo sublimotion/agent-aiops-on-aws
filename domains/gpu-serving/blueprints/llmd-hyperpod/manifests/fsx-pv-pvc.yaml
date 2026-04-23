@@ -1,0 +1,35 @@
+# FSx Lustre PV/PVC for L3 KV cache
+# HyperPod auto-provisioned: fs-0ea95350af6e402f6 (1.2 TiB)
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: fsx-kvcache-pv
+spec:
+  capacity:
+    storage: 1200Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  csi:
+    driver: fsx.csi.aws.com
+    volumeHandle: fs-0ea95350af6e402f6
+    volumeAttributes:
+      dnsname: fs-0ea95350af6e402f6.fsx.us-east-1.amazonaws.com
+      mountname: bukizb4v
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: fsx-kvcache
+  namespace: llmd-validation
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: fsx-kvcache-pv
+  resources:
+    requests:
+      storage: 1200Gi

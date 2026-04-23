@@ -1,0 +1,20 @@
+diff --git a/sympy/utilities/lambdify.py b/sympy/utilities/lambdify.py
+index f71bea25f5..ff6674bf70 100644
+--- a/sympy/utilities/lambdify.py
++++ b/sympy/utilities/lambdify.py
+@@ -739,7 +739,14 @@ def _preprocess(self, args, expr):
+                 argstrs.append(self._argrepr(dummy))
+                 expr = self._subexpr(expr, {arg: dummy})
+             else:
+-                argstrs.append(str(arg))
++                argrep = str(arg)
++
++                if dummify or not self._is_safe_ident(argrep):
++                    dummy = Dummy()
++                    argstrs.append(self._argrepr(dummy))
++                    expr = self._subexpr(expr, {arg: dummy})
++                else:
++                    argstrs.append(argrep)
+ 
+         return argstrs, expr
+ 

@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 101.8,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 100514,
+    "duration_api_ms": 80293,
+    "num_turns": 18,
+    "result": "All 4 existing decorator tests pass. The fix is correct and complete.\n\n## Summary\n\nThe issue was in `django/utils/decorators.py` at line 40 in `_multi_decorate`. The `partial` object wrapping the bound method lacked function attributes (`__name__`, `__module__`, `__qualname__`, `__doc__`), causing `AttributeError` when decorators using `@wraps(func)` tried to access them.\n\n**Fix**: Apply `wraps(method)` to the `partial` object before passing it to decorators:\n\n```python\n# Before\nbound_method = partial(method.__get__(self, type(self)))\n\n# After\nbound_method = wraps(method)(partial(method.__get__(self, type(self))))\n```\n\nThis uses `functools.wraps` to copy the function's attributes (`__name__`, `__doc__`, `__module__`, `__qualname__`, `__dict__`, `__wrapped__`) onto the `partial` object, so decorators that access these attributes work correctly.",
+    "stop_reason": "end_turn",
+    "session_id": "45a319f4-80bf-4735-8995-5770a30f7f48",
+    "total_cost_usd": 0.21334709999999996,
+    "usage": {
+      "input_tokens": 84,
+      "cache_creation_input_tokens": 15998,
+      "cache_read_input_tokens": 349992,
+      "output_tokens": 3207,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 15998
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 84,
+        "outputTokens": 3207,
+        "cacheReadInputTokens": 349992,
+        "cacheCreationInputTokens": 15998,
+        "webSearchRequests": 0,
+        "costUSD": 0.21334709999999996,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "0ae19457-85ae-4817-88c6-69de59ccd4cd"
+  },
+  "stderr": ""
+}

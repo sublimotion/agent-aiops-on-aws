@@ -40,8 +40,26 @@ log = logging.getLogger(__name__)
 sys.path.insert(0, os.path.dirname(__file__))
 from harness_eval import (
     Issue, load_subset, setup_workspace, run_instrumented_loop,
-    PHASE1_CONFIGS, _check_tests_pass, _get_git_diff,
+    PHASE1_CONFIGS, _check_tests_pass, _get_git_diff, FIX_SYSTEM_PROMPT,
 )
+
+# ---------------------------------------------------------------------------
+# Prompt Variants (T6: Adversarial Self-Critique in Generation)
+# ---------------------------------------------------------------------------
+
+PROMPT_VARIANTS = {
+    "control": "",
+    "self-critique": (
+        "\n\nAfter writing your fix, review it critically: assume the patch is wrong "
+        "and try to find a bug. If you find one, fix it before finishing."
+    ),
+    "self-critique-strong": (
+        "\n\nIMPORTANT: Before you finish, you MUST do a self-review. "
+        "Assume your patch is incorrect. Try to construct an input that would make "
+        "the patched code fail. If you find a plausible failure, fix the patch. "
+        "Only finish when you cannot break your own fix."
+    ),
+}
 
 # ---------------------------------------------------------------------------
 # Harness Definitions
@@ -130,6 +148,13 @@ HARNESSES = {
         "check_cmd": "codex --version",
         "description": "OpenAI coding agent using Responses API, sandboxed shell + file tools",
     },
+    "droid": {
+        "name": "Factory Droid",
+        "type": "cli",
+        "install_cmd": "npm install -g droid",
+        "check_cmd": "droid --version",
+        "description": "Factory AI coding agent with custom vLLM support via generic-chat-completion-api",
+    },
 }
 
 
@@ -142,8 +167,13 @@ class HarnessResult:
     fix_generated: bool = False
     turns_used: int = 0
     tokens_consumed: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
     total_latency_ms: float = 0
     error: Optional[str] = None
+    # Not serialized to summary JSONL — saved to separate files
+    diff: Optional[str] = None
+    trajectory: Optional[list] = None
 
 
 # ---------------------------------------------------------------------------
@@ -190,6 +220,7 @@ async def run_sera(
     endpoint: str,
     model: str,
     best_turn_config: dict,
+    prompt_variant: str = "control",
 ) -> HarnessResult:
     """Run SERA baseline (our own agent loop with best Phase 1 config)."""
     import aiohttp
@@ -200,9 +231,12 @@ async def run_sera(
     try:
         connector = aiohttp.TCPConnector(limit=10)
         async with aiohttp.ClientSession(connector=connector) as session:
+            # Inject prompt variant into config for system prompt modification
+            config = dict(best_turn_config)
+            config["_prompt_suffix"] = PROMPT_VARIANTS.get(prompt_variant, "")
             eval_result = await run_instrumented_loop(
                 session, endpoint, model, issue, workspace,
-                best_turn_config, "sera",
+                config, "sera",
             )
             result.tests_pass = eval_result.tests_pass
             result.fix_generated = eval_result.fix_generated
@@ -252,7 +286,15 @@ def run_cli_harness(
         "PROBLEM_STATEMENT": issue.problem_statement[:10000],
         "TEST_CMD": issue.test_cmd,
         "REPO": issue.repo,
+        "PROMPT_VARIANT": os.environ.get("PROMPT_VARIANT", "control"),
     })
+
+    # Tell adapter where to save raw trajectory events
+    traj_file = os.path.join(
+        os.environ.get("TRAJECTORY_DIR", "/tmp"),
+        f"{harness_id}_{issue.instance_id}.jsonl",
+    )
+    env["TRAJECTORY_FILE"] = traj_file
 
     try:
         proc = subprocess.run(
@@ -271,6 +313,8 @@ def run_cli_harness(
                 result.tests_pass = output.get("pass", False)
                 result.turns_used = output.get("turns", 0)
                 result.tokens_consumed = output.get("tokens", 0)
+                result.input_tokens = output.get("input_tokens", 0)
+                result.output_tokens = output.get("output_tokens", 0)
                 result.fix_generated = output.get("fix_generated", result.tests_pass)
             except json.JSONDecodeError:
                 result.error = f"Could not parse adapter output: {lines[-1][:200]}"
@@ -287,9 +331,21 @@ def run_cli_harness(
 
     result.total_latency_ms = (time.monotonic() - start) * 1000
 
-    # Also check git diff as fallback for fix_generated
-    if not result.fix_generated:
-        result.fix_generated = bool(_get_git_diff(workspace))
+    # Capture git diff
+    diff = _get_git_diff(workspace)
+    if diff:
+        result.diff = diff
+        result.fix_generated = True
+    elif not result.fix_generated:
+        result.fix_generated = False
+
+    # Load raw trajectory if adapter saved one
+    if os.path.isfile(traj_file):
+        try:
+            with open(traj_file) as tf:
+                result.trajectory = [json.loads(l) for l in tf if l.strip()]
+        except Exception:
+            pass
 
     return result
 
@@ -307,10 +363,16 @@ async def run_harness(
     workspace_dir: str,
     output_path: str,
     best_turn_config: dict,
+    prompt_variant: str = "control",
 ):
     """Run one harness against all issues."""
     harness = HARNESSES[harness_id]
     log.info(f"=== Harness: {harness['name']} ({harness['description']}) ===")
+
+    # Set trajectory dir so adapters can persist raw events
+    traj_raw_dir = os.path.join(os.path.dirname(output_path), "trajectories", "raw")
+    os.makedirs(traj_raw_dir, exist_ok=True)
+    os.environ["TRAJECTORY_DIR"] = traj_raw_dir
 
     results = []
     for i, issue in enumerate(issues):
@@ -319,8 +381,9 @@ async def run_harness(
 
         try:
             if harness["type"] == "builtin":
-                result = await run_sera(issue, workspace, endpoint, model, best_turn_config)
+                result = await run_sera(issue, workspace, endpoint, model, best_turn_config, prompt_variant)
             else:
+                os.environ["PROMPT_VARIANT"] = prompt_variant
                 result = run_cli_harness(harness_id, issue, workspace, endpoint, model)
             results.append(result)
         except Exception as e:
@@ -334,11 +397,33 @@ async def run_harness(
                 import shutil
                 shutil.rmtree(workspace, ignore_errors=True)
 
-    # Write results
+    # Write results — diffs and trajectories go to separate files
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    diff_dir = os.path.join(os.path.dirname(output_path), "diffs", harness_id)
+    traj_dir = os.path.join(os.path.dirname(output_path), "trajectories", harness_id)
+    os.makedirs(diff_dir, exist_ok=True)
+    os.makedirs(traj_dir, exist_ok=True)
+
     with open(output_path, "w") as f:
         for r in results:
-            f.write(json.dumps(asdict(r)) + "\n")
+            # Save diff to separate file
+            if r.diff:
+                diff_path = os.path.join(diff_dir, f"{r.instance_id}.diff")
+                with open(diff_path, "w") as df:
+                    df.write(r.diff)
+
+            # Save trajectory to separate file
+            if r.trajectory:
+                traj_path = os.path.join(traj_dir, f"{r.instance_id}.jsonl")
+                with open(traj_path, "w") as tf:
+                    for evt in r.trajectory:
+                        tf.write(json.dumps(evt) + "\n")
+
+            # Strip heavy fields from summary JSONL
+            d = asdict(r)
+            d.pop("diff", None)
+            d.pop("trajectory", None)
+            f.write(json.dumps(d) + "\n")
 
     # Summary
     n_pass = sum(1 for r in results if r.tests_pass)
@@ -443,11 +528,32 @@ async def main():
     parser.add_argument("--workspace-dir", default="/mnt/nvme/sera-workspaces", help="Workspace dir")
     parser.add_argument("--best-config", default="D", help="Best Phase 1 config for SERA baseline")
     parser.add_argument("--check-installed", action="store_true", help="Check which harnesses are installed")
+    parser.add_argument("--shard", type=str, default=None,
+                        help="Run a subset of issues: SHARD_ID/NUM_SHARDS (e.g. 0/4, 1/4)")
+    parser.add_argument("--prompt-variant", default="control",
+                        choices=list(PROMPT_VARIANTS.keys()),
+                        help="Prompt variant for T6 self-critique experiment")
     args = parser.parse_args()
 
     if args.report:
         generate_report(args.report)
         return
+
+    # Pre-flight smoke test — abort early if endpoint is broken
+    if not args.check_installed:
+        smoke_script = os.path.join(os.path.dirname(__file__), "smoke_test.py")
+        if os.path.isfile(smoke_script):
+            log.info("Running pre-flight smoke test...")
+            smoke = subprocess.run(
+                [sys.executable, smoke_script,
+                 "--endpoint", args.endpoint, "--model", args.model,
+                 "--workspace-dir", args.workspace_dir],
+                timeout=300,
+            )
+            if smoke.returncode != 0:
+                log.error("Smoke test FAILED — aborting eval. Fix the issues above before retrying.")
+                sys.exit(1)
+            log.info("Smoke test passed.")
 
     if args.check_installed:
         for hid, h in HARNESSES.items():
@@ -464,6 +570,12 @@ async def main():
 
     issues = load_subset()
 
+    # Shard issues for parallel execution across GPUs
+    if args.shard:
+        shard_id, num_shards = map(int, args.shard.split("/"))
+        issues = [iss for i, iss in enumerate(issues) if i % num_shards == shard_id]
+        log.info(f"Shard {shard_id}/{num_shards}: {len(issues)} issues")
+
     if args.run_all:
         all_summaries = []
         for hid in HARNESSES:
@@ -476,7 +588,7 @@ async def main():
             output = os.path.join(args.output_dir, f"phase2_{hid}.jsonl")
             summary = await run_harness(
                 hid, issues, args.endpoint, args.model,
-                args.workspace_dir, output, best_config,
+                args.workspace_dir, output, best_config, args.prompt_variant,
             )
             all_summaries.append(summary)
 
@@ -499,10 +611,12 @@ async def main():
                 log.error(f"Could not install {args.harness}")
                 sys.exit(1)
 
-        output = os.path.join(args.output_dir, f"phase2_{args.harness}.jsonl")
+        shard_suffix = f"_s{args.shard.split('/')[0]}" if args.shard else ""
+        variant_suffix = f"_{args.prompt_variant}" if args.prompt_variant != "control" else ""
+        output = os.path.join(args.output_dir, f"phase2_{args.harness}{variant_suffix}{shard_suffix}.jsonl")
         await run_harness(
             args.harness, issues, args.endpoint, args.model,
-            args.workspace_dir, output, best_config,
+            args.workspace_dir, output, best_config, args.prompt_variant,
         )
         return
 

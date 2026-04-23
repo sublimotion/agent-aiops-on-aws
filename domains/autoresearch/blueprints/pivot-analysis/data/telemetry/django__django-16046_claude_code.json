@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 72.7,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 71386,
+    "duration_api_ms": 49387,
+    "num_turns": 20,
+    "result": "All 6 existing tests pass. The fix is correct \u2014 adding `str_number and` before `str_number[0] == \"-\"` prevents the `IndexError` when the number converts to an empty string.\n\nThe one-line fix on line 71 of `django/utils/numberformat.py`:\n- **Before**: `if str_number[0] == \"-\":`\n- **After**: `if str_number and str_number[0] == \"-\":`\n\nThis guards against an empty string by short-circuiting the index check when `str_number` is falsy (empty).",
+    "stop_reason": "end_turn",
+    "session_id": "1f027855-1b12-4c07-a204-8a539d9476fa",
+    "total_cost_usd": 0.18988155,
+    "usage": {
+      "input_tokens": 84,
+      "cache_creation_input_tokens": 15543,
+      "cache_read_input_tokens": 329361,
+      "output_tokens": 2169,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 15543
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 84,
+        "outputTokens": 2169,
+        "cacheReadInputTokens": 329361,
+        "cacheCreationInputTokens": 15543,
+        "webSearchRequests": 0,
+        "costUSD": 0.18988155,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "be86d72c-3f18-4e1c-b3e5-13763e6432a6"
+  },
+  "stderr": ""
+}

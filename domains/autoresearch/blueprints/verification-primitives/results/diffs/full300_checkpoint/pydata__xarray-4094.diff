@@ -1,0 +1,35 @@
+diff --git a/xarray/__init__.py b/xarray/__init__.py
+index 3886edc6..e4d9485d 100644
+--- a/xarray/__init__.py
++++ b/xarray/__init__.py
+@@ -1,4 +1,7 @@
+-import pkg_resources
++try:
++    import pkg_resources
++except ImportError:
++    pkg_resources = None  # type: ignore
+ 
+ from . import testing, tutorial, ufuncs
+ from .backends.api import (
+@@ -30,7 +33,7 @@ from .core.variable import Coordinate, IndexVariable, Variable, as_variable
+ from .util.print_versions import show_versions
+ 
+ try:
+-    __version__ = pkg_resources.get_distribution("xarray").version
++    __version__ = pkg_resources.get_distribution("xarray").version if pkg_resources else "999"
+ except Exception:
+     # Local copy or not installed with setuptools.
+     # Disable minimum version checks on downstream libraries.
+diff --git a/xarray/core/dataarray.py b/xarray/core/dataarray.py
+index b0df8749..7aeefc3e 100644
+--- a/xarray/core/dataarray.py
++++ b/xarray/core/dataarray.py
+@@ -1961,7 +1961,7 @@ class DataArray(AbstractArray, DataWithCoords):
+         # pull variables out of datarray
+         data_dict = {}
+         for k in variables:
+-            data_dict[k] = self.sel({variable_dim: k}).squeeze(drop=True)
++            data_dict[k] = self.sel({variable_dim: k}).squeeze(drop=True).drop_vars(dim)
+ 
+         # unstacked dataset
+         return Dataset(data_dict)

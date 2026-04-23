@@ -1,0 +1,14 @@
+diff --git a/seaborn/_stats/regression.py b/seaborn/_stats/regression.py
+index 7b7ddc8d..9c40f411 100644
+--- a/seaborn/_stats/regression.py
++++ b/seaborn/_stats/regression.py
+@@ -23,6 +23,9 @@ class PolyFit(Stat):
+ 
+         x = data["x"]
+         y = data["y"]
++        finite = x.notna() & y.notna()
++        x = x[finite]
++        y = y[finite]
+         if x.nunique() <= self.order:
+             # TODO warn?
+             xx = yy = []

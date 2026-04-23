@@ -1,0 +1,50 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 16df317631..bff5765228 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -684,7 +684,13 @@ class RawSQL(Expression):
+         return "{}({}, {})".format(self.__class__.__name__, self.sql, self.params)
+ 
+     def as_sql(self, compiler, connection):
+-        return '(%s)' % self.sql, self.params
++        # Normalize multiline SQL by removing newlines and extra spaces
++        # while preserving the SQL structure
++        if '\n' in self.sql:
++            sql = ' '.join(line.strip() for line in self.sql.splitlines())
++        else:
++            sql = self.sql
++        return '(%s)' % sql, self.params
+ 
+     def get_group_by_cols(self, alias=None):
+         return [self]
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 7649c39262..4e25a6d983 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -353,12 +353,20 @@ class SQLCompiler:
+             # not taken into account so we strip it. When this entire method
+             # is refactored into expressions, then we can check each part as we
+             # generate it.
+-            without_ordering = self.ordering_parts.search(sql).group(1)
+-            params_hash = make_hashable(params)
+-            if (without_ordering, params_hash) in seen:
+-                continue
+-            seen.add((without_ordering, params_hash))
+-            result.append((resolved, (sql, params, is_ref)))
++            # For RawSQL expressions, we need to handle duplicate detection differently
++            # since identical last lines in different RawSQL expressions could be considered duplicates
++            if isinstance(resolved, RawSQL):
++                # For RawSQL expressions, we skip duplicate detection entirely
++                # since they are explicitly written by the developer and should be treated as unique
++                result.append((resolved, (sql, params, is_ref)))
++            else:
++                # For non-RawSQL expressions, use the traditional method
++                without_ordering = self.ordering_parts.search(sql).group(1)
++                params_hash = make_hashable(params)
++                if (without_ordering, params_hash) in seen:
++                    continue
++                seen.add((without_ordering, params_hash))
++                result.append((resolved, (sql, params, is_ref)))
+         return result
+ 
+     def get_extra_select(self, order_by, select):

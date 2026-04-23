@@ -1,0 +1,38 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 9b00e24509..0ea837caa0 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -45,7 +45,23 @@ class ResolverMatch:
+         self.namespaces = [x for x in namespaces if x] if namespaces else []
+         self.namespace = ':'.join(self.namespaces)
+ 
+-        if not hasattr(func, '__name__'):
++        if isinstance(func, functools.partial):
++            # Unwrap functools.partial objects to get the underlying function
++            # and any pre-set arguments/keywords for a better repr().
++            unwrapped = func
++            partial_args = ()
++            partial_kwargs = {}
++            while isinstance(unwrapped, functools.partial):
++                partial_args = unwrapped.args + partial_args
++                partial_kwargs = {**unwrapped.keywords, **partial_kwargs}
++                unwrapped = unwrapped.func
++            self._func_path = (
++                'functools.partial(%r' % unwrapped +
++                ''.join(', %r' % (arg,) for arg in partial_args) +
++                ''.join(', %s=%r' % (k, v) for k, v in partial_kwargs.items()) +
++                ')'
++            )
++        elif not hasattr(func, '__name__'):
+             # A class-based view
+             self._func_path = func.__class__.__module__ + '.' + func.__class__.__name__
+         else:
+@@ -59,7 +75,7 @@ class ResolverMatch:
+         return (self.func, self.args, self.kwargs)[index]
+ 
+     def __repr__(self):
+-        return "ResolverMatch(func=%s, args=%s, kwargs=%s, url_name=%s, app_names=%s, namespaces=%s, route=%s)" % (
++        return "ResolverMatch(func=%s, args=%s, kwargs=%s, url_name=%r, app_names=%s, namespaces=%s, route=%r)" % (
+             self._func_path, self.args, self.kwargs, self.url_name,
+             self.app_names, self.namespaces, self.route,
+         )

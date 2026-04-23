@@ -1,0 +1,18 @@
+diff --git a/sklearn/preprocessing/_encoders.py b/sklearn/preprocessing/_encoders.py
+index 1e05aba59..77f72f9a2 100644
+--- a/sklearn/preprocessing/_encoders.py
++++ b/sklearn/preprocessing/_encoders.py
+@@ -111,6 +111,13 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
+                     # removed later.
+                     X_mask[:, i] = valid_mask
+                     Xi = Xi.copy()
++                    # If Xi has a fixed-width string dtype (e.g. '<U5') and
++                    # the replacement value is longer than the array's item
++                    # size, the assignment below would silently truncate the
++                    # string. Cast to object dtype first to avoid this.
++                    if hasattr(Xi, 'dtype') and np.issubdtype(Xi.dtype,
++                                                               np.str_):
++                        Xi = Xi.astype(object)
+                     Xi[~valid_mask] = self.categories_[i][0]
+             _, encoded = _encode(Xi, self.categories_[i], encode=True)
+             X_int[:, i] = encoded

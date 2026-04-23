@@ -1,12 +1,14 @@
 ###############################################################################
-# NLB Service for Ray Serve — exposes all 3 Serve proxies (head + 2 workers)
+# NLB Service for Ray Serve — targets worker proxies only (not head)
 #
 # The KubeRay-created yolo-ft-serve-svc is ClusterIP only and its selector
 # includes the random cluster suffix, making it fragile across recreations.
-# This NLB uses stable labels to route to all serve-enabled pods.
+# This NLB uses stable labels to route to worker-only serve proxies.
 #
 # With this in place, head pod failure causes zero downtime:
 # NLB health checks detect the dead pod and route to worker proxies.
+#
+# Uses in-tree cloud provider NLB (no AWS LB Controller required).
 ###############################################################################
 apiVersion: v1
 kind: Service
@@ -14,12 +16,8 @@ metadata:
   name: yolo-ft-nlb
   namespace: ray-ft
   annotations:
-    service.beta.kubernetes.io/aws-load-balancer-type: "external"
-    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
     service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
-    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/-/healthz"
-    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "HTTP"
-    service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval: "10"
     service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
 spec:
   type: LoadBalancer

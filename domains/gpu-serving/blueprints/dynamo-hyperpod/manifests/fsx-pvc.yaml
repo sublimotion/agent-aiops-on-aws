@@ -1,0 +1,37 @@
+# FSx PVC for dynamo-validation namespace
+# Binds to existing PV fsx-kvcache-pv (HyperPod auto-provisioned FSx)
+# Note: PV is already bound to llmd-validation/fsx-kvcache.
+# For dynamo-validation, we create a second PV pointing to the same FSx filesystem.
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: fsx-dynamo-pv
+spec:
+  capacity:
+    storage: 1200Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  csi:
+    driver: fsx.csi.aws.com
+    volumeHandle: fs-0ea95350af6e402f6-dynamo
+    volumeAttributes:
+      dnsname: fs-0ea95350af6e402f6.fsx.us-east-1.amazonaws.com
+      mountname: bukizb4v
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: fsx-dynamo
+  namespace: dynamo-validation
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: fsx-dynamo-pv
+  resources:
+    requests:
+      storage: 1200Gi

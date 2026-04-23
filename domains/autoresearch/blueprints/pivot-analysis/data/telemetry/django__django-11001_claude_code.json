@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 42.6,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 41316,
+    "duration_api_ms": 27615,
+    "num_turns": 10,
+    "result": "All 10 tests pass. The fix is a one-line change: adding `re.DOTALL` to the `ordering_parts` regex in `compiler.py:35`.\n\n**Root cause:** The regex `r'(.*)\\s(ASC|DESC)(.*)'` uses `.*` which doesn't match newlines by default. On multiline SQL, it only captures the last line containing ASC/DESC as `group(1)`. When two different multiline RawSQL expressions share the same last line (e.g., both end in `else null end`), they're incorrectly treated as duplicates and the second is dropped.\n\n**Fix:** Adding `re.DOTALL` makes `.` match newlines, so the entire SQL string (not just the last line) is captured in `group(1)`, giving each multiline expression a unique `without_ordering` value.",
+    "stop_reason": "end_turn",
+    "session_id": "c24b37aa-3514-43cb-9e18-e13dc8591053",
+    "total_cost_usd": 0.10618979999999999,
+    "usage": {
+      "input_tokens": 76,
+      "cache_creation_input_tokens": 12212,
+      "cache_read_input_tokens": 139906,
+      "output_tokens": 1213,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 12212
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 76,
+        "outputTokens": 1213,
+        "cacheReadInputTokens": 139906,
+        "cacheCreationInputTokens": 12212,
+        "webSearchRequests": 0,
+        "costUSD": 0.10618979999999999,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "8378fb6f-8620-42e8-81b1-e1d6fb28de42"
+  },
+  "stderr": ""
+}

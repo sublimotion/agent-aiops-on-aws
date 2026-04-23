@@ -1,0 +1,42 @@
+diff --git a/lib/matplotlib/axes/_base.py b/lib/matplotlib/axes/_base.py
+index 366e2f1fb0..2b5a10dd14 100644
+--- a/lib/matplotlib/axes/_base.py
++++ b/lib/matplotlib/axes/_base.py
+@@ -2973,7 +2973,7 @@ class _AxesBase(martist.Artist):
+                     else:
+                         ax.apply_aspect()
+                     axs = axs + [ax]
+-            top = -np.Inf
++            top = -np.inf
+             for ax in axs:
+                 bb = None
+                 if (ax.xaxis.get_ticks_position() in ['top', 'unknown']
+diff --git a/lib/matplotlib/tests/test_colors.py b/lib/matplotlib/tests/test_colors.py
+index fa30bba50a..bd19c4b9bb 100644
+--- a/lib/matplotlib/tests/test_colors.py
++++ b/lib/matplotlib/tests/test_colors.py
+@@ -297,9 +297,9 @@ def test_BoundaryNorm():
+     assert_array_equal(bn(vals), expected)
+ 
+     # Non-trivial masked arrays
+-    vals = np.ma.masked_invalid([np.Inf, np.NaN])
++    vals = np.ma.masked_invalid([np.inf, np.NaN])
+     assert np.all(bn(vals).mask)
+-    vals = np.ma.masked_invalid([np.Inf])
++    vals = np.ma.masked_invalid([np.inf])
+     assert np.all(bn(vals).mask)
+ 
+     # Incompatible extend and clip
+diff --git a/lib/mpl_toolkits/mplot3d/axes3d.py b/lib/mpl_toolkits/mplot3d/axes3d.py
+index 9db44b7994..5479bc1af0 100644
+--- a/lib/mpl_toolkits/mplot3d/axes3d.py
++++ b/lib/mpl_toolkits/mplot3d/axes3d.py
+@@ -387,6 +387,8 @@ class Axes3D(Axes):
+ 
+     @martist.allow_rasterization
+     def draw(self, renderer):
++        if not self.get_visible():
++            return
+         self._unstale_viewLim()
+ 
+         # draw the background patch

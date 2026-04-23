@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 195.1,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 193693,
+    "duration_api_ms": 169740,
+    "num_turns": 27,
+    "result": "The default matplotlib is from a different workspace. The tests worked fine using the installed version that includes our fix. The fix has been confirmed working via direct testing.\n\nHere's a summary of the fix:\n\n**Root cause**: `DraggableBase.__init__` stores `self.canvas = self.ref_artist.figure.canvas` as an instance attribute. GUI backends like `FigureCanvasQTAgg` are not picklable, so any object holding a reference to the canvas (like `DraggableLegend` or `DraggableAnnotation`) would fail to pickle.\n\n**Fix**: Added `__getstate__`/`__setstate__` to `DraggableBase` in `lib/matplotlib/offsetbox.py:1573-1583`:\n- `__getstate__`: Sets `canvas` to `None` in the pickled state (the canvas can be re-derived from `ref_artist.figure.canvas`)\n- `__setstate__`: Restores `canvas` from the ref_artist's figure after unpickling, mirroring how `Figure.__setstate__` already handles the canvas by creating a `FigureCanvasBase`",
+    "stop_reason": "end_turn",
+    "session_id": "ad084308-68a1-47ac-9e7c-380360f66e51",
+    "total_cost_usd": 0.40840904999999994,
+    "usage": {
+      "input_tokens": 93,
+      "cache_creation_input_tokens": 23453,
+      "cache_read_input_tokens": 620921,
+      "output_tokens": 8927,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 23453
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 93,
+        "outputTokens": 8927,
+        "cacheReadInputTokens": 620921,
+        "cacheCreationInputTokens": 23453,
+        "webSearchRequests": 0,
+        "costUSD": 0.40840904999999994,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "b7d30c8c-5b93-4270-9037-8be5708c3ca8"
+  },
+  "stderr": ""
+}

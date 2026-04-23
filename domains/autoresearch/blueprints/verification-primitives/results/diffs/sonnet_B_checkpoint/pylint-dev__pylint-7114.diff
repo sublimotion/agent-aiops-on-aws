@@ -1,0 +1,18 @@
+diff --git a/pylint/lint/expand_modules.py b/pylint/lint/expand_modules.py
+index 289e1afc..41fa97ff 100644
+--- a/pylint/lint/expand_modules.py
++++ b/pylint/lint/expand_modules.py
+@@ -32,6 +32,13 @@ def get_python_path(filepath: str) -> str:
+     dirname = os.path.realpath(os.path.expanduser(filepath))
+     if not os.path.isdir(dirname):
+         dirname = os.path.dirname(dirname)
++    else:
++        # If the filepath is a directory (i.e. a package), we must start from
++        # the parent directory so that the package directory itself is not
++        # mistakenly added to sys.path. Without this, a namespace package
++        # 'a/' containing 'a.py' would cause 'a/__init__.py' to be searched
++        # and 'a/a.py' to shadow the package when resolving module 'a'.
++        dirname = os.path.dirname(dirname)
+     while True:
+         if not os.path.exists(os.path.join(dirname, "__init__.py")):
+             return dirname

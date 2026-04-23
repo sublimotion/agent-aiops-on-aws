@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 51.6,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 50264,
+    "duration_api_ms": 37598,
+    "num_turns": 10,
+    "result": "All 12 tests pass. The fix adds:\n\n1. `import logging` at the top\n2. A module-level `logger = logging.getLogger('django.dispatch')`\n3. `logger.exception(...)` in the `except` clause of `send_robust()` before appending the error to responses\n\nThis ensures exceptions caught in `send_robust()` are logged (including the full traceback via `logger.exception`), making them visible in error tracking tools like Sentry, while preserving the existing behavior of returning the exception as the response.",
+    "stop_reason": "end_turn",
+    "session_id": "5909429c-8cfc-476f-bb21-f1374db49ed2",
+    "total_cost_usd": 0.12279194999999998,
+    "usage": {
+      "input_tokens": 76,
+      "cache_creation_input_tokens": 13901,
+      "cache_read_input_tokens": 167034,
+      "output_tokens": 1355,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 13901
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 76,
+        "outputTokens": 1355,
+        "cacheReadInputTokens": 167034,
+        "cacheCreationInputTokens": 13901,
+        "webSearchRequests": 0,
+        "costUSD": 0.12279194999999998,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "1101b77e-ec3a-406a-8fe1-f60d44b7695f"
+  },
+  "stderr": ""
+}

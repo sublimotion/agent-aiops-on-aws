@@ -1,0 +1,96 @@
+diff --git a/sympy/matrices/expressions/blockmatrix.py b/sympy/matrices/expressions/blockmatrix.py
+index b821c42845..90d821e3d7 100644
+--- a/sympy/matrices/expressions/blockmatrix.py
++++ b/sympy/matrices/expressions/blockmatrix.py
+@@ -233,18 +233,83 @@ def transpose(self):
+         return self._eval_transpose()
+ 
+     def _entry(self, i, j, **kwargs):
+-        # Find row entry
+-        for row_block, numrows in enumerate(self.rowblocksizes):
+-            if (i < numrows) != False:
++        from sympy import Piecewise
++        from sympy.matrices.expressions.matexpr import MatrixElement
++
++        # Resolve row block: find which block row `i` falls into
++        row_block = None
++        row_offset = 0
++        row_cumul = 0
++        for rb, numrows in enumerate(self.rowblocksizes):
++            cond = i < row_cumul + numrows
++            if cond == True:
++                row_block = rb
++                row_offset = row_cumul
+                 break
++            elif cond == False:
++                row_cumul += numrows
+             else:
+-                i -= numrows
+-        for col_block, numcols in enumerate(self.colblocksizes):
+-            if (j < numcols) != False:
++                # i is symbolic — build Piecewise over all row blocks
++                # First resolve column offset (may also be symbolic)
++                col_offset = self._find_col_offset(j)
++                pieces = []
++                cumul = 0
++                for rb2, rs in enumerate(self.rowblocksizes):
++                    if col_offset is None:
++                        # symbolic col too: nest Piecewise
++                        col_pieces = []
++                        cc = 0
++                        for cb2, cs in enumerate(self.colblocksizes):
++                            col_pieces.append((
++                                MatrixElement(self.blocks[rb2, cb2], i - cumul, j - cc),
++                                (j >= cc) & (j < cc + cs)
++                            ))
++                            cc += cs
++                        entry = Piecewise(*col_pieces)
++                    else:
++                        cb2, coff = col_offset
++                        entry = MatrixElement(self.blocks[rb2, cb2], i - cumul, j - coff)
++                    pieces.append((entry, (i >= cumul) & (i < cumul + rs)))
++                    cumul += rs
++                return Piecewise(*pieces)
++
++        # Row block is concrete; resolve column block
++        col_block = None
++        col_cumul = 0
++        for cb, numcols in enumerate(self.colblocksizes):
++            cond = j < col_cumul + numcols
++            if cond == True:
++                col_block = cb
++                col_offset = col_cumul
+                 break
++            elif cond == False:
++                col_cumul += numcols
+             else:
+-                j -= numcols
+-        return self.blocks[row_block, col_block][i, j]
++                # j is symbolic — build Piecewise over all col blocks
++                pieces = []
++                cumul = 0
++                for cb2, cs in enumerate(self.colblocksizes):
++                    pieces.append((
++                        MatrixElement(self.blocks[row_block, cb2], i - row_offset, j - cumul),
++                        (j >= cumul) & (j < cumul + cs)
++                    ))
++                    cumul += cs
++                return Piecewise(*pieces)
++
++        return self.blocks[row_block, col_block][i - row_offset, j - col_offset]
++
++    def _find_col_offset(self, j):
++        """Return (col_block_index, col_offset) if j is concrete, else None."""
++        cumul = 0
++        for cb, numcols in enumerate(self.colblocksizes):
++            cond = j < cumul + numcols
++            if cond == True:
++                return (cb, cumul)
++            elif cond == False:
++                cumul += numcols
++            else:
++                return None
++        return None
+ 
+     @property
+     def is_Identity(self):

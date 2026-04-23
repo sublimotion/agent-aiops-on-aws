@@ -76,7 +76,10 @@ Pass rate verified by applying agent patches + gold `test_patch` from SWE-bench,
 | 3 | **PiAgent** (str_replace) | **8/50 (16%)** | 39/50 (78%) | 39 | 20.5% | str_replace |
 | 4 | **Hashline** (ohmypi) | **7/50 (14%)** | 38/50 (76%) | 38 | 18.4% | LINE:HASH |
 | 5 | **Codex CLI** | **9/50 (18%)** | 48/50 (96%) | 48 | 18.8% | shell commands |
+| 6 | **Droid** | **2/24 (8%)** | 24/50 (48%) | 24 | 8.3% | CLI agent (Factory) |
 | - | DeepAgents | DNF | - | - | - | (recursion limit) |
+
+**Droid**: Factory's CLI agent (`droid exec`) with `generic-chat-completion-api` provider pointing at local vLLM. Uses `--auto high` for full autonomy. Droid generates non-compliant tool_call_ids (underscores, wrong length) that Mistral's chat template rejects — required patching vLLM's MistralRenderer to normalize IDs via MD5 hash. 48% fix rate (24/50 diffs) but only 8% pass rate (2/24 verified). Despite low precision, both passes (pylint-5859, seaborn-3010) are unique — solved by no other harness — from repos where no other harness has verified passes.
 
 **OpenCode**: CLI agent using Vercel AI SDK with `@ai-sdk/openai-compatible` custom provider pointing at local vLLM. Uses its own built-in tool set (glob, read, edit, bash, grep, write) rather than custom tools. Required 64K context (vs 32K for other harnesses) due to ~11K system prompt + ~20 built-in tool definitions. Connected via `opencode.json` config: `{"provider":{"vllm":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":"http://localhost:8080/v1"}}}}`.
 
@@ -90,11 +93,11 @@ Pass rate verified by applying agent patches + gold `test_patch` from SWE-bench,
 
 **DeepAgents**: langchain-ai/deepagents with SummarizationMiddleware + sub-agents. Failed — `create_deep_agent` hits LangGraph recursion limit (60) before completing even one issue. Sub-agent spawning consumes recursion budget too quickly.
 
-### Ensemble (All 7 Harnesses)
+### Ensemble (All 8 Harnesses)
 
 | Metric | Value |
 |--------|-------|
-| **Union pass rate** | **16/50 (32%)** |
+| **Union pass rate** | **18/50 (36%)** |
 | **OpenCode** | **11/50 (22%)** |
 | **Claude Code** | **10/50 (20%)** |
 | **Codex CLI** | **9/50 (18%)** |
@@ -102,35 +105,39 @@ Pass rate verified by applying agent patches + gold `test_patch` from SWE-bench,
 | PiAgent (str_replace) | 8/50 (16%) |
 | LangGraph | 7/50 (14%) |
 | Hashline (ohmypi) | 7/50 (14%) |
+| Droid | 2/24 (8%) |
 
 **Per-issue breakdown** (issues where at least one harness passes):
 
-| Instance | SERA | LangGraph | Hashline | PiAgent | OpenCode | Claude Code | Codex |
-|----------|------|-----------|----------|---------|----------|-------------|-------|
-| django-11039 | PASS | - | fail | fail | PASS | PASS | fail |
-| django-11620 | PASS | - | fail | - | PASS | PASS | PASS |
-| django-11630 | - | - | - | - | - | - | **PASS** |
-| django-11815 | PASS | - | - | - | PASS | PASS | fail |
-| django-12286 | - | PASS | fail | PASS | PASS | PASS | PASS |
-| django-12453 | PASS | PASS | PASS | PASS | PASS | PASS | PASS |
-| django-12497 | - | PASS | fail | PASS | - | - | PASS |
-| django-12747 | - | - | - | - | - | - | **PASS** |
-| django-14238 | - | - | PASS | PASS | PASS | PASS | fail |
-| django-14608 | - | PASS | PASS | PASS | PASS | - | PASS |
-| django-14672 | PASS | - | fail | PASS | PASS | PASS | PASS |
-| django-14855 | PASS | PASS | PASS | PASS | - | - | PASS |
-| django-15400 | - | - | - | - | - | PASS | fail |
-| pytest-11143 | PASS | PASS | - | - | PASS | - | fail |
-| sympy-17022 | - | - | PASS | fail | PASS | PASS | fail |
-| sympy-18835 | - | fail | PASS | fail | - | - | fail |
-| sympy-24152 | PASS | PASS | PASS | PASS | PASS | PASS | fail |
+| Instance | SERA | LangGraph | Hashline | PiAgent | OpenCode | Claude Code | Codex | Droid |
+|----------|------|-----------|----------|---------|----------|-------------|-------|-------|
+| django-11039 | PASS | - | fail | fail | PASS | PASS | fail | fail |
+| django-11620 | PASS | - | fail | - | PASS | PASS | PASS | fail |
+| django-11630 | - | - | - | - | - | - | **PASS** | - |
+| django-11815 | PASS | - | - | - | PASS | PASS | fail | fail |
+| django-12286 | - | PASS | fail | PASS | PASS | PASS | PASS | fail |
+| django-12453 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | fail |
+| django-12497 | - | PASS | fail | PASS | - | - | PASS | fail |
+| django-12747 | - | - | - | - | - | - | **PASS** | - |
+| django-14238 | - | - | PASS | PASS | PASS | PASS | fail | fail |
+| django-14608 | - | PASS | PASS | PASS | PASS | - | PASS | fail |
+| django-14672 | PASS | - | fail | PASS | PASS | PASS | PASS | fail |
+| django-14855 | PASS | PASS | PASS | PASS | - | - | PASS | fail |
+| django-15400 | - | - | - | - | - | PASS | fail | fail |
+| pylint-5859 | - | - | - | - | - | - | - | **PASS** |
+| pytest-11143 | PASS | PASS | - | - | PASS | - | fail | fail |
+| seaborn-3010 | - | - | - | - | - | - | - | **PASS** |
+| sympy-17022 | - | - | PASS | fail | PASS | PASS | fail | fail |
+| sympy-18835 | - | fail | PASS | fail | - | - | fail | fail |
+| sympy-24152 | PASS | PASS | PASS | PASS | PASS | PASS | fail | fail |
 
 **Unique passes** (solved by only one harness):
 - Hashline: sympy-18835 (1)
 - Claude Code: django-15400 (1)
 - Codex CLI: django-11630, django-12747 (2)
+- Droid: pylint-5859, seaborn-3010 (2)
 
-Codex adds 2 new passes to bring the 7-harness ensemble from 14/50 to 16/50 (32%).
+Droid adds 2 new passes from previously unsolved repos (pylint, seaborn), bringing the 8-harness ensemble from 16/50 to 18/50 (36%).
 
 ### Key Findings
 
@@ -154,7 +161,7 @@ Codex adds 2 new passes to bring the 7-harness ensemble from 14/50 to 16/50 (32%
 
 **Hashline is token-expensive**. Average 191K tokens/issue vs ~10K for LangGraph str_replace (~19x overhead). The `LINE:HASH|` prefix on every line inflates context significantly.
 
-**Ensemble ceiling is 32%**. 7-harness union = 16/50. Codex adds 2 unique passes (django-11630, django-12747) over the 6-harness ensemble (14/50). Diminishing returns persist but Codex's unique passes show shell-based editing can solve issues that structured edit tools miss.
+**Ensemble ceiling is 36%**. 8-harness union = 18/50. Droid adds 2 unique passes (pylint-5859, seaborn-3010) — the first verified passes from pylint and seaborn repos. Each new harness consistently adds 1-2 unique passes from different repo/issue combinations, suggesting harness diversity matters even when individual pass rates are low.
 
 **Aider cannot drive Devstral Small 2**. The `--edit-format diff` mode produces zero fixes — the model cannot produce valid unified diffs in Aider's expected format.
 
@@ -200,7 +207,7 @@ This is a trainable error class — a LoRA finetuned on successful fix trajector
 1. **OpenCode is the best single harness by pass rate** at 22% — Claude Code is 2nd at 20%, Codex CLI 3rd at 18%. All three use built-in tool sets rather than custom adapters.
 2. **Claude Code has the best precision** at 52.6% — its conservative approach (38% fix rate) produces the highest-quality patches. Codex has the highest fix rate (96%) but lowest precision (19%).
 3. **30 turns baseline is optimal** — compaction and restart strategies hurt or are neutral.
-4. **Ensemble ceiling is 32%** with 7 harnesses (16/50). Each additional harness adds 1-2 new passes. Diminishing returns are clear.
+4. **Ensemble ceiling is 36%** with 8 harnesses (18/50). Each additional harness adds 1-2 new passes. Diminishing returns persist but new harnesses solve issues in previously uncovered repos.
 5. **Fix rate is not pass rate** — conversion ranges from 19% (Codex) to 53% (Claude Code). Harness design affects precision as much as recall.
 6. **Shell-based editing (Codex) solves different issues** — Codex's 2 unique passes (django-11630, django-12747) are not covered by any structured edit tool harness.
 7. **Hashline helps strong models, not weak ones** — the edit format that produced 10x gains for Grok provides no advantage for Devstral Small 2.
@@ -219,17 +226,19 @@ This is a trainable error class — a LoRA finetuned on successful fix trajector
 |-------|------|-----------|--------|-----|-------------|
 | Devstral Small 2 24B FP8 | Baseline | 24B | 24B | 1 | Mistral native |
 | Qwen 2.5 Coder 32B | Finetuning control | 32B | 32B | 1 | Bare JSON (no `<tool_call>` tags) |
-| SWE-agent-LM 32B | Finetuned (SWE-smith) | 32B | 32B | 1 | Bare JSON (no `<tool_call>` tags) |
+| SWE-agent-LM 32B | SFT on SWE-agent trajectories (SWE-smith, Princeton) | 32B | 32B | 1 | Bare JSON (no `<tool_call>` tags) |
+| **SERA-32B (Allen AI)** | SVG-trained agent (allenai/SERA-32B, Qwen 3-32B base) | 32B | 32B | 1 | Hermes native (`<tools>` XML) |
 | Qwen3.5-397B-A17B FP8 | Scale frontier | 397B MoE | 17B | 4 | Hermes native |
 
 ### Fix Rate Matrix
 
-| Model | SERA | OpenCode | Claude Code | Best Harness |
-|-------|------|----------|-------------|-------------|
-| **Qwen3.5 397B** | **36/50 (72%)** | **44/50 (88%)** | — (incompatible) | OpenCode |
-| **Devstral 24B** | 23/50 (46%) | 44/50 (88%) | 19/50 (38%) | OpenCode |
-| Qwen 2.5 32B | 24/50 (48%) | 0/45 (0%) | — | SERA |
-| SWE-LM 32B | 9/50 (18%) | 0/46 (0%) | — | SERA |
+| Model | SERA | OpenCode | Claude Code | Best Harness | Union (SERA+OC) |
+|-------|------|----------|-------------|-------------|-----------------|
+| **Qwen3.5 397B** | **36/50 (72%)** | **44/50 (88%)** | — (incompatible) | OpenCode | **48/50 (96%)** |
+| **SERA-32B (Allen AI)** | **32/50 (64%)** | **27/50 (54%)** | — (not tested) | **SERA** | **37/50 (74%)** |
+| **Devstral 24B** | 23/50 (46%) | 44/50 (88%) | 19/50 (38%) | OpenCode | — |
+| Qwen 2.5 32B | 24/50 (48%) | 0/45 (0%) | — | SERA | 24/50 (48%) |
+| SWE-LM 32B | 9/50 (18%) | 0/46 (0%) | — | SERA | 9/50 (18%) |
 
 Fix rate = generated a non-empty git diff. Not verified by gold tests.
 
@@ -240,6 +249,7 @@ Fix rate = generated a non-empty git diff. Not verified by gold tests.
 | Devstral 24B | Works (Mistral chat template) | Works (Mistral tool calling) | Works (vLLM Anthropic API patches) |
 | Qwen 2.5 32B | Works (bare JSON fallback) | FAIL (bare JSON, hermes parser can't extract) | Not tested |
 | SWE-LM 32B | Works (bare JSON fallback) | FAIL (bare JSON, hermes parser can't extract) | Not tested |
+| SERA-32B | Works (hermes parser) | Works (hermes parser, `<tools>` XML template) | Not tested |
 | Qwen3.5 397B | Works (hermes parser) | Works (hermes parser) | FAIL (Anthropic API doesn't translate tools to Qwen chat template) |
 
 ### Qwen3.5 397B: SERA vs OpenCode
@@ -254,18 +264,33 @@ Fix rate = generated a non-empty git diff. Not verified by gold tests.
 
 Just 2 harnesses with Qwen3.5 produce fixes for 96% of issues. The 4 SERA-only fixes and 12 OpenCode-only fixes demonstrate genuine harness complementarity even with a strong model.
 
-### 4-Model SERA Comparison
+### SERA-32B (Allen AI): SERA vs OpenCode
+
+| Metric | Value |
+|--------|-------|
+| Both fix | 22 |
+| Only SERA | 10 |
+| Only OpenCode | 5 |
+| Neither | 13 |
+| **Union** | **37/50 (74%)** |
+
+SERA-32B is the first model where SERA harness outperforms OpenCode (64% vs 54%). This is expected — SERA-32B was trained on SVG trajectories that match the SERA harness's interaction pattern. Despite lower absolute numbers than Qwen3.5, the model shows strong complementarity: 10 SERA-only fixes and 5 OpenCode-only fixes indicate genuinely different capabilities accessed by each harness.
+
+**SERA-32B vs SWE-agent-LM — finetuning methodology comparison**: Both are ~32B models finetuned for SWE-bench. SWE-agent-LM (Princeton, SWE-smith SFT on Qwen 2.5) achieves 18% fix rate — a 30pp degradation from its base model. SERA-32B (Allen AI, SVG training on Qwen 3) achieves 64% — a 16pp improvement over the comparable Qwen 2.5 base (48%). The difference is +46pp, demonstrating that training methodology (SVG vs SWE-smith SFT) is the dominant factor, not model scale or architecture.
+
+### 5-Model SERA Comparison
 
 | Metric | Value |
 |--------|-------|
 | Devstral 24B | 23/50 fixes |
 | Qwen 2.5 32B | 24/50 fixes |
 | SWE-LM 32B | 9/50 fixes |
+| **SERA-32B (Allen AI)** | **32/50 fixes** |
 | Qwen3.5 397B | 36/50 fixes |
-| **Union (any model)** | **46/50 (92%)** |
+| **Union (any model)** | **47/50 (94%)** |
 | Intersection (all) | 1/50 |
 
-Models fix almost completely different issues — only 1 issue (pytest-11143) is fixed by all 4 models via SERA. The 4-model union (46/50) far exceeds the best single model (36/50), demonstrating strong model complementarity.
+Models fix almost completely different issues — only 1 issue (pytest-11143) is fixed by all 5 models via SERA. The 5-model union (47/50) far exceeds the best single model (36/50), demonstrating strong model complementarity. SERA-32B adds 1 new issue to the 4-model union, slotting in between Qwen 2.5 (24) and Qwen3.5 (36) despite being the same 32B scale.
 
 ### Behavioral Metrics
 
@@ -284,7 +309,7 @@ Devstral and Qwen3.5 both exhibit high Parkinson's ratios (~46%) — they explor
 
 **Bitter lesson partially validated**: Scale from 24B → 397B MoE produces +26pp on SERA (46% → 72%). But Devstral 24B matches Qwen3.5 397B on OpenCode (both 88%), suggesting harness choice can compensate for model scale.
 
-**SWE-agent-LM finetuning is actively harmful**: -30pp from base Qwen 2.5 (48% → 18%) on the same architecture and harness. The SWE-bench-specific finetuning narrowed the model's capabilities rather than enhancing them.
+**SWE-agent-LM finetuning is actively harmful, but SERA-32B validates the right approach**: SWE-agent-LM (Princeton, SWE-smith SFT) degrades Qwen 2.5 by -30pp (48% → 18%). In contrast, SERA-32B (Allen AI, SVG training on Qwen 3-32B) achieves 64% via SERA harness — a +16pp improvement over the comparable base. The two models demonstrate that SWE-bench finetuning methodology is the critical variable: SVG training preserves and enhances general capabilities, while SWE-smith SFT narrows them. SERA-32B is the first model where the SERA harness outperforms OpenCode (64% vs 54%), likely because SVG training aligns with SERA's interaction pattern.
 
 **Harness spread varies by model**: Devstral has 50pp spread (38-88%), Qwen3.5 has 16pp spread (72-88%). Stronger models are less sensitive to harness choice — the harness matters most for weaker models.
 
@@ -295,6 +320,30 @@ Devstral and Qwen3.5 both exhibit high Parkinson's ratios (~46%) — they explor
 **Context management is critical for weaker models**: Qwen 2.5 32B overflows 16K context by turn 5. Even with 32K + aggressive trimming (tool output caps at 4K chars, old results trimmed to 500 chars), conversations still overflow. Qwen3.5's 65K context eliminates this bottleneck.
 
 **MoE inference is fast**: Qwen3.5-397B (17B active) processes issues as fast as 32B dense models despite 12x total parameters. MoE is free performance at inference time.
+
+### Insight: Harness-Model Co-Alignment and the Overfitting Trap
+
+The SERA-32B results reveal a deeper dynamic: **SVG training is fundamentally harness-model co-alignment**. It teaches the model the specific interaction protocol that the harness expects — when to explore, when to edit, how to verify — rather than general coding ability.
+
+**Evidence for co-alignment**:
+- SERA-32B is the only model where SERA harness > OpenCode (64% vs 54%). Every other model shows the opposite pattern.
+- SVG training improved SERA harness by +16pp but OpenCode only reached 54% (vs 88% for base Devstral and base Qwen3.5 on OpenCode).
+- The model learned SERA's interaction pattern (explore → targeted edit at ~turn 15 → verify) from successful SVG trajectories.
+
+**The overfitting trap**: SWE-agent-LM is the extreme case — Princeton trained exclusively on SWE-agent trajectories and the model became 30pp *worse* at everything. The model learned SWE-agent's `open`/`goto`/`scroll` workflow so narrowly it couldn't generalize. SERA-32B is better but shows early signs of the same pattern: strong on SERA, weaker on OpenCode.
+
+**Why no standard solves this**: The agent tooling ecosystem is fragmented — no two harnesses share the same tool names, schemas, or interaction patterns:
+- OpenCode: `glob`, `read`, `edit`, `bash`, `grep`, `write`
+- Claude Code: `Read`, `Edit`, `Write`, `Bash`, `Glob`, `Grep`
+- SWE-agent: `open`, `goto`, `edit`, `scroll`, `search`
+- Codex: `exec_command`, `write_stdin` (shell-based editing)
+- Droid: `read_file`, `edit_file`, `apply_diff`
+
+Same capabilities, different dialects. Training on one dialect narrows the model; training on none wastes potential.
+
+**The path forward — multi-harness trajectory training**: Train on successful trajectories from 3-4 diverse harnesses simultaneously. The model learns the *intent* (explore, locate, fix, verify) rather than the *syntax* (`edit_file` vs `Edit` vs `sed`). This is analogous to multi-format instruction tuning — early models broke when prompt format changed; the field converged on training across formats.
+
+**Current practical implication**: Harness diversity at inference time is more valuable than harness-specific finetuning. SERA-32B × SERA gets 64%, but base Qwen3.5 × {SERA + OpenCode} gets 96%. Ensembling across harnesses with a general model beats specializing on one — until multi-harness training matures.
 
 ---
 
@@ -382,7 +431,13 @@ tc = `tool_coefficient` (oversubscription factor). Backfill rate = % of requests
 - `results/phase1_{A-F}.jsonl` — 50 lines each, per-issue metrics with turn-level breakdown
 - `results/phase2_{langgraph,sera,aider}.jsonl` — 50 lines each, per-issue harness metrics
 - `results/phase2b_{ohmypi,piagent,deepagents,opencode,claude_code,codex}.jsonl` — Phase 2b per-issue metrics
+- `results/phase2_droid_s{0-3}.jsonl` — Droid per-shard harness results
+- `results/eval_droid.jsonl` — Droid gold test evaluation results
+- `results/diffs/droid/` — 24 agent-generated diffs
+- `results/trajectories/droid/` — 27 raw trajectory JSONL files
 - `results/eval_{ohmypi,piagent,opencode,claude_code,codex}.jsonl` — Gold test evaluation results for Phase 2b
+- `results/phase2_sera_s{0-3}.jsonl` — SERA-32B × SERA harness per-shard results
+- `results/phase2_opencode_s{0-3}.jsonl` — SERA-32B × OpenCode per-shard results
 - `results/swarm/swarm_phase1_{model}_{harness}.jsonl` — Phase 3 multi-model results
 - `results/swarm/swarm_phase2a_n{2,4,8}_*.jsonl` — Phase 2a concurrent scaling results
 - `results/swarm/swarm_phase2b_n{4,8}_*.jsonl` — Phase 2b ThunderAgent scheduling results

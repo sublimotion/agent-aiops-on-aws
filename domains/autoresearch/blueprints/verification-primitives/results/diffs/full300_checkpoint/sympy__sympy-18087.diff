@@ -1,0 +1,21 @@
+diff --git a/sympy/simplify/fu.py b/sympy/simplify/fu.py
+index 612bc0bb69..e225c8b0bf 100644
+--- a/sympy/simplify/fu.py
++++ b/sympy/simplify/fu.py
+@@ -1888,6 +1888,7 @@ def trig_split(a, b, two=False):
+     if _ROOT2 is None:
+         _roots()
+ 
++    a_orig, b_orig = a, b
+     a, b = [Factors(i) for i in (a, b)]
+     ua, ub = a.normal(b)
+     gcd = a.gcd(b).as_expr()
+@@ -1899,6 +1900,8 @@ def trig_split(a, b, two=False):
+         ub = ub.quo(S.NegativeOne)
+         n2 = -n2
+     a, b = [i.as_expr() for i in (ua, ub)]
++    if gcd*n1*a != a_orig or gcd*n2*b != b_orig:
++        return None
+ 
+     def pow_cos_sin(a, two):
+         """Return ``a`` as a tuple (r, c, s) such that

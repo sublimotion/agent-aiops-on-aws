@@ -1,0 +1,32 @@
+diff --git a/astropy/modeling/separable.py b/astropy/modeling/separable.py
+index a308e2729..0845770e9 100644
+--- a/astropy/modeling/separable.py
++++ b/astropy/modeling/separable.py
+@@ -209,10 +209,12 @@ def _coord_matrix(model, pos, noutp):
+     else:
+         mat = np.zeros((noutp, model.n_inputs))
+ 
+-        for i in range(model.n_inputs):
+-            mat[i, i] = 1
+-        if pos == 'right':
+-            mat = np.roll(mat, (noutp - model.n_outputs))
++        # For separable models, each output depends only on its corresponding input
++        for i in range(min(model.n_inputs, model.n_outputs)):
++            if pos == 'left':
++                mat[i, i] = 1
++            else:  # right
++                mat[noutp - model.n_outputs + i, i] = 1
+     return mat
+ 
+ 
+@@ -304,8 +306,10 @@ def _separable(transform):
+     if (transform_matrix := transform._calculate_separability_matrix()) is not NotImplemented:
+         return transform_matrix
+     elif isinstance(transform, CompoundModel):
++        # Handle nested CompoundModels by recursively getting their separability matrices
+         sepleft = _separable(transform.left)
+         sepright = _separable(transform.right)
++        # Apply the operator to combine the separability matrices
+         return _operators[transform.op](sepleft, sepright)
+     elif isinstance(transform, Model):
+         return _coord_matrix(transform, 'left', transform.n_outputs)

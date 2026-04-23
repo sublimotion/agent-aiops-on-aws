@@ -1,0 +1,15 @@
+diff --git a/sympy/functions/elementary/complexes.py b/sympy/functions/elementary/complexes.py
+index 66a96335eb..79aea96106 100644
+--- a/sympy/functions/elementary/complexes.py
++++ b/sympy/functions/elementary/complexes.py
+@@ -618,6 +618,10 @@ def eval(cls, arg):
+             abs_free_arg = arg.xreplace({i: Dummy(real=True) for i in ignore})
+             unk = [a for a in abs_free_arg.free_symbols if a.is_extended_real is None]
+             if not unk or not all(conj.has(conjugate(u)) for u in unk):
++                if arg.is_extended_real:
++                    # If arg is real then conj = arg and sqrt(arg*conj) = sqrt(arg**2)
++                    # which evaluates back to Abs(arg), causing infinite recursion.
++                    return
+                 return sqrt(expand_mul(arg*conj))
+ 
+     def _eval_is_real(self):

@@ -1,0 +1,14 @@
+diff --git a/sympy/sets/sets.py b/sympy/sets/sets.py
+index 03cf57a30b..fe2b5dc49a 100644
+--- a/sympy/sets/sets.py
++++ b/sympy/sets/sets.py
+@@ -1987,6 +1987,9 @@ def simplify_intersection(args):
+         if not isinstance(arg, Set):
+             raise TypeError("Input args to Union must be Sets")
+ 
++    # Remove duplicates
++    args = list(ordered(set(args), Set._infimum_key))
++
+     # If any EmptySets return EmptySet
+     if S.EmptySet in args:
+         return S.EmptySet

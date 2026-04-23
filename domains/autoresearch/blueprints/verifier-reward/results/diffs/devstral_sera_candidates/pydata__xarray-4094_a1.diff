@@ -1,0 +1,95 @@
+diff --git a/xarray/core/dataarray.py b/xarray/core/dataarray.py
+index b0df8749..023f8286 100644
+--- a/xarray/core/dataarray.py
++++ b/xarray/core/dataarray.py
+@@ -1964,7 +1964,9 @@ class DataArray(AbstractArray, DataWithCoords):
+             data_dict[k] = self.sel({variable_dim: k}).squeeze(drop=True)
+ 
+         # unstacked dataset
+-        return Dataset(data_dict)
++        # Preserve original coordinates to avoid conflicts
++        coords = {name: self.coords[name] for name in self.coords if name not in data_dict}
++        return Dataset(data_dict, coords=coords)
+ 
+     def transpose(self, *dims: Hashable, transpose_coords: bool = True) -> "DataArray":
+         """Return a new DataArray object with transposed dimensions.
+diff --git a/xarray/core/dataset.py b/xarray/core/dataset.py
+index a024324b..08f4d652 100644
+--- a/xarray/core/dataset.py
++++ b/xarray/core/dataset.py
+@@ -3453,20 +3453,48 @@ class Dataset(Mapping, ImplementsDatasetReduce, DataWithCoords):
+ 
+         def ensure_stackable(val):
+             assign_coords = {variable_dim: val.name}
+-            for dim in stacking_dims:
+-                if dim not in val.dims:
+-                    assign_coords[dim] = None
+-
+-            expand_dims = set(stacking_dims).difference(set(val.dims))
+-            expand_dims.add(variable_dim)
+-            # must be list for .expand_dims
+-            expand_dims = list(expand_dims)
+-
+-            return (
+-                val.assign_coords(**assign_coords)
+-                .expand_dims(expand_dims)
+-                .stack({new_dim: (variable_dim,) + stacking_dims})
+-            )
++            
++            # For single-dimension variables, we need to handle coordinates differently
++            if len(val.dims) == 1:
++                # Get the original coordinate name and values
++                orig_dim = val.dims[0]
++                orig_coords = val.coords[orig_dim]
++                
++                # Assign the coordinate to the sample dimension
++                assign_coords[sample_dims[0]] = orig_coords
++                
++                # Stack using only the variable dimension
++                # Use a temporary dimension name to avoid conflicts
++                temp_dim = f"_temp_{new_dim}"
++                
++                # First rename the original dimension to avoid conflicts
++                result = val.rename({orig_dim: sample_dims[0]})
++                
++                # Then assign coordinates and stack
++                result = (
++                    result.assign_coords(**assign_coords)
++                    .expand_dims(variable_dim)
++                    .stack({temp_dim: (variable_dim,)})
++                )
++                
++                # Rename back to the original dimension name
++                return result.rename({temp_dim: new_dim})
++            else:
++                # For multi-dimension variables, proceed as before
++                for dim in stacking_dims:
++                    if dim not in val.dims:
++                        assign_coords[dim] = None
++
++                expand_dims = set(stacking_dims).difference(set(val.dims))
++                expand_dims.add(variable_dim)
++                # must be list for .expand_dims
++                expand_dims = list(expand_dims)
++
++                return (
++                    val.assign_coords(**assign_coords)
++                    .expand_dims(expand_dims)
++                    .stack({new_dim: (variable_dim,) + stacking_dims})
++                )
+ 
+         # concatenate the arrays
+         stackable_vars = [ensure_stackable(self[key]) for key in self.data_vars]
+diff --git a/xarray/core/dtypes.py b/xarray/core/dtypes.py
+index 4db2990a..295c15c3 100644
+--- a/xarray/core/dtypes.py
++++ b/xarray/core/dtypes.py
+@@ -38,7 +38,7 @@ NINF = AlwaysLessThan()
+ PROMOTE_TO_OBJECT = [
+     {np.number, np.character},  # numpy promotes to character
+     {np.bool_, np.character},  # numpy promotes to character
+-    {np.bytes_, np.unicode_},  # numpy promotes to unicode
++    {np.bytes_, np.str_},  # numpy promotes to unicode
+ ]
+ 
+ 

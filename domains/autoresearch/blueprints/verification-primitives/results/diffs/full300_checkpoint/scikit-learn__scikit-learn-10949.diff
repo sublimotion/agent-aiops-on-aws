@@ -1,0 +1,27 @@
+diff --git a/sklearn/utils/validation.py b/sklearn/utils/validation.py
+index fe1f7236e..e613beb02 100644
+--- a/sklearn/utils/validation.py
++++ b/sklearn/utils/validation.py
+@@ -466,6 +466,22 @@ def check_array(array, accept_sparse=False, accept_large_sparse=True,
+         # not a data type (e.g. a column named dtype in a pandas DataFrame)
+         dtype_orig = None
+ 
++    if dtype_orig is None and hasattr(array, "dtypes"):
++        # pandas DataFrame: capture dtype info for warn_on_dtype.
++        # If all columns share the same dtype, use it; otherwise use object
++        # as a sentinel to indicate mixed dtypes (conversion will be needed).
++        dtypes = array.dtypes
++        if len(dtypes.unique()) == 1:
++            dtype_orig = dtypes.iloc[0]
++        else:
++            # mixed dtypes: use object dtype so any numeric conversion triggers
++            # the warning.
++            dtype_orig = np.dtype('object')
++        # Flag that the input is a DataFrame for the warning message.
++        dtype_orig_was_dataframe = True
++    else:
++        dtype_orig_was_dataframe = False
++
+     if dtype_numeric:
+         if dtype_orig is not None and dtype_orig.kind == "O":
+             # if input is object, convert to float.

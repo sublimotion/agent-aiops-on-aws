@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 270.0,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 268625,
+    "duration_api_ms": 109710,
+    "num_turns": 29,
+    "result": "All 18 failures are pre-existing \u2014 my change doesn't introduce any new test failures.\n\nThe fix is minimal and correct:\n\n**Root cause**: In `_safe_first_finite` (cbook/__init__.py:1749), when `skip_nonfinite=True` (default), the function uses a generator to find the first finite value. When all values are NaN, the generator is exhausted and `next()` raises `StopIteration`. The caller in `_convert_dx` only catches `TypeError, IndexError, KeyError` \u2014 not `StopIteration`.\n\n**Fix**: Pass a default value (`safe_first_element(obj)`) to `next()` so that when no finite values exist, it falls back to returning the first element (which may be NaN). This matches the pre-3.6.1 behavior where NaN x-positions were handled gracefully.",
+    "stop_reason": "end_turn",
+    "session_id": "151e6077-493d-4534-be79-05d80014d69c",
+    "total_cost_usd": 0.34878029999999993,
+    "usage": {
+      "input_tokens": 31,
+      "cache_creation_input_tokens": 21660,
+      "cache_read_input_tokens": 672641,
+      "output_tokens": 4378,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 21660
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 31,
+        "outputTokens": 4378,
+        "cacheReadInputTokens": 672641,
+        "cacheCreationInputTokens": 21660,
+        "webSearchRequests": 0,
+        "costUSD": 0.34878029999999993,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "6d6b75d0-fec4-4ad4-a269-fd4506d2601c"
+  },
+  "stderr": ""
+}

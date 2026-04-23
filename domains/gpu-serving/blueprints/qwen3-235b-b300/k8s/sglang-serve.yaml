@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sglang-qwen3-235b
+  namespace: default
+  labels:
+    app: sglang-qwen3-235b
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    node.kubernetes.io/instance-type: p6-b300.48xlarge
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  hostNetwork: true
+  containers:
+    - name: sglang
+      image: lmsysorg/sglang:v0.5.10.post1-cu130
+      command:
+        - python3
+        - -m
+        - sglang.launch_server
+        - --model-path
+        - /mnt/nvme/models/qwen3-235b-fp8
+        - --served-model-name
+        - Qwen3-235B-A22B-FP8
+        - --tp
+        - "8"
+        - --trust-remote-code
+        - --reasoning-parser
+        - qwen3
+        - --host
+        - "0.0.0.0"
+        - --port
+        - "8000"
+        - --mem-fraction-static
+        - "0.88"
+        - --context-length
+        - "131072"
+      env:
+        - name: SGLANG_JIT_DEEPGEMM_FAST_WARMUP
+          value: "1"
+        - name: HF_HOME
+          value: /mnt/nvme/hf-cache
+      resources:
+        requests:
+          nvidia.com/gpu: "8"
+          cpu: "32"
+          memory: 128Gi
+        limits:
+          nvidia.com/gpu: "8"
+          cpu: "64"
+          memory: 256Gi
+      volumeMounts:
+        - name: nvme
+          mountPath: /mnt/nvme
+        - name: shm
+          mountPath: /dev/shm
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        initialDelaySeconds: 120
+        periodSeconds: 10
+        failureThreshold: 60
+  volumes:
+    - name: nvme
+      hostPath:
+        path: /mnt/nvme
+        type: Directory
+    - name: shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 64Gi

@@ -1,0 +1,321 @@
+diff --git a/seaborn/_core/scales.py b/seaborn/_core/scales.py
+index 6c9ecbc9..1a67d2db 100644
+--- a/seaborn/_core/scales.py
++++ b/seaborn/_core/scales.py
+@@ -38,6 +38,7 @@ from seaborn._core.rules import categorical_order
+ from seaborn._core.typing import Default, default
+ 
+ from typing import TYPE_CHECKING
++
+ if TYPE_CHECKING:
+     from seaborn._core.properties import Property
+     from numpy.typing import ArrayLike, NDArray
+@@ -63,7 +64,6 @@ class Scale:
+     _legend: tuple[list[str], list[Any]] | None
+ 
+     def __post_init__(self):
+-
+         self._tick_params = None
+         self._label_params = None
+         self._legend = None
+@@ -81,7 +81,6 @@ class Scale:
+         raise NotImplementedError()
+ 
+     def _get_scale(self, name: str, forward: Callable, inverse: Callable):
+-
+         major_locator, minor_locator = self._get_locators(**self._tick_params)
+         major_formatter = self._get_formatter(major_locator, **self._label_params)
+ 
+@@ -103,12 +102,14 @@ class Scale:
+         return space
+ 
+     def _setup(
+-        self, data: Series, prop: Property, axis: Axis | None = None,
++        self,
++        data: Series,
++        prop: Property,
++        axis: Axis | None = None,
+     ) -> Scale:
+         raise NotImplementedError()
+ 
+     def __call__(self, data: Series) -> ArrayLike:
+-
+         trans_data: Series | NDArray | list
+ 
+         # TODO sometimes we need to handle scalars (e.g. for Line)
+@@ -130,7 +131,6 @@ class Scale:
+ 
+     @staticmethod
+     def _identity():
+-
+         class Identity(Scale):
+             _pipeline = []
+             _spacer = None
+@@ -145,6 +145,7 @@ class Nominal(Scale):
+     """
+     A categorical scale without relative importance / magnitude.
+     """
++
+     # Categorical (convert to strings), un-sortable
+ 
+     values: tuple | str | list | dict | None = None
+@@ -153,9 +154,11 @@ class Nominal(Scale):
+     _priority: ClassVar[int] = 3
+ 
+     def _setup(
+-        self, data: Series, prop: Property, axis: Axis | None = None,
++        self,
++        data: Series,
++        prop: Property,
++        axis: Axis | None = None,
+     ) -> Scale:
+-
+         new = copy(self)
+         if new._tick_params is None:
+             new = new.tick()
+@@ -283,7 +286,6 @@ class Nominal(Scale):
+         return new
+ 
+     def _get_locators(self, locator):
+-
+         if locator is not None:
+             return locator, None
+ 
+@@ -292,7 +294,6 @@ class Nominal(Scale):
+         return locator, None
+ 
+     def _get_formatter(self, locator, formatter):
+-
+         if formatter is not None:
+             return formatter
+ 
+@@ -315,14 +316,15 @@ class Discrete(Scale):
+ 
+ @dataclass
+ class ContinuousBase(Scale):
+-
+     values: tuple | str | None = None
+     norm: tuple | None = None
+ 
+     def _setup(
+-        self, data: Series, prop: Property, axis: Axis | None = None,
++        self,
++        data: Series,
++        prop: Property,
++        axis: Axis | None = None,
+     ) -> Scale:
+-
+         new = copy(self)
+         if new._tick_params is None:
+             new = new.tick()
+@@ -346,6 +348,11 @@ class ContinuousBase(Scale):
+                 vmin, vmax = data.min(), data.max()
+             else:
+                 vmin, vmax = new.norm
++            # Convert boolean values to numeric to enable arithmetic operations
++            if isinstance(vmin, (bool, np.bool_)):
++                vmin = float(vmin)
++            if isinstance(vmax, (bool, np.bool_)):
++                vmax = float(vmax)
+             vmin, vmax = axis.convert_units((vmin, vmax))
+             a = forward(vmin)
+             b = forward(vmax) - forward(vmin)
+@@ -360,7 +367,7 @@ class ContinuousBase(Scale):
+             axis.convert_units,
+             forward,
+             normalize,
+-            prop.get_mapping(new, data)
++            prop.get_mapping(new, data),
+         ]
+ 
+         def spacer(x):
+@@ -368,6 +375,7 @@ class ContinuousBase(Scale):
+             if len(x) < 2:
+                 return np.nan
+             return np.min(np.diff(np.sort(x)))
++
+         new._spacer = spacer
+ 
+         # TODO How to allow disabling of legend for all uses of property?
+@@ -392,13 +400,12 @@ class ContinuousBase(Scale):
+         return new
+ 
+     def _get_transform(self):
+-
+         arg = self.trans
+ 
+         def get_param(method, default):
+             if arg == method:
+                 return default
+-            return float(arg[len(method):])
++            return float(arg[len(method) :])
+ 
+         if arg is None:
+             return _make_identity_transforms()
+@@ -430,6 +437,7 @@ class Continuous(ContinuousBase):
+     """
+     A numeric scale supporting norms and functional transforms.
+     """
++
+     values: tuple | str | None = None
+     trans: str | TransFuncs | None = None
+ 
+@@ -440,7 +448,8 @@ class Continuous(ContinuousBase):
+ 
+     def tick(
+         self,
+-        locator: Locator | None = None, *,
++        locator: Locator | None = None,
++        *,
+         at: Sequence[float] | None = None,
+         upto: int | None = None,
+         count: int | None = None,
+@@ -501,7 +510,8 @@ class Continuous(ContinuousBase):
+ 
+     def label(
+         self,
+-        formatter: Formatter | None = None, *,
++        formatter: Formatter | None = None,
++        *,
+         like: str | Callable | None = None,
+         base: int | None | Default = default,
+         unit: str | None = None,
+@@ -553,7 +563,6 @@ class Continuous(ContinuousBase):
+     def _parse_for_log_params(
+         self, trans: str | TransFuncs | None
+     ) -> tuple[float | None, float | None]:
+-
+         log_base = symlog_thresh = None
+         if isinstance(trans, str):
+             m = re.match(r"^log(\d*)", trans)
+@@ -565,7 +574,6 @@ class Continuous(ContinuousBase):
+         return log_base, symlog_thresh
+ 
+     def _get_locators(self, locator, at, upto, count, every, between, minor):
+-
+         log_base, symlog_thresh = self._parse_for_log_params(self.trans)
+ 
+         if locator is not None:
+@@ -621,7 +629,6 @@ class Continuous(ContinuousBase):
+         return major_locator, minor_locator
+ 
+     def _get_formatter(self, locator, formatter, like, base, unit):
+-
+         log_base, symlog_thresh = self._parse_for_log_params(self.trans)
+         if base is default:
+             if symlog_thresh:
+@@ -665,6 +672,7 @@ class Temporal(ContinuousBase):
+     """
+     A scale for date/time data.
+     """
++
+     # TODO date: bool?
+     # For when we only care about the time component, would affect
+     # default formatter and norm conversion. Should also happen in
+@@ -680,7 +688,9 @@ class Temporal(ContinuousBase):
+     _priority: ClassVar[int] = 2
+ 
+     def tick(
+-        self, locator: Locator | None = None, *,
++        self,
++        locator: Locator | None = None,
++        *,
+         upto: int | None = None,
+     ) -> Temporal:
+         """
+@@ -715,7 +725,8 @@ class Temporal(ContinuousBase):
+ 
+     def label(
+         self,
+-        formatter: Formatter | None = None, *,
++        formatter: Formatter | None = None,
++        *,
+         concise: bool = False,
+     ) -> Temporal:
+         """
+@@ -743,7 +754,6 @@ class Temporal(ContinuousBase):
+         return new
+ 
+     def _get_locators(self, locator, upto):
+-
+         if locator is not None:
+             major_locator = locator
+         elif upto is not None:
+@@ -756,7 +766,6 @@ class Temporal(ContinuousBase):
+         return major_locator, minor_locator
+ 
+     def _get_formatter(self, locator, formatter, concise):
+-
+         if formatter is not None:
+             return formatter
+ 
+@@ -798,10 +807,10 @@ class PseudoAxis:
+     code, this object acts like an Axis and can be used to scale other variables.
+ 
+     """
++
+     axis_name = ""  # Matplotlib requirement but not actually used
+ 
+     def __init__(self, scale):
+-
+         self.converter = None
+         self.units = None
+         self.scale = scale
+@@ -899,7 +908,6 @@ class PseudoAxis:
+ 
+ 
+ def _make_identity_transforms() -> TransFuncs:
+-
+     def identity(x):
+         return x
+ 
+@@ -907,7 +915,6 @@ def _make_identity_transforms() -> TransFuncs:
+ 
+ 
+ def _make_logit_transforms(base: float | None = None) -> TransFuncs:
+-
+     log, exp = _make_log_transforms(base)
+ 
+     def logit(x):
+@@ -922,7 +929,6 @@ def _make_logit_transforms(base: float | None = None) -> TransFuncs:
+ 
+ 
+ def _make_log_transforms(base: float | None = None) -> TransFuncs:
+-
+     fs: TransFuncs
+     if base is None:
+         fs = np.log, np.exp
+@@ -931,8 +937,10 @@ def _make_log_transforms(base: float | None = None) -> TransFuncs:
+     elif base == 10:
+         fs = np.log10, partial(np.power, 10)
+     else:
++
+         def forward(x):
+             return np.log(x) / np.log(base)
++
+         fs = forward, partial(np.power, base)
+ 
+     def log(x: ArrayLike) -> ArrayLike:
+@@ -947,7 +955,6 @@ def _make_log_transforms(base: float | None = None) -> TransFuncs:
+ 
+ 
+ def _make_symlog_transforms(c: float = 1, base: float = 10) -> TransFuncs:
+-
+     # From https://iopscience.iop.org/article/10.1088/0957-0233/24/2/027001
+ 
+     # Note: currently not using base because we only get
+@@ -967,7 +974,6 @@ def _make_symlog_transforms(c: float = 1, base: float = 10) -> TransFuncs:
+ 
+ 
+ def _make_sqrt_transforms() -> TransFuncs:
+-
+     def sqrt(x):
+         return np.sign(x) * np.sqrt(np.abs(x))
+ 
+@@ -978,7 +984,6 @@ def _make_sqrt_transforms() -> TransFuncs:
+ 
+ 
+ def _make_power_transforms(exp: float) -> TransFuncs:
+-
+     def forward(x):
+         return np.sign(x) * np.power(np.abs(x), exp)

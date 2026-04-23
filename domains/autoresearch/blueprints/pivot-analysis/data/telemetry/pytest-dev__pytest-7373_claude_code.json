@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 109.9,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 108433,
+    "duration_api_ms": 83240,
+    "num_turns": 27,
+    "result": "No other usages. The fix is complete and clean. Here's a summary of what was done:\n\n**Root cause:** `cached_eval` in `_pytest/mark/evaluate.py` used only the expression string as the cache key, but the evaluation result also depends on the item's module globals (e.g., `skip = True` in one module vs `skip = False` in another). This caused the first evaluation result to be incorrectly reused for subsequent items from different modules.\n\n**Fix:** Removed `cached_eval` entirely and inlined the expression compilation and evaluation directly in `MarkEvaluator._istrue`, so each evaluation uses the correct per-item globals via `self._getglobals()`. Also cleaned up the now-unused imports (`Any`, `Config`, `StoreKey`, `evalcache_key`).",
+    "stop_reason": "end_turn",
+    "session_id": "b93108e0-a222-4b1f-83b6-e296e046bebd",
+    "total_cost_usd": 0.33518535000000005,
+    "usage": {
+      "input_tokens": 27,
+      "cache_creation_input_tokens": 24173,
+      "cache_read_input_tokens": 617302,
+      "output_tokens": 3951,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 24173
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 27,
+        "outputTokens": 3951,
+        "cacheReadInputTokens": 617302,
+        "cacheCreationInputTokens": 24173,
+        "webSearchRequests": 0,
+        "costUSD": 0.33518535000000005,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "cd8f2ba9-bdce-42c4-ab78-1860f8b9286c"
+  },
+  "stderr": ""
+}

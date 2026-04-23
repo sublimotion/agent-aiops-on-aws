@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 109.9,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 108437,
+    "duration_api_ms": 85609,
+    "num_turns": 21,
+    "result": "The fix works correctly. \n\n**Root cause**: `AutoFieldMeta.__subclasscheck__` used `subclass in self._subclasses` which only checks for exact membership (`BigAutoField` or `SmallAutoField` exactly). When a user subclasses `BigAutoField` (e.g., `MyBigAutoField`), the check returns `False`, causing the `ValueError`.\n\n**Fix**: Changed to `issubclass(subclass, self._subclasses)` which correctly handles the entire inheritance chain. This mirrors how `__instancecheck__` already uses `isinstance(instance, self._subclasses)` \u2014 both now use the proper subclass/instance checking functions.",
+    "stop_reason": "end_turn",
+    "session_id": "5492c11b-7f27-4493-9e13-eaa67032df2e",
+    "total_cost_usd": 0.2358435,
+    "usage": {
+      "input_tokens": 86,
+      "cache_creation_input_tokens": 18098,
+      "cache_read_input_tokens": 390210,
+      "output_tokens": 3377,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 18098
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 86,
+        "outputTokens": 3377,
+        "cacheReadInputTokens": 390210,
+        "cacheCreationInputTokens": 18098,
+        "webSearchRequests": 0,
+        "costUSD": 0.2358435,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "806166d5-a392-412f-b7d8-989bf4c443a0"
+  },
+  "stderr": ""
+}

@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kimi K2.5 KV Cache Benchmark Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --surface-2: #242740;
+      --border: #2e3151;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --accent: #6366f1;
+      --accent-soft: rgba(99,102,241,0.15);
+      --green: #22c55e;
+      --green-soft: rgba(34,197,94,0.12);
+      --red: #ef4444;
+      --red-soft: rgba(239,68,68,0.12);
+      --yellow: #f59e0b;
+      --yellow-soft: rgba(245,158,11,0.12);
+      --blue: #3b82f6;
+      --blue-soft: rgba(59,130,246,0.12);
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-2: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --accent-soft: rgba(99,102,241,0.08);
+      --green-soft: rgba(34,197,94,0.08);
+      --red-soft: rgba(239,68,68,0.08);
+      --yellow-soft: rgba(245,158,11,0.08);
+      --blue-soft: rgba(59,130,246,0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; color: var(--text); }
+    header .meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .theme-toggle {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+    .theme-toggle:hover { background: var(--border); }
+    main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    .hw-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+    }
+    .hw-item .label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+    .hw-item .value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+    h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
+    h3 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: var(--text);
+    }
+    .section { margin-bottom: 2.5rem; }
+    .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    thead { background: var(--surface-2); }
+    th {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    th:hover { color: var(--text); }
+    th.sorted-asc::after { content: ' \2191'; color: var(--accent); }
+    th.sorted-desc::after { content: ' \2193'; color: var(--accent); }
+    td {
+      padding: 0.75rem 1rem;
+      border-top: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+    }
+    tr:hover td { background: var(--accent-soft); }
+    td.config-name {
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 0.85rem;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+    }
+    .badge-best { background: var(--green-soft); color: var(--green); }
+    .badge-worst { background: var(--red-soft); color: var(--red); }
+    .badge-info { background: var(--blue-soft); color: var(--blue); }
+    .badge-warn { background: var(--yellow-soft); color: var(--yellow); }
+    .badge-blocked { background: var(--red-soft); color: var(--red); }
+    .chart-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+    }
+    .mermaid { overflow-x: auto; }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+    .summary-card .stat-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+    .summary-card .stat-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    .summary-card .stat-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+    .part-header {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+      margin-top: 3rem;
+    }
+    .part-header h2 {
+      margin-bottom: 0.25rem;
+      font-size: 1.1rem;
+    }
+    .part-header p {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin: 0;
+    }
+    .finding-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .finding-card.green { border-left: 3px solid var(--green); }
+    .finding-card.red { border-left: 3px solid var(--red); }
+    .finding-card.yellow { border-left: 3px solid var(--yellow); }
+    .finding-card.blue { border-left: 3px solid var(--blue); }
+    .finding-card h4 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+    .finding-card p {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin: 0;
+      line-height: 1.5;
+    }
+    .timeline {
+      position: relative;
+      padding-left: 2rem;
+      margin-bottom: 1.5rem;
+    }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 0.5rem;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--border);
+    }
+    .timeline-item {
+      position: relative;
+      margin-bottom: 1.25rem;
+    }
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -1.75rem;
+      top: 0.45rem;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid var(--bg);
+    }
+    .timeline-item.fail::before { background: var(--red); }
+    .timeline-item.pass::before { background: var(--green); }
+    .timeline-item .time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+    .timeline-item .desc {
+      font-size: 0.82rem;
+      color: var(--text);
+    }
+    .winner-tag {
+      display: inline-block;
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      background: var(--green-soft);
+      color: var(--green);
+    }
+    .loser-tag {
+      display: inline-block;
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      background: var(--red-soft);
+      color: var(--red);
+    }
+    .nav-pills {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+    }
+    .nav-pill {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 0.4rem 1rem;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      font-family: inherit;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .nav-pill:hover { background: var(--accent-soft); color: var(--text); border-color: var(--accent); }
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      background: var(--surface-2);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+    }
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    @media (max-width: 768px) {
+      .two-col { grid-template-columns: 1fr; }
+    }
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Kimi K2.5 KV Cache Benchmark Report</h1>
+    <div class="meta">p5e.48xlarge &middot; 8&times; H200 143GB HBM3 &middot; Feb 18&ndash;21, 2026</div>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">Toggle theme</button>
+</header>
+
+<main>
+
+  <!-- Navigation -->
+  <nav class="nav-pills">
+    <a class="nav-pill" href="#hw">Hardware</a>
+    <a class="nav-pill" href="#summary">Summary</a>
+    <a class="nav-pill" href="#part1">LMCache+GDS</a>
+    <a class="nav-pill" href="#part2">Dynamo KVBM</a>
+    <a class="nav-pill" href="#part3">Head-to-Head</a>
+    <a class="nav-pill" href="#part4">SGLang HiCache</a>
+    <a class="nav-pill" href="#part5">Baseline Re-Run</a>
+    <a class="nav-pill" href="#recs">Recommendations</a>
+  </nav>
+
+  <!-- Hardware config card -->
+  <div class="hw-card" id="hw">
+    <div class="hw-item">
+      <div class="label">Instance</div>
+      <div class="value">p5e.48xlarge</div>
+    </div>
+    <div class="hw-item">
+      <div class="label">GPUs</div>
+      <div class="value">8 &times; NVIDIA H200</div>
+    </div>
+    <div class="hw-item">
+      <div class="label">Total VRAM</div>
+      <div class="value">1,144 GB HBM3</div>
+    </div>
+    <div class="hw-item">
+      <div class="label">Model</div>
+      <div class="value">Kimi-K2.5 (1T INT4)</div>
+    </div>
+    <div class="hw-item">
+      <div class="label">KV Cache</div>
+      <div class="value">610K tokens (9,533 blocks)</div>
+    </div>
+    <div class="hw-item">
+      <div class="label">Storage</div>
+      <div class="value">FSx Lustre 4.8 TiB + NVMe 28 TB</div>
+    </div>
+  </div>
+
+  <!-- Summary stat cards -->
+  <div class="summary-grid" id="summary">
+    <div class="summary-card">
+      <div class="stat-label">Best Prefix Speedup</div>
+      <div class="stat-value">1.82&times;</div>
+      <div class="stat-sub">Dynamo KVBM &mdash; API Gateway</div>
+    </div>
+    <div class="summary-card">
+      <div class="stat-label">Best TTFT (warm)</div>
+      <div class="stat-value">120 ms</div>
+      <div class="stat-sub">Dynamo &mdash; Multi-turn Round 1</div>
+    </div>
+    <div class="summary-card">
+      <div class="stat-label">Generation Throughput</div>
+      <div class="stat-value">~11 tok/s</div>
+      <div class="stat-sub">Flat across all configs &amp; contexts</div>
+    </div>
+    <div class="summary-card">
+      <div class="stat-label">Configs Tested</div>
+      <div class="stat-value">4</div>
+      <div class="stat-sub">Baseline, LMCache, Dynamo, SGLang (blocked)</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- PART 1: LMCache + GDS -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="part-header" id="part1">
+    <h2>Part 1: LMCache + FSx Lustre (GDS)</h2>
+    <p>KV cache offloading via GPU Direct Storage to FSx Lustre &mdash; Feb 18/19</p>
+  </div>
+
+  <div class="section">
+    <h3>Prefix Caching Results</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Test</th>
+            <th>Cold TTFT (ms)</th>
+            <th>Warm TTFT (ms)</th>
+            <th>Speedup</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="config-name">Multi-Turn (20 rounds)</td>
+            <td>155</td>
+            <td>349 <span style="font-size:0.7rem;color:var(--text-muted)">(round 20)</span></td>
+            <td>2.3&times; TTFT growth <span style="font-size:0.7rem;color:var(--text-muted)">(20x ctx)</span></td>
+            <td style="font-family:Inter;font-size:0.78rem">Sub-linear scaling confirms prefix reuse</td>
+          </tr>
+          <tr>
+            <td class="config-name">API Gateway (8K schema)</td>
+            <td>265</td>
+            <td>203</td>
+            <td><span class="badge badge-best">1.31&times;</span></td>
+            <td style="font-family:Inter;font-size:0.78rem">Best LMCache result &mdash; max prefix sharing</td>
+          </tr>
+          <tr>
+            <td class="config-name">Document RAG (15 docs)</td>
+            <td>241</td>
+            <td>226</td>
+            <td>1.07&times;</td>
+            <td style="font-family:Inter;font-size:0.78rem">Limited by varying doc combinations</td>
+          </tr>
+          <tr>
+            <td class="config-name">Conversation Resumption</td>
+            <td>153 <span style="font-size:0.7rem;color:var(--text-muted)">(pre-gap)</span></td>
+            <td>166 <span style="font-size:0.7rem;color:var(--text-muted)">(post-gap)</span></td>
+            <td>1.04&times; ratio</td>
+            <td style="font-family:Inter;font-size:0.78rem">Near-perfect FSx recovery</td>
+          </tr>
+          <tr>
+            <td class="config-name">Shared Prompt (50 tenants)</td>
+            <td>180</td>
+            <td>177</td>
+            <td>1.02&times;</td>
+            <td style="font-family:Inter;font-size:0.78rem">Diminishing returns with more tenants</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Memory Pressure</h3>
+    <div class="two-col">
+      <div class="finding-card red">
+        <h4>Moderate Pressure (25 &times; 24K = 600K tokens)</h4>
+        <p>LMCache fg TTFT: <strong>5,330 ms</strong> vs baseline <strong>403 ms</strong> (13&times; worse). FSx write-back serializes request processing &mdash; only 5/25 sessions concurrent.</p>
+      </div>
+      <div class="finding-card yellow">
+        <h4>Aggressive Pressure (50 &times; 32K = 1.6M tokens)</h4>
+        <p>Both systems GPU-scheduler bottlenecked. LMCache had 1 fewer preemption (2 vs 3) but difference is negligible. 100% success rate maintained.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- PART 2: Dynamo KVBM -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="part-header" id="part2">
+    <h2>Part 2: NVIDIA Dynamo KVBM</h2>
+    <p>4-tier cache hierarchy (GPU &rarr; CPU &rarr; Disk &rarr; Remote) with async write-back &mdash; Feb 19</p>
+  </div>
+
+  <div class="section">
+    <h3>Prefix Caching Results</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Test</th>
+            <th>Cold TTFT (ms)</th>
+            <th>Warm TTFT (ms)</th>
+            <th>Speedup</th>
+            <th>vs LMCache</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="config-name">Multi-Turn (20 rounds)</td>
+            <td>120</td>
+            <td>191 <span style="font-size:0.7rem;color:var(--text-muted)">(round 20)</span></td>
+            <td>1.6&times; growth</td>
+            <td><span class="winner-tag">1.83&times; faster</span></td>
+          </tr>
+          <tr>
+            <td class="config-name">API Gateway (8K schema)</td>
+            <td>219</td>
+            <td>133</td>
+            <td><span class="badge badge-best">1.82&times;</span></td>
+            <td><span class="winner-tag">Dynamo wins</span></td>
+          </tr>
+          <tr>
+            <td class="config-name">Document RAG (15 docs)</td>
+            <td>278</td>
+            <td>198</td>
+            <td><span class="badge badge-best">1.41&times;</span></td>
+            <td><span class="winner-tag">Dynamo wins</span></td>
+          </tr>
+          <tr>
+            <td class="config-name">Conversation Resumption</td>
+            <td>118</td>
+            <td>123</td>
+            <td>0.99&times; ratio</td>
+            <td><span class="winner-tag">Dynamo wins</span></td>
+          </tr>
+          <tr>
+            <td class="config-name">Shared Prompt (50 tenants)</td>
+            <td>—</td>
+            <td>~124</td>
+            <td>1.68&times;</td>
+            <td><span class="winner-tag">Dynamo wins</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Memory Pressure</h3>
+    <div class="two-col">
+      <div class="finding-card red">
+        <h4>Moderate Pressure (25 &times; 24K)</h4>
+        <p>Dynamo fg TTFT: <strong>7,959 ms</strong> mean (19.7&times; vs baseline). But p50 is <strong>811 ms</strong> &mdash; bimodal distribution where most requests are fast, outliers are very slow.</p>
+      </div>
+      <div class="finding-card red">
+        <h4>Aggressive Pressure (50 &times; 32K)</h4>
+        <p>Background throughput 4&times; slower (741s vs 165s baseline). 6 requests failed (90% success). Recovery TTFT: <strong>27,769 ms</strong>. FSx disk tier never activated.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- PART 3: Head-to-Head -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="part-header" id="part3">
+    <h2>Part 3: Head-to-Head Comparison</h2>
+    <p>Cross-framework comparison across all workloads and pressure levels</p>
+  </div>
+
+  <div class="section">
+    <h3>Prefix Caching (Low Pressure)</h3>
+    <div class="table-wrap">
+      <table id="h2h-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable2('h2h-table',0)">Test</th>
+            <th onclick="sortTable2('h2h-table',1)">Dynamo</th>
+            <th onclick="sortTable2('h2h-table',2)">LMCache</th>
+            <th onclick="sortTable2('h2h-table',3)">Winner</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="config-name">Multi-turn TTFT (round 20)</td><td>191 ms</td><td>349 ms</td><td><span class="winner-tag">Dynamo 1.83&times;</span></td></tr>
+          <tr><td class="config-name">API Gateway speedup</td><td>1.82&times;</td><td>1.31&times;</td><td><span class="winner-tag">Dynamo</span></td></tr>
+          <tr><td class="config-name">Doc RAG speedup</td><td>1.41&times;</td><td>1.07&times;</td><td><span class="winner-tag">Dynamo</span></td></tr>
+          <tr><td class="config-name">Conversation resumption</td><td>0.99&times;</td><td>1.04&times;</td><td><span class="winner-tag">Dynamo</span></td></tr>
+          <tr><td class="config-name">Shared prompt (50 tenants)</td><td>1.68&times;</td><td>1.02&times;</td><td><span class="winner-tag">Dynamo</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Memory Pressure Comparison</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Dynamo</th>
+            <th>LMCache</th>
+            <th>Baseline vLLM</th>
+            <th>Winner</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="config-name">Moderate fg TTFT mean</td><td>7,959 ms</td><td>5,330 ms</td><td>403 ms</td><td><span class="winner-tag">Baseline</span></td></tr>
+          <tr><td class="config-name">Moderate fg TTFT p50</td><td>811 ms</td><td>1,017 ms</td><td>405 ms</td><td><span class="winner-tag">Baseline</span></td></tr>
+          <tr><td class="config-name">Aggressive bg elapsed</td><td>741 s</td><td>183 s</td><td>165 s</td><td><span class="winner-tag">Baseline</span></td></tr>
+          <tr><td class="config-name">Aggressive fg success</td><td>90%</td><td>100%</td><td>100%</td><td><span class="winner-tag">LMCache/Baseline</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Throughput Comparison (TTFT Speedup by Framework)</h3>
+    <div class="chart-container">
+      <div class="mermaid">
+xychart-beta
+  title "Prefix Caching TTFT Speedup by Test"
+  x-axis ["Multi-turn", "API Gateway", "Doc RAG", "Resumption", "50 Tenants"]
+  y-axis "Speedup (x)" 0 --> 2.0
+  bar [1.83, 1.82, 1.41, 1.05, 1.68]
+  line [1.0, 1.31, 1.07, 1.04, 1.02]
+      </div>
+      <div style="display:flex;gap:2rem;margin-top:0.75rem;font-size:0.75rem;color:var(--text-muted)">
+        <span>&#9608; Bar = Dynamo KVBM</span>
+        <span>&#9472; Line = LMCache+GDS</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Pressure Level Summary</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Pressure Level</th>
+            <th>LMCache</th>
+            <th>Dynamo</th>
+            <th>Baseline</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="config-name">Low (&lt; 50% KV)</td>
+            <td>Slight TTFT improvement</td>
+            <td><span class="badge badge-best">Strong TTFT improvement</span></td>
+            <td>Reference</td>
+          </tr>
+          <tr>
+            <td class="config-name">Moderate (60% KV)</td>
+            <td><span class="badge badge-worst">13&times; worse</span></td>
+            <td><span class="badge badge-worst">20&times; worse</span></td>
+            <td><span class="badge badge-best">Best</span></td>
+          </tr>
+          <tr>
+            <td class="config-name">Extreme (99% KV)</td>
+            <td>Neutral</td>
+            <td><span class="badge badge-worst">4&times; slower bg</span></td>
+            <td><span class="badge badge-best">Best</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- PART 4: SGLang HiCache -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="part-header" id="part4" style="border-left-color: var(--red);">
+    <h2>Part 4: SGLang HiCache Assessment <span class="badge badge-blocked">BLOCKED</span></h2>
+    <p>Cascading eviction (GPU &rarr; CPU &rarr; Storage) &mdash; Feb 21 &mdash; Incompatible with Kimi K2.5</p>
+  </div>
+
+  <div class="section">
+    <h3>Attempt Timeline</h3>
+    <div class="timeline">
+      <div class="timeline-item fail">
+        <div class="time">7:00 PM &mdash; Attempt 1</div>
+        <div class="desc"><code>--enforce-eager</code> is not a valid SGLang argument. Fixed: use <code>--disable-cuda-graph</code></div>
+      </div>
+      <div class="timeline-item fail">
+        <div class="time">7:10 PM &mdash; Attempt 2</div>
+        <div class="desc"><code>KimiK25ForConditionalGeneration has no SGLang implementation</code> &mdash; model not in registry</div>
+      </div>
+      <div class="timeline-item fail">
+        <div class="time">7:15 PM &mdash; Attempt 3</div>
+        <div class="desc"><code>--language-only</code> requires <code>--encoder-urls</code> &mdash; wrong flag for text-only mode</div>
+      </div>
+      <div class="timeline-item fail">
+        <div class="time">7:30 PM &mdash; Attempt 4</div>
+        <div class="desc">Custom <code>kimi_k25_text.py</code> wrapper &mdash; registry OK, but packed MoE weight format crashes loader</div>
+      </div>
+      <div class="timeline-item pass">
+        <div class="time">7:50 PM &mdash; Decision</div>
+        <div class="desc">Fall back to vLLM baseline benchmarks for remaining capacity block time</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Root Cause: Weight Format Mismatch</h3>
+    <div class="two-col">
+      <div class="finding-card red">
+        <h4>Kimi K2.5 (packed MoE)</h4>
+        <p><code>experts.w13_weight_packed</code> (gate+up fused)<br><code>experts.w2_weight_packed</code> (down_proj)</p>
+      </div>
+      <div class="finding-card blue">
+        <h4>SGLang expects (per-expert named)</h4>
+        <p><code>experts.*.gate_proj.weight</code><br><code>experts.*.up_proj.weight</code><br><code>experts.*.down_proj.weight</code></p>
+      </div>
+    </div>
+    <div class="finding-card yellow" style="margin-top:1rem">
+      <h4>GitHub Issue #18458 Misleading</h4>
+      <p>Lists KimiK25 as "Native: Y" but no <code>kimi_k25.py</code> exists in SGLang main branch. The tracking issue appears auto-generated from model config scanning, not reflecting merged code. SGLang <code>latest-cu130</code> = v0.5.8.post1.</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- PART 5: Baseline Re-Run -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="part-header" id="part5">
+    <h2>Part 5: Baseline Re-Run (Feb 21)</h2>
+    <p>Fresh vLLM v0.15.1 baseline on same hardware after SGLang was blocked</p>
+  </div>
+
+  <div class="section">
+    <h3>KV Cache Workloads (medium QPS)</h3>
+    <div class="table-wrap">
+      <table id="baseline-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable2('baseline-table',0)">Workload</th>
+            <th onclick="sortTable2('baseline-table',1)">N</th>
+            <th onclick="sortTable2('baseline-table',2)">TTFT p50 (ms)</th>
+            <th onclick="sortTable2('baseline-table',3)">TTFT p90 (ms)</th>
+            <th onclick="sortTable2('baseline-table',4)">E2E p50 (ms)</th>
+            <th onclick="sortTable2('baseline-table',5)">E2E p90 (ms)</th>
+            <th onclick="sortTable2('baseline-table',6)">Throughput (tok/s)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="config-name">multi_turn_qa</td><td>10</td><td>274</td><td>277</td><td>13,523</td><td>13,581</td><td>11.1</td></tr>
+          <tr><td class="config-name">long_context_rag</td><td>30</td><td>361</td><td>367</td><td>17,958</td><td>18,035</td><td>11.1</td></tr>
+          <tr><td class="config-name">strict_no_reuse</td><td>30</td><td>270</td><td>276</td><td>13,420</td><td>13,630</td><td>11.2</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Long Context Scaling (16K &rarr; 48K)</h3>
+    <div class="chart-container" style="margin-bottom:1.5rem">
+      <div class="mermaid">
+xychart-beta
+  title "TTFT vs Context Length (baseline vLLM)"
+  x-axis ["16K", "24K", "36K", "48K"]
+  y-axis "TTFT p50 (ms)" 0 --> 700
+  bar [361, 411, 506, 558]
+  line [509, 449, 558, 592]
+      </div>
+      <div style="display:flex;gap:2rem;margin-top:0.75rem;font-size:0.75rem;color:var(--text-muted)">
+        <span>&#9608; Bar = TTFT p50</span>
+        <span>&#9472; Line = TTFT p90</span>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Context</th>
+            <th>N</th>
+            <th>TTFT p50</th>
+            <th>TTFT p90</th>
+            <th>E2E p50</th>
+            <th>E2E p90</th>
+            <th>Throughput</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="config-name">16K tokens</td><td>10</td><td>361</td><td>509</td><td>13,570</td><td>13,923</td><td>11.0</td></tr>
+          <tr><td class="config-name">24K tokens</td><td>10</td><td>411</td><td>449</td><td>13,704</td><td>13,822</td><td>10.9</td></tr>
+          <tr><td class="config-name">36K tokens</td><td>10</td><td>506</td><td>558</td><td>13,713</td><td>13,916</td><td>10.9</td></tr>
+          <tr><td class="config-name">48K tokens</td><td>10</td><td>558</td><td>592</td><td>13,730</td><td>13,804</td><td>10.9</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Multi-Tenant (50 tenants)</h3>
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="stat-label">TTFT p50</div>
+        <div class="stat-value">293 ms</div>
+        <div class="stat-sub">100 requests, 100% success</div>
+      </div>
+      <div class="summary-card">
+        <div class="stat-label">E2E p50</div>
+        <div class="stat-value">13,492 ms</div>
+        <div class="stat-sub">~11.1 tok/s throughput</div>
+      </div>
+      <div class="summary-card">
+        <div class="stat-label">Cold/Warm Speedup</div>
+        <div class="stat-value" style="color:var(--yellow)">1.00&times;</div>
+        <div class="stat-sub">No prefix caching benefit</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Key Findings</h3>
+    <div class="finding-card blue">
+      <h4>Generation-bound, not prefill-bound</h4>
+      <p>Throughput is flat at 11 tok/s regardless of context length (16K&ndash;48K). Marlin MoE kernel dominates token generation. Prefill cost is a small fraction of E2E at 150-token outputs.</p>
+    </div>
+    <div class="finding-card yellow">
+      <h4>No prefix caching benefit in multi-tenant</h4>
+      <p>50-tenant workload shows 1.00&times; cold/warm speedup. Each tenant has a unique system prompt &mdash; baseline vLLM's prefix cache doesn't help. This is where KV offloading should provide value.</p>
+    </div>
+    <div class="finding-card red">
+      <h4>GDS unavailable on AL2023</h4>
+      <p><code>nvidia-fs</code> kernel module not in AL2023 EKS AMI. LMCache must use POSIX mode (CPU-mediated I/O). Eliminates the GDS advantage that motivated the FSx + LMCache architecture.</p>
+    </div>
+    <div class="finding-card blue">
+      <h4>Model loading is compute-bound</h4>
+      <p>64-shard INT4 MoE takes ~2 hours regardless of NVMe or FSx. Marlin MoE kernel repacking per shard is the bottleneck, not I/O bandwidth.</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- RECOMMENDATIONS -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="part-header" id="recs" style="border-left-color: var(--green);">
+    <h2>Recommendations</h2>
+    <p>Framework selection guide based on workload characteristics and hardware</p>
+  </div>
+
+  <div class="section">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Framework</th>
+            <th>Best For</th>
+            <th>Avoid When</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="config-name">Baseline vLLM</td>
+            <td style="font-family:Inter;font-size:0.82rem">Large GPUs, high concurrency, throughput-critical, cost-sensitive</td>
+            <td style="font-family:Inter;font-size:0.82rem">Small GPUs with KV cache pressure</td>
+            <td><span class="badge badge-best">Production</span></td>
+          </tr>
+          <tr>
+            <td class="config-name">Dynamo KVBM</td>
+            <td style="font-family:Inter;font-size:0.82rem">Prefix-heavy workloads, multi-tenant SaaS, TTFT-critical</td>
+            <td style="font-family:Inter;font-size:0.82rem">High concurrency (&gt;15 users), aggressive KV pressure</td>
+            <td><span class="badge badge-info">Early (requires patching)</span></td>
+          </tr>
+          <tr>
+            <td class="config-name">LMCache+FSx</td>
+            <td style="font-family:Inter;font-size:0.82rem">Small GPUs, persistent KV across restarts, multi-node</td>
+            <td style="font-family:Inter;font-size:0.82rem">High concurrency, memory pressure scenarios</td>
+            <td><span class="badge badge-best">Production</span></td>
+          </tr>
+          <tr>
+            <td class="config-name">SGLang HiCache</td>
+            <td style="font-family:Inter;font-size:0.82rem">Cascading eviction, Mooncake integration</td>
+            <td style="font-family:Inter;font-size:0.82rem">Models not natively supported (e.g., Kimi K2.5)</td>
+            <td><span class="badge badge-blocked">Blocked for Kimi K2.5</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Next Steps</h3>
+    <div class="summary-grid">
+      <div class="summary-card" style="border-left:3px solid var(--accent)">
+        <div class="stat-label">Priority 1</div>
+        <div class="stat-value" style="font-size:0.95rem">LMCache POSIX</div>
+        <div class="stat-sub">Re-run with prefix cache metrics + memory pressure workload</div>
+      </div>
+      <div class="summary-card" style="border-left:3px solid var(--accent)">
+        <div class="stat-label">Priority 2</div>
+        <div class="stat-value" style="font-size:0.95rem">Dynamo Re-Run</div>
+        <div class="stat-sub">With prefix cache metrics enabled</div>
+      </div>
+      <div class="summary-card" style="border-left:3px solid var(--yellow)">
+        <div class="stat-label">Priority 3</div>
+        <div class="stat-value" style="font-size:0.95rem">Longer Outputs</div>
+        <div class="stat-sub">500&ndash;1000 tokens to increase KV cache pressure</div>
+      </div>
+      <div class="summary-card" style="border-left:3px solid var(--yellow)">
+        <div class="stat-label">Priority 4</div>
+        <div class="stat-value" style="font-size:0.95rem">SGLang + DeepSeek-V3</div>
+        <div class="stat-sub">Test HiCache with a natively supported model</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tiered framework comparison -->
+  <div class="section">
+    <h3>Tiered KV Cache Framework Comparison</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Framework</th>
+            <th>Tiers</th>
+            <th>Multi-tier Chain</th>
+            <th>Eviction Strategy</th>
+            <th>Maturity</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="config-name">vLLM native</td>
+            <td>2 (GPU + CPU swap)</td>
+            <td>No disk offloading</td>
+            <td>LRU eviction + recompute</td>
+            <td><span class="badge badge-best">Production</span></td>
+          </tr>
+          <tr>
+            <td class="config-name">LMCache</td>
+            <td>2 (local + remote)</td>
+            <td>Pick one local backend</td>
+            <td>Admission gating</td>
+            <td><span class="badge badge-best">Production</span></td>
+          </tr>
+          <tr>
+            <td class="config-name">Dynamo KVBM</td>
+            <td>4 (GPU/CPU/NVMe/Remote)</td>
+            <td>Architecture yes, OSS partial</td>
+            <td>Async write-back</td>
+            <td><span class="badge badge-warn">Early</span></td>
+          </tr>
+          <tr>
+            <td class="config-name">SGLang HiCache</td>
+            <td>3+ (GPU/CPU/Storage)</td>
+            <td>Yes &mdash; cascading</td>
+            <td>Cascading eviction</td>
+            <td><span class="badge badge-warn">Research</span></td>
+          </tr>
+          <tr>
+            <td class="config-name">Mooncake Store</td>
+            <td>4 (VRAM/DRAM/NVMe/Remote)</td>
+            <td>Yes &mdash; full hierarchy</td>
+            <td>Cascading eviction</td>
+            <td><span class="badge badge-warn">Research</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  Generated by visual-explainer &middot; agent-aiops-on-aws &middot; 2026-02-21
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
+    themeVariables: {
+      primaryColor: '#6366f1',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#2e3151',
+      lineColor: '#8892a4',
+      background: '#1a1d2e',
+      mainBkg: '#1a1d2e',
+    }
+  });
+
+  function toggleTheme() {
+    const html = document.documentElement;
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    // Re-render mermaid charts
+    document.querySelectorAll('.mermaid').forEach(el => {
+      const svg = el.querySelector('svg');
+      if (svg) {
+        el.removeAttribute('data-processed');
+        el.innerHTML = el.getAttribute('data-original') || el.innerHTML;
+      }
+    });
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: next === 'dark' ? 'dark' : 'default',
+      themeVariables: next === 'dark' ? {
+        primaryColor: '#6366f1',
+        primaryTextColor: '#e2e8f0',
+        primaryBorderColor: '#2e3151',
+        lineColor: '#8892a4',
+        background: '#1a1d2e',
+        mainBkg: '#1a1d2e',
+      } : {}
+    });
+    mermaid.run();
+  }
+
+  // Store original mermaid source for re-rendering
+  document.querySelectorAll('.mermaid').forEach(el => {
+    el.setAttribute('data-original', el.innerHTML.trim());
+  });
+
+  function sortTable2(tableId, col) {
+    const table = document.getElementById(tableId);
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const headers = table.querySelectorAll('th');
+
+    // Determine sort direction
+    const th = headers[col];
+    const asc = !th.classList.contains('sorted-asc');
+    headers.forEach(h => h.classList.remove('sorted-asc', 'sorted-desc'));
+    th.classList.add(asc ? 'sorted-asc' : 'sorted-desc');
+
+    rows.sort((a, b) => {
+      const av = a.cells[col].textContent.trim().replace(/[^0-9.\-]/g, '');
+      const bv = b.cells[col].textContent.trim().replace(/[^0-9.\-]/g, '');
+      const an = parseFloat(av), bn = parseFloat(bv);
+      if (!isNaN(an) && !isNaN(bn)) return asc ? an - bn : bn - an;
+      return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+    });
+
+    rows.forEach(r => tbody.appendChild(r));
+  }
+</script>
+</body>
+</html>

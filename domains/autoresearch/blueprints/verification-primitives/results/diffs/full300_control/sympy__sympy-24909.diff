@@ -1,0 +1,39 @@
+diff --git a/sympy/physics/units/prefixes.py b/sympy/physics/units/prefixes.py
+index ca6a642156..6ddd59e691 100644
+--- a/sympy/physics/units/prefixes.py
++++ b/sympy/physics/units/prefixes.py
+@@ -5,6 +5,7 @@
+ BIN_PREFIXES.
+ """
+ from sympy.core.expr import Expr
++from sympy.core.singleton import S
+ from sympy.core.sympify import sympify
+ 
+ 
+@@ -83,12 +84,11 @@ def __mul__(self, other):
+         if not isinstance(other, (Quantity, Prefix)):
+             return super().__mul__(other)
+ 
+-        fact = self.scale_factor * other.scale_factor
+-
+-        if fact == 1:
+-            return 1
+-        elif isinstance(other, Prefix):
+-            # simplify prefix
++        if isinstance(other, Prefix):
++            # simplify prefix-prefix multiplication
++            fact = self.scale_factor * other.scale_factor
++            if fact == 1:
++                return S.One
+             for p in PREFIXES:
+                 if PREFIXES[p].scale_factor == fact:
+                     return PREFIXES[p]
+@@ -103,7 +103,7 @@ def __truediv__(self, other):
+         fact = self.scale_factor / other.scale_factor
+ 
+         if fact == 1:
+-            return 1
++            return S.One
+         elif isinstance(other, Prefix):
+             for p in PREFIXES:
+                 if PREFIXES[p].scale_factor == fact:

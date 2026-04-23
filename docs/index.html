@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent AIOps on AWS - Report Card</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent-blue: #58a6ff;
+    --accent-green: #3fb950;
+    --accent-purple: #bc8cff;
+    --accent-orange: #d29922;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  header {
+    text-align: center;
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 {
+    font-size: 2rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+  header p {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+  }
+  .stats {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .stat {
+    text-align: center;
+  }
+  .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent-blue);
+  }
+  .stat-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .domain {
+    margin-bottom: 2.5rem;
+  }
+  .domain-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .domain-header h2 {
+    font-size: 1.3rem;
+    font-weight: 600;
+  }
+  .domain-badge {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.6rem;
+    border-radius: 2rem;
+    font-weight: 500;
+  }
+  .badge-gpu { background: rgba(88, 166, 255, 0.15); color: var(--accent-blue); }
+  .badge-agent { background: rgba(188, 140, 255, 0.15); color: var(--accent-purple); }
+  .badge-research { background: rgba(63, 185, 80, 0.15); color: var(--accent-green); }
+  .badge-overview { background: rgba(210, 153, 34, 0.15); color: var(--accent-orange); }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 1rem;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    transition: border-color 0.2s, transform 0.2s;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+  }
+  .card:hover {
+    border-color: var(--accent-blue);
+    transform: translateY(-2px);
+  }
+  .card.hidden { display: none; }
+  .domain.hidden { display: none; }
+  .filters {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 0.3rem 0.8rem;
+    border-radius: 2rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .filter-btn:hover { border-color: var(--accent-blue); color: var(--text); }
+  .filter-btn.active { border-color: var(--accent-blue); color: var(--accent-blue); background: rgba(88,166,255,0.1); }
+  .card-title {
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 0.4rem;
+    color: var(--accent-blue);
+  }
+  .card-desc {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+  }
+  .card-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+  .card-meta span {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+  footer a { color: var(--accent-blue); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  @media (max-width: 600px) {
+    body { padding: 1rem; }
+    .cards { grid-template-columns: 1fr; }
+    .stats { gap: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Agent AIOps on AWS</h1>
+  <p>Autonomous infrastructure deployment reports &mdash; GPU serving, agent runtimes, and research experiments</p>
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-value" id="report-count">-</div>
+      <div class="stat-label">Reports</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">2</div>
+      <div class="stat-label">Domains</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="date-range">-</div>
+      <div class="stat-label">Date Range</div>
+    </div>
+  </div>
+  <div class="filters">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn active" data-filter="gpu-serving">GPU Serving</button>
+    <button class="filter-btn active" data-filter="autoresearch">Autoresearch</button>
+    <button class="filter-btn active" data-filter="overview">Cross-Domain</button>
+  </div>
+</header>
+
+<section class="domain" data-domain="gpu-serving">
+  <div class="domain-header">
+    <h2>GPU Serving</h2>
+    <span class="domain-badge badge-gpu">gpu-serving</span>
+  </div>
+  <div class="cards">
+    <a class="card" data-id="ray-serve-video" href="reports/benchmark-visual-ray-serve-video-20260327.html">
+      <div class="card-title">Ray Serve Video Pipeline</div>
+      <div class="card-desc">Multi-framework PT+TF pipeline with Kafka ingestion &mdash; in-memory 1.57x faster than S3 passthrough</div>
+      <div class="card-meta"><span>2026-03-27</span><span>ray-serve-video</span></div>
+    </a>
+    <a class="card" data-id="ray-serve-ft" href="reports/ray-ft-visual-20260323.html">
+      <div class="card-title">Ray Serve Fault Tolerance</div>
+      <div class="card-desc">Zero-SPOF architecture with GCS failover, ElastiCache+stunnel, and NLB traffic testing on EKS</div>
+      <div class="card-meta"><span>2026-03-23</span><span>ray-serve-ft</span></div>
+    </a>
+    <a class="card" data-id="glm5-lmcache" href="reports/benchmark-visual-glm5-lmcache-20260307.html">
+      <div class="card-title">GLM-5 + LMCache on B200</div>
+      <div class="card-desc">744B MoE serving with HiCache on p6-b200, hierarchical KV cache benchmarks</div>
+      <div class="card-meta"><span>2026-03-07</span><span>glm5-lmcache</span></div>
+    </a>
+    <a class="card" data-id="glm5-llmd" href="reports/benchmark-visual-glm5-llmd-20260307.html">
+      <div class="card-title">GLM-5 + llm-d on B200</div>
+      <div class="card-desc">vLLM serving with Gateway API Inference Extension and EPP routing</div>
+      <div class="card-meta"><span>2026-03-07</span><span>glm5-llmd</span></div>
+    </a>
+    <a class="card" data-id="qwen3-next-sglang" href="reports/benchmark-visual-qwen3-next-sglang-20260303.html">
+      <div class="card-title">Qwen3.5 MoE + SGLang</div>
+      <div class="card-desc">397B MoE serving with SGLang on g7e Blackwell GPUs</div>
+      <div class="card-meta"><span>2026-03-03</span><span>qwen3-next-sglang</span></div>
+    </a>
+    <a class="card" data-id="qwen3-next-custbench" href="reports/benchmark-visual-report-custbench-20260226.html">
+      <div class="card-title">Qwen3.5 Custom Benchmarks</div>
+      <div class="card-desc">Custom benchmark suite comparing vLLM configurations for Qwen3.5 122B-A10B-FP8</div>
+      <div class="card-meta"><span>2026-02-26</span><span>qwen3-next-custbench</span></div>
+    </a>
+    <a class="card" data-id="qwen3-next-g7e" href="reports/benchmark-visual-qwen3-next-g7e-20260225.html">
+      <div class="card-title">Qwen3.5 MoE on g7e</div>
+      <div class="card-desc">First Qwen3.5 deployment on RTX PRO 6000 Blackwell with TP4</div>
+      <div class="card-meta"><span>2026-02-25</span><span>qwen3-next-g7e</span></div>
+    </a>
+    <a class="card" data-id="qwen3-next" href="reports/benchmark-visual-qwen3-next-20260224.html">
+      <div class="card-title">Qwen3.5 MoE Baseline</div>
+      <div class="card-desc">Initial Qwen3.5 397B serving benchmarks on vLLM</div>
+      <div class="card-meta"><span>2026-02-24</span><span>qwen3-next</span></div>
+    </a>
+    <a class="card" data-id="kimi-k2.5" href="reports/benchmark-visual-kimi-k2.5-20260221.html">
+      <div class="card-title">Kimi K2.5</div>
+      <div class="card-desc">Kimi K2.5 serving benchmark on vLLM</div>
+      <div class="card-meta"><span>2026-02-21</span><span>kimi-k2.5</span></div>
+    </a>
+    <a class="card" data-id="nemotron-super" href="reports/benchmark-report-nemotron-super.html">
+      <div class="card-title">Nemotron Super</div>
+      <div class="card-desc">NVIDIA Nemotron Super serving benchmarks</div>
+      <div class="card-meta"><span>nemotron-super</span></div>
+    </a>
+    <a class="card" data-id="qwen3-235b-b300" href="reports/benchmark-visual-qwen3-235b-b300-20260422.html">
+      <div class="card-title">Qwen3-235B on B300</div>
+      <div class="card-desc">FP8 MoE on B300 spot &mdash; TP4 vs TP2+DP4+EP, co-tenancy economics, $0.19/M tokens</div>
+      <div class="card-meta"><span>2026-04-22</span><span>qwen3-235b-b300</span></div>
+    </a>
+    <a class="card" data-id="kimi-k2.6" href="reports/benchmark-visual-kimi-k2.6-20260422.html">
+      <div class="card-title">Kimi K2.6 on B300</div>
+      <div class="card-desc">3-way engine comparison: vLLM vs SGLang vs HiCache &mdash; vLLM 3.1x throughput scaling advantage</div>
+      <div class="card-meta"><span>2026-04-22</span><span>kimi-k2.6</span></div>
+    </a>
+  </div>
+</section>
+
+<section class="domain" data-domain="autoresearch">
+  <div class="domain-header">
+    <h2>Autoresearch</h2>
+    <span class="domain-badge badge-research">autoresearch</span>
+  </div>
+  <div class="cards">
+    <a class="card" data-id="verification-primitives" href="reports/verification-primitives-consolidated.html">
+      <div class="card-title">Verification Primitives</div>
+      <div class="card-desc">Two-stage checkpoint + adversarial review tools &mdash; 58.3% SWE-bench Lite pass rate, 3.7x tool-user lift</div>
+      <div class="card-meta"><span>2026-03-31</span><span>verification-primitives</span></div>
+    </a>
+    <a class="card" data-id="verifier-reward" href="reports/verifier-reward-visual.html">
+      <div class="card-title">Verifier Reward Experiment</div>
+      <div class="card-desc">Adversarial rubric verification for SWE-bench patches &mdash; 38 iterations, precision/recall analysis</div>
+      <div class="card-meta"><span>2026-03</span><span>verifier-reward</span></div>
+    </a>
+    <a class="card" data-id="sera32b-coalignment" href="reports/sera32b-coalignment-20260322.html">
+      <div class="card-title">SERA-32B Co-alignment</div>
+      <div class="card-desc">SVG-trained SERA-32B vs base Qwen3-32B &mdash; methodology vs finetuning analysis</div>
+      <div class="card-meta"><span>2026-03-22</span><span>agent-harness</span></div>
+    </a>
+    <a class="card" data-id="thunderagent" href="reports/thunderagent-phase2b-20260320.html">
+      <div class="card-title">ThunderAgent Phase 2b</div>
+      <div class="card-desc">Program-aware scheduling proxy for agent swarms &mdash; GPU bubble filling during tool execution</div>
+      <div class="card-meta"><span>2026-03-20</span><span>agent-harness</span></div>
+    </a>
+    <a class="card" data-id="agent-swarm" href="reports/agent-swarm-20260319.html">
+      <div class="card-title">Agent Swarm Results</div>
+      <div class="card-desc">Multi-model, multi-harness SWE-bench ensemble &mdash; fix rate matrix and union analysis</div>
+      <div class="card-meta"><span>2026-03-19</span><span>agent-harness</span></div>
+    </a>
+    <a class="card" data-id="agent-harness-phase2" href="reports/visual-explainer-harness-20260318.html">
+      <div class="card-title">Agent Harness Phase 2</div>
+      <div class="card-desc">Harness comparison: SERA, OpenCode, Aider, Claude Code, Codex, Droid on SWE-bench</div>
+      <div class="card-meta"><span>2026-03-18</span><span>agent-harness</span></div>
+    </a>
+    <a class="card" data-id="agent-harness-phase1" href="reports/visual-explainer-harness-20260315.html">
+      <div class="card-title">Agent Harness Phase 1</div>
+      <div class="card-desc">Devstral turn budget experiments &mdash; Parkinson's Law for agents</div>
+      <div class="card-meta"><span>2026-03-15</span><span>agent-harness</span></div>
+    </a>
+    <a class="card" data-id="training-recipes" href="reports/benchmark-report-training-recipes.html">
+      <div class="card-title">Training Recipes</div>
+      <div class="card-desc">Fine-tuning recipe benchmarks and comparisons</div>
+      <div class="card-meta"><span>training-recipes</span></div>
+    </a>
+    <a class="card" data-id="finetuning-recipes" href="reports/benchmark-report-finetuning-recipes.html">
+      <div class="card-title">Finetuning Recipes</div>
+      <div class="card-desc">Finetuning configuration benchmarks</div>
+      <div class="card-meta"><span>finetuning-recipes</span></div>
+    </a>
+  </div>
+</section>
+
+<section class="domain" data-domain="overview">
+  <div class="domain-header">
+    <h2>Cross-Domain</h2>
+    <span class="domain-badge badge-overview">overview</span>
+  </div>
+  <div class="cards">
+    <a class="card" data-id="compatibility-matrix" href="reports/compatibility-matrix.html">
+      <div class="card-title">Compatibility Matrix</div>
+      <div class="card-desc">Model-engine-hardware compatibility overview</div>
+      <div class="card-meta"><span>site</span></div>
+    </a>
+    <a class="card" data-id="model-comparison" href="reports/model-comparison.html">
+      <div class="card-title">Model Comparison</div>
+      <div class="card-desc">Cross-model benchmark comparison</div>
+      <div class="card-meta"><span>site</span></div>
+    </a>
+    <a class="card" data-id="provider-comparison" href="reports/provider-comparison.html">
+      <div class="card-title">Provider Comparison</div>
+      <div class="card-desc">Serving engine provider comparison</div>
+      <div class="card-meta"><span>site</span></div>
+    </a>
+    <a class="card" data-id="benchmark-overview" href="reports/site-benchmark-report.html">
+      <div class="card-title">Benchmark Overview</div>
+      <div class="card-desc">Aggregate benchmark report across deployments</div>
+      <div class="card-meta"><span>site</span></div>
+    </a>
+  </div>
+</section>
+
+<footer>
+  <p>Generated by <a href="https://github.com/sublimotion/agent-aiops-on-aws">Agent AIOps on AWS</a></p>
+</footer>
+
+<script>
+(function() {
+  const cards = document.querySelectorAll('.card[data-id]');
+  const domains = document.querySelectorAll('.domain[data-domain]');
+  const filterBtns = document.querySelectorAll('.filter-btn');
+
+  function updateStats() {
+    const visible = document.querySelectorAll('.card[data-id]:not(.hidden)');
+    document.getElementById('report-count').textContent = visible.length;
+    document.getElementById('date-range').textContent = 'Feb\u2013Apr 2026';
+  }
+
+  function applyVisibility(visibleIds) {
+    cards.forEach(card => {
+      card.classList.toggle('hidden', !visibleIds.has(card.dataset.id));
+    });
+    // Hide domain sections where all cards are hidden
+    domains.forEach(section => {
+      const sectionCards = section.querySelectorAll('.card[data-id]');
+      const allHidden = [...sectionCards].every(c => c.classList.contains('hidden'));
+      section.classList.toggle('hidden', allHidden);
+    });
+    updateStats();
+  }
+
+  // Domain filter buttons (toggle entire domains)
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const filter = btn.dataset.filter;
+      if (filter === 'all') {
+        // Toggle all
+        const allActive = [...filterBtns].filter(b => b.dataset.filter !== 'all').every(b => b.classList.contains('active'));
+        filterBtns.forEach(b => b.classList.toggle('active', !allActive));
+      } else {
+        btn.classList.toggle('active');
+        // Sync "All" button
+        const domainBtns = [...filterBtns].filter(b => b.dataset.filter !== 'all');
+        const allBtn = [...filterBtns].find(b => b.dataset.filter === 'all');
+        allBtn.classList.toggle('active', domainBtns.every(b => b.classList.contains('active')));
+      }
+      // Collect visible card IDs from active domains
+      const activeDomains = new Set([...filterBtns].filter(b => b.dataset.filter !== 'all' && b.classList.contains('active')).map(b => b.dataset.filter));
+      const visibleIds = new Set();
+      cards.forEach(card => {
+        const domain = card.closest('.domain[data-domain]');
+        if (domain && activeDomains.has(domain.dataset.domain)) {
+          visibleIds.add(card.dataset.id);
+        }
+      });
+      // Intersect with config visibility
+      if (window._configVisible) {
+        const configSet = new Set(window._configVisible);
+        visibleIds.forEach(id => { if (!configSet.has(id)) visibleIds.delete(id); });
+      }
+      applyVisibility(visibleIds);
+    });
+  });
+
+  // Load config.json for card-level visibility
+  fetch('config.json')
+    .then(r => r.json())
+    .then(config => {
+      window._configVisible = config.visible;
+      applyVisibility(new Set(config.visible));
+    })
+    .catch(() => {
+      // No config or fetch failed (local file://), show all
+      applyVisibility(new Set([...cards].map(c => c.dataset.id)));
+    });
+})();
+</script>
+
+</body>
+</html>

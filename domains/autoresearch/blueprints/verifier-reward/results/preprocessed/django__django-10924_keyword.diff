@@ -1,0 +1,1705 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -12,6 +12,7 @@ from django import forms
+ from django.apps import apps
+ from django.conf import settings
+ from django.core import checks, exceptions, validators
++
+ # When the _meta object was formalized, this exception was moved to
+ # django.core.exceptions. It is retained here for backwards compatibility
+ # purposes.
+@@ -22,7 +23,10 @@ from django.db.models.query_utils import DeferredAttribute, RegisterLookupMixin
+ from django.utils import timezone
+ from django.utils.datastructures import DictWrapper
+ from django.utils.dateparse import (
+-    parse_date, parse_datetime, parse_duration, parse_time,
++    parse_date,
++    parse_datetime,
++    parse_duration,
++    parse_time,
+ )
+ from django.utils.duration import duration_microseconds, duration_string
+ from django.utils.functional import Promise, cached_property
+@@ -32,14 +36,37 @@ from django.utils.text import capfirst
+ from django.utils.translation import gettext_lazy as _
+ 
+ __all__ = [
+-    'AutoField', 'BLANK_CHOICE_DASH', 'BigAutoField', 'BigIntegerField',
+-    'BinaryField', 'BooleanField', 'CharField', 'CommaSeparatedIntegerField',
+-    'DateField', 'DateTimeField', 'DecimalField', 'DurationField',
+-    'EmailField', 'Empty', 'Field', 'FieldDoesNotExist', 'FilePathField',
+-    'FloatField', 'GenericIPAddressField', 'IPAddressField', 'IntegerField',
+-    'NOT_PROVIDED', 'NullBooleanField', 'PositiveIntegerField',
+-    'PositiveSmallIntegerField', 'SlugField', 'SmallIntegerField', 'TextField',
+-    'TimeField', 'URLField', 'UUIDField',
++    "AutoField",
++    "BLANK_CHOICE_DASH",
++    "BigAutoField",
++    "BigIntegerField",
++    "BinaryField",
++    "BooleanField",
++    "CharField",
++    "CommaSeparatedIntegerField",
++    "DateField",
++    "DateTimeField",
++    "DecimalField",
++    "DurationField",
++    "EmailField",
++    "Empty",
++    "Field",
++    "FieldDoesNotExist",
++    "FilePathField",
++    "FloatField",
++    "GenericIPAddressField",
++    "IPAddressField",
++    "IntegerField",
++    "NOT_PROVIDED",
++    "NullBooleanField",
++    "PositiveIntegerField",
++    "PositiveSmallIntegerField",
++    "SlugField",
++    "SmallIntegerField",
++    "TextField",
++    "TimeField",
++    "URLField",
++    "UUIDField",
+ ]
+ 
+ 
+@@ -101,15 +129,15 @@ class Field(RegisterLookupMixin):
+     auto_creation_counter = -1
+     default_validators = []  # Default set of validators
+     default_error_messages = {
+-        'invalid_choice': _('Value %(value)r is not a valid choice.'),
+-        'null': _('This field cannot be null.'),
+-        'blank': _('This field cannot be blank.'),
+-        'unique': _('%(model_name)s with this %(field_label)s '
+-                    'already exists.'),
++        "invalid_choice": _("Value %(value)r is not a valid choice."),
++        "null": _("This field cannot be null."),
++        "blank": _("This field cannot be blank."),
++        "unique": _("%(model_name)s with this %(field_label)s already exists."),
+         # Translators: The 'lookup_type' is one of 'date', 'year' or 'month'.
+         # Eg: "Title must be unique for pub_date year"
+-        'unique_for_date': _("%(field_label)s must be unique for "
+-                             "%(date_field_label)s %(lookup_type)s."),
++        "unique_for_date": _(
++            "%(field_label)s must be unique for %(date_field_label)s %(lookup_type)s."
++        ),
+     }
+     system_check_deprecated_details = None
+     system_check_removed_details = None
+@@ -125,18 +153,37 @@ class Field(RegisterLookupMixin):
+ 
+     # Generic field type description, usually overridden by subclasses
+     def _description(self):
+-        return _('Field of type: %(field_type)s') % {
+-            'field_type': self.__class__.__name__
++        return _("Field of type: %(field_type)s") % {
++            "field_type": self.__class__.__name__
+         }
++
+     description = property(_description)
+ 
+-    def __init__(self, verbose_name=None, name=None, primary_key=False,
+-                 max_length=None, unique=False, blank=False, null=False,
+-                 db_index=False, rel=None, default=NOT_PROVIDED, editable=True,
+-                 serialize=True, unique_for_date=None, unique_for_month=None,
+-                 unique_for_year=None, choices=None, help_text='', db_column=None,
+-                 db_tablespace=None, auto_created=False, validators=(),
+-                 error_messages=None):
++    def __init__(
++        self,
++        verbose_name=None,
++        name=None,
++        primary_key=False,
++        max_length=None,
++        unique=False,
++        blank=False,
++        null=False,
++        db_index=False,
++        rel=None,
++        default=NOT_PROVIDED,
++        editable=True,
++        serialize=True,
++        unique_for_date=None,
++        unique_for_month=None,
++        unique_for_year=None,
++        choices=None,
++        help_text="",
++        db_column=None,
++        db_tablespace=None,
++        auto_created=False,
++        validators=(),
++        error_messages=None,
++    ):
+         self.name = name
+         self.verbose_name = verbose_name  # May be set by set_attributes_from_name
+         self._verbose_name = verbose_name  # Store original for deconstruction
+@@ -182,19 +229,19 @@ class Field(RegisterLookupMixin):
+         Return "app_label.model_label.field_name" for fields attached to
+         models.
+         """
+-        if not hasattr(self, 'model'):
++        if not hasattr(self, "model"):
+             return super().__str__()
+         model = self.model
+         app = model._meta.app_label
+-        return '%s.%s.%s' % (app, model._meta.object_name, self.name)
++        return "%s.%s.%s" % (app, model._meta.object_name, self.name)
+ 
+     def __repr__(self):
+         """Display the module, class, and name of the field."""
+-        path = '%s.%s' % (self.__class__.__module__, self.__class__.__qualname__)
+-        name = getattr(self, 'name', None)
++        path = "%s.%s" % (self.__class__.__module__, self.__class__.__qualname__)
++        name = getattr(self, "name", None)
+         if name is not None:
+-            return '<%s: %s>' % (path, name)
+-        return '<%s>' % path
++            return "<%s: %s>" % (path, name)
++        return "<%s>" % path
+ 
+     def check(self, **kwargs):
+         return [
+@@ -244,14 +291,16 @@ class Field(RegisterLookupMixin):
+             return []
+ 
+         def is_value(value, accept_promise=True):
+-            return isinstance(value, (str, Promise) if accept_promise else str) or not is_iterable(value)
++            return isinstance(
++                value, (str, Promise) if accept_promise else str
++            ) or not is_iterable(value)
+ 
+         if is_value(self.choices, accept_promise=False):
+             return [
+                 checks.Error(
+                     "'choices' must be an iterable (e.g., a list or tuple).",
+                     obj=self,
+-                    id='fields.E004',
++                    id="fields.E004",
+                 )
+             ]
+ 
+@@ -295,25 +344,30 @@ class Field(RegisterLookupMixin):
+                 checks.Error(
+                     "'db_index' must be None, True or False.",
+                     obj=self,
+-                    id='fields.E006',
++                    id="fields.E006",
+                 )
+             ]
+         else:
+             return []
+ 
+     def _check_null_allowed_for_primary_keys(self):
+-        if (self.primary_key and self.null and
+-                not connection.features.interprets_empty_strings_as_nulls):
++        if (
++            self.primary_key
++            and self.null
++            and not connection.features.interprets_empty_strings_as_nulls
++        ):
+             # We cannot reliably check this for backends like Oracle which
+             # consider NULL and '' to be equal (and thus set up
+             # character-based fields a little differently).
+             return [
+                 checks.Error(
+-                    'Primary keys must not have null=True.',
+-                    hint=('Set null=False on the field, or '
+-                          'remove primary_key=True argument.'),
++                    "Primary keys must not have null=True.",
++                    hint=(
++                        "Set null=False on the field, or "
++                        "remove primary_key=True argument."
++                    ),
+                     obj=self,
+-                    id='fields.E007',
++                    id="fields.E007",
+                 )
+             ]
+         else:
+@@ -322,7 +376,9 @@ class Field(RegisterLookupMixin):
+     def _check_backend_specific_checks(self, **kwargs):
+         app_label = self.model._meta.app_label
+         for db in connections:
+-            if router.allow_migrate(db, app_label, model_name=self.model._meta.model_name):
++            if router.allow_migrate(
++                db, app_label, model_name=self.model._meta.model_name
++            ):
+                 return connections[db].validation.check_field(self, **kwargs)
+         return []
+ 
+@@ -350,25 +407,24 @@ class Field(RegisterLookupMixin):
+             return [
+                 checks.Error(
+                     self.system_check_removed_details.get(
+-                        'msg',
+-                        '%s has been removed except for support in historical '
+-                        'migrations.' % self.__class__.__name__
++                        "msg",
++                        "%s has been removed except for support in historical "
++                        "migrations." % self.__class__.__name__,
+                     ),
+-                    hint=self.system_check_removed_details.get('hint'),
++                    hint=self.system_check_removed_details.get("hint"),
+                     obj=self,
+-                    id=self.system_check_removed_details.get('id', 'fields.EXXX'),
++                    id=self.system_check_removed_details.get("id", "fields.EXXX"),
+                 )
+             ]
+         elif self.system_check_deprecated_details is not None:
+             return [
+                 checks.Warning(
+                     self.system_check_deprecated_details.get(
+-                        'msg',
+-                        '%s has been deprecated.' % self.__class__.__name__
++                        "msg", "%s has been deprecated." % self.__class__.__name__
+                     ),
+-                    hint=self.system_check_deprecated_details.get('hint'),
++                    hint=self.system_check_deprecated_details.get("hint"),
+                     obj=self,
+-                    id=self.system_check_deprecated_details.get('id', 'fields.WXXX'),
++                    id=self.system_check_deprecated_details.get("id", "fields.WXXX"),
+                 )
+             ]
+         return []
+@@ -378,6 +434,7 @@ class Field(RegisterLookupMixin):
+             output_field = self
+         if alias != self.model._meta.db_table or output_field != self:
+             from django.db.models.expressions import Col
++
+             return Col(alias, self, output_field)
+         else:
+             return self.cached_col
+@@ -385,6 +442,7 @@ class Field(RegisterLookupMixin):
+     @cached_property
+     def cached_col(self):
+         from django.db.models.expressions import Col
++
+         return Col(self.model._meta.db_table, self)
+ 
+     def select_format(self, compiler, sql, params):
+@@ -532,7 +590,7 @@ class Field(RegisterLookupMixin):
+         not a new copy of that field. So, use the app registry to load the
+         model and then the field back.
+         """
+-        if not hasattr(self, 'model'):
++        if not hasattr(self, "model"):
+             # Fields are sometimes used without attaching them to models (for
+             # example in aggregation). In this case give back a plain field
+             # instance. The code below will create a new empty instance of
+@@ -541,10 +599,13 @@ class Field(RegisterLookupMixin):
+             state = self.__dict__.copy()
+             # The _get_default cached_property can't be pickled due to lambda
+             # usage.
+-            state.pop('_get_default', None)
++            state.pop("_get_default", None)
+             return _empty, (self.__class__,), state
+-        return _load_field, (self.model._meta.app_label, self.model._meta.object_name,
+-                             self.name)
++        return _load_field, (
++            self.model._meta.app_label,
++            self.model._meta.object_name,
++            self.name,
++        )
+ 
+     def get_pk_value_on_save(self, instance):
+         """
+@@ -609,16 +670,16 @@ class Field(RegisterLookupMixin):
+                 elif value == option_key:
+                     return
+             raise exceptions.ValidationError(
+-                self.error_messages['invalid_choice'],
+-                code='invalid_choice',
+-                params={'value': value},
++                self.error_messages["invalid_choice"],
++                code="invalid_choice",
++                params={"value": value},
+             )
+ 
+         if value is None and not self.null:
+-            raise exceptions.ValidationError(self.error_messages['null'], code='null')
++            raise exceptions.ValidationError(self.error_messages["null"], code="null")
+ 
+         if not self.blank and value in self.empty_values:
+-            raise exceptions.ValidationError(self.error_messages['blank'], code='blank')
++            raise exceptions.ValidationError(self.error_messages["blank"], code="blank")
+ 
+     def clean(self, value, model_instance):
+         """
+@@ -800,11 +866,21 @@ class Field(RegisterLookupMixin):
+                 return self.default
+             return lambda: self.default
+ 
+-        if not self.empty_strings_allowed or self.null and not connection.features.interprets_empty_strings_as_nulls:
++        if (
++            not self.empty_strings_allowed
++            or self.null
++            and not connection.features.interprets_empty_strings_as_nulls
++        ):
+             return return_None
+         return str  # return empty string
+ 
+-    def get_choices(self, include_blank=True, blank_choice=BLANK_CHOICE_DASH, limit_choices_to=None, ordering=()):
++    def get_choices(
++        self,
++        include_blank=True,
++        blank_choice=BLANK_CHOICE_DASH,
++        limit_choices_to=None,
++        ordering=(),
++    ):
+         """
+         Return choices with a default blank choices included, for use
+         as <select> choices for this field.
+@@ -820,12 +898,14 @@ class Field(RegisterLookupMixin):
+         limit_choices_to = limit_choices_to or self.get_limit_choices_to()
+         choice_func = operator.attrgetter(
+             self.remote_field.get_related_field().attname
+-            if hasattr(self.remote_field, 'get_related_field')
+-            else 'pk'
++            if hasattr(self.remote_field, "get_related_field")
++            else "pk"
+         )
+         return (blank_choice if include_blank else []) + [
+             (choice_func(x), str(x))
+-            for x in rel_model._default_manager.complex_filter(limit_choices_to).order_by(*ordering)
++            for x in rel_model._default_manager.complex_filter(
++                limit_choices_to
++            ).order_by(*ordering)
+         ]
+ 
+     def value_to_string(self, obj):
+@@ -854,24 +935,25 @@ class Field(RegisterLookupMixin):
+     def formfield(self, form_class=None, choices_form_class=None, **kwargs):
+         """Return a django.forms.Field instance for this field."""
+         defaults = {
+-            'required': not self.blank,
+-            'label': capfirst(self.verbose_name),
+-            'help_text': self.help_text,
++            "required": not self.blank,
++            "label": capfirst(self.verbose_name),
++            "help_text": self.help_text,
+         }
+         if self.has_default():
+             if callable(self.default):
+-                defaults['initial'] = self.default
+-                defaults['show_hidden_initial'] = True
++                defaults["initial"] = self.default
++                defaults["show_hidden_initial"] = True
+             else:
+-                defaults['initial'] = self.get_default()
++                defaults["initial"] = self.get_default()
+         if self.choices is not None:
+             # Fields with choices get special treatment.
+-            include_blank = (self.blank or
+-                             not (self.has_default() or 'initial' in kwargs))
+-            defaults['choices'] = self.get_choices(include_blank=include_blank)
+-            defaults['coerce'] = self.to_python
++            include_blank = self.blank or not (
++                self.has_default() or "initial" in kwargs
++            )
++            defaults["choices"] = self.get_choices(include_blank=include_blank)
++            defaults["coerce"] = self.to_python
+             if self.null:
+-                defaults['empty_value'] = None
++                defaults["empty_value"] = None
+             if choices_form_class is not None:
+                 form_class = choices_form_class
+             else:
+@@ -899,11 +991,11 @@ class AutoField(Field):
+ 
+     empty_strings_allowed = False
+     default_error_messages = {
+-        'invalid': _("'%(value)s' value must be an integer."),
++        "invalid": _("'%(value)s' value must be an integer."),
+     }
+ 
+     def __init__(self, *args, **kwargs):
+-        kwargs['blank'] = True
++        kwargs["blank"] = True
+         super().__init__(*args, **kwargs)
+ 
+     def check(self, **kwargs):
+@@ -926,8 +1018,8 @@ class AutoField(Field):
+ 
+     def deconstruct(self):
+         name, path, args, kwargs = super().deconstruct()
+-        del kwargs['blank']
+-        kwargs['primary_key'] = True
++        del kwargs["blank"]
++        kwargs["primary_key"] = True
+         return name, path, args, kwargs
+ 
+     def get_internal_type(self):
+@@ -959,13 +1051,16 @@ class AutoField(Field):
+ 
+     def get_prep_value(self, value):
+         from django.db.models.expressions import OuterRef
++
+         value = super().get_prep_value(value)
+         if value is None or isinstance(value, OuterRef):
+             return value
+         return int(value)
+ 
+     def contribute_to_class(self, cls, name, **kwargs):
+-        assert not cls._meta.auto_field, "Model %s can't have more than one AutoField." % cls._meta.label
++        assert not cls._meta.auto_field, (
++            "Model %s can't have more than one AutoField." % cls._meta.label
++        )
+         super().contribute_to_class(cls, name, **kwargs)
+         cls._meta.auto_field = self
+ 
+@@ -986,8 +1081,8 @@ class BigAutoField(AutoField):
+ class BooleanField(Field):
+     empty_strings_allowed = False
+     default_error_messages = {
+-        'invalid': _("'%(value)s' value must be either True or False."),
+-        'invalid_nullable': _("'%(value)s' value must be either True, False, or None."),
++        "invalid": _("'%(value)s' value must be either True or False."),
++        "invalid_nullable": _("'%(value)s' value must be either True, False, or None."),
+     }
+     description = _("Boolean (Either True or False)")
+ 
+@@ -1018,14 +1113,14 @@ class BooleanField(Field):
+ 
+     def formfield(self, **kwargs):
+         if self.choices is not None:
+-            include_blank = not (self.has_default() or 'initial' in kwargs)
+-            defaults = {'choices': self.get_choices(include_blank=include_blank)}
++            include_blank = not (self.has_default() or "initial" in kwargs)
++            defaults = {"choices": self.get_choices(include_blank=include_blank)}
+         else:
+             form_class = forms.NullBooleanField if self.null else forms.BooleanField
+             # In HTML checkboxes, 'required' means "must be checked" which is
+             # different from the choices case ("must select some value").
+             # required=False allows unchecked checkboxes.
+-            defaults = {'form_class': form_class, 'required': False}
++            defaults = {"form_class": form_class, "required": False}
+         return super().formfield(**{**defaults, **kwargs})
+ 
+ 
+@@ -1084,10 +1182,10 @@ class CharField(Field):
+         # Passing max_length to forms.CharField means that the value's length
+         # will be validated twice. This is considered acceptable since we want
+         # the value in the form field (to pass into widget for example).
+-        defaults = {'max_length': self.max_length}
++        defaults = {"max_length": self.max_length}
+         # TODO: Handle multiple backends with different feature flags.
+         if self.null and not connection.features.interprets_empty_strings_as_nulls:
+-            defaults['empty_value'] = None
++            defaults["empty_value"] = None
+         defaults.update(kwargs)
+         return super().formfield(**defaults)
+ 
+@@ -1096,20 +1194,18 @@ class CommaSeparatedIntegerField(CharField):
+     default_validators = [validators.validate_comma_separated_integer_list]
+     description = _("Comma-separated integers")
+     system_check_removed_details = {
+-        'msg': (
+-            'CommaSeparatedIntegerField is removed except for support in '
+-            'historical migrations.'
++        "msg": (
++            "CommaSeparatedIntegerField is removed except for support in "
++            "historical migrations."
+         ),
+-        'hint': (
+-            'Use CharField(validators=[validate_comma_separated_integer_list]) '
+-            'instead.'
++        "hint": (
++            "Use CharField(validators=[validate_comma_separated_integer_list]) instead."
+         ),
+-        'id': 'fields.E901',
++        "id": "fields.E901",
+     }
+ 
+ 
+ class DateTimeCheckMixin:
+-
+     def check(self, **kwargs):
+         return [
+             *super().check(**kwargs),
+@@ -1143,19 +1245,24 @@ class DateTimeCheckMixin:
+ class DateField(DateTimeCheckMixin, Field):
+     empty_strings_allowed = False
+     default_error_messages = {
+-        'invalid': _("'%(value)s' value has an invalid date format. It must be "
+-                     "in YYYY-MM-DD format."),
+-        'invalid_date': _("'%(value)s' value has the correct format (YYYY-MM-DD) "
+-                          "but it is an invalid date."),
++        "invalid": _(
++            "'%(value)s' value has an invalid date format. It must be "
++            "in YYYY-MM-DD format."
++        ),
++        "invalid_date": _(
++            "'%(value)s' value has the correct format (YYYY-MM-DD) "
++            "but it is an invalid date."
++        ),
+     }
+     description = _("Date (without time)")
+ 
+-    def __init__(self, verbose_name=None, name=None, auto_now=False,
+-                 auto_now_add=False, **kwargs):
++    def __init__(
++        self, verbose_name=None, name=None, auto_now=False, auto_now_add=False, **kwargs
++    ):
+         self.auto_now, self.auto_now_add = auto_now, auto_now_add
+         if auto_now or auto_now_add:
+-            kwargs['editable'] = False
+-            kwargs['blank'] = True
++            kwargs["editable"] = False
++            kwargs["blank"] = True
+         super().__init__(verbose_name, name, **kwargs)
+ 
+     def _check_fix_default_value(self):
+@@ -1186,13 +1293,13 @@ class DateField(DateTimeCheckMixin, Field):
+         if lower <= value <= upper:
+             return [
+                 checks.Warning(
+-                    'Fixed default value provided.',
+-                    hint='It seems you set a fixed date / time / datetime '
+-                         'value as default for this field. This may not be '
+-                         'what you want. If you want to have the current date '
+-                         'as default, use `django.utils.timezone.now`',
++                    "Fixed default value provided.",
++                    hint="It seems you set a fixed date / time / datetime "
++                    "value as default for this field. This may not be "
++                    "what you want. If you want to have the current date "
++                    "as default, use `django.utils.timezone.now`",
+                     obj=self,
+-                    id='fields.W161',
++                    id="fields.W161",
+                 )
+             ]
+ 
+@@ -1201,12 +1308,12 @@ class DateField(DateTimeCheckMixin, Field):
+     def deconstruct(self):
+         name, path, args, kwargs = super().deconstruct()
+         if self.auto_now:
+-            kwargs['auto_now'] = True
++            kwargs["auto_now"] = True
+         if self.auto_now_add:
+-            kwargs['auto_now_add'] = True
++            kwargs["auto_now_add"] = True
+         if self.auto_now or self.auto_now_add:
+-            del kwargs['editable']
+-            del kwargs['blank']
++            del kwargs["editable"]
++            del kwargs["blank"]
+         return name, path, args, kwargs
+ 
+     def get_internal_type(self):
+@@ -1231,15 +1338,15 @@ class DateField(DateTimeCheckMixin, Field):
+                 return parsed
+         except ValueError:
+             raise exceptions.ValidationError(
+-                self.error_messages['invalid_date'],
+-                code='invalid_date',
+-                params={'value': value},
++                self.error_messages["invalid_date"],
++                code="invalid_date",
++                params={"value": value},
+             )
+ 
+         raise exceptions.ValidationError(
+-            self.error_messages['invalid'],
+-            code='invalid',
+-            params={'value': value},
++            self.error_messages["invalid"],
++            code="invalid",
++            params={"value": value},
+         )
+ 
+     def pre_save(self, model_instance, add):
+@@ -1274,25 +1387,33 @@ class DateField(DateTimeCheckMixin, Field):
+ 
+     def value_to_string(self, obj):
+         val = self.value_from_object(obj)
+-        return '' if val is None else val.isoformat()
++        return "" if val is None else val.isoformat()
+ 
+     def formfield(self, **kwargs):
+-        return super().formfield(**{
+-            'form_class': forms.DateField,
+-            **kwargs,
+-        })
++        return super().formfield(
++            **{
++                "form_class": forms.DateField,
++                **kwargs,
++            }
++        )
+ 
+ 
+ class DateTimeField(DateField):
+     empty_strings_allowed = False
+     default_error_messages = {
+-        'invalid': _("'%(value)s' value has an invalid format. It must be in "
+-                     "YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ] format."),
+-        'invalid_date': _("'%(value)s' value has the correct format "
+-                          "(YYYY-MM-DD) but it is an invalid date."),
+-        'invalid_datetime': _("'%(value)s' value has the correct format "
+-                              "(YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ]) "
+-                              "but it is an invalid date/time."),
++        "invalid": _(
++            "'%(value)s' value has an invalid format. It must be in "
++            "YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ] format."
++        ),
++        "invalid_date": _(
++            "'%(value)s' value has the correct format "
++            "(YYYY-MM-DD) but it is an invalid date."
++        ),
++        "invalid_datetime": _(
++            "'%(value)s' value has the correct format "
++            "(YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ]) "
++            "but it is an invalid date/time."
++        ),
+     }
+     description = _("Date (with time)")
+ 
+@@ -1329,13 +1450,13 @@ class DateTimeField(DateField):
+         if lower <= value <= upper:
+             return [
+                 checks.Warning(
+-                    'Fixed default value provided.',
+-                    hint='It seems you set a fixed date / time / datetime '
+-                         'value as default for this field. This may not be '
+-                         'what you want. If you want to have the current date '
+-                         'as default, use `django.utils.timezone.now`',
++                    "Fixed default value provided.",
++                    hint="It seems you set a fixed date / time / datetime "
++                    "value as default for this field. This may not be "
++                    "what you want. If you want to have the current date "
++                    "as default, use `django.utils.timezone.now`",
+                     obj=self,
+-                    id='fields.W161',
++                    id="fields.W161",
+                 )
+             ]
+ 
+@@ -1356,10 +1477,12 @@ class DateTimeField(DateField):
+                 # local time. This won't work during DST change, but we can't
+                 # do much about it, so we let the exceptions percolate up the
+                 # call stack.
+-                warnings.warn("DateTimeField %s.%s received a naive datetime "
+-                              "(%s) while time zone support is active." %
+-                              (self.model.__name__, self.name, value),
+-                              RuntimeWarning)
++                warnings.warn(
++                    "DateTimeField %s.%s received a naive datetime "
++                    "(%s) while time zone support is active."
++                    % (self.model.__name__, self.name, value),
++                    RuntimeWarning,
++                )
+                 default_timezone = timezone.get_default_timezone()
+                 value = timezone.make_aware(value, default_timezone)
+             return value
+@@ -1381,15 +1504,15 @@ class DateTimeField(DateField):
+                 return datetime.datetime(parsed.year, parsed.month, parsed.day)
+         except ValueError:
+             raise exceptions.ValidationError(
+-                self.error_messages['invalid_date'],
+-                code='invalid_date',
+-                params={'value': value},
++                self.error_messages["invalid_date"],
++                code="invalid_date",
++                params={"value": value},
+             )
+ 
+         raise exceptions.ValidationError(
+-            self.error_messages['invalid'],
+-            code='invalid',
+-            params={'value': value},
++            self.error_messages["invalid"],
++            code="invalid",
++            params={"value": value},
+         )
+ 
+     def pre_save(self, model_instance, add):
+@@ -1411,13 +1534,14 @@ class DateTimeField(DateField):
+             # time. This won't work during DST change, but we can't do much
+             # about it, so we let the exceptions percolate up the call stack.
+             try:
+-                name = '%s.%s' % (self.model.__name__, self.name)
++                name = "%s.%s" % (self.model.__name__, self.name)
+             except AttributeError:
+-                name = '(unbound)'
+-            warnings.warn("DateTimeField %s received a naive datetime (%s)"
+-                          " while time zone support is active." %
+-                          (name, value),
+-                          RuntimeWarning)
++                name = "(unbound)"
++            warnings.warn(
++                "DateTimeField %s received a naive datetime (%s)"
++                " while time zone support is active." % (name, value),
++                RuntimeWarning,
++            )
+             default_timezone = timezone.get_default_timezone()
+             value = timezone.make_aware(value, default_timezone)
+         return value
+@@ -1430,24 +1554,32 @@ class DateTimeField(DateField):
+ 
+     def value_to_string(self, obj):
+         val = self.value_from_object(obj)
+-        return '' if val is None else val.isoformat()
++        return "" if val is None else val.isoformat()
+ 
+     def formfield(self, **kwargs):
+-        return super().formfield(**{
+-            'form_class': forms.DateTimeField,
+-            **kwargs,
+-        })
++        return super().formfield(
++            **{
++                "form_class": forms.DateTimeField,
++                **kwargs,
++            }
++        )
+ 
+ 
+ class DecimalField(Field):
+     empty_strings_allowed = False
+     default_error_messages = {
+-        'invalid': _("'%(value)s' value must be a decimal number."),
++        "invalid": _("'%(value)s' value must be a decimal number."),
+     }
+     description = _("Decimal number")
+ 
+-    def __init__(self, verbose_name=None, name=None, max_digits=None,
+-                 decimal_places=None, **kwargs):
++    def __init__(
++        self,
++        verbose_name=None,
++        name=None,
++        max_digits=None,
++        decimal_places=None,
++        **kwargs,
++    ):
+         self.max_digits, self.decimal_places = max_digits, decimal_places
+         super().__init__(verbose_name, name, **kwargs)
+ 
+@@ -1536,9 +1668,9 @@ class DecimalField(Field):
+     def deconstruct(self):
+         name, path, args, kwargs = super().deconstruct()
+         if self.max_digits is not None:
+-            kwargs['max_digits'] = self.max_digits
++            kwargs["max_digits"] = self.max_digits
+         if self.decimal_places is not None:
+-            kwargs['decimal_places'] = self.decimal_places
++            kwargs["decimal_places"] = self.decimal_places
+         return name, path, args, kwargs
+ 
+     def get_internal_type(self):
+@@ -1581,10 +1717,13 @@ class DurationField(Field):
+     Use interval on PostgreSQL, INTERVAL DAY TO SECOND on Oracle, and bigint
+     of microseconds on other databases.
+     """
++
+     empty_strings_allowed = False
+     default_error_messages = {
+-        'invalid': _("'%(value)s' value has an invalid format. It must be in "
+-                     "[DD] [[HH:]MM:]ss[.uuuuuu] format.")
++        "invalid": _(
++            "'%(value)s' value has an invalid format. It must be in "
++            "[DD] [[HH:]MM:]ss[.uuuuuu] format."
++        )
+     }
+     description = _("Duration")
+ 
+@@ -1652,20 +1793,31 @@ class EmailField(CharField):
+     def formfield(self, **kwargs):
+         # As with CharField, this will cause email validation to be performed
+         # twice.
+-        return super().formfield(**{
+-            'form_class': forms.EmailField,
+-            **kwargs,
+-        })
++        return super().formfield(
++            **{
++                "form_class": forms.EmailField,
++                **kwargs,
++            }
++        )
+ 
+ 
+ class FilePathField(Field):
+     description = _("File path")
+ 
+-    def __init__(self, verbose_name=None, name=None, path='', match=None,
+-                 recursive=False, allow_files=True, allow_folders=False, **kwargs):
++    def __init__(
++        self,
++        verbose_name=None,
++        name=None,
++        path="",
++        match=None,
++        recursive=False,
++        allow_files=True,
++        allow_folders=False,
++        **kwargs,
++    ):
+         self.path, self.match, self.recursive = path, match, recursive
+         self.allow_files, self.allow_folders = allow_files, allow_folders
+-        kwargs.setdefault('max_length', 100)
++        kwargs.setdefault("max_length", 100)
+         super().__init__(verbose_name, name, **kwargs)
+ 
+     def check(self, **kwargs):
+@@ -1680,23 +1832,23 @@ class FilePathField(Field):
+                 checks.Error(
+                     "FilePathFields must have either 'allow_files' or 'allow_folders' set to True.",
+                     obj=self,
+-                    id='fields.E140',
++                    id="fields.E140",
+                 )
+             ]
+         return []
+ 
+     def deconstruct(self):
+         name, path, args, kwargs = super().deconstruct()
+-        if self.path != '':
+-            kwargs['path'] = self.path
++        if self.path != "":
++            kwargs["path"] = self.path
+         if self.match is not None:
+-            kwargs['match'] = self.match
++            kwargs["match"] = self.match
+         if self.recursive is not False:
+-            kwargs['recursive'] = self.recursive
++            kwargs["recursive"] = self.recursive
+         if self.allow_files is not True:
+-            kwargs['allow_files'] = self.allow_files
++            kwargs["allow_files"] = self.allow_files
+         if self.allow_folders is not False:
+-            kwargs['allow_folders'] = self.allow_folders
++            kwargs["allow_folders"] = self.allow_folders
+         if kwargs.get("max_length") == 100:
+             del kwargs["max_length"]
+         return name, path, args, kwargs
+@@ -1708,15 +1860,17 @@ class FilePathField(Field):
+         return str(value)
+ 
+     def formfield(self, **kwargs):
+-        return super().formfield(**{
+-            'path': self.path,
+-            'match': self.match,
+-            'recursive': self.recursive,
+-            'form_class': forms.FilePathField,
+-            'allow_files': self.allow_files,
+-            'allow_folders': self.allow_folders,
+-            **kwargs,
+-        })
++        return super().formfield(
++            **{
++                "path": self.path() if callable(self.path) else self.path,
++                "match": self.match,
++                "recursive": self.recursive,
++                "form_class": forms.FilePathField,
++                "allow_files": self.allow_files,
++                "allow_folders": self.allow_folders,
++                **kwargs,
++            }
++        )
+ 
+     def get_internal_type(self):
+         return "FilePathField"
+@@ -1725,7 +1879,7 @@ class FilePathField(Field):
+ class FloatField(Field):
+     empty_strings_allowed = False
+     default_error_messages = {
+-        'invalid': _("'%(value)s' value must be a float."),
++        "invalid": _("'%(value)s' value must be a float."),
+     }
+     description = _("Floating point number")
+ 
+@@ -1745,22 +1899,24 @@ class FloatField(Field):
+             return float(value)
+         except (TypeError, ValueError):
+             raise exceptions.ValidationError(
+-                self.error_messages['invalid'],
+-                code='invalid',
+-                params={'value': value},
++                self.error_messages["invalid"],
++                code="invalid",
++                params={"value": value},
+             )
+ 
+     def formfield(self, **kwargs):
+-        return super().formfield(**{
+-            'form_class': forms.FloatField,
+-            **kwargs,
+-        })
++        return super().formfield(
++            **{
++                "form_class": forms.FloatField,
++                **kwargs,
++            }
++        )
+ 
+ 
+ class IntegerField(Field):
+     empty_strings_allowed = False
+     default_error_messages = {
+-        'invalid': _("'%(value)s' value must be an integer."),
++        "invalid": _("'%(value)s' value must be an integer."),
+     }
+     description = _("Integer")
+ 
+@@ -1791,22 +1948,28 @@ class IntegerField(Field):
+         min_value, max_value = connection.ops.integer_field_range(internal_type)
+         if min_value is not None and not any(
+             (
+-                isinstance(validator, validators.MinValueValidator) and (
++                isinstance(validator, validators.MinValueValidator)
++                and (
+                     validator.limit_value()
+                     if callable(validator.limit_value)
+                     else validator.limit_value
+-                ) >= min_value
+-            ) for validator in validators_
++                )
++                >= min_value
++            )
++            for validator in validators_
+         ):
+             validators_.append(validators.MinValueValidator(min_value))
+         if max_value is not None and not any(
+             (
+-                isinstance(validator, validators.MaxValueValidator) and (
++                isinstance(validator, validators.MaxValueValidator)
++                and (
+                     validator.limit_value()
+                     if callable(validator.limit_value)
+                     else validator.limit_value
+-                ) <= max_value
+-            ) for validator in validators_
++                )
++                <= max_value
++            )
++            for validator in validators_
+         ):
+             validators_.append(validators.MaxValueValidator(max_value))
+         return validators_
+@@ -1847,32 +2012,34 @@ class BigIntegerField(IntegerField):
+         return "BigIntegerField"
+ 
+     def formfield(self, **kwargs):
+-        return super().formfield(**{
+-            'min_value': -BigIntegerField.MAX_BIGINT - 1,
+-            'max_value': BigIntegerField.MAX_BIGINT,
+-            **kwargs,
+-        })
++        return super().formfield(
++            **{
++                "min_value": -BigIntegerField.MAX_BIGINT - 1,
++                "max_value": BigIntegerField.MAX_BIGINT,
++                **kwargs,
++            }
++        )
+ 
+ 
+ class IPAddressField(Field):
+     empty_strings_allowed = False
+     description = _("IPv4 address")
+     system_check_removed_details = {
+-        'msg': (
+-            'IPAddressField has been removed except for support in '
+-            'historical migrations.'
++        "msg": (
++            "IPAddressField has been removed except for support in "
++            "historical migrations."
+         ),
+-        'hint': 'Use GenericIPAddressField instead.',
+-        'id': 'fields.E900',
++        "hint": "Use GenericIPAddressField instead.",
++        "id": "fields.E900",
+     }
+ 
+     def __init__(self, *args, **kwargs):
+-        kwargs['max_length'] = 15
++        kwargs["max_length"] = 15
+         super().__init__(*args, **kwargs)
+ 
+     def deconstruct(self):
+         name, path, args, kwargs = super().deconstruct()
+-        del kwargs['max_length']
++        del kwargs["max_length"]
+         return name, path, args, kwargs
+ 
+     def get_prep_value(self, value):
+@@ -1890,14 +2057,22 @@ class GenericIPAddressField(Field):
+     description = _("IP address")
+     default_error_messages = {}
+ 
+-    def __init__(self, verbose_name=None, name=None, protocol='both',
+-                 unpack_ipv4=False, *args, **kwargs):
++    def __init__(
++        self,
++        verbose_name=None,
++        name=None,
++        protocol="both",
++        unpack_ipv4=False,
++        *args,
++        **kwargs,
++    ):
+         self.unpack_ipv4 = unpack_ipv4
+         self.protocol = protocol
+-        self.default_validators, invalid_error_message = \
++        self.default_validators, invalid_error_message = (
+             validators.ip_address_validators(protocol, unpack_ipv4)
+-        self.default_error_messages['invalid'] = invalid_error_message
+-        kwargs['max_length'] = 39
++        )
++        self.default_error_messages["invalid"] = invalid_error_message
++        kwargs["max_length"] = 39
+         super().__init__(verbose_name, name, *args, **kwargs)
+ 
+     def check(self, **kwargs):
+@@ -1921,11 +2096,11 @@ class GenericIPAddressField(Field):
+     def deconstruct(self):
+         name, path, args, kwargs = super().deconstruct()
+         if self.unpack_ipv4 is not False:
+-            kwargs['unpack_ipv4'] = self.unpack_ipv4
++            kwargs["unpack_ipv4"] = self.unpack_ipv4
+         if self.protocol != "both":
+-            kwargs['protocol'] = self.protocol
++            kwargs["protocol"] = self.protocol
+         if kwargs.get("max_length") == 39:
+-            del kwargs['max_length']
++            del kwargs["max_length"]
+         return name, path, args, kwargs
+ 
+     def get_internal_type(self):
+@@ -1958,29 +2135,31 @@ class GenericIPAddressField(Field):
+         return str(value)
+ 
+     def formfield(self, **kwargs):
+-        return super().formfield(**{
+-            'protocol': self.protocol,
+-            'form_class': forms.GenericIPAddressField,
+-            **kwargs,
+-        })
++        return super().formfield(
++            **{
++                "protocol": self.protocol,
++                "form_class": forms.GenericIPAddressField,
++                **kwargs,
++            }
++        )
+ 
+ 
+ class NullBooleanField(BooleanField):
+     default_error_messages = {
+-        'invalid': _("'%(value)s' value must be either None, True or False."),
+-        'invalid_nullable': _("'%(value)s' value must be either None, True or False."),
++        "invalid": _("'%(value)s' value must be either None, True or False."),
++        "invalid_nullable": _("'%(value)s' value must be either None, True or False."),
+     }
+     description = _("Boolean (Either True, False or None)")
+ 
+     def __init__(self, *args, **kwargs):
+-        kwargs['null'] = True
+-        kwargs['blank'] = True
++        kwargs["null"] = True
++        kwargs["blank"] = True
+         super().__init__(*args, **kwargs)
+ 
+     def deconstruct(self):
+         name, path, args, kwargs = super().deconstruct()
+-        del kwargs['null']
+-        del kwargs['blank']
++        del kwargs["null"]
++        del kwargs["blank"]
+         return name, path, args, kwargs
+ 
+     def get_internal_type(self):
+@@ -2024,17 +2204,21 @@ class PositiveSmallIntegerField(PositiveIntegerRelDbTypeMixin, IntegerField):
+         return "PositiveSmallIntegerField"
+ 
+     def formfield(self, **kwargs):
+-        return super().formfield(**{
+-            'min_value': 0,
+-            **kwargs,
+-        })
++        return super().formfield(
++            **{
++                "min_value": 0,
++                **kwargs,
++            }
++        )
+ 
+ 
+ class SlugField(CharField):
+     default_validators = [validators.validate_slug]
+     description = _("Slug (up to %(max_length)s)")
+ 
+-    def __init__(self, *args, max_length=50, db_index=True, allow_unicode=False, **kwargs):
++    def __init__(
++        self, *args, max_length=50, db_index=True, allow_unicode=False, **kwargs
++    ):
+         self.allow_unicode = allow_unicode
+         if self.allow_unicode:
+             self.default_validators = [validators.validate_unicode_slug]
+@@ -2043,24 +2227,26 @@ class SlugField(CharField):
+     def deconstruct(self):
+         name, path, args, kwargs = super().deconstruct()
+         if kwargs.get("max_length") == 50:
+-            del kwargs['max_length']
++            del kwargs["max_length"]
+         if self.db_index is False:
+-            kwargs['db_index'] = False
++            kwargs["db_index"] = False
+         else:
+-            del kwargs['db_index']
++            del kwargs["db_index"]
+         if self.allow_unicode is not False:
+-            kwargs['allow_unicode'] = self.allow_unicode
++            kwargs["allow_unicode"] = self.allow_unicode
+         return name, path, args, kwargs
+ 
+     def get_internal_type(self):
+         return "SlugField"
+ 
+     def formfield(self, **kwargs):
+-        return super().formfield(**{
+-            'form_class': forms.SlugField,
+-            'allow_unicode': self.allow_unicode,
+-            **kwargs,
+-        })
++        return super().formfield(
++            **{
++                "form_class": forms.SlugField,
++                "allow_unicode": self.allow_unicode,
++                **kwargs,
++            }
++        )
+ 
+ 
+ class SmallIntegerField(IntegerField):
+@@ -2089,29 +2275,36 @@ class TextField(Field):
+         # Passing max_length to forms.CharField means that the value's length
+         # will be validated twice. This is considered acceptable since we want
+         # the value in the form field (to pass into widget for example).
+-        return super().formfield(**{
+-            'max_length': self.max_length,
+-            **({} if self.choices is not None else {'widget': forms.Textarea}),
+-            **kwargs,
+-        })
++        return super().formfield(
++            **{
++                "max_length": self.max_length,
++                **({} if self.choices is not None else {"widget": forms.Textarea}),
++                **kwargs,
++            }
++        )
+ 
+ 
+ class TimeField(DateTimeCheckMixin, Field):
+     empty_strings_allowed = False
+     default_error_messages = {
+-        'invalid': _("'%(value)s' value has an invalid format. It must be in "
+-                     "HH:MM[:ss[.uuuuuu]] format."),
+-        'invalid_time': _("'%(value)s' value has the correct format "
+-                          "(HH:MM[:ss[.uuuuuu]]) but it is an invalid time."),
++        "invalid": _(
++            "'%(value)s' value has an invalid format. It must be in "
++            "HH:MM[:ss[.uuuuuu]] format."
++        ),
++        "invalid_time": _(
++            "'%(value)s' value has the correct format "
++            "(HH:MM[:ss[.uuuuuu]]) but it is an invalid time."
++        ),
+     }
+     description = _("Time")
+ 
+-    def __init__(self, verbose_name=None, name=None, auto_now=False,
+-                 auto_now_add=False, **kwargs):
++    def __init__(
++        self, verbose_name=None, name=None, auto_now=False, auto_now_add=False, **kwargs
++    ):
+         self.auto_now, self.auto_now_add = auto_now, auto_now_add
+         if auto_now or auto_now_add:
+-            kwargs['editable'] = False
+-            kwargs['blank'] = True
++            kwargs["editable"] = False
++            kwargs["blank"] = True
+         super().__init__(verbose_name, name, **kwargs)
+ 
+     def _check_fix_default_value(self):
+@@ -2145,13 +2338,13 @@ class TimeField(DateTimeCheckMixin, Field):
+         if lower <= value <= upper:
+             return [
+                 checks.Warning(
+-                    'Fixed default value provided.',
+-                    hint='It seems you set a fixed date / time / datetime '
+-                         'value as default for this field. This may not be '
+-                         'what you want. If you want to have the current date '
+-                         'as default, use `django.utils.timezone.now`',
++                    "Fixed default value provided.",
++                    hint="It seems you set a fixed date / time / datetime "
++                    "value as default for this field. This may not be "
++                    "what you want. If you want to have the current date "
++                    "as default, use `django.utils.timezone.now`",
+                     obj=self,
+-                    id='fields.W161',
++                    id="fields.W161",
+                 )
+             ]
+ 
+@@ -2164,8 +2357,8 @@ class TimeField(DateTimeCheckMixin, Field):
+         if self.auto_now_add is not False:
+             kwargs["auto_now_add"] = self.auto_now_add
+         if self.auto_now or self.auto_now_add:
+-            del kwargs['blank']
+-            del kwargs['editable']
++            del kwargs["blank"]
++            del kwargs["editable"]
+         return name, path, args, kwargs
+ 
+     def get_internal_type(self):
+@@ -2188,15 +2381,15 @@ class TimeField(DateTimeCheckMixin, Field):
+                 return parsed
+         except ValueError:
+             raise exceptions.ValidationError(
+-                self.error_messages['invalid_time'],
+-                code='invalid_time',
+-                params={'value': value},
++                self.error_messages["invalid_time"],
++                code="invalid_time",
++                params={"value": value},
+             )
+ 
+         raise exceptions.ValidationError(
+-            self.error_messages['invalid'],
+-            code='invalid',
+-            params={'value': value},
++            self.error_messages["invalid"],
++            code="invalid",
++            params={"value": value},
+         )
+ 
+     def pre_save(self, model_instance, add):
+@@ -2233,30 +2428,32 @@ class URLField(CharField):
+     description = _("URL")
+ 
+     def __init__(self, verbose_name=None, name=None, **kwargs):
+-        kwargs.setdefault('max_length', 200)
++        kwargs.setdefault("max_length", 200)
+         super().__init__(verbose_name, name, **kwargs)
+ 
+     def deconstruct(self):
+         name, path, args, kwargs = super().deconstruct()
+         if kwargs.get("max_length") == 200:
+-            del kwargs['max_length']
++            del kwargs["max_length"]
+         return name, path, args, kwargs
+ 
+     def formfield(self, **kwargs):
+         # As with CharField, this will cause URL validation to be performed
+         # twice.
+-        return super().formfield(**{
+-            'form_class': forms.URLField,
+-            **kwargs,
+-        })
++        return super().formfield(
++            **{
++                "form_class": forms.URLField,
++                **kwargs,
++            }
++        )
+ 
+ 
+ class BinaryField(Field):
+     description = _("Raw binary data")
+-    empty_values = [None, b'']
++    empty_values = [None, b""]
+ 
+     def __init__(self, *args, **kwargs):
+-        kwargs.setdefault('editable', False)
++        kwargs.setdefault("editable", False)
+         super().__init__(*args, **kwargs)
+         if self.max_length is not None:
+             self.validators.append(validators.MaxLengthValidator(self.max_length))
+@@ -2279,9 +2476,9 @@ class BinaryField(Field):
+     def deconstruct(self):
+         name, path, args, kwargs = super().deconstruct()
+         if self.editable:
+-            kwargs['editable'] = True
++            kwargs["editable"] = True
+         else:
+-            del kwargs['editable']
++            del kwargs["editable"]
+         return name, path, args, kwargs
+ 
+     def get_internal_type(self):
+@@ -2294,8 +2491,8 @@ class BinaryField(Field):
+         if self.has_default() and not callable(self.default):
+             return self.default
+         default = super().get_default()
+-        if default == '':
+-            return b''
++        if default == "":
++            return b""
+         return default
+ 
+     def get_db_prep_value(self, value, connection, prepared=False):
+@@ -2306,29 +2503,29 @@ class BinaryField(Field):
+ 
+     def value_to_string(self, obj):
+         """Binary data is serialized as base64"""
+-        return b64encode(self.value_from_object(obj)).decode('ascii')
++        return b64encode(self.value_from_object(obj)).decode("ascii")
+ 
+     def to_python(self, value):
+         # If it's a string, it should be base64-encoded data
+         if isinstance(value, str):
+-            return memoryview(b64decode(value.encode('ascii')))
++            return memoryview(b64decode(value.encode("ascii")))
+         return value
+ 
+ 
+ class UUIDField(Field):
+     default_error_messages = {
+-        'invalid': _("'%(value)s' is not a valid UUID."),
++        "invalid": _("'%(value)s' is not a valid UUID."),
+     }
+-    description = _('Universally unique identifier')
++    description = _("Universally unique identifier")
+     empty_strings_allowed = False
+ 
+     def __init__(self, verbose_name=None, **kwargs):
+-        kwargs['max_length'] = 32
++        kwargs["max_length"] = 32
+         super().__init__(verbose_name, **kwargs)
+ 
+     def deconstruct(self):
+         name, path, args, kwargs = super().deconstruct()
+-        del kwargs['max_length']
++        del kwargs["max_length"]
+         return name, path, args, kwargs
+ 
+     def get_internal_type(self):
+diff --git a/django/forms/fields.py b/django/forms/fields.py
+--- a/django/forms/fields.py
++++ b/django/forms/fields.py
+@@ -15,15 +15,29 @@ from urllib.parse import urlsplit, urlunsplit
+ 
+ from django.core import validators
+ from django.core.exceptions import ValidationError
++
+ # Provide this import for backwards compatibility.
+ from django.core.validators import EMPTY_VALUES  # NOQA
+ from django.forms.boundfield import BoundField
+ from django.forms.utils import from_current_timezone, to_current_timezone
+ from django.forms.widgets import (
+-    FILE_INPUT_CONTRADICTION, CheckboxInput, ClearableFileInput, DateInput,
+-    DateTimeInput, EmailInput, FileInput, HiddenInput, MultipleHiddenInput,
+-    NullBooleanSelect, NumberInput, Select, SelectMultiple,
+-    SplitDateTimeWidget, SplitHiddenDateTimeWidget, TextInput, TimeInput,
++    FILE_INPUT_CONTRADICTION,
++    CheckboxInput,
++    ClearableFileInput,
++    DateInput,
++    DateTimeInput,
++    EmailInput,
++    FileInput,
++    HiddenInput,
++    MultipleHiddenInput,
++    NullBooleanSelect,
++    NumberInput,
++    Select,
++    SelectMultiple,
++    SplitDateTimeWidget,
++    SplitHiddenDateTimeWidget,
++    TextInput,
++    TimeInput,
+     URLInput,
+ )
+ from django.utils import formats
+@@ -33,30 +47,64 @@ from django.utils.ipv6 import clean_ipv6_address
+ from django.utils.translation import gettext_lazy as _, ngettext_lazy
+ 
+ __all__ = (
+-    'Field', 'CharField', 'IntegerField',
+-    'DateField', 'TimeField', 'DateTimeField', 'DurationField',
+-    'RegexField', 'EmailField', 'FileField', 'ImageField', 'URLField',
+-    'BooleanField', 'NullBooleanField', 'ChoiceField', 'MultipleChoiceField',
+-    'ComboField', 'MultiValueField', 'FloatField', 'DecimalField',
+-    'SplitDateTimeField', 'GenericIPAddressField', 'FilePathField',
+-    'SlugField', 'TypedChoiceField', 'TypedMultipleChoiceField', 'UUIDField',
++    "Field",
++    "CharField",
++    "IntegerField",
++    "DateField",
++    "TimeField",
++    "DateTimeField",
++    "DurationField",
++    "RegexField",
++    "EmailField",
++    "FileField",
++    "ImageField",
++    "URLField",
++    "BooleanField",
++    "NullBooleanField",
++    "ChoiceField",
++    "MultipleChoiceField",
++    "ComboField",
++    "MultiValueField",
++    "FloatField",
++    "DecimalField",
++    "SplitDateTimeField",
++    "GenericIPAddressField",
++    "FilePathField",
++    "SlugField",
++    "TypedChoiceField",
++    "TypedMultipleChoiceField",
++    "UUIDField",
+ )
+ 
+ 
+ class Field:
+     widget = TextInput  # Default widget to use when rendering this type of Field.
+-    hidden_widget = HiddenInput  # Default widget to use when rendering this as "hidden".
++    hidden_widget = (
++        HiddenInput  # Default widget to use when rendering this as "hidden".
++    )
+     default_validators = []  # Default set of validators
+     # Add an 'invalid' entry to default_error_message if you want a specific
+     # field error message not raised by the field validators.
+     default_error_messages = {
+-        'required': _('This field is required.'),
++        "required": _("This field is required."),
+     }
+     empty_values = list(validators.EMPTY_VALUES)
+ 
+-    def __init__(self, *, required=True, widget=None, label=None, initial=None,
+-                 help_text='', error_messages=None, show_hidden_initial=False,
+-                 validators=(), localize=False, disabled=False, label_suffix=None):
++    def __init__(
++        self,
++        *,
++        required=True,
++        widget=None,
++        label=None,
++        initial=None,
++        help_text="",
++        error_messages=None,
++        show_hidden_initial=False,
++        validators=(),
++        localize=False,
++        disabled=False,
++        label_suffix=None,
++    ):
+         # required -- Boolean that specifies whether the field is required.
+         #             True by default.
+         # widget -- A Widget class, or instance of a Widget class, that should
+@@ -529,14 +590,17 @@ class EmailField(CharField):
+ class FileField(Field):
+     widget = ClearableFileInput
+     default_error_messages = {
+-        'invalid': _("No file was submitted. Check the encoding type on the form."),
+-        'missing': _("No file was submitted."),
+-        'empty': _("The submitted file is empty."),
+-        'max_length': ngettext_lazy(
+-            'Ensure this filename has at most %(max)d character (it has %(length)d).',
+-            'Ensure this filename has at most %(max)d characters (it has %(length)d).',
+-            'max'),
+-        'contradiction': _('Please either submit a file or check the clear checkbox, not both.')
++        "invalid": _("No file was submitted. Check the encoding type on the form."),
++        "missing": _("No file was submitted."),
++        "empty": _("The submitted file is empty."),
++        "max_length": ngettext_lazy(
++            "Ensure this filename has at most %(max)d character (it has %(length)d).",
++            "Ensure this filename has at most %(max)d characters (it has %(length)d).",
++            "max",
++        ),
++        "contradiction": _(
++            "Please either submit a file or check the clear checkbox, not both."
++        ),
+     }
+ 
+     def __init__(self, *, max_length=None, allow_empty_file=False, **kwargs):
+@@ -553,22 +617,26 @@ class FileField(Field):
+             file_name = data.name
+             file_size = data.size
+         except AttributeError:
+-            raise ValidationError(self.error_messages['invalid'], code='invalid')
++            raise ValidationError(self.error_messages["invalid"], code="invalid")
+ 
+         if self.max_length is not None and len(file_name) > self.max_length:
+-            params = {'max': self.max_length, 'length': len(file_name)}
+-            raise ValidationError(self.error_messages['max_length'], code='max_length', params=params)
++            params = {"max": self.max_length, "length": len(file_name)}
++            raise ValidationError(
++                self.error_messages["max_length"], code="max_length", params=params
++            )
+         if not file_name:
+-            raise ValidationError(self.error_messages['invalid'], code='invalid')
++            raise ValidationError(self.error_messages["invalid"], code="invalid")
+         if not self.allow_empty_file and not file_size:
+-            raise ValidationError(self.error_messages['empty'], code='empty')
++            raise ValidationError(self.error_messages["empty"], code="empty")
+ 
+         return data
+ 
+     def clean(self, data, initial=None):
+         # If the widget got contradictory inputs, we raise a validation error
+         if data is FILE_INPUT_CONTRADICTION:
+-            raise ValidationError(self.error_messages['contradiction'], code='contradiction')
++            raise ValidationError(
++                self.error_messages["contradiction"], code="contradiction"
++            )
+         # False means the field value should be cleared; further validation is
+         # not needed.
+         if data is False:
+@@ -615,13 +683,13 @@ class ImageField(FileField):
+ 
+         # We need to get a file object for Pillow. We might have a path or we might
+         # have to read the data into memory.
+-        if hasattr(data, 'temporary_file_path'):
++        if hasattr(data, "temporary_file_path"):
+             file = data.temporary_file_path()
+         else:
+-            if hasattr(data, 'read'):
++            if hasattr(data, "read"):
+                 file = BytesIO(data.read())
+             else:
+-                file = BytesIO(data['content'])
++                file = BytesIO(data["content"])
+ 
+         try:
+             # load() could spot a truncated JPEG, but it loads the entire
+@@ -638,24 +706,24 @@ class ImageField(FileField):
+         except Exception as exc:
+             # Pillow doesn't recognize it as an image.
+             raise ValidationError(
+-                self.error_messages['invalid_image'],
+-                code='invalid_image',
++                self.error_messages["invalid_image"],
++                code="invalid_image",
+             ) from exc
+-        if hasattr(f, 'seek') and callable(f.seek):
++        if hasattr(f, "seek") and callable(f.seek):
+             f.seek(0)
+         return f
+ 
+     def widget_attrs(self, widget):
+         attrs = super().widget_attrs(widget)
+-        if isinstance(widget, FileInput) and 'accept' not in widget.attrs:
+-            attrs.setdefault('accept', 'image/*')
++        if isinstance(widget, FileInput) and "accept" not in widget.attrs:
++            attrs.setdefault("accept", "image/*")
+         return attrs
+ 
+ 
+ class URLField(CharField):
+     widget = URLInput
+     default_error_messages = {
+-        'invalid': _('Enter a valid URL.'),
++        "invalid": _("Enter a valid URL."),
+     }
+     default_validators = [validators.URLValidator()]
+ 
+@@ -674,19 +741,19 @@ class URLField(CharField):
+             except ValueError:
+                 # urlparse.urlsplit can raise a ValueError with some
+                 # misformatted URLs.
+-                raise ValidationError(self.error_messages['invalid'], code='invalid')
++                raise ValidationError(self.error_messages["invalid"], code="invalid")
+ 
+         value = super().to_python(value)
+         if value:
+             url_fields = split_url(value)
+             if not url_fields[0]:
+                 # If no URL scheme given, assume http://
+-                url_fields[0] = 'http'
++                url_fields[0] = "http"
+             if not url_fields[1]:
+                 # Assume that if no domain is provided, that the path segment
+                 # contains the domain.
+                 url_fields[1] = url_fields[2]
+-                url_fields[2] = ''
++                url_fields[2] = ""
+                 # Rebuild the url_fields list, since the domain segment may now
+                 # contain the path too.
+                 url_fields = split_url(urlunsplit(url_fields))
+@@ -964,17 +1039,17 @@ class MultiValueField(Field):
+ 
+     You'll probably want to use this with MultiWidget.
+     """
++
+     default_error_messages = {
+-        'invalid': _('Enter a list of values.'),
+-        'incomplete': _('Enter a complete value.'),
++        "invalid": _("Enter a list of values."),
++        "incomplete": _("Enter a complete value."),
+     }
+ 
+     def __init__(self, fields, *, require_all_fields=True, **kwargs):
+         self.require_all_fields = require_all_fields
+         super().__init__(**kwargs)
+         for f in fields:
+-            f.error_messages.setdefault('incomplete',
+-                                        self.error_messages['incomplete'])
++            f.error_messages.setdefault("incomplete", self.error_messages["incomplete"])
+             if self.disabled:
+                 f.disabled = True
+             if self.require_all_fields:
+@@ -1076,8 +1155,16 @@ class MultiValueField(Field):
+ 
+ 
+ class FilePathField(ChoiceField):
+-    def __init__(self, path, *, match=None, recursive=False, allow_files=True,
+-                 allow_folders=False, **kwargs):
++    def __init__(
++        self,
++        path,
++        *,
++        match=None,
++        recursive=False,
++        allow_files=True,
++        allow_folders=False,
++        **kwargs,
++    ):
+         self.path, self.match, self.recursive = path, match, recursive
+         self.allow_files, self.allow_folders = allow_files, allow_folders
+         super().__init__(choices=(), **kwargs)
+@@ -1090,8 +1177,9 @@ class FilePathField(ChoiceField):
+         if self.match is not None:
+             self.match_re = re.compile(self.match)
+ 
++        path = self.path() if callable(self.path) else self.path
+         if recursive:
+-            for root, dirs, files in sorted(os.walk(self.path)):
++            for root, dirs, files in sorted(os.walk(path)):
+                 if self.allow_files:
+                     for f in sorted(files):
+                         if self.match is None or self.match_re.search(f):
+@@ -1099,19 +1187,20 @@ class FilePathField(ChoiceField):
+                             self.choices.append((f, f.replace(path, "", 1)))
+                 if self.allow_folders:
+                     for f in sorted(dirs):
+-                        if f == '__pycache__':
++                        if f == "__pycache__":
+                             continue
+                         if self.match is None or self.match_re.search(f):
+                             f = os.path.join(root, f)
+                             self.choices.append((f, f.replace(path, "", 1)))
+         else:
+             choices = []
+-            for f in os.scandir(self.path):
+-                if f.name == '__pycache__':
++            for f in os.scandir(path):
++                if f.name == "__pycache__":
+                     continue
+-                if (((self.allow_files and f.is_file()) or
+-                        (self.allow_folders and f.is_dir())) and
+-                        (self.match is None or self.match_re.search(f.name))):
++                if (
++                    (self.allow_files and f.is_file())
++                    or (self.allow_folders and f.is_dir())
++                ) and (self.match is None or self.match_re.search(f.name)):
+                     choices.append((f.path, f.name))
+             choices.sort(key=operator.itemgetter(1))
+             self.choices.extend(choices)

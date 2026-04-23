@@ -1,0 +1,31 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index 005b8f8499..16799daa3c 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,9 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping
++try:
++    from collections.abc import Mapping
++except ImportError:
++    from collections import Mapping
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+ from .cache import cacheit
+diff --git a/sympy/plotting/plot.py b/sympy/plotting/plot.py
+index b1ead153ef..e9a6aadc73 100644
+--- a/sympy/plotting/plot.py
++++ b/sympy/plotting/plot.py
+@@ -25,7 +25,10 @@
+ from __future__ import print_function, division
+ 
+ import inspect
+-from collections import Callable
++try:
++    from collections.abc import Callable
++except ImportError:
++    from collections import Callable
+ import warnings
+ import sys
+ 

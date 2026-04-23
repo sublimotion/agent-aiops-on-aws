@@ -1,0 +1,41 @@
+diff --git a/src/_pytest/tmpdir.py b/src/_pytest/tmpdir.py
+index 29c7e19d..382f8833 100644
+--- a/src/_pytest/tmpdir.py
++++ b/src/_pytest/tmpdir.py
+@@ -154,9 +154,10 @@ def get_user() -> Optional[str]:
+     import getpass
+ 
+     try:
+-        return getpass.getuser()
++        user = getpass.getuser()
+     except (ImportError, KeyError):
+         return None
++    return re.sub(r"[^\w\d-]", "_", user)
+ 
+ 
+ def pytest_configure(config: Config) -> None:
+diff --git a/testing/test_tmpdir.py b/testing/test_tmpdir.py
+index 4dec9c59..c0672f62 100644
+--- a/testing/test_tmpdir.py
++++ b/testing/test_tmpdir.py
+@@ -456,4 +456,19 @@ def test_tmp_path_factory_handles_invalid_dir_characters(
+     monkeypatch.setattr(tmp_path_factory, "_basetemp", None)
+     monkeypatch.setattr(tmp_path_factory, "_given_basetemp", None)
+     p = tmp_path_factory.getbasetemp()
+-    assert "pytest-of-unknown" in str(p)
++    assert "pytest-of-os_______agnostic" in str(p)
++
++
++def test_tmp_path_factory_handles_illegal_username_characters(
++    tmp_path_factory: TempPathFactory, monkeypatch: MonkeyPatch
++) -> None:
++    """Test that tmpdir creation doesn't fail when the username contains
++    characters that are illegal for directory names (e.g. domain\\username
++    on Windows, see #8765).
++    """
++    monkeypatch.setattr("getpass.getuser", lambda: "contoso\\john_doe")
++    # _basetemp / _given_basetemp are cached / set in parallel runs, patch them
++    monkeypatch.setattr(tmp_path_factory, "_basetemp", None)
++    monkeypatch.setattr(tmp_path_factory, "_given_basetemp", None)
++    p = tmp_path_factory.getbasetemp()
++    assert "pytest-of-contoso_john_doe" in str(p)

@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 114.9,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 113691,
+    "duration_api_ms": 89244,
+    "num_turns": 28,
+    "result": "The adversarial review gives a perfect score (1.0) with verdict `likely_correct`.\n\nThe fix is a single-line change in `django/db/models/fields/__init__.py:1590` \u2014 the error message format for invalid `DurationField` values was corrected from `[DD] [HH:[MM:]]ss[.uuuuuu]` to `[DD] [[HH:]MM:]ss[.uuuuuu]`, which accurately reflects the actual parsing behavior:\n\n- `ss` (seconds) is mandatory\n- `MM:` (minutes) is optional\n- `HH:` (hours) is optional only when minutes are provided\n\nThe test in `tests/model_fields/test_durationfield.py:78` was updated to match.",
+    "stop_reason": "end_turn",
+    "session_id": "d1be20a7-efb7-4a94-8ff4-ba55d730bdcb",
+    "total_cost_usd": 0.3732789,
+    "usage": {
+      "input_tokens": 91,
+      "cache_creation_input_tokens": 29398,
+      "cache_read_input_tokens": 665378,
+      "output_tokens": 4210,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 29398
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 91,
+        "outputTokens": 4210,
+        "cacheReadInputTokens": 665378,
+        "cacheCreationInputTokens": 29398,
+        "webSearchRequests": 0,
+        "costUSD": 0.3732789,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "d1312b68-6c5d-40c9-a78b-0c8c20dc0420"
+  },
+  "stderr": ""
+}

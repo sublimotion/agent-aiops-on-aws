@@ -1,0 +1,142 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index 1edc712358..81177aa505 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -356,62 +356,57 @@ def _print_Mul(self, expr):
+         else:
+             tex = ""
+ 
+-        from sympy.simplify import fraction
+-        numer, denom = fraction(expr, exact=True)
++        # Separate numerator and denominator terms like pretty printer
++        a = []  # numerator terms
++        b = []  # denominator terms
++        if self.order not in ('old', 'none'):
++            args = expr.as_ordered_factors()
++        else:
++            args = expr.args
++
++        from sympy import Integral, Piecewise, Product, Sum
++        for item in args:
++            if item.is_commutative and item.is_Pow and item.exp.is_Rational and item.exp.is_negative:
++                if item.exp != -1:
++                    a.append(Pow(item.base, -item.exp, evaluate=False))
++                else:
++                    a.append(Pow(item.base, -item.exp))
++            elif item.is_Rational and item is not S.Infinity:
++                if item.p != 1:
++                    a.append(Rational(item.p))
++                if item.q != 1:
++                    b.append(Rational(item.q))
++            else:
++                a.append(item)
++
++        # Convert terms to LaTeX with proper parentheses
++        def convert_term(term):
++            if (term.is_Add and len(a) > 1) or isinstance(term, (Integral, Piecewise, Product, Sum)):
++                return r"\left(%s\right)" % self._print(term)
++            return self._print(term)
++
++        numer_terms = [convert_term(t) for t in a]
++        denom_terms = [convert_term(t) for t in b]
++
++        # Join terms with appropriate separators
+         separator = self._settings['mul_symbol_latex']
+         numbersep = self._settings['mul_symbol_latex_numbers']
+ 
+-        def convert(expr):
+-            if not expr.is_Mul:
+-                return str(self._print(expr))
+-            else:
+-                _tex = last_term_tex = ""
++        if numer_terms:
++            numer = separator.join(numer_terms)
++        else:
++            numer = "1"
+ 
+-                if self.order not in ('old', 'none'):
+-                    args = expr.as_ordered_factors()
+-                else:
+-                    args = expr.args
+-
+-                for i, term in enumerate(args):
+-                    term_tex = self._print(term)
+-
+-                    if self._needs_mul_brackets(term, first=(i == 0),
+-                                                last=(i == len(args) - 1)):
+-                        term_tex = r"\left(%s\right)" % term_tex
+-
+-                    if _between_two_numbers_p[0].search(last_term_tex) and \
+-                            _between_two_numbers_p[1].match(term_tex):
+-                        # between two numbers
+-                        _tex += numbersep
+-                    elif _tex:
+-                        _tex += separator
+-
+-                    _tex += term_tex
+-                    last_term_tex = term_tex
+-                return _tex
+-
+-        if denom is S.One:
+-            # use the original expression here, since fraction() may have
+-            # altered it when producing numer and denom
+-            tex += convert(expr)
+-        else:
+-            snumer = convert(numer)
+-            sdenom = convert(denom)
+-            ldenom = len(sdenom.split())
+-            ratio = self._settings['long_frac_ratio']
+-            if self._settings['fold_short_frac'] \
+-                    and ldenom <= 2 and not "^" in sdenom:
+-                # handle short fractions
+-                if self._needs_mul_brackets(numer, last=False):
+-                    tex += r"\left(%s\right) / %s" % (snumer, sdenom)
+-                else:
+-                    tex += r"%s / %s" % (snumer, sdenom)
+-            elif len(snumer.split()) > ratio*ldenom:
+-                # handle long fractions
+-                if self._needs_mul_brackets(numer, last=True):
+-                    tex += r"\frac{1}{%s}%s\left(%s\right)" \
+-                        % (sdenom, separator, snumer)
+-                elif numer.is_Mul:
++        if denom_terms:
++            denom = separator.join(denom_terms)
++            tex += r"\frac{%s}{%s}" % (numer, denom)
++        else:
++            tex += numer
++
++        if include_parens:
++            tex += ")"
++
++        return tex
+                     # split a long numerator
+                     a = S.One
+                     b = S.One
+@@ -1316,6 +1311,13 @@ def _print_Relational(self, expr):
+             charmap[expr.rel_op], self._print(expr.rhs))
+ 
+     def _print_Piecewise(self, expr):
++        # Add parentheses around the piecewise expression
++        if not (expr.is_atom or expr.is_Pow or expr.is_Mul or expr.is_Add):
++            tex = r"\left("
++        else:
++            tex = ""
++
++        # Print the piecewise cases
+         ecpairs = [r"%s & \text{for}\: %s" % (self._print(e), self._print(c))
+                    for e, c in expr.args[:-1]]
+         if expr.args[-1].cond == true:
+@@ -1325,7 +1327,12 @@ def _print_Piecewise(self, expr):
+             ecpairs.append(r"%s & \text{for}\: %s" %
+                            (self._print(expr.args[-1].expr),
+                             self._print(expr.args[-1].cond)))
+-        tex = r"\begin{cases} %s \end{cases}"
++        tex += r"\begin{cases} %s \end{cases}"
++
++        # Close parentheses if needed
++        if not (expr.is_atom or expr.is_Pow or expr.is_Mul or expr.is_Add):
++            tex += r"\right)"
++
+         return tex % r" \\".join(ecpairs)
+ 
+     def _print_MatrixBase(self, expr):

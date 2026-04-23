@@ -1,0 +1,19 @@
+catalog_id: chatbot-long
+use_case: chatbot
+description: Long-context conversation (32K+ input). Tests prefill performance.
+
+dataset:
+  type: synthetic
+  input_tokens: {mean: 32768, std_dev: 0}
+  output_tokens: {mean: 512, std_dev: 0}
+
+load:
+  type: constant
+  request_rate: 0.5
+  num_prompts: 50
+
+slo:
+  ttft_p99_ms: 2000
+  tpot_p99_ms: 50
+  e2e_p99_ms: 30000
+  error_rate_max: 0.001

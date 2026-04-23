@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 113.8,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 112689,
+    "duration_api_ms": 88223,
+    "num_turns": 22,
+    "result": "All 8 existing tests pass. The fix correctly handles the case where permissions already exist with the new content type by deleting the old duplicates rather than trying to update and hitting a unique constraint violation.\n\n**Summary of the fix:**\n\nThe migration `0011_update_proxy_permissions` originally used a bulk `.update(content_type=new_content_type)`. This fails with `IntegrityError` when a model was recreated as a proxy \u2014 in that scenario, permissions already exist for the proxy content type, so moving the concrete model's permissions would violate the unique `(content_type_id, codename)` constraint.\n\nThe fix iterates per-permission and checks if a permission with the target content type already exists. If it does, the old permission (with the concrete content type) is deleted instead of updated. This results in the correct final state (permissions under the proxy content type) without the duplicate key violation.",
+    "stop_reason": "end_turn",
+    "session_id": "c7e7b55d-c1a4-49bf-87f9-9dda86690335",
+    "total_cost_usd": 0.28501694999999994,
+    "usage": {
+      "input_tokens": 2447,
+      "cache_creation_input_tokens": 23809,
+      "cache_read_input_tokens": 414874,
+      "output_tokens": 4262,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 23809
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 2447,
+        "outputTokens": 4262,
+        "cacheReadInputTokens": 414874,
+        "cacheCreationInputTokens": 23809,
+        "webSearchRequests": 0,
+        "costUSD": 0.28501694999999994,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "cbd6c8b7-7c06-48b6-a0a4-e4ac8c9cd63f"
+  },
+  "stderr": ""
+}

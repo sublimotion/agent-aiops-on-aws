@@ -1,0 +1,42 @@
+diff --git a/sympy/polys/polytools.py b/sympy/polys/polytools.py
+index c9e77a901f..ac586b9614 100644
+--- a/sympy/polys/polytools.py
++++ b/sympy/polys/polytools.py
+@@ -5895,6 +5895,27 @@ def _factors_product(factors):
+     return Mul(*[f.as_expr()**k for f, k in factors])
+ 
+ 
++def _merge_factors_sqf(factors):
++    """Merge factors with the same multiplicity in sqf decomposition.
++
++    For sqf decomposition, factors with the same integer multiplicity should
++    be combined into a single factor (their product). For example,
++    ``[(x-2, 3), (x-3, 3)]`` should become ``[(x**2 - 5*x + 6, 3)]``.
++    """
++    from collections import defaultdict
++    sqf_factors = defaultdict(lambda: S.One)
++    other_factors = []
++
++    for f, k in factors:
++        if isinstance(k, int) or k.is_Integer:
++            sqf_factors[int(k)] *= f.as_expr() if hasattr(f, 'as_expr') else f
++        else:
++            other_factors.append((f, k))
++
++    merged = [(expr, k) for k, expr in sorted(sqf_factors.items())]
++    return merged + other_factors
++
++
+ def _symbolic_factor_list(expr, opt, method):
+     """Helper function for :func:`_symbolic_factor`. """
+     coeff, factors = S.One, []
+@@ -5950,6 +5971,9 @@ def _symbolic_factor_list(expr, opt, method):
+ 
+                 factors.append((_factors_product(other), exp))
+ 
++    if method == 'sqf':
++        factors = _merge_factors_sqf(factors)
++
+     return coeff, factors
+ 
+ 

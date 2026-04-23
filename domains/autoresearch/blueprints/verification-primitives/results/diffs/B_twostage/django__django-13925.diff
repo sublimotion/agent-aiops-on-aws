@@ -1,0 +1,21 @@
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index 4038859cfa..501403bfde 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -1300,7 +1300,15 @@ class Model(metaclass=ModelBase):
+         if (
+             cls._meta.pk.auto_created and
+             not settings.is_overridden('DEFAULT_AUTO_FIELD') and
+-            not cls._meta.app_config._is_default_auto_field_overridden
++            not cls._meta.app_config._is_default_auto_field_overridden and
++            # Inherited primary keys (parent_link) don't need this warning
++            # since the auto-created pk is a link to the parent model's pk,
++            # which will already have been warned about (or was explicitly
++            # defined by the user).
++            not (
++                cls._meta.pk.is_relation and
++                cls._meta.pk.remote_field.parent_link
++            )
+         ):
+             return [
+                 checks.Warning(

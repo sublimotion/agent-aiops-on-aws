@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nemotron-3-Super Benchmark Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2a2d3a;
+    --text: #e1e4ed;
+    --muted: #8b8fa3;
+    --green: #76b900;
+    --green-dim: rgba(118, 185, 0, 0.15);
+    --red: #ff4d6a;
+    --red-dim: rgba(255, 77, 106, 0.15);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59, 130, 246, 0.15);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245, 158, 11, 0.15);
+    --purple: #a855f7;
+    --purple-dim: rgba(168, 85, 247, 0.15);
+    --cyan: #06b6d4;
+    --cyan-dim: rgba(6, 182, 212, 0.15);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; line-height: 1.6; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+  header { text-align: center; margin-bottom: 3rem; }
+  header h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
+  header .subtitle { color: var(--muted); font-size: 1rem; }
+
+  .badge-row { display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+  .badge { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; }
+  .badge-green { background: var(--green-dim); color: var(--green); }
+  .badge-blue { background: var(--blue-dim); color: var(--blue); }
+  .badge-amber { background: var(--amber-dim); color: var(--amber); }
+  .badge-purple { background: var(--purple-dim); color: var(--purple); }
+  .badge-cyan { background: var(--cyan-dim); color: var(--cyan); }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+  .kpi-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.25rem; }
+  .kpi-value { font-size: 1.75rem; font-weight: 700; }
+  .kpi-sub { font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; }
+  .kpi-green .kpi-value { color: var(--green); }
+  .kpi-blue .kpi-value { color: var(--blue); }
+  .kpi-amber .kpi-value { color: var(--amber); }
+  .kpi-red .kpi-value { color: var(--red); }
+  .kpi-purple .kpi-value { color: var(--purple); }
+  .kpi-cyan .kpi-value { color: var(--cyan); }
+
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+  @media (max-width: 900px) { .charts { grid-template-columns: 1fr; } }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+  .chart-card h3 { font-size: 1rem; margin-bottom: 1rem; font-weight: 600; }
+  .chart-card canvas { width: 100% !important; }
+  .chart-full { grid-column: 1 / -1; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { padding: 0.75rem 1rem; text-align: right; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; }
+  td:first-child, th:first-child { text-align: left; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .highlight-row td { background: var(--green-dim); font-weight: 600; }
+
+  .section-title { font-size: 1.25rem; font-weight: 700; margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+
+  .insight-box { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--green); border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem; }
+  .insight-box h4 { color: var(--green); margin-bottom: 0.5rem; font-size: 0.9rem; }
+  .insight-box p { color: var(--muted); font-size: 0.85rem; }
+  .insight-box.warn { border-left-color: var(--amber); }
+  .insight-box.warn h4 { color: var(--amber); }
+  .insight-box.info { border-left-color: var(--blue); }
+  .insight-box.info h4 { color: var(--blue); }
+  .insight-box.blocked { border-left-color: var(--red); }
+  .insight-box.blocked h4 { color: var(--red); }
+
+  .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .config-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+  .config-item dt { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .config-item dd { font-size: 1rem; font-weight: 600; margin-top: 0.25rem; }
+
+  .legend-inline { display: flex; gap: 1.5rem; margin-bottom: 0.5rem; font-size: 0.8rem; }
+  .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 0.3rem; vertical-align: middle; }
+
+  .footer { text-align: center; color: var(--muted); font-size: 0.75rem; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Nemotron-3-Super-120B Benchmark Report</h1>
+  <div class="subtitle">NVIDIA Nemotron-3-Super-120B-A12B-FP8 on AWS p6-b200.48xlarge (8x B200 183GB)</div>
+  <div class="badge-row">
+    <span class="badge badge-green">vLLM Aggregated</span>
+    <span class="badge badge-cyan">SGLang Aggregated</span>
+    <span class="badge badge-blue">TP=2 x 4 Workers</span>
+    <span class="badge badge-amber">8x B200 NVLink</span>
+    <span class="badge badge-purple">Mamba-2 Hybrid</span>
+  </div>
+</header>
+
+<!-- KPIs -->
+<div class="kpi-grid">
+  <div class="kpi kpi-green">
+    <div class="kpi-label">Peak Throughput (vLLM)</div>
+    <div class="kpi-value">1,449</div>
+    <div class="kpi-sub">tok/s @ conc=256</div>
+  </div>
+  <div class="kpi kpi-cyan">
+    <div class="kpi-label">Peak Throughput (SGLang)</div>
+    <div class="kpi-value">1,238</div>
+    <div class="kpi-sub">tok/s @ conc=256</div>
+  </div>
+  <div class="kpi kpi-blue">
+    <div class="kpi-label">vLLM Sweet Spot</div>
+    <div class="kpi-value">1,081</div>
+    <div class="kpi-sub">tok/s @ conc=64 (TTFT &lt;1s)</div>
+  </div>
+  <div class="kpi kpi-amber">
+    <div class="kpi-label">Best TTFT p50</div>
+    <div class="kpi-value">304ms</div>
+    <div class="kpi-sub">vLLM @ conc=1</div>
+  </div>
+  <div class="kpi kpi-purple">
+    <div class="kpi-label">Best ITL p50</div>
+    <div class="kpi-value">6.6ms</div>
+    <div class="kpi-sub">vLLM @ conc=1</div>
+  </div>
+  <div class="kpi kpi-red">
+    <div class="kpi-label">vLLM Advantage</div>
+    <div class="kpi-value">+17%</div>
+    <div class="kpi-sub">peak throughput over SGLang</div>
+  </div>
+</div>
+
+<!-- Charts -->
+<div class="charts">
+  <div class="chart-card">
+    <h3>Throughput: vLLM vs SGLang</h3>
+    <canvas id="chartThroughput"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>TTFT p50: vLLM vs SGLang</h3>
+    <canvas id="chartTTFT"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>ITL p50: vLLM vs SGLang</h3>
+    <canvas id="chartITL"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Throughput vs TTFT p50 Tradeoff</h3>
+    <canvas id="chartTradeoff"></canvas>
+  </div>
+  <div class="chart-card chart-full">
+    <h3>TTFT p90 Comparison (Head-of-Line Blocking)</h3>
+    <canvas id="chartTTFTp90"></canvas>
+  </div>
+</div>
+
+<!-- Insights -->
+<h2 class="section-title">Key Insights</h2>
+
+<div class="insight-box">
+  <h4>vLLM Wins on Throughput: +17% Peak, +41% at Single-Stream</h4>
+  <p>vLLM consistently outperforms SGLang across all concurrency levels. At conc=1, vLLM delivers 76.5 tok/s vs SGLang's 54.1 tok/s (+41%). At peak concurrency=256, vLLM reaches 1,449 tok/s vs SGLang's 1,238 tok/s (+17%). The gap narrows at higher concurrency as both systems become compute-bound.</p>
+</div>
+
+<div class="insight-box info">
+  <h4>vLLM Wins on TTFT: 2-4x Lower Latency</h4>
+  <p>vLLM's TTFT advantage is dramatic. At conc=64: vLLM 974ms vs SGLang 4,146ms (4.3x). At conc=128: vLLM 6.2s vs SGLang 7.7s (1.2x). vLLM's Dynamo image with TRITON_ATTN backend handles the Mamba-2 hybrid attention more efficiently for prefill.</p>
+</div>
+
+<div class="insight-box warn">
+  <h4>Head-of-Line Blocking in Both Engines</h4>
+  <p>TTFT p90 explodes in both: vLLM goes from 337ms (conc=1) to 44.5s (conc=256); SGLang from 492ms to 48.7s. Both engines suffer from aggregated prefill/decode sharing the same GPUs. Disaggregated prefill/decode would isolate these workloads on dedicated GPUs.</p>
+</div>
+
+<div class="insight-box blocked">
+  <h4>Disaggregated Mode BLOCKED for Mamba Hybrids</h4>
+  <p>SGLang disaggregated prefill/decode with NIXL transfer crashes on Nemotron-3-Super. The Mamba-2 recurrent state + attention KV hybrid cache is incompatible with NIXL's transfer protocol. SGLang issues #19158, #18414, #19045 track this. PR #19254 (hybrid PP+PD support) is in progress but not merged. vLLM disaggregated mode is also unsupported (Dynamo PR #7216).</p>
+</div>
+
+<div class="insight-box">
+  <h4>Mamba-2: Efficient Decode in Both Engines</h4>
+  <p>ITL stays remarkably close between engines: vLLM 6.6ms vs SGLang 10.5ms at conc=1; vLLM 44.7ms vs SGLang 36.0ms at conc=256. The Mamba-2 recurrent state enables O(1) per-token decode without attention KV cache growth. At high concurrency, SGLang's ITL is actually slightly better.</p>
+</div>
+
+<!-- vLLM Data Table -->
+<h2 class="section-title">vLLM Aggregated (TP=2 x 4, 8x B200)</h2>
+<div class="chart-card">
+<table>
+  <thead>
+    <tr>
+      <th>Concurrency</th>
+      <th>TTFT p50</th>
+      <th>TTFT p90</th>
+      <th>ITL p50</th>
+      <th>ITL p90</th>
+      <th>E2E p50</th>
+      <th>Throughput</th>
+      <th>Req/s</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td><td>304ms</td><td>337ms</td><td>6.6ms</td><td>7.9ms</td><td>7.0s</td><td>76.5 tok/s</td><td>0.15</td>
+    </tr>
+    <tr>
+      <td>16</td><td>504ms</td><td>11.9s</td><td>12.3ms</td><td>15.8ms</td><td>16.0s</td><td>513 tok/s</td><td>0.94</td>
+    </tr>
+    <tr class="highlight-row">
+      <td>64</td><td>974ms</td><td>9.4s</td><td>20.3ms</td><td>27.3ms</td><td>34.5s</td><td>1,081 tok/s</td><td>2.01</td>
+    </tr>
+    <tr>
+      <td>128</td><td>6.2s</td><td>21.0s</td><td>28.0ms</td><td>47.3ms</td><td>57.9s</td><td>1,228 tok/s</td><td>2.36</td>
+    </tr>
+    <tr>
+      <td>256</td><td>21.2s</td><td>44.5s</td><td>44.7ms</td><td>223ms</td><td>97.2s</td><td>1,449 tok/s</td><td>2.76</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- SGLang Data Table -->
+<h2 class="section-title">SGLang Aggregated (TP=2 x 4, 8x B200)</h2>
+<div class="chart-card">
+<table>
+  <thead>
+    <tr>
+      <th>Concurrency</th>
+      <th>TTFT p50</th>
+      <th>TTFT p90</th>
+      <th>ITL p50</th>
+      <th>ITL p90</th>
+      <th>E2E p50</th>
+      <th>Throughput</th>
+      <th>Req/s</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td><td>336ms</td><td>492ms</td><td>10.5ms</td><td>13.3ms</td><td>11.3s</td><td>54.1 tok/s</td><td>0.09</td>
+    </tr>
+    <tr>
+      <td>16</td><td>754ms</td><td>9.5s</td><td>16.2ms</td><td>22.1ms</td><td>22.7s</td><td>428 tok/s</td><td>0.73</td>
+    </tr>
+    <tr>
+      <td>64</td><td>4,146ms</td><td>14.2s</td><td>23.3ms</td><td>35.8ms</td><td>48.1s</td><td>924 tok/s</td><td>1.56</td>
+    </tr>
+    <tr>
+      <td>128</td><td>7,738ms</td><td>25.3s</td><td>30.4ms</td><td>56.2ms</td><td>72.6s</td><td>1,044 tok/s</td><td>1.83</td>
+    </tr>
+    <tr>
+      <td>256</td><td>27,542ms</td><td>48.7s</td><td>36.0ms</td><td>185ms</td><td>105.8s</td><td>1,238 tok/s</td><td>2.31</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- 1-Worker Baseline -->
+<h2 class="section-title">1-Worker Baseline (TP=2 x 1, 2x B200, vLLM only)</h2>
+<div class="chart-card">
+<table>
+  <thead>
+    <tr>
+      <th>Concurrency</th>
+      <th>TTFT p50</th>
+      <th>TTFT p90</th>
+      <th>ITL p50</th>
+      <th>ITL p90</th>
+      <th>Throughput</th>
+      <th>Req/s</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td><td>311ms</td><td>507ms</td><td>6.6ms</td><td>8.1ms</td><td>79.6 tok/s</td><td>0.16</td>
+    </tr>
+    <tr>
+      <td>16</td><td>1,359ms</td><td>12.7s</td><td>12.2ms</td><td>15.8ms</td><td>469 tok/s</td><td>0.85</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- Config -->
+<h2 class="section-title">Test Configuration</h2>
+<div class="config-grid">
+  <div class="config-item"><dt>Model</dt><dd>NVIDIA Nemotron-3-Super-120B-A12B-FP8</dd></div>
+  <div class="config-item"><dt>Architecture</dt><dd>Mamba-2 + LatentMoE + Select Attention</dd></div>
+  <div class="config-item"><dt>Active Parameters</dt><dd>12B per token (120B total)</dd></div>
+  <div class="config-item"><dt>Hardware</dt><dd>p6-b200.48xlarge (8x B200 183GB NVLink)</dd></div>
+  <div class="config-item"><dt>Instance Cost</dt><dd>~$18/hr spot (us-east-2)</dd></div>
+  <div class="config-item"><dt>vLLM Backend</dt><dd>vLLM (Dynamo 0.9.1 image) + TRITON_ATTN</dd></div>
+  <div class="config-item"><dt>SGLang Backend</dt><dd>SGLang v0.5.9 + nano_v3 parser</dd></div>
+  <div class="config-item"><dt>Tensor Parallelism</dt><dd>TP=2 per worker, 4 workers</dd></div>
+  <div class="config-item"><dt>VRAM Usage</dt><dd>57.6 GB model + 100 GB KV cache per worker</dd></div>
+  <div class="config-item"><dt>Input / Output Tokens</dt><dd>4,096 / 1,024</dd></div>
+  <div class="config-item"><dt>Model Staging</dt><dd>FSx Lustre -> NVMe (31s load, 119 GB)</dd></div>
+  <div class="config-item"><dt>Cold Start</dt><dd>vLLM ~3 min / SGLang ~4 min</dd></div>
+</div>
+
+<div class="footer">
+  Generated 2026-03-12 | Nemotron-3-Super Blueprint | Agent AIOps on AWS
+</div>
+
+</div>
+
+<script>
+// === DATA ===
+const conc = [1, 16, 64, 128, 256];
+
+// vLLM
+const tputVllm = [76.5, 513, 1081, 1228, 1449];
+const ttftP50Vllm = [304, 504, 974, 6200, 21209];
+const ttftP90Vllm = [337, 11884, 9436, 20974, 44465];
+const itlP50Vllm = [6.6, 12.3, 20.3, 28.0, 44.7];
+const itlP90Vllm = [7.9, 15.8, 27.3, 47.3, 223];
+
+// SGLang
+const tputSglang = [54.1, 428, 924, 1044, 1238];
+const ttftP50Sglang = [336, 754, 4146, 7738, 27542];
+const ttftP90Sglang = [492, 9500, 14200, 25300, 48700];
+const itlP50Sglang = [10.5, 16.2, 23.3, 30.4, 36.0];
+const itlP90Sglang = [13.3, 22.1, 35.8, 56.2, 185];
+
+const chartDefaults = {
+  responsive: true,
+  plugins: {
+    legend: { labels: { color: '#8b8fa3', font: { size: 12 } } },
+    tooltip: { backgroundColor: '#1a1d27', borderColor: '#2a2d3a', borderWidth: 1, titleColor: '#e1e4ed', bodyColor: '#e1e4ed' }
+  },
+  scales: {
+    x: { ticks: { color: '#8b8fa3' }, grid: { color: '#2a2d3a' } },
+    y: { ticks: { color: '#8b8fa3' }, grid: { color: '#2a2d3a' } }
+  }
+};
+
+// Throughput comparison
+new Chart(document.getElementById('chartThroughput'), {
+  type: 'line',
+  data: {
+    labels: conc,
+    datasets: [
+      {
+        label: 'vLLM (tok/s)',
+        data: tputVllm,
+        borderColor: '#76b900',
+        backgroundColor: 'rgba(118, 185, 0, 0.1)',
+        fill: true, tension: 0.3, pointRadius: 6, borderWidth: 3
+      },
+      {
+        label: 'SGLang (tok/s)',
+        data: tputSglang,
+        borderColor: '#06b6d4',
+        backgroundColor: 'rgba(6, 182, 212, 0.1)',
+        fill: true, tension: 0.3, pointRadius: 6, borderWidth: 3
+      }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    scales: {
+      ...chartDefaults.scales,
+      x: { ...chartDefaults.scales.x, title: { display: true, text: 'Concurrency', color: '#8b8fa3' } },
+      y: { ...chartDefaults.scales.y, title: { display: true, text: 'Tokens/sec', color: '#8b8fa3' }, beginAtZero: true }
+    }
+  }
+});
+
+// TTFT p50 comparison
+new Chart(document.getElementById('chartTTFT'), {
+  type: 'line',
+  data: {
+    labels: conc,
+    datasets: [
+      { label: 'vLLM TTFT p50', data: ttftP50Vllm, borderColor: '#76b900', fill: false, tension: 0.3, pointRadius: 5, borderWidth: 2 },
+      { label: 'SGLang TTFT p50', data: ttftP50Sglang, borderColor: '#06b6d4', fill: false, tension: 0.3, pointRadius: 5, borderWidth: 2 }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    scales: {
+      ...chartDefaults.scales,
+      x: { ...chartDefaults.scales.x, title: { display: true, text: 'Concurrency', color: '#8b8fa3' } },
+      y: { ...chartDefaults.scales.y, type: 'logarithmic', title: { display: true, text: 'TTFT p50 (ms) — log scale', color: '#8b8fa3' } }
+    }
+  }
+});
+
+// ITL p50 comparison
+new Chart(document.getElementById('chartITL'), {
+  type: 'line',
+  data: {
+    labels: conc,
+    datasets: [
+      { label: 'vLLM ITL p50', data: itlP50Vllm, borderColor: '#76b900', fill: false, tension: 0.3, pointRadius: 5, borderWidth: 2 },
+      { label: 'SGLang ITL p50', data: itlP50Sglang, borderColor: '#06b6d4', fill: false, tension: 0.3, pointRadius: 5, borderWidth: 2 }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    scales: {
+      ...chartDefaults.scales,
+      x: { ...chartDefaults.scales.x, title: { display: true, text: 'Concurrency', color: '#8b8fa3' } },
+      y: { ...chartDefaults.scales.y, title: { display: true, text: 'ITL p50 (ms)', color: '#8b8fa3' }, beginAtZero: true }
+    }
+  }
+});
+
+// Tradeoff scatter — both engines
+new Chart(document.getElementById('chartTradeoff'), {
+  type: 'scatter',
+  data: {
+    datasets: [
+      {
+        label: 'vLLM',
+        data: conc.map((c, i) => ({ x: ttftP50Vllm[i], y: tputVllm[i] })),
+        backgroundColor: '#76b900',
+        pointRadius: conc.map((c, i) => i === 2 ? 10 : 7),
+        borderColor: '#76b900', borderWidth: 2
+      },
+      {
+        label: 'SGLang',
+        data: conc.map((c, i) => ({ x: ttftP50Sglang[i], y: tputSglang[i] })),
+        backgroundColor: '#06b6d4',
+        pointRadius: 7,
+        borderColor: '#06b6d4', borderWidth: 2
+      }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    plugins: {
+      ...chartDefaults.plugins,
+      tooltip: {
+        ...chartDefaults.plugins.tooltip,
+        callbacks: {
+          label: function(ctx) {
+            const i = ctx.dataIndex;
+            const engine = ctx.datasetIndex === 0 ? 'vLLM' : 'SGLang';
+            return `${engine} c=${conc[i]}: ${ctx.parsed.y} tok/s, TTFT=${ctx.parsed.x}ms`;
+          }
+        }
+      }
+    },
+    scales: {
+      ...chartDefaults.scales,
+      x: { ...chartDefaults.scales.x, type: 'logarithmic', title: { display: true, text: 'TTFT p50 (ms) — log scale (lower is better)', color: '#8b8fa3' } },
+      y: { ...chartDefaults.scales.y, title: { display: true, text: 'Throughput tok/s (higher is better)', color: '#8b8fa3' }, beginAtZero: true }
+    }
+  }
+});
+
+// TTFT p90 comparison (head-of-line blocking)
+new Chart(document.getElementById('chartTTFTp90'), {
+  type: 'bar',
+  data: {
+    labels: conc.map(c => `Conc=${c}`),
+    datasets: [
+      { label: 'vLLM TTFT p90', data: ttftP90Vllm.map(v => v / 1000), backgroundColor: 'rgba(118, 185, 0, 0.7)', borderColor: '#76b900', borderWidth: 1 },
+      { label: 'SGLang TTFT p90', data: ttftP90Sglang.map(v => v / 1000), backgroundColor: 'rgba(6, 182, 212, 0.7)', borderColor: '#06b6d4', borderWidth: 1 }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    plugins: {
+      ...chartDefaults.plugins,
+      title: { display: true, text: 'TTFT p90 shows head-of-line blocking in both engines (both need disaggregated P/D)', color: '#e1e4ed', font: { size: 13 } }
+    },
+    scales: {
+      ...chartDefaults.scales,
+      y: { ...chartDefaults.scales.y, title: { display: true, text: 'TTFT p90 (seconds)', color: '#8b8fa3' }, beginAtZero: true }
+    }
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+diff --git a/pylint/lint/expand_modules.py b/pylint/lint/expand_modules.py
+index 289e1afc..7d72b14d 100644
+--- a/pylint/lint/expand_modules.py
++++ b/pylint/lint/expand_modules.py
+@@ -121,6 +121,13 @@ def expand_modules(
+         else:
+             is_namespace = modutils.is_namespace(spec)
+             is_directory = modutils.is_directory(spec)
++        if os.path.isdir(something) and not os.path.exists(filepath):
++            # The directory is a namespace package (no __init__.py).
++            # file_info_from_modpath may have resolved to a same-named .py file
++            # inside the directory (e.g. a/a.py when linting directory 'a'),
++            # causing is_namespace/is_directory to be wrong. Force namespace mode.
++            is_namespace = True
++            is_directory = False
+         if not is_namespace:
+             result.append(
+                 {

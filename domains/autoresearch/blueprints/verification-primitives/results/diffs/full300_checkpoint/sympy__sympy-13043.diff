@@ -1,0 +1,50 @@
+diff --git a/sympy/integrals/intpoly.py b/sympy/integrals/intpoly.py
+index fc72bd206f..2319ba579d 100644
+--- a/sympy/integrals/intpoly.py
++++ b/sympy/integrals/intpoly.py
+@@ -556,7 +556,7 @@ def decompose(expr, separate=False):
+     >>> decompose(x**2 + x*y + x + y + x**3*y**2 + y**5)
+     {1: x + y, 2: x**2 + x*y, 5: x**3*y**2 + y**5}
+     >>> decompose(x**2 + x*y + x + y + x**3*y**2 + y**5, True)
+-    [x, y, x**2, y**5, x*y, x**3*y**2]
++    [x, y, x**2, x*y, x**3*y**2, y**5]
+     """
+     expr = S(expr)
+     poly_dict = {}
+@@ -569,7 +569,7 @@ def decompose(expr, separate=False):
+             degrees = [(sum(degree_list(monom, *symbols)), monom)
+                        for monom in expr.args]
+             if separate:
+-                return [monom[1] for monom in degrees]
++                return [monom[1] for monom in sorted(degrees, key=lambda x: x[0])]
+             else:
+                 for monom in degrees:
+                     degree, term = monom
+diff --git a/sympy/integrals/tests/test_intpoly.py b/sympy/integrals/tests/test_intpoly.py
+index 80dee95dca..f542bddf1c 100644
+--- a/sympy/integrals/tests/test_intpoly.py
++++ b/sympy/integrals/tests/test_intpoly.py
+@@ -26,15 +26,15 @@ def test_decompose():
+     assert decompose(9*x**2 + y + 4*x + x**3 + y**2*x + 3) ==\
+         {0: 3, 1: 4*x + y, 2: 9*x**2, 3: x**3 + x*y**2}
+ 
+-    assert decompose(x, True) == {x}
+-    assert decompose(x ** 2, True) == {x**2}
+-    assert decompose(x * y, True) == {x * y}
+-    assert decompose(x + y, True) == {x, y}
+-    assert decompose(x ** 2 + y, True) == {y, x ** 2}
+-    assert decompose(8 * x ** 2 + 4 * y + 7, True) == {7, 4*y, 8*x**2}
+-    assert decompose(x ** 2 + 3 * y * x, True) == {x ** 2, 3 * x * y}
++    assert decompose(x, True) == [x]
++    assert decompose(x ** 2, True) == [x**2]
++    assert decompose(x * y, True) == [x * y]
++    assert decompose(x + y, True) == [x, y]
++    assert decompose(x ** 2 + y, True) == [y, x ** 2]
++    assert decompose(8 * x ** 2 + 4 * y + 7, True) == [7, 4*y, 8*x**2]
++    assert decompose(x ** 2 + 3 * y * x, True) == [x ** 2, 3 * x * y]
+     assert decompose(9 * x ** 2 + y + 4 * x + x ** 3 + y ** 2 * x + 3, True) == \
+-           {3, y, 4*x, 9*x**2, x*y**2, x**3}
++           [3, y, 4*x, 9*x**2, x**3, x*y**2]
+ 
+ 
+ def test_best_origin():

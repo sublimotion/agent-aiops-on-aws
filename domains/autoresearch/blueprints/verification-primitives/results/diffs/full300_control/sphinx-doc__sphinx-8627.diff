@@ -1,0 +1,52 @@
+diff --git a/sphinx/util/typing.py b/sphinx/util/typing.py
+index 2d4f67bba..b92651dc6 100644
+--- a/sphinx/util/typing.py
++++ b/sphinx/util/typing.py
+@@ -86,6 +86,25 @@ def is_system_TypeVar(typ: Any) -> bool:
+     return modname == 'typing' and isinstance(typ, TypeVar)
+ 
+ 
++def _restify_cls_module(cls: "Type") -> str:
++    """Return the correct module name for a class, resolving private modules.
++
++    Some classes are defined in private C-extension modules (e.g. ``_struct``)
++    but are publicly accessible through a public module (e.g. ``struct``).
++    This helper detects that situation and returns the public module name.
++    """
++    module = getattr(cls, '__module__', None)
++    if module and module.startswith('_') and not module.startswith('__'):
++        # Check if there is a public module (e.g. 'struct' for '_struct')
++        # that exposes this class under the same name.
++        public_name = module[1:]
++        if public_name in sys.modules:
++            public_module = sys.modules[public_name]
++            if getattr(public_module, cls.__name__, None) is cls:
++                return public_name
++    return module
++
++
+ def restify(cls: Optional["Type"]) -> str:
+     """Convert python class to a reST reference."""
+     from sphinx.util import inspect  # lazy loading
+@@ -146,18 +165,18 @@ def _restify_py37(cls: Optional["Type"]) -> str:
+         if cls.__module__ == 'typing':
+             return ':class:`%s`' % cls.__qualname__
+         else:
+-            return ':class:`%s.%s`' % (cls.__module__, cls.__qualname__)
++            return ':class:`%s.%s`' % (_restify_cls_module(cls), cls.__qualname__)
+     elif hasattr(cls, '_name'):
+         # SpecialForm
+         if cls.__module__ == 'typing':
+             return ':obj:`%s`' % cls._name
+         else:
+-            return ':obj:`%s.%s`' % (cls.__module__, cls._name)
++            return ':obj:`%s.%s`' % (_restify_cls_module(cls), cls._name)
+     elif isinstance(cls, ForwardRef):
+         return ':class:`%s`' % cls.__forward_arg__
+     else:
+         # not a class (ex. TypeVar)
+-        return ':obj:`%s.%s`' % (cls.__module__, cls.__name__)
++        return ':obj:`%s.%s`' % (_restify_cls_module(cls), cls.__name__)
+ 
+ 
+ def _restify_py36(cls: Optional["Type"]) -> str:

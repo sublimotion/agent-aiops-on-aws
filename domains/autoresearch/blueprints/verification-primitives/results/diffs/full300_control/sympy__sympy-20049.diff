@@ -1,0 +1,55 @@
+diff --git a/sympy/physics/vector/point.py b/sympy/physics/vector/point.py
+index d4e3cfcc90..35091f4008 100644
+--- a/sympy/physics/vector/point.py
++++ b/sympy/physics/vector/point.py
+@@ -508,17 +508,49 @@ def vel(self, frame):
+         Examples
+         ========
+ 
+-        >>> from sympy.physics.vector import Point, ReferenceFrame
++        >>> from sympy.physics.vector import Point, ReferenceFrame, dynamicsymbols
++        >>> from sympy.physics.vector import init_vprinting
++        >>> init_vprinting(pretty_print=False)
+         >>> N = ReferenceFrame('N')
+         >>> p1 = Point('p1')
+         >>> p1.set_vel(N, 10 * N.x)
+         >>> p1.vel(N)
+         10*N.x
+ 
++        Velocities will be automatically calculated if not explicitly
++        defined, provided that the velocity of at least one other point
++        and its position relative to this point are known.
++
++        >>> p2 = Point('p2')
++        >>> p1.set_vel(N, 10 * N.x)
++        >>> p2.set_pos(p1, N.x)
++        >>> p2.vel(N)
++        10*N.x
++
+         """
+ 
+         _check_frame(frame)
+         if not (frame in self._vel_dict):
++            try:
++                plist = self._pdict_list(self, 0)
++            except ValueError:
++                plist = []
++            visited = []
++            queue = [self]
++            while queue:  # BFS to find points with velocity defined in frame
++                node = queue.pop(0)
++                if node in visited:
++                    continue
++                visited.append(node)
++                if node != self and node._vel_dict.get(frame) is not None:
++                    # Found a point with velocity defined; compute velocity
++                    # of self by differentiating the position vector
++                    self._vel_dict[frame] = (node._vel_dict[frame] +
++                                             self.pos_from(node).dt(frame))
++                    return self._vel_dict[frame]
++                for neighbor in node._pos_dict:
++                    if neighbor not in visited:
++                        queue.append(neighbor)
+             raise ValueError('Velocity of point ' + self.name + ' has not been'
+                              ' defined in ReferenceFrame ' + frame.name)
+         return self._vel_dict[frame]

@@ -1,0 +1,33 @@
+diff --git a/astropy/io/ascii/rst.py b/astropy/io/ascii/rst.py
+index abdeba8ef..77f99d01e 100644
+--- a/astropy/io/ascii/rst.py
++++ b/astropy/io/ascii/rst.py
+@@ -3,7 +3,6 @@
+ :Author: Simon Gibbons (simongibbons@gmail.com)
+ """
+ 
+-
+ from .core import DefaultSplitter
+ from .fixedwidth import (
+     FixedWidth,
+@@ -57,10 +56,17 @@ class RST(FixedWidth):
+     data_class = SimpleRSTData
+     header_class = SimpleRSTHeader
+ 
+-    def __init__(self):
+-        super().__init__(delimiter_pad=None, bookend=False)
++    def __init__(self, header_rows=None):
++        super().__init__(delimiter_pad=None, bookend=False, header_rows=header_rows)
++        # Adjust data start line to account for the two === lines and header rows.
++        # RST format: === line, header row(s), === line, data rows, === line.
++        self.data.start_line = len(self.header.header_rows) + 2
+ 
+     def write(self, lines):
+         lines = super().write(lines)
+-        lines = [lines[1]] + lines + [lines[1]]
++        # Find the position line which is the line with the === characters.
++        # This is after all the header rows.
++        header_rows = getattr(self.data, "header_rows", ["name"])
++        idx = len(header_rows)
++        lines = [lines[idx]] + lines + [lines[idx]]
+         return lines

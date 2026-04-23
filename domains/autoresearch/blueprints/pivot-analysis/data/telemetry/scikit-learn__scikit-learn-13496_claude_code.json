@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 93.3,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 91883,
+    "duration_api_ms": 54339,
+    "num_turns": 16,
+    "result": "The fix is clean and correct. The adversarial review gives it a 0.92 overall score with verdict \"likely_correct\".\n\nHere's what was changed in `sklearn/ensemble/iforest.py`:\n\n1. **Added `warm_start=False` parameter** to `IsolationForest.__init__()` signature\n2. **Passed `warm_start` to `super().__init__()`** so `BaseBagging` handles it properly  \n3. **Added docstring documentation** matching the style used in `RandomForestClassifier`, with a `.. versionadded:: 0.21` note\n\nThe parameter was already supported by the parent class `BaseBagging` \u2014 it just wasn't exposed. Now users can do:\n\n```python\nclf = IsolationForest(warm_start=True, n_estimators=10)\nclf.fit(X)\nclf.n_estimators = 20\nclf.fit(X)  # adds 10 more estimators instead of refitting from scratch\n```",
+    "stop_reason": "end_turn",
+    "session_id": "ba6ba7a4-4f87-4f1b-a871-f05ede5d29e8",
+    "total_cost_usd": 0.22645139999999997,
+    "usage": {
+      "input_tokens": 82,
+      "cache_creation_input_tokens": 21614,
+      "cache_read_input_tokens": 348493,
+      "output_tokens": 2707,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 21614
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 82,
+        "outputTokens": 2707,
+        "cacheReadInputTokens": 348493,
+        "cacheCreationInputTokens": 21614,
+        "webSearchRequests": 0,
+        "costUSD": 0.22645139999999997,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "1ef2c774-d797-4826-876a-fb2c0c92c75b"
+  },
+  "stderr": ""
+}

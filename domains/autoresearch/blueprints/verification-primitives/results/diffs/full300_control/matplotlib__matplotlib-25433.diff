@@ -1,0 +1,14 @@
+diff --git a/lib/matplotlib/figure.py b/lib/matplotlib/figure.py
+index d2568fddbf..01fb9ff414 100644
+--- a/lib/matplotlib/figure.py
++++ b/lib/matplotlib/figure.py
+@@ -3098,6 +3098,9 @@ None}, default: None
+ 
+     def clear(self, keep_observers=False):
+         # docstring inherited
++        # Reset the mouse grabber if it points to an Axes that will be cleared.
++        if self.canvas.mouse_grabber in self.axes:
++            self.canvas.release_mouse(self.canvas.mouse_grabber)
+         super().clear(keep_observers=keep_observers)
+         # FigureBase.clear does not clear toolbars, as
+         # only Figure can have toolbars

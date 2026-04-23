@@ -1,0 +1,25 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 66461181d0..ba5c433756 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -1145,12 +1145,14 @@ def _print_BasisDependent(self, expr):
+                 tempstr = partstr
+                 tempstr = tempstr.replace(vectstrs[i], '')
+                 if '\N{right parenthesis extension}' in tempstr:   # If scalar is a fraction
+-                    for paren in range(len(tempstr)):
+-                        flag[i] = 1
+-                        if tempstr[paren] == '\N{right parenthesis extension}':
+-                            tempstr = tempstr[:paren] + '\N{right parenthesis extension}'\
+-                                         + ' '  + vectstrs[i] + tempstr[paren + 1:]
+-                            break
++                    flag[i] = 1
++                    # Insert the unit vector after the last right parenthesis extension
++                    # (which is on the baseline row of the outermost parenthesis)
++                    # using rfind to get the last occurrence
++                    paren_pos = tempstr.rfind('\N{right parenthesis extension}')
++                    tempstr = tempstr[:paren_pos] + \
++                        '\N{right parenthesis extension}' + ' ' + vectstrs[i] + \
++                        tempstr[paren_pos + 1:]
+                 elif '\N{RIGHT PARENTHESIS LOWER HOOK}' in tempstr:
+                     flag[i] = 1
+                     tempstr = tempstr.replace('\N{RIGHT PARENTHESIS LOWER HOOK}',

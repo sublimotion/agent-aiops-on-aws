@@ -1,0 +1,23 @@
+diff --git a/src/_pytest/pathlib.py b/src/_pytest/pathlib.py
+index e43310ef..7f14e4d4 100644
+--- a/src/_pytest/pathlib.py
++++ b/src/_pytest/pathlib.py
+@@ -524,6 +524,18 @@ def import_path(
+     if mode is ImportMode.importlib:
+         module_name = module_name_from_path(path, root)
+ 
++        # Check if the module is already in sys.modules to avoid duplicates.
++        # This can happen when the module was previously imported under its
++        # canonical package name (e.g. "pmxbot.logging") while import_path
++        # would generate a different name from the path (e.g. "pmxbot.logging"
++        # based on root). We check by __file__ to find the canonical module.
++        for mod_name, mod in sys.modules.items():
++            if (
++                getattr(mod, "__file__", None) == str(path)
++                or getattr(mod, "__file__", None) == str(path) + "c"
++            ):
++                return mod
++
+         for meta_importer in sys.meta_path:
+             spec = meta_importer.find_spec(module_name, [str(path.parent)])
+             if spec is not None:

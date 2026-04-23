@@ -1,0 +1,28 @@
+diff --git a/sphinx/ext/napoleon/docstring.py b/sphinx/ext/napoleon/docstring.py
+index a11424537..c39f4e59a 100644
+--- a/sphinx/ext/napoleon/docstring.py
++++ b/sphinx/ext/napoleon/docstring.py
+@@ -278,13 +278,21 @@ class GoogleDocstring:
+                         multiple: bool = False) -> List[Tuple[str, str, List[str]]]:
+         self._consume_empty()
+         fields = []
++        existing_names = set()  # Track existing parameter names to avoid duplicates
+         while not self._is_section_break():
+             _name, _type, _desc = self._consume_field(parse_type, prefer_type)
+             if multiple and _name:
+                 for name in _name.split(","):
+-                    fields.append((name.strip(), _type, _desc))
++                    name = name.strip()
++                    # Skip if this parameter name already exists
++                    if name and name not in existing_names:
++                        fields.append((name, _type, _desc))
++                        existing_names.add(name)
+             elif _name or _type or _desc:
+-                fields.append((_name, _type, _desc,))
++                # Skip if this parameter name already exists
++                if _name and _name not in existing_names:
++                    fields.append((_name, _type, _desc,))
++                    existing_names.add(_name)
+         return fields
+ 
+     def _consume_inline_attribute(self) -> Tuple[str, List[str]]:

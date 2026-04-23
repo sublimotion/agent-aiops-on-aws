@@ -1,0 +1,23 @@
+diff --git a/seaborn/_oldcore.py b/seaborn/_oldcore.py
+index c9218c1f..366a8591 100644
+--- a/seaborn/_oldcore.py
++++ b/seaborn/_oldcore.py
+@@ -143,6 +143,18 @@ class HueMapping(SemanticMapping):
+             self.norm = norm
+             self.cmap = cmap
+ 
++            # If an explicit order was provided, mask out hue values that are
++            # not in the levels so they are treated as missing rather than
++            # causing lookup errors (e.g. np.isnan on string values).
++            if order is not None:
++                plotter.plot_data["hue"] = (
++                    plotter.plot_data["hue"].where(
++                        plotter.plot_data["hue"].isin(levels)
++                    )
++                )
++
++
++
+     def _lookup_single(self, key):
+         """Get the color for a single value, using colormap to interpolate."""
+         try:

@@ -1,0 +1,36 @@
+diff --git a/sympy/printing/pycode.py b/sympy/printing/pycode.py
+index 1877c3f92a..b4eb1c9500 100644
+--- a/sympy/printing/pycode.py
++++ b/sympy/printing/pycode.py
+@@ -259,6 +259,15 @@ def _print_Sum(self, expr):
+     def _print_ImaginaryUnit(self, expr):
+         return '1j'
+ 
++    def _print_tuple(self, expr):
++        if len(expr) == 1:
++            return "({},)".format(self._print(expr[0]))
++        else:
++            return "({})".format(", ".join(self._print(e) for e in expr))
++
++    def _print_Tuple(self, expr):
++        return self._print_tuple(expr)
++
+     def _print_KroneckerDelta(self, expr):
+         a, b = expr.args
+ 
+diff --git a/sympy/utilities/lambdify.py b/sympy/utilities/lambdify.py
+index da67263b19..159185dcf5 100644
+--- a/sympy/utilities/lambdify.py
++++ b/sympy/utilities/lambdify.py
+@@ -961,7 +961,10 @@ def _recursive_to_string(doprint, arg):
+             left, right = "()"
+         else:
+             raise NotImplementedError("unhandled type: %s, %s" % (type(arg), arg))
+-        return left +', '.join(_recursive_to_string(doprint, e) for e in arg) + right
++        contents = ', '.join(_recursive_to_string(doprint, e) for e in arg)
++        if isinstance(arg, tuple) and len(arg) == 1:
++            contents += ','
++        return left + contents + right
+     elif isinstance(arg, str):
+         return arg
+     else:

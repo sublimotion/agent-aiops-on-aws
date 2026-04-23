@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 104.9,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 103646,
+    "duration_api_ms": 77991,
+    "num_turns": 24,
+    "result": "The fix works correctly. The rendered HTML now includes `class=\"errorlist nonform\"` for non-form errors in FormSets, mirroring how forms render non-field errors with `class=\"errorlist nonfield\"`.\n\nThe generated test had an overly strict assertion (`== 'nonform'` instead of checking `'nonform' in error_class`), but the actual behavior is correct. The two-line fix:\n\n1. **Line 336**: `self._non_form_errors = self.error_class(error_class='nonform')` \u2014 ensures empty error lists also get the `nonform` CSS class\n2. **Line 383**: `self._non_form_errors = self.error_class(e.error_list, error_class='nonform')` \u2014 ensures validation errors captured in `full_clean()` get the `nonform` CSS class",
+    "stop_reason": "end_turn",
+    "session_id": "989d20be-bd7b-4949-ac91-060ffe3c3b46",
+    "total_cost_usd": 0.25331909999999996,
+    "usage": {
+      "input_tokens": 895,
+      "cache_creation_input_tokens": 19638,
+      "cache_read_input_tokens": 401472,
+      "output_tokens": 3770,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 19638
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 895,
+        "outputTokens": 3770,
+        "cacheReadInputTokens": 401472,
+        "cacheCreationInputTokens": 19638,
+        "webSearchRequests": 0,
+        "costUSD": 0.25331909999999996,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "2e9172e3-cad7-4103-a8dc-0f9df207dfa2"
+  },
+  "stderr": ""
+}

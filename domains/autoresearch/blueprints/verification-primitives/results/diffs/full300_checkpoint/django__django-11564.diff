@@ -1,0 +1,41 @@
+diff --git a/django/conf/__init__.py b/django/conf/__init__.py
+index b32e56184d..9c22109024 100644
+--- a/django/conf/__init__.py
++++ b/django/conf/__init__.py
+@@ -12,6 +12,7 @@ import time
+ import traceback
+ import warnings
+ from pathlib import Path
++from urllib.parse import urlparse
+ 
+ import django
+ from django.conf import global_settings
+@@ -128,6 +129,28 @@ class LazySettings(LazyObject):
+             )
+         return self.__getattr__('PASSWORD_RESET_TIMEOUT_DAYS')
+ 
++    @property
++    def STATIC_URL(self):
++        return self._add_script_prefix(self.__getattr__('STATIC_URL'))
++
++    @property
++    def MEDIA_URL(self):
++        return self._add_script_prefix(self.__getattr__('MEDIA_URL'))
++
++    def _add_script_prefix(self, value):
++        """
++        Add SCRIPT_NAME prefix to relative paths.
++
++        Absolute paths, valid absolute URLs and None are returned unchanged.
++        """
++        if value is None:
++            return value
++        # Don't apply prefix to valid absolute URLs or absolute paths.
++        if value.startswith('/') or urlparse(value).scheme:
++            return value
++        from django.urls import get_script_prefix
++        return '%s%s' % (get_script_prefix(), value)
++
+ 
+ class Settings:
+     def __init__(self, settings_module):

@@ -1,0 +1,74 @@
+diff --git a/django/core/exceptions.py b/django/core/exceptions.py
+index dc084b8692..2097cc5aa5 100644
+--- a/django/core/exceptions.py
++++ b/django/core/exceptions.py
+@@ -96,6 +96,18 @@ class FieldError(Exception):
+ NON_FIELD_ERRORS = '__all__'
+ 
+ 
++def _error_key(error):
++    """
++    Return a sortable key for a leaf ValidationError instance.
++    Leaf errors always have a 'message' attribute.
++    """
++    return (
++        str(error.message),
++        error.code or '',
++        str(sorted(error.params.items()) if error.params else ''),
++    )
++
++
+ class ValidationError(Exception):
+     """An error while validating data."""
+     def __init__(self, message, code=None, params=None):
+@@ -182,6 +194,50 @@ class ValidationError(Exception):
+     def __repr__(self):
+         return 'ValidationError(%s)' % self
+ 
++    def __eq__(self, other):
++        if not isinstance(other, ValidationError):
++            return NotImplemented
++        # Compare error_dict vs error_dict
++        if hasattr(self, 'error_dict') and hasattr(other, 'error_dict'):
++            if self.error_dict.keys() != other.error_dict.keys():
++                return False
++            return all(
++                sorted(self.error_dict[field], key=_error_key) ==
++                sorted(other.error_dict[field], key=_error_key)
++                for field in self.error_dict
++            )
++        # Both must be non-dict errors
++        if hasattr(self, 'error_dict') or hasattr(other, 'error_dict'):
++            return False
++        # Both are leaf (single) errors
++        if hasattr(self, 'message') and hasattr(other, 'message'):
++            return (
++                self.message == other.message and
++                self.code == other.code and
++                self.params == other.params
++            )
++        # One is a leaf, the other is a list-form — not equal
++        if hasattr(self, 'message') or hasattr(other, 'message'):
++            return False
++        # Both are list-form errors; compare order-independently
++        return (
++            sorted(self.error_list, key=_error_key) ==
++            sorted(other.error_list, key=_error_key)
++        )
++
++    def __hash__(self):
++        if hasattr(self, 'error_dict'):
++            return hash(frozenset(
++                (field, frozenset(_error_key(e) for e in errors))
++                for field, errors in self.error_dict.items()
++            ))
++        if hasattr(self, 'message'):
++            # Single (leaf) error
++            params_hash = frozenset(self.params.items()) if self.params else None
++            return hash((self.message, self.code, params_hash))
++        # List-form error
++        return hash(frozenset(_error_key(e) for e in self.error_list))
++
+ 
+ class EmptyResultSet(Exception):
+     """A database query predicate is impossible."""

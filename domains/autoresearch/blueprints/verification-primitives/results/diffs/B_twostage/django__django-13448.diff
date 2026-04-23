@@ -1,0 +1,16 @@
+diff --git a/django/db/backends/base/creation.py b/django/db/backends/base/creation.py
+index 503f7f56fd..d34c050a9b 100644
+--- a/django/db/backends/base/creation.py
++++ b/django/db/backends/base/creation.py
+@@ -105,7 +105,10 @@ class BaseDatabaseCreation:
+                 if (
+                     app_config.models_module is not None and
+                     app_config.label in loader.migrated_apps and
+-                    app_config.name not in settings.TEST_NON_SERIALIZED_APPS
++                    app_config.name not in settings.TEST_NON_SERIALIZED_APPS and
++                    # When MIGRATE=False, no migrations are run so migrated apps'
++                    # tables don't exist yet; skip them to avoid errors.
++                    self.connection.settings_dict['TEST'].get('MIGRATE', True)
+                 ):
+                     for model in app_config.get_models():
+                         if (

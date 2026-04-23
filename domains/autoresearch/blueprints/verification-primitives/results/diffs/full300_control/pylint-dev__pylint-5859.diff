@@ -1,0 +1,55 @@
+diff --git a/pylint/checkers/misc.py b/pylint/checkers/misc.py
+index 69149e61a..f91c5dc6b 100644
+--- a/pylint/checkers/misc.py
++++ b/pylint/checkers/misc.py
+@@ -119,11 +119,14 @@ class EncodingChecker(BaseChecker):
+     def open(self):
+         super().open()
+ 
+-        notes = "|".join(re.escape(note) for note in self.config.notes)
++        notes = "|".join(
++            re.escape(note) + (r"\b" if note[-1].isalnum() or note[-1] == "_" else "")
++            for note in self.config.notes
++        )
+         if self.config.notes_rgx:
+-            regex_string = rf"#\s*({notes}|{self.config.notes_rgx})\b"
++            regex_string = rf"#\s*({notes}|{self.config.notes_rgx})"
+         else:
+-            regex_string = rf"#\s*({notes})\b"
++            regex_string = rf"#\s*({notes})"
+ 
+         self._fixme_pattern = re.compile(regex_string, re.I)
+ 
+diff --git a/tests/checkers/unittest_misc.py b/tests/checkers/unittest_misc.py
+index bd15a932e..0b9291e9f 100644
+--- a/tests/checkers/unittest_misc.py
++++ b/tests/checkers/unittest_misc.py
+@@ -78,6 +78,28 @@ class TestFixme(CheckerTestCase):
+         ):
+             self.checker.process_tokens(_tokenize_str(code))
+ 
++    @set_config(notes=["???"])
++    def test_non_alphanumeric_codetag_with_message(self) -> None:
++        code = """a = 1
++                # ???: no
++                """
++        with self.assertAddsMessages(
++            MessageTest(msg_id="fixme", line=2, args="???: no", col_offset=17)
++        ):
++            self.checker.process_tokens(_tokenize_str(code))
++
++    @set_config(notes=["YES", "???"])
++    def test_punctuation_notes_and_text_notes(self) -> None:
++        code = """a = 1
++                # YES: yes
++                # ???: no
++                """
++        with self.assertAddsMessages(
++            MessageTest(msg_id="fixme", line=2, args="YES: yes", col_offset=17),
++            MessageTest(msg_id="fixme", line=3, args="???: no", col_offset=17),
++        ):
++            self.checker.process_tokens(_tokenize_str(code))
++
+     @set_config(notes=[])
+     def test_absent_codetag(self) -> None:
+         code = """a = 1

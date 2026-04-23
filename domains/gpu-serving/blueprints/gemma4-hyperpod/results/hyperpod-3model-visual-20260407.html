@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HyperPod 3-Model Benchmark — Gemma 4 31B vs Mistral SM4 119B vs Gemma 4 E4B</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --surface-2: #242740;
+      --border: #2e3151;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --accent: #6366f1;
+      --accent-soft: rgba(99,102,241,0.15);
+      --green: #22c55e;
+      --green-soft: rgba(34,197,94,0.12);
+      --red: #ef4444;
+      --red-soft: rgba(239,68,68,0.12);
+      --yellow: #f59e0b;
+      --yellow-soft: rgba(245,158,11,0.12);
+      --blue: #3b82f6;
+      --blue-soft: rgba(59,130,246,0.12);
+      --purple: #a855f7;
+      --purple-soft: rgba(168,85,247,0.12);
+      --cyan: #06b6d4;
+      --cyan-soft: rgba(6,182,212,0.12);
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-2: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --accent-soft: rgba(99,102,241,0.08);
+      --green-soft: rgba(34,197,94,0.08);
+      --red-soft: rgba(239,68,68,0.08);
+      --yellow-soft: rgba(245,158,11,0.08);
+      --blue-soft: rgba(59,130,246,0.08);
+      --purple-soft: rgba(168,85,247,0.08);
+      --cyan-soft: rgba(6,182,212,0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    header .meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .theme-toggle {
+      background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+      padding: 0.4rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem;
+      font-family: inherit; transition: background 0.2s;
+    }
+    .theme-toggle:hover { background: var(--border); }
+    main { max-width: 1300px; margin: 0 auto; padding: 2rem; }
+
+    /* Hero cards */
+    .hero-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem;
+    }
+    .hero-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 1.25rem; position: relative; overflow: hidden;
+    }
+    .hero-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    }
+    .hero-card.gemma31b::before { background: var(--accent); }
+    .hero-card.mistral::before { background: var(--cyan); }
+    .hero-card.gemma4b::before { background: var(--purple); }
+    .hero-card .model-name { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .hero-card .model-detail { font-size: 0.75rem; color: var(--text-muted); line-height: 1.7; }
+    .hero-card .model-detail span { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; }
+
+    /* Metric pills */
+    .pills {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.75rem; margin-bottom: 2rem;
+    }
+    .pill {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 1rem 1.1rem; text-align: center;
+    }
+    .pill .label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 0.35rem; }
+    .pill .value { font-family: 'JetBrains Mono', monospace; font-size: 1.3rem; font-weight: 700; }
+    .pill .sub { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .pill.best .value { color: var(--green); }
+    .pill.worst .value { color: var(--red); }
+    .pill.mid .value { color: var(--yellow); }
+
+    /* Sections */
+    h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
+    .section { margin-bottom: 2.5rem; }
+    .section-desc { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1rem; }
+
+    /* Tables */
+    .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    thead { background: var(--surface-2); }
+    th {
+      padding: 0.7rem 0.9rem; text-align: left; font-weight: 600; font-size: 0.72rem;
+      text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 0.65rem 0.9rem; border-bottom: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover { background: var(--surface-2); }
+    .val-good { color: var(--green); font-weight: 600; }
+    .val-bad { color: var(--red); font-weight: 600; }
+    .val-warn { color: var(--yellow); font-weight: 600; }
+    .val-best { color: var(--green); font-weight: 700; background: var(--green-soft); }
+
+    /* Bar charts */
+    .bar-chart { margin-bottom: 1.5rem; }
+    .bar-row {
+      display: grid; grid-template-columns: 140px 1fr 80px;
+      align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;
+    }
+    .bar-label { font-size: 0.78rem; font-weight: 500; text-align: right; }
+    .bar-track { height: 28px; background: var(--surface-2); border-radius: 6px; overflow: hidden; position: relative; }
+    .bar-fill {
+      height: 100%; border-radius: 6px; transition: width 0.6s ease;
+      display: flex; align-items: center; justify-content: flex-end; padding-right: 8px;
+      font-size: 0.7rem; font-weight: 600; color: white; min-width: 2px;
+    }
+    .bar-fill.gemma31b { background: linear-gradient(90deg, var(--accent), #818cf8); }
+    .bar-fill.mistral { background: linear-gradient(90deg, var(--cyan), #22d3ee); }
+    .bar-fill.gemma4b { background: linear-gradient(90deg, var(--purple), #c084fc); }
+    .bar-value { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; font-weight: 600; }
+
+    /* Grouped bars */
+    .grouped-chart { margin-bottom: 2rem; }
+    .group-label {
+      font-size: 0.75rem; font-weight: 600; color: var(--text-muted);
+      margin-bottom: 0.4rem; padding-left: 150px;
+    }
+
+    /* Callout */
+    .callout {
+      background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent);
+      border-radius: 0 8px 8px 0; padding: 1rem 1.25rem; margin-bottom: 1.5rem;
+    }
+    .callout .title { font-weight: 600; font-size: 0.85rem; margin-bottom: 0.3rem; }
+    .callout .body { font-size: 0.8rem; color: var(--text-muted); line-height: 1.6; }
+
+    /* Legend */
+    .legend {
+      display: flex; gap: 1.5rem; margin-bottom: 1rem; flex-wrap: wrap;
+    }
+    .legend-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+    .legend-dot.gemma31b { background: var(--accent); }
+    .legend-dot.mistral { background: var(--cyan); }
+    .legend-dot.gemma4b { background: var(--purple); }
+
+    /* Infra card */
+    .hw-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 1.25rem 1.5rem; margin-bottom: 2rem;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem;
+    }
+    .hw-item .label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 0.2rem; }
+    .hw-item .value { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; }
+
+    /* Status badges */
+    .badge {
+      display: inline-block; padding: 0.15rem 0.55rem; border-radius: 4px;
+      font-size: 0.7rem; font-weight: 600; font-family: 'JetBrains Mono', monospace;
+    }
+    .badge.pass { background: var(--green-soft); color: var(--green); }
+    .badge.fail { background: var(--red-soft); color: var(--red); }
+    .badge.warn { background: var(--yellow-soft); color: var(--yellow); }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .hero-grid { grid-template-columns: 1fr; }
+      .pills { grid-template-columns: repeat(2, 1fr); }
+      .bar-row { grid-template-columns: 100px 1fr 60px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>HyperPod 3-Model Benchmark Report</h1>
+      <div class="meta">ml.p5.48xlarge (8x H100 80GB) &bull; vLLM 0.19.0 &bull; April 6-7, 2026 &bull; mistral-sm4-eks (EKS 1.34)</div>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()">Toggle Theme</button>
+  </header>
+
+  <main>
+    <!-- Model cards -->
+    <div class="hero-grid">
+      <div class="hero-card mistral">
+        <div class="model-name">Mistral Small 4 &mdash; 119B</div>
+        <div class="model-detail">
+          <span>MoE 119B (6.5B active)</span><br>
+          <span>TP2 &bull; FP8 &bull; FLASH_ATTN_MLA</span><br>
+          <span>57 GiB/GPU &bull; Port 8001</span><br>
+          <span>mistral tool parser</span>
+        </div>
+      </div>
+      <div class="hero-card gemma31b">
+        <div class="model-name">Gemma 4 &mdash; 31B</div>
+        <div class="model-detail">
+          <span>Dense 31B</span><br>
+          <span>TP2 &bull; BF16 &bull; TRITON_ATTN</span><br>
+          <span>~38 GiB/GPU &bull; Port 8002</span><br>
+          <span>pythonic tool parser</span>
+        </div>
+      </div>
+      <div class="hero-card gemma4b">
+        <div class="model-name">Gemma 4 E4B &mdash; 4B</div>
+        <div class="model-detail">
+          <span>Dense 4B</span><br>
+          <span>TP1 &bull; BF16 &bull; TRITON_ATTN</span><br>
+          <span>~15 GiB &bull; Port 8000</span><br>
+          <span>pythonic tool parser</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Infrastructure -->
+    <div class="hw-card">
+      <div class="hw-item"><div class="label">Cluster</div><div class="value">mistral-sm4-eks</div></div>
+      <div class="hw-item"><div class="label">HyperPod</div><div class="value">mistral-sm4-hyperpod</div></div>
+      <div class="hw-item"><div class="label">Instance</div><div class="value">ml.p5.48xlarge</div></div>
+      <div class="hw-item"><div class="label">GPUs</div><div class="value">8x H100 80GB NVSwitch</div></div>
+      <div class="hw-item"><div class="label">GPUs Used</div><div class="value">5/8 (2+2+1)</div></div>
+      <div class="hw-item"><div class="label">Engine</div><div class="value">vLLM 0.19.0</div></div>
+      <div class="hw-item"><div class="label">Region</div><div class="value">us-east-2</div></div>
+      <div class="hw-item"><div class="label">Window</div><div class="value">~19 hrs FTP</div></div>
+    </div>
+
+    <!-- Headline metrics -->
+    <h2>Headline Comparison</h2>
+    <div class="pills">
+      <div class="pill best">
+        <div class="label">Best Throughput</div>
+        <div class="value">25,788</div>
+        <div class="sub">total tok/s &mdash; E4B @ QPS 20</div>
+      </div>
+      <div class="pill best">
+        <div class="label">Best ITL</div>
+        <div class="value">5.9 ms</div>
+        <div class="sub">Mistral SM4 @ QPS 0.5</div>
+      </div>
+      <div class="pill best">
+        <div class="label">Best Prefix Cache</div>
+        <div class="value">11.1x</div>
+        <div class="sub">Gemma 31B @ 16K prefix</div>
+      </div>
+      <div class="pill mid">
+        <div class="label">Best TTFT @ 16K</div>
+        <div class="value">379 ms</div>
+        <div class="sub">E4B (H100, TP1)</div>
+      </div>
+      <div class="pill best">
+        <div class="label">Max QPS @ SLO</div>
+        <div class="value">&gt;20</div>
+        <div class="sub">E4B on H100</div>
+      </div>
+      <div class="pill">
+        <div class="label">Models Colocated</div>
+        <div class="value">3</div>
+        <div class="sub">on 1 node, 5 GPUs</div>
+      </div>
+    </div>
+
+    <!-- QPS Sweep comparison -->
+    <div class="section">
+      <h2>QPS Sweep &mdash; Output tok/s (input=2048, output=512)</h2>
+      <p class="section-desc">Higher is better. Shows how each model scales throughput under increasing request rates.</p>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot mistral"></div>Mistral SM4 119B</div>
+        <div class="legend-item"><div class="legend-dot gemma31b"></div>Gemma 4 31B</div>
+        <div class="legend-item"><div class="legend-dot gemma4b"></div>Gemma 4 E4B</div>
+      </div>
+
+      <div class="grouped-chart">
+        <div class="group-label">QPS = 1.0</div>
+        <div class="bar-row"><div class="bar-label">Mistral SM4</div><div class="bar-track"><div class="bar-fill mistral" style="width:9.1%">471</div></div><div class="bar-value">471</div></div>
+        <div class="bar-row"><div class="bar-label">Gemma 4 31B</div><div class="bar-track"><div class="bar-fill gemma31b" style="width:9.1%">470</div></div><div class="bar-value">470</div></div>
+        <div class="bar-row"><div class="bar-label">Gemma 4 E4B</div><div class="bar-track"><div class="bar-fill gemma4b" style="width:8.4%">432</div></div><div class="bar-value">432</div></div>
+
+        <div class="group-label" style="margin-top:1rem">QPS = 4.0</div>
+        <div class="bar-row"><div class="bar-label">Mistral SM4</div><div class="bar-track"><div class="bar-fill mistral" style="width:30.9%">1,591</div></div><div class="bar-value">1,591</div></div>
+        <div class="bar-row"><div class="bar-label">Gemma 4 31B</div><div class="bar-track"><div class="bar-fill gemma31b" style="width:21.1%">1,086</div></div><div class="bar-value">1,086</div></div>
+        <div class="bar-row"><div class="bar-label">Gemma 4 E4B</div><div class="bar-track"><div class="bar-fill gemma4b" style="width:34.5%">1,776</div></div><div class="bar-value">1,776</div></div>
+
+        <div class="group-label" style="margin-top:1rem">QPS = 10.0 (E4B) / 8.0 (SM4, 31B)</div>
+        <div class="bar-row"><div class="bar-label">Mistral SM4</div><div class="bar-track"><div class="bar-fill mistral" style="width:41.9%">2,160</div></div><div class="bar-value">2,160</div></div>
+        <div class="bar-row"><div class="bar-label">Gemma 4 31B</div><div class="bar-track"><div class="bar-fill gemma31b" style="width:22.9%">1,182</div></div><div class="bar-value">1,182</div></div>
+        <div class="bar-row"><div class="bar-label">Gemma 4 E4B</div><div class="bar-track"><div class="bar-fill gemma4b" style="width:69.9%">3,602</div></div><div class="bar-value">3,602</div></div>
+
+        <div class="group-label" style="margin-top:1rem">QPS = 20.0 (E4B only)</div>
+        <div class="bar-row"><div class="bar-label">Gemma 4 E4B</div><div class="bar-track"><div class="bar-fill gemma4b" style="width:100%">5,158</div></div><div class="bar-value">5,158</div></div>
+      </div>
+    </div>
+
+    <!-- TTFT Context Scaling -->
+    <div class="section">
+      <h2>TTFT p50 vs Context Length (QPS=1.0)</h2>
+      <p class="section-desc">Lower is better. Shows prefill latency scaling. TRITON_ATTN (Gemma models) penalizes long-context prefill on H100.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Context</th><th>Mistral SM4 119B</th><th>Gemma 4 31B</th><th>Gemma 4 E4B</th><th>Winner</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1,024</td>
+              <td>93 ms</td>
+              <td>109 ms</td>
+              <td class="val-best">29 ms</td>
+              <td>E4B</td>
+            </tr>
+            <tr>
+              <td>4,096</td>
+              <td class="val-best">117 ms</td>
+              <td>376 ms</td>
+              <td>78 ms</td>
+              <td>E4B</td>
+            </tr>
+            <tr>
+              <td>8,192</td>
+              <td class="val-good">258 ms</td>
+              <td class="val-warn">990 ms</td>
+              <td class="val-best">156 ms</td>
+              <td>E4B</td>
+            </tr>
+            <tr>
+              <td>16,384</td>
+              <td class="val-warn">539 ms</td>
+              <td class="val-bad">1,788 ms</td>
+              <td class="val-good">379 ms</td>
+              <td>E4B</td>
+            </tr>
+            <tr>
+              <td>32,768</td>
+              <td class="val-bad">1,127 ms</td>
+              <td>&mdash;</td>
+              <td>&mdash;</td>
+              <td>SM4 (only tested)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout" style="margin-top:1rem">
+        <div class="title">Why is the 4B model faster at 16K than the 31B?</div>
+        <div class="body">
+          Both Gemma models use TRITON_ATTN (forced by heterogeneous head_dim 256/512). But the 31B has 8x more parameters to prefill.
+          Mistral SM4, despite being 119B total, uses MLA + FlashAttention with only 6.5B active params per token, giving it better long-context TTFT than the 31B dense model.
+        </div>
+      </div>
+    </div>
+
+    <!-- ITL Comparison -->
+    <div class="section">
+      <h2>Inter-Token Latency (ITL p50)</h2>
+      <p class="section-desc">Lower is better. Measures decode speed &mdash; how fast tokens stream after the first one.</p>
+
+      <div class="bar-chart">
+        <div class="bar-row"><div class="bar-label">Mistral SM4</div><div class="bar-track"><div class="bar-fill mistral" style="width:17.4%"></div></div><div class="bar-value val-good">5.9 ms</div></div>
+        <div class="bar-row"><div class="bar-label">Gemma 4 E4B</div><div class="bar-track"><div class="bar-fill gemma4b" style="width:20.6%"></div></div><div class="bar-value val-good">7.0 ms</div></div>
+        <div class="bar-row"><div class="bar-label">Gemma 4 31B</div><div class="bar-track"><div class="bar-fill gemma31b" style="width:50%"></div></div><div class="bar-value">17 ms</div></div>
+      </div>
+      <p class="section-desc">Mistral SM4's MoE architecture (6.5B active) delivers best-in-class ITL despite being 119B total. All models well under 50ms target.</p>
+    </div>
+
+    <!-- Prefix Caching -->
+    <div class="section">
+      <h2>Prefix Cache Speedup @ 16K</h2>
+      <p class="section-desc">Higher is better. Models with expensive prefill benefit most from caching.</p>
+
+      <div class="bar-chart">
+        <div class="bar-row"><div class="bar-label">Gemma 4 31B</div><div class="bar-track"><div class="bar-fill gemma31b" style="width:100%">11.1x</div></div><div class="bar-value val-good">11.1x</div></div>
+        <div class="bar-row"><div class="bar-label">Mistral SM4</div><div class="bar-track"><div class="bar-fill mistral" style="width:47.1%">5.2x</div></div><div class="bar-value val-good">5.2x</div></div>
+        <div class="bar-row"><div class="bar-label">Gemma 4 E4B</div><div class="bar-track"><div class="bar-fill gemma4b" style="width:35.1%">3.9x</div></div><div class="bar-value val-good">3.9x</div></div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Model</th><th>Prefix Len</th><th>TTFT (no cache)</th><th>TTFT (cached)</th><th>Speedup</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Gemma 4 31B</td><td>4,096</td><td>376 ms</td><td class="val-good">82 ms</td><td class="val-good">4.6x</td></tr>
+            <tr><td>Gemma 4 31B</td><td>16,384</td><td>1,788 ms</td><td class="val-good">161 ms</td><td class="val-best">11.1x</td></tr>
+            <tr><td>Mistral SM4</td><td>4,096</td><td>117 ms</td><td class="val-good">81 ms</td><td>1.4x</td></tr>
+            <tr><td>Mistral SM4</td><td>16,384</td><td>539 ms</td><td class="val-good">103 ms</td><td class="val-good">5.2x</td></tr>
+            <tr><td>Gemma 4 E4B</td><td>4,096</td><td>78 ms</td><td class="val-good">45 ms</td><td>1.7x</td></tr>
+            <tr><td>Gemma 4 E4B</td><td>16,384</td><td>379 ms</td><td class="val-good">98 ms</td><td class="val-good">3.9x</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout" style="margin-top:1rem">
+        <div class="title">Prefix caching inverts the TTFT ranking</div>
+        <div class="body">
+          Without caching, Gemma 31B has the worst 16K TTFT (1,788ms). <strong>With caching, it drops to 161ms</strong> &mdash; competitive with E4B (98ms) and Mistral (103ms).
+          The higher the uncached prefill cost, the more valuable caching becomes. For RAG and agentic workloads with shared system prompts, all three models deliver sub-200ms TTFT.
+        </div>
+      </div>
+    </div>
+
+    <!-- Full QPS tables -->
+    <div class="section">
+      <h2>Full QPS Sweep Data</h2>
+
+      <h3 style="font-size:0.85rem; margin: 1rem 0 0.5rem; color: var(--cyan)">Mistral Small 4 119B (TP2, FP8)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>QPS</th><th>TTFT p50</th><th>TTFT p99</th><th>ITL p50</th><th>Output tok/s</th><th>Total tok/s</th><th>Peak Conc</th><th>SLO</th></tr></thead>
+          <tbody>
+            <tr><td>0.5</td><td>95 ms</td><td>173 ms</td><td>5.9 ms</td><td>247</td><td>1,232</td><td>5</td><td><span class="badge pass">PASS</span></td></tr>
+            <tr><td>1.0</td><td>31 ms</td><td>41 ms</td><td>7.7 ms</td><td>471</td><td>2,354</td><td>9</td><td><span class="badge pass">PASS</span></td></tr>
+            <tr><td>2.0</td><td>77 ms</td><td>164 ms</td><td>11.7 ms</td><td>916</td><td>4,580</td><td>27</td><td><span class="badge pass">PASS</span></td></tr>
+            <tr><td>4.0</td><td>48 ms</td><td>102 ms</td><td>15.9 ms</td><td>1,591</td><td>7,949</td><td>48</td><td><span class="badge pass">PASS</span></td></tr>
+            <tr><td>8.0</td><td>57 ms</td><td>3,335 ms</td><td>20.1 ms</td><td>2,160</td><td>10,795</td><td>82</td><td><span class="badge fail">FAIL</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 style="font-size:0.85rem; margin: 1rem 0 0.5rem; color: var(--accent)">Gemma 4 31B (TP2, BF16)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>QPS</th><th>TTFT p50</th><th>TTFT p99</th><th>ITL p50</th><th>Output tok/s</th><th>Total tok/s</th><th>Peak Conc</th></tr></thead>
+          <tbody>
+            <tr><td>1.0</td><td>192 ms</td><td>2,374 ms</td><td>17 ms</td><td>470</td><td>2,352</td><td>20</td></tr>
+            <tr><td>4.0</td><td>509 ms</td><td>10,817 ms</td><td>33 ms</td><td>1,086</td><td>5,430</td><td>93</td></tr>
+            <tr><td>10.0</td><td>2,396 ms</td><td>22,221 ms</td><td>34 ms</td><td>1,182</td><td>5,910</td><td>100</td></tr>
+            <tr><td>20.0</td><td>5,005 ms</td><td>27,085 ms</td><td>34 ms</td><td>1,188</td><td>5,938</td><td>100</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 style="font-size:0.85rem; margin: 1rem 0 0.5rem; color: var(--purple)">Gemma 4 E4B (TP1, BF16)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>QPS</th><th>TTFT p50</th><th>TTFT p99</th><th>ITL p50</th><th>Output tok/s</th><th>Total tok/s</th><th>Peak Conc</th></tr></thead>
+          <tbody>
+            <tr><td>1.0</td><td>62 ms</td><td>2,966 ms</td><td>7.0 ms</td><td>432</td><td>2,160</td><td>8</td></tr>
+            <tr><td>4.0</td><td>61 ms</td><td>121 ms</td><td>7.4 ms</td><td>1,776</td><td>8,880</td><td>29</td></tr>
+            <tr><td>10.0</td><td>39 ms</td><td>147 ms</td><td>8.6 ms</td><td>3,602</td><td>18,010</td><td>64</td></tr>
+            <tr><td>20.0</td><td>46 ms</td><td>158 ms</td><td>10.3 ms</td><td>5,158</td><td>25,788</td><td>100</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Context Scaling tables -->
+    <div class="section">
+      <h2>Context Scaling Data (QPS=1.0, output=512)</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Context</th><th colspan="2">Mistral SM4 119B</th><th colspan="2">Gemma 4 31B</th><th colspan="2">Gemma 4 E4B</th></tr>
+            <tr><th></th><th>TTFT p50</th><th>Output tok/s</th><th>TTFT p50</th><th>Output tok/s</th><th>TTFT p50</th><th>Output tok/s</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>1,024</td><td>93 ms</td><td>472</td><td>109 ms</td><td>438</td><td class="val-best">29 ms</td><td>479</td></tr>
+            <tr><td>2,048</td><td class="val-good">31 ms</td><td>471</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+            <tr><td>4,096</td><td>117 ms</td><td>468</td><td>376 ms</td><td>424</td><td class="val-best">78 ms</td><td>475</td></tr>
+            <tr><td>8,192</td><td>258 ms</td><td>463</td><td class="val-warn">990 ms</td><td>388</td><td class="val-best">156 ms</td><td>469</td></tr>
+            <tr><td>16,384</td><td>539 ms</td><td>442</td><td class="val-bad">1,788 ms</td><td>69</td><td class="val-good">379 ms</td><td>461</td></tr>
+            <tr><td>32,768</td><td class="val-bad">1,127 ms</td><td>232</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Success criteria -->
+    <div class="section">
+      <h2>Success Criteria Status</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Metric</th><th>Target</th><th>Mistral SM4</th><th>Gemma 4 31B</th><th>Gemma 4 E4B</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>P0: Tool calling</td><td>Works</td>
+              <td><span class="badge pass">PASS</span> parallel</td>
+              <td><span class="badge pass">PASS</span> parallel</td>
+              <td><span class="badge pass">PASS</span> 100% BFCL</td>
+            </tr>
+            <tr>
+              <td>ITL p50</td><td>&lt; 50 ms</td>
+              <td><span class="badge pass">5.9 ms</span></td>
+              <td><span class="badge pass">17 ms</span></td>
+              <td><span class="badge pass">7.0 ms</span></td>
+            </tr>
+            <tr>
+              <td>TTFT p50 @ 16K</td><td>&lt; 500 ms</td>
+              <td><span class="badge fail">539 ms</span></td>
+              <td><span class="badge fail">1,788 ms</span></td>
+              <td><span class="badge pass">379 ms</span></td>
+            </tr>
+            <tr>
+              <td>TTFT p50 @ 16K (cached)</td><td>&lt; 200 ms</td>
+              <td><span class="badge pass">103 ms</span></td>
+              <td><span class="badge pass">161 ms</span></td>
+              <td><span class="badge pass">98 ms</span></td>
+            </tr>
+            <tr>
+              <td>Prefix cache speedup</td><td>&ge; 1.5x</td>
+              <td><span class="badge pass">5.2x</span></td>
+              <td><span class="badge pass">11.1x</span></td>
+              <td><span class="badge pass">3.9x</span></td>
+            </tr>
+            <tr>
+              <td>Max QPS @ SLO</td><td>&ge; 2.0</td>
+              <td><span class="badge pass">~4.0</span></td>
+              <td><span class="badge warn">~1.0</span></td>
+              <td><span class="badge pass">&gt;20</span></td>
+            </tr>
+            <tr>
+              <td>Peak output tok/s</td><td>&mdash;</td>
+              <td>2,160</td>
+              <td>1,188</td>
+              <td><span class="badge pass">5,158</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Key findings -->
+    <div class="section">
+      <h2>Key Findings</h2>
+
+      <div class="callout">
+        <div class="title">1. TRITON_ATTN is the dominant performance factor</div>
+        <div class="body">
+          Both Gemma 4 variants force TRITON_ATTN due to heterogeneous head_dim (256 local + 512 global). This backend is significantly slower for prefill on H100 than FlashAttention.
+          Mistral SM4, despite being 4x larger (119B vs 31B), has better long-context TTFT because it uses FLASH_ATTN_MLA with only 6.5B active params.
+          <strong>Takeaway:</strong> Attention backend matters more than model size for prefill latency.
+        </div>
+      </div>
+
+      <div class="callout" style="border-left-color: var(--green)">
+        <div class="title">2. Prefix caching equalizes all three models</div>
+        <div class="body">
+          With prefix caching at 16K, all three models deliver sub-200ms TTFT: Gemma E4B (98ms), Mistral SM4 (103ms), Gemma 31B (161ms).
+          The model with the worst uncached TTFT (Gemma 31B) gets the biggest cache benefit (11.1x). For RAG/agentic workloads with shared system prompts, prefix caching is the great equalizer.
+        </div>
+      </div>
+
+      <div class="callout" style="border-left-color: var(--purple)">
+        <div class="title">3. Small models dominate throughput on H100</div>
+        <div class="body">
+          Gemma 4 E4B on a single H100 delivers 5,158 output tok/s at QPS=20 &mdash; more than 2x the 31B (1,188) and 2.4x Mistral SM4 (2,160).
+          For high-throughput, low-latency use cases, the 4B model is the clear winner. TTFT stays under 160ms even at QPS=20.
+        </div>
+      </div>
+
+      <div class="callout" style="border-left-color: var(--cyan)">
+        <div class="title">4. MoE delivers best ITL-per-parameter</div>
+        <div class="body">
+          Mistral SM4's MoE architecture (6.5B active of 119B total) achieves 5.9ms ITL p50 &mdash; the best of all three models.
+          Dense models pay a proportional ITL cost: 7ms for 4B, 17ms for 31B. MoE only pays for active parameters during decode.
+        </div>
+      </div>
+
+      <div class="callout" style="border-left-color: var(--yellow)">
+        <div class="title">5. Three models colocated on one p5.48xlarge</div>
+        <div class="body">
+          All three models ran simultaneously on a single ml.p5.48xlarge using 5 of 8 GPUs: Mistral SM4 (2 GPUs, TP2), Gemma 31B (2 GPUs, TP2), Gemma E4B (1 GPU, TP1).
+          This demonstrates efficient multi-model serving on HyperPod with K8s GPU device plugin scheduling.
+        </div>
+      </div>
+    </div>
+
+    <!-- Deployment lessons -->
+    <div class="section">
+      <h2>Deployment Lessons</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Lesson</th><th>Applies To</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>vLLM 0.19 <code>reasoning_effort</code> bug &mdash; sed patch required for Mistral tokenizer</td><td>Mistral SM4</td></tr>
+            <tr><td>2</td><td><code>vllm/vllm-openai:gemma4</code> image fails on H100 (NVML error) &mdash; use <code>latest</code> + git transformers</td><td>Gemma models</td></tr>
+            <tr><td>3</td><td>PyPI transformers lacks <code>gemma4</code> model_type &mdash; must install from git</td><td>Gemma models</td></tr>
+            <tr><td>4</td><td>Heterogeneous head_dim forces TRITON_ATTN &mdash; major TTFT penalty on H100</td><td>Gemma models</td></tr>
+            <tr><td>5</td><td>Don't set CUDA_VISIBLE_DEVICES with K8s nvidia device plugin &mdash; causes NVML InvalidArgument</td><td>All</td></tr>
+            <tr><td>6</td><td>HyperPod stale disk-pressure taints &mdash; fix with kubelet restart</td><td>All HyperPod</td></tr>
+            <tr><td>7</td><td>Tolerations needed: <code>nvidia.com/gpu</code>, <code>RestrictedNode</code>, <code>disk-pressure</code></td><td>All HyperPod</td></tr>
+            <tr><td>8</td><td>Tool calling: <code>pythonic</code> parser works for Gemma, <code>mistral</code> for Mistral</td><td>All</td></tr>
+            <tr><td>9</td><td><code>mistral_common</code> gets overwritten by git transformers &mdash; reinstall after</td><td>Mistral SM4</td></tr>
+            <tr><td>10</td><td>Prefix caching is essential for TRITON_ATTN models in RAG/agentic workloads</td><td>Gemma models</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    function toggleTheme() {
+      const html = document.documentElement;
+      html.dataset.theme = html.dataset.theme === 'dark' ? 'light' : 'dark';
+    }
+  </script>
+</body>
+</html>

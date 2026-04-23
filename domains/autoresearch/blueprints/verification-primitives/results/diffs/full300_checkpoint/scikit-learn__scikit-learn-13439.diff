@@ -1,0 +1,27 @@
+diff --git a/sklearn/pipeline.py b/sklearn/pipeline.py
+index 7eaf9a46f..e47db5da2 100644
+--- a/sklearn/pipeline.py
++++ b/sklearn/pipeline.py
+@@ -199,6 +199,12 @@ class Pipeline(_BaseComposition):
+             if trans is not None and trans != 'passthrough':
+                 yield idx, name, trans
+ 
++    def __len__(self):
++        """
++        Returns the length of the Pipeline
++        """
++        return len(self.steps)
++
+     def __getitem__(self, ind):
+         """Returns a sub-pipeline or a single esimtator in the pipeline
+ 
+@@ -210,7 +216,8 @@ class Pipeline(_BaseComposition):
+         """
+         if isinstance(ind, slice):
+             if ind.step not in (1, None):
+-                raise ValueError('Pipeline slicing only supports a step of 1')
++                raise ValueError('Pipeline slicing only supports a step of 1'
++                                 )
+             return self.__class__(self.steps[ind])
+         try:
+             name, est = self.steps[ind]

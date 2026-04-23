@@ -1,0 +1,219 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b899..50d05cd6 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -1,4 +1,5 @@
+ """Rewrite assertion AST to produce nice error messages"""
++
+ from __future__ import absolute_import
+ from __future__ import division
+ from __future__ import print_function
+@@ -334,8 +335,7 @@ class AssertionRewritingHook(object):
+         pkg_resources.register_loader_type(cls, pkg_resources.DefaultProvider)
+ 
+     def get_data(self, pathname):
+-        """Optional PEP302 get_data API.
+-        """
++        """Optional PEP302 get_data API."""
+         with open(pathname, "rb") as f:
+             return f.read()
+ 
+@@ -483,11 +483,11 @@ def _saferepr(obj):
+     # only occurs in python2.x, repr must return text in python3+
+     if isinstance(r, bytes):
+         # Represent unprintable bytes as `\x##`
+-        r = u"".join(
+-            u"\\x{:x}".format(ord(c)) if c not in string.printable else c.decode()
++        r = "".join(
++            "\\x{:x}".format(ord(c)) if c not in string.printable else c.decode()
+             for c in r
+         )
+-    return r.replace(u"\n", u"\\n")
++    return r.replace("\n", "\\n")
+ 
+ 
+ def _format_assertmsg(obj):
+@@ -502,10 +502,10 @@ def _format_assertmsg(obj):
+     # contains a newline it gets escaped, however if an object has a
+     # .__repr__() which contains newlines it does not get escaped.
+     # However in either case we want to preserve the newline.
+-    replaces = [(u"\n", u"\n~"), (u"%", u"%%")]
++    replaces = [("\n", "\n~"), ("%", "%%")]
+     if not isinstance(obj, six.string_types):
+         obj = saferepr(obj)
+-        replaces.append((u"\\n", u"\n~"))
++        replaces.append(("\\n", "\n~"))
+ 
+     if isinstance(obj, bytes):
+         replaces = [(r1.encode(), r2.encode()) for r1, r2 in replaces]
+@@ -529,7 +529,7 @@ def _should_repr_global_name(obj):
+ def _format_boolop(explanations, is_or):
+     explanation = "(" + (is_or and " or " or " and ").join(explanations) + ")"
+     if isinstance(explanation, six.text_type):
+-        return explanation.replace(u"%", u"%%")
++        return explanation.replace("%", "%%")
+     else:
+         return explanation.replace(b"%", b"%%")
+ 
+@@ -811,6 +811,131 @@ class AssertionRewriter(ast.NodeVisitor):
+         res = self.assign(node)
+         return res, self.explanation_param(self.display(res))
+ 
++    def _visit_Assert_all_any(self, assert_, func_name, comp):
++        """Unroll all()/any() calls into for loops for better failure messages.
++
++        ``assert all(pred(x) for x in iterable)`` becomes a for loop
++        that asserts each element individually, so that you can see
++        which element failed.
++
++        ``assert any(pred(x) for x in iterable)`` becomes a for loop
++        that raises if no element satisfies the predicate.
++        """
++        # Extract the element expression and the generators from the comprehension
++        elt = comp.elt
++        generators = comp.generators
++
++        if func_name == "all":
++            # For `assert all(expr for x in iterable)`:
++            # Rewrite as:
++            #   for x in iterable:
++            #       assert expr, orig_msg
++            inner_assert = ast.Assert(test=elt, msg=assert_.msg)
++            # Build the for loop from innermost to outermost generator
++            body = [inner_assert]
++            for gen in reversed(generators):
++                # Add any `if` filters as wrapping conditions
++                # gen.ifs contains filter conditions, e.g. `x for x in items if x > 0`
++                if gen.ifs:
++                    # Combine all ifs with AND
++                    test = gen.ifs[0]
++                    for if_clause in gen.ifs[1:]:
++                        test = ast.BoolOp(op=ast.And(), values=[test, if_clause])
++                    body = [ast.If(test=test, body=body, orelse=[])]
++                for_loop = ast.For(
++                    target=gen.target,
++                    iter=gen.iter,
++                    body=body,
++                    orelse=[],
++                )
++                body = [for_loop]
++            # Fix line numbers on all generated nodes
++            for stmt in body:
++                set_location(stmt, assert_.lineno, assert_.col_offset)
++            # The inner assert will be visited again by the normal rewriting machinery
++            new_stmts = []
++            for stmt in body:
++                if isinstance(stmt, ast.Assert):
++                    new_stmts.extend(self.visit(stmt))
++                else:
++                    new_stmts.extend(self._fix_and_visit_stmt(stmt, assert_))
++            return new_stmts
++        else:
++            # For `assert any(expr for x in iterable)`:
++            # Rewrite as:
++            #   @py_assert_any = False
++            #   for x in iterable:
++            #       if expr:
++            #           @py_assert_any = True
++            #           break
++            #   assert @py_assert_any, orig_msg
++            found_var = "@py_assert_any_" + str(id(assert_))
++            assign_false = ast.Assign(
++                targets=[ast.Name(id=found_var, ctx=ast.Store())],
++                value=_NameConstant(False),
++            )
++            set_true_and_break = [
++                ast.Assign(
++                    targets=[ast.Name(id=found_var, ctx=ast.Store())],
++                    value=_NameConstant(True),
++                ),
++                ast.Break(),
++            ]
++            if_found = ast.If(test=elt, body=set_true_and_break, orelse=[])
++            body = [if_found]
++            for gen in reversed(generators):
++                if gen.ifs:
++                    test = gen.ifs[0]
++                    for if_clause in gen.ifs[1:]:
++                        test = ast.BoolOp(op=ast.And(), values=[test, if_clause])
++                    body = [ast.If(test=test, body=body, orelse=[])]
++                for_loop = ast.For(
++                    target=gen.target,
++                    iter=gen.iter,
++                    body=body,
++                    orelse=[],
++                )
++                body = [for_loop]
++            final_assert = ast.Assert(
++                test=ast.Name(id=found_var, ctx=ast.Load()),
++                msg=assert_.msg,
++            )
++            all_stmts = [assign_false] + body + [final_assert]
++            for stmt in all_stmts:
++                set_location(stmt, assert_.lineno, assert_.col_offset)
++            new_stmts = []
++            for stmt in all_stmts:
++                if isinstance(stmt, ast.Assert):
++                    new_stmts.extend(self.visit(stmt))
++                else:
++                    new_stmts.extend(self._fix_and_visit_stmt(stmt, assert_))
++            return new_stmts
++
++    def _fix_and_visit_stmt(self, stmt, orig_assert):
++        """Recursively fix line numbers and rewrite asserts inside a statement."""
++        set_location(stmt, orig_assert.lineno, orig_assert.col_offset)
++        # Walk the statement and rewrite any nested assert statements
++        if isinstance(stmt, ast.For):
++            new_body = []
++            for child in stmt.body:
++                if isinstance(child, ast.Assert):
++                    new_body.extend(self.visit(child))
++                else:
++                    new_body.extend(self._fix_and_visit_stmt(child, orig_assert))
++            stmt.body = new_body
++            return [stmt]
++        elif isinstance(stmt, ast.If):
++            new_body = []
++            for child in stmt.body:
++                if isinstance(child, ast.Assert):
++                    new_body.extend(self.visit(child))
++                else:
++                    new_body.extend(self._fix_and_visit_stmt(child, orig_assert))
++            stmt.body = new_body
++            return [stmt]
++        else:
++            return [stmt]
++
+     def visit_Assert(self, assert_):
+         """Return the AST statements to replace the ast.Assert instance.
+ 
+@@ -820,6 +945,19 @@ class AssertionRewriter(ast.NodeVisitor):
+         the expression is false.
+ 
+         """
++        if (
++            isinstance(assert_.test, ast.Call)
++            and isinstance(assert_.test.func, ast.Name)
++            and assert_.test.func.id in ("all", "any")
++            and len(assert_.test.args) == 1
++            and not assert_.test.keywords
++        ):
++            call = assert_.test
++            func_name = call.func.id
++            arg = call.args[0]
++            if isinstance(arg, (ast.GeneratorExp, ast.ListComp)):
++                return self._visit_Assert_all_any(assert_, func_name, arg)
++
+         if isinstance(assert_.test, ast.Tuple) and len(assert_.test.elts) >= 1:
+             from _pytest.warning_types import PytestAssertRewriteWarning
+             import warnings
+@@ -899,9 +1037,7 @@ warn_explicit(
+     filename={filename!r},
+     lineno={lineno},
+ )
+-            """.format(
+-                filename=module_path.strpath, lineno=lineno
+-            )
++            """.format(filename=module_path.strpath, lineno=lineno)
+         ).body
+         return ast.If(val_is_none, send_warning, [])

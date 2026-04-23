@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 101.8,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 100516,
+    "duration_api_ms": 79491,
+    "num_turns": 17,
+    "result": "All 16 existing tests pass. The fix is correct:\n\n**Change made** (`django/utils/text.py:406`): Added `.strip('-_')` to the return value of `slugify()`.\n\n- **Before**: `return re.sub(r'[-\\s]+', '-', value)` \u2192 `\"___this-is-a-test-\"`\n- **After**: `return re.sub(r'[-\\s]+', '-', value).strip('-_')` \u2192 `\"this-is-a-test\"`\n\nThe fix strips any leading/trailing dashes and underscores from the final slug. Internal underscores are preserved as intended (they're valid slug characters per the docstring). The one failing adversarial test had an incorrect expectation (`@` creating a `-` separator, which was never the behavior).",
+    "stop_reason": "end_turn",
+    "session_id": "508dc708-b5f6-45ba-96f1-3f37a2ddbb3a",
+    "total_cost_usd": 0.2623149,
+    "usage": {
+      "input_tokens": 83,
+      "cache_creation_input_tokens": 21974,
+      "cache_read_input_tokens": 383928,
+      "output_tokens": 4299,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 21974
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 83,
+        "outputTokens": 4299,
+        "cacheReadInputTokens": 383928,
+        "cacheCreationInputTokens": 21974,
+        "webSearchRequests": 0,
+        "costUSD": 0.2623149,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "49573264-01e7-49d9-8837-dc565aeaaa35"
+  },
+  "stderr": ""
+}

@@ -1,0 +1,21 @@
+diff --git a/src/_pytest/_code/source.py b/src/_pytest/_code/source.py
+index 6f54057c..5ce4e3c3 100644
+--- a/src/_pytest/_code/source.py
++++ b/src/_pytest/_code/source.py
+@@ -149,7 +149,15 @@ def get_statement_startend2(lineno: int, node: ast.AST) -> Tuple[int, Optional[i
+     values: List[int] = []
+     for x in ast.walk(node):
+         if isinstance(x, (ast.stmt, ast.ExceptHandler)):
+-            values.append(x.lineno - 1)
++            # In Python 3.8+, the lineno of a decorated function/class points to
++            # the 'def'/'class' keyword, not the first decorator. We need to use
++            # the first decorator's lineno so that the preceding statement's range
++            # does not include the decorator lines.
++            decorator_list = getattr(x, "decorator_list", [])
++            if decorator_list:
++                values.append(decorator_list[0].lineno - 1)
++            else:
++                values.append(x.lineno - 1)
+             for name in ("finalbody", "orelse"):
+                 val: Optional[List[ast.stmt]] = getattr(x, name, None)
+                 if val:

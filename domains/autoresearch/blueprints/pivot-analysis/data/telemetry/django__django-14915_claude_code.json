@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 44.3,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 43012,
+    "duration_api_ms": 29723,
+    "num_turns": 10,
+    "result": "All 21 tests pass. The fix is a single `__hash__` method added to `ModelChoiceIteratorValue`:\n\n```python\ndef __hash__(self):\n    return hash(self.value)\n```\n\nIn Python 3, defining `__eq__` without `__hash__` implicitly sets `__hash__ = None`, making the object unhashable. Since `ModelChoiceIteratorValue` compares equal to its underlying `value`, it should also hash the same way \u2014 allowing it to be used as a dict key or in sets.",
+    "stop_reason": "end_turn",
+    "session_id": "3bb3444c-a76b-42b2-8ec8-6c322982a4fd",
+    "total_cost_usd": 0.10434405,
+    "usage": {
+      "input_tokens": 76,
+      "cache_creation_input_tokens": 11259,
+      "cache_read_input_tokens": 150166,
+      "output_tokens": 1123,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 11259
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 76,
+        "outputTokens": 1123,
+        "cacheReadInputTokens": 150166,
+        "cacheCreationInputTokens": 11259,
+        "webSearchRequests": 0,
+        "costUSD": 0.10434405,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "c28c0800-0d70-4d7e-8219-6bb543a480c9"
+  },
+  "stderr": ""
+}

@@ -1,0 +1,174 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b899..706ba9c2 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -1,4 +1,5 @@
+ """Rewrite assertion AST to produce nice error messages"""
++
+ from __future__ import absolute_import
+ from __future__ import division
+ from __future__ import print_function
+@@ -334,8 +335,7 @@ class AssertionRewritingHook(object):
+         pkg_resources.register_loader_type(cls, pkg_resources.DefaultProvider)
+ 
+     def get_data(self, pathname):
+-        """Optional PEP302 get_data API.
+-        """
++        """Optional PEP302 get_data API."""
+         with open(pathname, "rb") as f:
+             return f.read()
+ 
+@@ -483,11 +483,11 @@ def _saferepr(obj):
+     # only occurs in python2.x, repr must return text in python3+
+     if isinstance(r, bytes):
+         # Represent unprintable bytes as `\x##`
+-        r = u"".join(
+-            u"\\x{:x}".format(ord(c)) if c not in string.printable else c.decode()
++        r = "".join(
++            "\\x{:x}".format(ord(c)) if c not in string.printable else c.decode()
+             for c in r
+         )
+-    return r.replace(u"\n", u"\\n")
++    return r.replace("\n", "\\n")
+ 
+ 
+ def _format_assertmsg(obj):
+@@ -502,10 +502,10 @@ def _format_assertmsg(obj):
+     # contains a newline it gets escaped, however if an object has a
+     # .__repr__() which contains newlines it does not get escaped.
+     # However in either case we want to preserve the newline.
+-    replaces = [(u"\n", u"\n~"), (u"%", u"%%")]
++    replaces = [("\n", "\n~"), ("%", "%%")]
+     if not isinstance(obj, six.string_types):
+         obj = saferepr(obj)
+-        replaces.append((u"\\n", u"\n~"))
++        replaces.append(("\\n", "\n~"))
+ 
+     if isinstance(obj, bytes):
+         replaces = [(r1.encode(), r2.encode()) for r1, r2 in replaces]
+@@ -529,7 +529,7 @@ def _should_repr_global_name(obj):
+ def _format_boolop(explanations, is_or):
+     explanation = "(" + (is_or and " or " or " and ").join(explanations) + ")"
+     if isinstance(explanation, six.text_type):
+-        return explanation.replace(u"%", u"%%")
++        return explanation.replace("%", "%%")
+     else:
+         return explanation.replace(b"%", b"%%")
+ 
+@@ -899,9 +899,7 @@ warn_explicit(
+     filename={filename!r},
+     lineno={lineno},
+ )
+-            """.format(
+-                filename=module_path.strpath, lineno=lineno
+-            )
++            """.format(filename=module_path.strpath, lineno=lineno)
+         ).body
+         return ast.If(val_is_none, send_warning, [])
+ 
+@@ -968,6 +966,16 @@ warn_explicit(
+         """
+         visit `ast.Call` nodes on Python3.5 and after
+         """
++        if (
++            isinstance(call.func, ast.Name)
++            and call.func.id in ("all", "any")
++            and len(call.args) == 1
++            and not call.keywords
++            and isinstance(call.args[0], (ast.GeneratorExp, ast.ListComp))
++            and len(call.args[0].generators) == 1
++            and not call.args[0].generators[0].is_async
++        ):
++            return self._visit_all_any_call(call)
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []
+@@ -991,6 +999,88 @@ warn_explicit(
+         outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
+         return res, outer_expl
+ 
++    def _visit_all_any_call(self, call):
++        """Unroll all()/any() calls with generator/listcomp arguments.
++
++        Instead of just showing ``assert False = all(<generator>)``, this
++        rewrites the call so that each element of the iterable is checked
++        individually, producing a much more useful failure message that
++        shows which element failed (for ``all``) or that no element
++        matched (for ``any``).
++        """
++        is_all = call.func.id == "all"
++        comp = call.args[0]
++        generator = comp.generators[0]
++
++        # Result variable: True for all (assume all pass until one fails),
++        # False for any (assume none pass until one does).
++        result_var = self.variable()
++        initial_val = _NameConstant(True if is_all else False)
++        self.statements.append(
++            ast.Assign([ast.Name(result_var, ast.Store())], initial_val)
++        )
++
++        # Variable to hold the failing/passing element's explanation string
++        expl_var = self.variable()
++        self.statements.append(
++            ast.Assign([ast.Name(expl_var, ast.Store())], ast.Str(""))
++        )
++
++        # Use self.visit on the element expression to get full explanation
++        # (including intermediate values for function calls, etc.)
++        # Save and restore self.statements and self.on_failure so that the
++        # element evaluation statements and format assignments go into the
++        # for loop body, not the outer scope.
++        save_statements = self.statements
++        save_on_failure = self.on_failure
++        self.statements = []
++        self.on_failure = []
++        # Push format context for element explanation
++        self.push_format_context()
++        elt_res, elt_expl = self.visit(comp.elt)
++        elt_expl_template = self.pop_format_context(ast.Str(elt_expl))
++        elt_stmts = self.statements
++        # The on_failure list now contains the format dict assignments
++        format_stmts = self.on_failure
++        self.statements = save_statements
++        self.on_failure = save_on_failure
++
++        # Build the inner check and break
++        # For `all`: if not <elt>: result = False; expl = ...; break
++        # For `any`: if <elt>: result = True; expl = ...; break
++        if is_all:
++            check = ast.UnaryOp(ast.Not(), elt_res)
++        else:
++            check = elt_res
++
++        set_result = ast.Assign(
++            [ast.Name(result_var, ast.Store())],
++            _NameConstant(False if is_all else True),
++        )
++        # Store the element explanation string for the failure message
++        set_expl = ast.Assign([ast.Name(expl_var, ast.Store())], elt_expl_template)
++        # The format_stmts (format dict assignments) need to run before
++        # the explanation template can be formatted
++        inner_if_body = format_stmts + [set_result, set_expl, ast.Break()]
++        inner_if = ast.If(check, inner_if_body, [])
++
++        # Build loop body: element evaluation statements + the check
++        loop_body = elt_stmts + [inner_if]
++
++        # Handle comprehension `if` filters: wrap the body in nested ifs
++        for if_clause in reversed(generator.ifs):
++            loop_body = [ast.If(if_clause, loop_body, [])]
++
++        # Build the for loop
++        for_loop = ast.For(generator.target, generator.iter, loop_body, [])
++        self.statements.append(for_loop)
++
++        # Build the explanation
++        res = ast.Name(result_var, ast.Load())
++        expl_name = ast.Name(expl_var, ast.Load())
++        expl_template = self.explanation_param(expl_name)
++        return res, expl_template
++
+     def visit_Starred(self, starred):
+         # From Python 3.5, a Starred node can appear in a function call
+         res, expl = self.visit(starred.value)

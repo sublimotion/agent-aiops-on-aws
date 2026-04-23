@@ -87,7 +87,7 @@ MODELS = {
         "role": "finetuning-control",
     },
     "swesmith-qwen25-32b": {
-        "name": "SWE-agent-LM 32B (SERA-finetuned)",
+        "name": "SWE-agent-LM 32B (SWE-smith SFT, Princeton)",
         "hf_id": "SWE-bench/SWE-agent-LM-32B",
         "weights_path": "/mnt/nvme/models/swe-agent-lm-32b",
         "tp": 1,
@@ -99,6 +99,20 @@ MODELS = {
         ],
         "chat_template": "qwen",
         "role": "finetuning-after",
+    },
+    "sera-32b-allenai": {
+        "name": "allenai/SERA-32B (SVG, Allen AI)",
+        "hf_id": "allenai/SERA-32B",
+        "weights_path": "/mnt/nvme/models/sera-32b-allenai",
+        "tp": 1,
+        "context": 65536,
+        "vllm_args": [
+            "--tool-call-parser", "hermes",
+            "--enable-auto-tool-choice",
+            "--enable-prefix-caching",
+        ],
+        "chat_template": "qwen",  # Qwen 3-32B base — verify tool calling format
+        "role": "finetuning-svg",
     },
     "qwen35-397b": {
         "name": "Qwen3.5-397B-A17B FP8",
@@ -553,8 +567,8 @@ def generate_leaderboard(result_files: list[str]):
               f"SWE-smith 32B ({100*swesmith['pass_rate']:.1f}%) = {delta:+.0f}pp")
     if base32 and swesmith:
         delta = (swesmith["pass_rate"] - base32["pass_rate"]) * 100
-        print(f"  SERA effect: Base 32B ({100*base32['pass_rate']:.1f}%) → "
-              f"SWE-smith 32B ({100*swesmith['pass_rate']:.1f}%) = {delta:+.0f}pp")
+        print(f"  SWE-smith SFT effect: Base 32B ({100*base32['pass_rate']:.1f}%) → "
+              f"SWE-agent-LM 32B ({100*swesmith['pass_rate']:.1f}%) = {delta:+.0f}pp")
     if devstral and qwen35:
         delta = (qwen35["pass_rate"] - devstral["pass_rate"]) * 100
         print(f"  Scale axis: Devstral 24B ({100*devstral['pass_rate']:.1f}%) → "

@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 158.2,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 156862,
+    "duration_api_ms": 130165,
+    "num_turns": 30,
+    "result": "The fix is clean and minimal. Here's what it does:\n\n- **Before**: `verbose_name_plural` always fell back to `model._meta.verbose_name_plural`, ignoring any `verbose_name` set on the inline class.\n- **After**: If `verbose_name` is explicitly set on the inline class (`self.__class__.verbose_name is not None`), `verbose_name_plural` is derived from it by appending `'s'` (using `format_lazy` to handle lazy translation strings). Otherwise, it falls back to the model's `verbose_name_plural`.\n\nThis is consistent with how Django's model `Meta` class handles the same situation (see `django/db/models/options.py:191-192`).",
+    "stop_reason": "end_turn",
+    "session_id": "fcf29056-5fee-4719-ad8b-19271d7456f6",
+    "total_cost_usd": 0.3487051499999999,
+    "usage": {
+      "input_tokens": 92,
+      "cache_creation_input_tokens": 22105,
+      "cache_read_input_tokens": 581418,
+      "output_tokens": 6074,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 22105
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 92,
+        "outputTokens": 6074,
+        "cacheReadInputTokens": 581418,
+        "cacheCreationInputTokens": 22105,
+        "webSearchRequests": 0,
+        "costUSD": 0.3487051499999999,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "162272f7-9a20-4927-be43-0f772d9eac0e"
+  },
+  "stderr": ""
+}

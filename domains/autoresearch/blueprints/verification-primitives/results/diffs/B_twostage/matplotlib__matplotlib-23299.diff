@@ -1,0 +1,17 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index c268a56724..4e93322088 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -674,6 +674,12 @@ class RcParams(MutableMapping, dict):
+             val = dict.__getitem__(self, key)
+             if val is rcsetup._auto_backend_sentinel:
+                 from matplotlib import pyplot as plt
++                if plt._backend_mod is not None:
++                    # A backend was already loaded (e.g. the sentinel was
++                    # restored by rc_context), so just return the name of the
++                    # current backend rather than triggering switch_backend
++                    # (which calls close("all") and would destroy open figures).
++                    return dict.__getitem__(rcParamsDefault, key)
+                 plt.switch_backend(rcsetup._auto_backend_sentinel)
+ 
+         return dict.__getitem__(self, key)

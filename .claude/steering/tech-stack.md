@@ -52,6 +52,19 @@ terraform apply -target='<deployment_resource>' -auto-approve
 kubectl -n <namespace> scale deployment <name> --replicas=1
 ```
 
+#### NIXL disables cuda_ipc by default — single-node P/D disaggregation requires explicit transport configuration
+<!-- stack: nixl=0.3.x, dynamo=alpha, vllm=0.18+ | validated: 2026-04-07 -->
+
+NIXL (the KV cache transfer library used by Dynamo and llm-d) disables UCX `cuda_ipc` transport by default (NIXL issue #1097) to avoid contention with NCCL collectives on NVSwitch fabric. Without override, same-node KV transfer falls back to TCP loopback — 40x slower (TTFT 355ms → 10+ seconds per Dynamo docs).
+
+**When deploying P/D disaggregation on a single NVSwitch node:**
+
+- **TP=1 workers (model fits on one GPU):** Re-enable cuda_ipc — no NCCL collectives means no contention. Set `UCX_TLS=cuda_copy,cuda_ipc`, `UCX_CUDA_IPC_ENABLE_GET_ZCOPY=on`, add `hostIPC: true` and `IPC_LOCK` capability to pods. This is the sweet spot for single-node disagg: full NVLink bandwidth (~900 GB/s) for KV transfer, tunable P:D ratio.
+- **TP>1 workers:** Do NOT re-enable cuda_ipc. NCCL allreduce and KV transfer compete for the same NVLink/NVSwitch fabric, causing decode TPOT spikes. Use chunked prefill instead (no KV transfer overhead), or on p5/p5e use IB RDMA loopback (`UCX_TLS=rc_x,rc,dc_x,dc,cuda_copy`) to route KV transfer over InfiniBand while NVLink stays dedicated to TP.
+- **Multi-node (the designed path):** KV transfer over RDMA (InfiniBand/RoCE). NVLink exclusively for TP. No contention. This is what NIXL's default assumes.
+
+**Disagg vs replicas decision:** At low QPS or short context, replicas with chunked prefill are simpler and sufficient. Disagg wins at moderate-to-high QPS with mixed context lengths, strict p99 TPOT SLOs, or when prefill interference measurably degrades decode latency. IMEX daemon / `/dev/nvidia-caps-imex-channels` is only relevant for MNNVL (multi-node NVLink) fabric — not needed for single-node cuda_ipc.
+
 #### Air-gapped serving environments require local tokenizer paths for benchmarking
 
 When `HF_HUB_OFFLINE=1` is set in the serving container (air-gapped, no HuggingFace Hub access), benchmark tools like `vllm bench serve` must use `--tokenizer /path/to/local/model` to point at the local model directory. The `--model` flag specifies the API-facing served model name, not the filesystem path.
@@ -511,3 +524,48 @@ Use stratified sampling (e.g., seed 42, stratified by repo) to generate a fixed 
 #### Phase experiments sequentially — run turn degradation analysis before multi-harness comparison
 
 Turn degradation analysis (Phase 1) identifies the optimal turn budget and context management strategy for the baseline harness. Multi-harness comparison (Phase 2) then uses that optimal baseline config as the SERA reference when benchmarking external harnesses. Running Phase 2 before Phase 1 wastes compute by comparing harnesses against a sub-optimal baseline. This pattern applies to any autoresearch blueprint with multiple experiment phases that build on each other.
+
+#### Use Python 3.12 for classical ML experiments
+<!-- stack: scikit-learn 1.8 / xgboost 3.2 | validated: 2026-04-04 -->
+
+Python 3.14 has import errors with scikit-learn (`ModuleNotFoundError: sklearn.utils._estimator_html_repr`). Create a Python 3.12 venv: `python3.12 -m venv /tmp/<name>-venv && source /tmp/<name>-venv/bin/activate && pip install xgboost scikit-learn pandas numpy`. Source: tiny-judge lessons.md.
+
+#### RandomForest outperforms XGBoost for calibration at small sample sizes (n<300)
+<!-- stack: scikit-learn 1.8 / xgboost 3.2 | validated: 2026-04-04 -->
+
+At n<300 with 20+ features, RandomForest achieves dramatically better calibration than XGBoost (ECE 0.043 vs 0.174 in tiny-judge). RF's bagging provides better variance reduction than boosting at small sample sizes, and XGBoost's hyperparameter search converges to shallow trees that essentially match simpler models. Use RF as default for small-dataset autoresearch experiments where calibration matters (e.g., RL reward signals). Source: tiny-judge lessons.md.
+
+#### Gemma 4 models require dedicated vLLM image tag
+<!-- stack: vllm=gemma4 (0.18.2rc1), transformers=4.52+ | validated: 2026-04-06 -->
+
+Standard vLLM images (v0.19.0, latest) lack `gemma4` model_type in their bundled transformers. Use `vllm/vllm-openai:gemma4` for all Gemma 4 variants (E4B, 31B). The model has heterogeneous head_dim (256 local + 512 global) which forces TRITON_ATTN backend. Source: gemma4-4b-hyperpod lessons.md.
+
+#### HyperPod EKS GPU pods require three tolerations
+<!-- stack: sagemaker-hyperpod=eks-1.32 | validated: 2026-04-06 -->
+
+HyperPod GPU nodes carry `sagemaker.amazonaws.com/RestrictedNode:NoSchedule` and `nvidia.com/gpu:NoSchedule` taints. Add both plus `node.kubernetes.io/disk-pressure:NoSchedule` (stale disk-pressure taints are common after large image pulls — fix with `kubectl debug node/<name> --image=busybox -- sh -c "chroot /host systemctl restart kubelet"`). Source: gemma4-4b-hyperpod lessons.md.
+
+#### FP8 MoE models require TP divisibility check against block_n=128
+<!-- stack: vllm>=0.19.1 | validated: 2026-04-22 | refresh: 2026-07-22 -->
+
+For fine-grained FP8 quantized MoE models (block_size=128), `moe_intermediate_size / tensor_parallel_size` must be divisible by 128. If not, vLLM raises `ValueError: output_size not divisible by block_n`. Check before deploying: `moe_intermediate_size % (TP * 128) == 0`. Example: Qwen3-235B has `moe_intermediate_size=1536` — TP8 fails (1536/8=192, 192%128≠0), TP4 works (1536/4=384, 384%128=0). Source: qwen3-235b-b300 lessons.md L1.
+
+#### Always verify max_position_embeddings from downloaded config.json
+<!-- stack: all-engines | validated: 2026-04-22 | refresh: 2026-07-22 -->
+
+Model cards and HuggingFace pages often cite YaRN-extended context lengths (e.g., 131K) that differ from the actual `max_position_embeddings` in the model's `config.json` (e.g., 40960). vLLM refuses `--max-model-len` above `max_position_embeddings` unless `VLLM_ALLOW_LONG_MAX_MODEL_LEN=1` is set. Always check the downloaded weights' `config.json` before setting `--max-model-len`. Source: qwen3-235b-b300 lessons.md L2.
+
+#### Qwen3 tool calling: use hermes parser, not qwen3_xml
+<!-- stack: vllm>=0.19.1 | validated: 2026-04-22 | refresh: 2026-07-22 -->
+
+Qwen3 models output tool calls in Hermes `<tool_call>` format, not a Qwen-specific XML format. Use `--tool-call-parser hermes` (not `qwen3_xml`). The `qwen3_xml` parser exists but does not parse `<tool_call>` tags — tool calls appear as raw text in the content field. Source: qwen3-235b-b300 lessons.md L3.
+
+#### huggingface-cli renamed to hf in huggingface_hub v1.11+
+<!-- stack: huggingface_hub>=1.11.0 | validated: 2026-04-22 | refresh: 2026-07-22 -->
+
+`huggingface-cli download` no longer works. Use `hf download <repo> --local-dir <path>`. The `--exclude` flag semantics also changed — do not use with positional filenames. Source: qwen3-235b-b300 lessons.md L4.
+
+#### B300 SXM6 AC has 275 GB VRAM per GPU, not 268 GB
+<!-- stack: p6-b300.48xlarge | validated: 2026-04-22 | refresh: 2026-07-22 -->
+
+nvidia-smi reports 275,040 MiB (275 GB) per B300 GPU, not the 268 GB commonly cited. Total cluster VRAM is 2,200 GB (8 GPUs). Use 275 GB for capacity planning. Source: qwen3-235b-b300 lessons.md L8.

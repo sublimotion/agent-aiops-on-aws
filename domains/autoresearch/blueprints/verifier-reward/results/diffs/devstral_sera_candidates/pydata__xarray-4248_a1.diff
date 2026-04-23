@@ -1,0 +1,71 @@
+diff --git a/xarray/core/dtypes.py b/xarray/core/dtypes.py
+index 4db2990a..295c15c3 100644
+--- a/xarray/core/dtypes.py
++++ b/xarray/core/dtypes.py
+@@ -38,7 +38,7 @@ NINF = AlwaysLessThan()
+ PROMOTE_TO_OBJECT = [
+     {np.number, np.character},  # numpy promotes to character
+     {np.bool_, np.character},  # numpy promotes to character
+-    {np.bytes_, np.unicode_},  # numpy promotes to unicode
++    {np.bytes_, np.str_},  # numpy promotes to unicode
+ ]
+ 
+ 
+diff --git a/xarray/core/formatting.py b/xarray/core/formatting.py
+index 28eaae5f..ea045e7f 100644
+--- a/xarray/core/formatting.py
++++ b/xarray/core/formatting.py
+@@ -138,10 +138,12 @@ def format_item(x, timedelta_format=None, quote_strings=True):
+         return format_timestamp(x)
+     if isinstance(x, (np.timedelta64, timedelta)):
+         return format_timedelta(x, timedelta_format=timedelta_format)
+-    elif isinstance(x, (str, bytes)):
++    elif isinstance(x, (str, bytes, np.str_)):
+         return repr(x) if quote_strings else x
+-    elif isinstance(x, (float, np.float_)):
++    elif isinstance(x, float) or (hasattr(x, 'dtype') and np.issubdtype(x.dtype, np.floating)):
+         return f"{x:.4}"
++    elif isinstance(x, (int, np.integer)):
++        return str(x)
+     else:
+         return str(x)
+ 
+@@ -160,7 +162,13 @@ def format_items(x):
+         elif np.logical_not(time_needed).all():
+             timedelta_format = "date"
+ 
+-    formatted = [format_item(xi, timedelta_format) for xi in x]
++    formatted = []
++    for xi in x:
++        item_str = format_item(xi, timedelta_format)
++        # Handle numpy string types
++        if isinstance(xi, np.str_):
++            item_str = repr(str(xi))
++        formatted.append(item_str)
+     return formatted
+ 
+ 
+@@ -262,6 +270,9 @@ def inline_variable_array_repr(var, max_width):
+     elif isinstance(var._data, sparse_array_type):
+         return inline_sparse_repr(var.data)
+     elif hasattr(var._data, "__array_function__"):
++        # Try to use _repr_inline_ if available
++        if hasattr(var._data, "_repr_inline_"):
++            return var._data._repr_inline_(max_width)
+         return maybe_truncate(repr(var._data).replace("\n", " "), max_width)
+     else:
+         # internal xarray array type
+@@ -283,7 +294,12 @@ def summarize_variable(
+         dims_str = "({}) ".format(", ".join(map(str, var.dims)))
+     else:
+         dims_str = ""
+-    front_str = f"{first_col}{dims_str}{var.dtype} "
++    
++    # Get units from attrs if available
++    units = var.attrs.get('units', '')
++    units_str = f" [{units}]" if units else ""
++    
++    front_str = f"{first_col}{dims_str}{var.dtype}{units_str} "
+ 
+     values_width = max_width - len(front_str)
+     values_str = inline_variable_array_repr(var, values_width)

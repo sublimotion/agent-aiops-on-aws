@@ -1,0 +1,19 @@
+diff --git a/sympy/printing/ccode.py b/sympy/printing/ccode.py
+index 30a07a7b59..4ae9ed9aec 100644
+--- a/sympy/printing/ccode.py
++++ b/sympy/printing/ccode.py
+@@ -251,6 +251,14 @@ def _print_For(self, expr):
+     def _print_sign(self, func):
+         return '((({0}) > 0) - (({0}) < 0))'.format(self._print(func.args[0]))
+ 
++    def _print_sinc(self, func):
++        from sympy import sin
++        # sinc(x) is defined as sin(x)/x, with sinc(0) = 1
++        # We need to handle the division by zero case using a ternary operator
++        arg = self._print(func.args[0])
++        true_expr = "   sin({0})/{0}".format(arg)
++        return "(({0} != 0) ? (\n{1}\n)\n: (\n   1\n))".format(arg, true_expr)
++
+     def indent_code(self, code):
+         """Accepts a string of code or a list of code lines"""
+ 

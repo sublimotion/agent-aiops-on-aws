@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 147.5,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 146233,
+    "duration_api_ms": 112680,
+    "num_turns": 24,
+    "result": "The fix is correct and consistent with how the existing code handles this in `format_args` for all three documenters. The adversarial review's concerns about 'all' mode are unfounded since that mode uses the default behavior (annotations shown), and the `setdefault` pattern is intentional (matching the existing non-overloaded code at lines 1211-1212, 1453-1454, and 1831-1832).\n\n**Summary of the fix:**\n\nThe bug was that when a function/method had `@overload` decorators, the `format_signature` method would call `stringify_signature(overload, **kwargs)` directly without first setting `show_annotation=False` based on the `autodoc_typehints` configuration. \n\nThe fix adds the same check that already exists in `format_args` for each of the three documenters:\n- `FunctionDocumenter.format_signature` (line ~1264)\n- `ClassDocumenter.format_signature` (line ~1481)  \n- `MethodDocumenter.format_signature` (line ~1911)\n\nWhen `autodoc_typehints` is `'none'` or `'description'`, `show_annotation=False` is added to kwargs before processing the overloaded signatures, which suppresses type annotations in the output.",
+    "stop_reason": "end_turn",
+    "session_id": "bc19650f-d48d-4bdd-a399-1932de19b703",
+    "total_cost_usd": 0.3363696,
+    "usage": {
+      "input_tokens": 1019,
+      "cache_creation_input_tokens": 23410,
+      "cache_read_input_tokens": 472117,
+      "output_tokens": 6926,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 23410
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 1019,
+        "outputTokens": 6926,
+        "cacheReadInputTokens": 472117,
+        "cacheCreationInputTokens": 23410,
+        "webSearchRequests": 0,
+        "costUSD": 0.3363696,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "b540e0aa-b3c5-4c53-864b-fcef97921813"
+  },
+  "stderr": ""
+}

@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 120.7,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 119589,
+    "duration_api_ms": 100349,
+    "num_turns": 20,
+    "result": "The fix is correct. Here's a summary of what was done:\n\n**Root cause**: In `adapters.py`, the `except (_SSLError, _HTTPError) as e:` block (line 427) catches all urllib3 `HTTPError` subclasses including `DecodeError` and `TimeoutError`, but the else branch just re-raises them \u2014 allowing urllib3 exceptions to leak through the requests API.\n\n**Fix** (`requests/adapters.py`):\n1. Import `DecodeError` and `TimeoutError` from urllib3 exceptions\n2. Import `ContentDecodingError` and `Timeout` from requests exceptions\n3. Add two new `elif` branches before the `else: raise`:\n   - `DecodeError` \u2192 wrapped as `ContentDecodingError`\n   - `TimeoutError` \u2192 wrapped as `Timeout`\n\nThe ordering is intentional: `ReadTimeoutError` is checked first (it's a subclass of `TimeoutError`), then `DecodeError`, then the base `TimeoutError` catches any remaining timeout exceptions (like proxy timeouts via `ConnectTimeoutError` that bypass `MaxRetryError`).",
+    "stop_reason": "end_turn",
+    "session_id": "e025ad68-6855-456d-b4be-71a87e841ea4",
+    "total_cost_usd": 0.3023185500000001,
+    "usage": {
+      "input_tokens": 85,
+      "cache_creation_input_tokens": 24659,
+      "cache_read_input_tokens": 455441,
+      "output_tokens": 4864,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 24659
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 85,
+        "outputTokens": 4864,
+        "cacheReadInputTokens": 455441,
+        "cacheCreationInputTokens": 24659,
+        "webSearchRequests": 0,
+        "costUSD": 0.3023185500000001,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "0e17bc02-151c-4467-9685-0a6945230c44"
+  },
+  "stderr": ""
+}

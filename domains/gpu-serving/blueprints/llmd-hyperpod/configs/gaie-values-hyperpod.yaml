@@ -1,0 +1,46 @@
+# llm-d Gateway AI Extension values — HyperPod overlay
+# Overlay for guides/inference-scheduling/gaie-inference-scheduling/values.yaml
+#
+# Configures Istio Gateway with AWS NLB for HyperPod EKS.
+
+gateway:
+  gatewayClassName: istio
+  service:
+    type: LoadBalancer
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+    service.beta.kubernetes.io/aws-load-balancer-type: external
+
+inferenceExtension:
+  flags:
+    v: 1
+  # EPP scorer configuration
+  config:
+    scorers:
+      - name: PrecisePrefixCacheScorer
+        weight: 3
+      - name: LoadAwareScorer
+        weight: 1
+      - name: SessionAffinityScorer
+        weight: 1
+
+provider:
+  name: istio
+  istio:
+    destinationRule:
+      trafficPolicy:
+        connectionPool:
+          http:
+            http1MaxPendingRequests: 256000
+            maxRequestsPerConnection: 256000
+            http2MaxRequests: 256000
+            idleTimeout: "900s"
+          tcp:
+            maxConnections: 256000
+            maxConnectionDuration: "1800s"
+            connectTimeout: "900s"
+
+routing:
+  proxy:
+    zapLogLevel: info  # Keep info for validation; switch to error for production

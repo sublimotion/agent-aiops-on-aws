@@ -1,0 +1,20 @@
+diff --git a/lib/matplotlib/widgets.py b/lib/matplotlib/widgets.py
+index ebe5da43e2..ff49d55ed0 100644
+--- a/lib/matplotlib/widgets.py
++++ b/lib/matplotlib/widgets.py
+@@ -583,6 +583,7 @@ class Slider(SliderBase):
+             self.ax.figure.canvas.draw_idle()
+         self.val = val
+         if self.eventson:
++            self.ax.figure.canvas.release_mouse(self.ax)
+             self._observers.process('changed', val)
+ 
+     def on_changed(self, func):
+@@ -966,6 +967,7 @@ class RangeSlider(SliderBase):
+             self.ax.figure.canvas.draw_idle()
+         self.val = (vmin, vmax)
+         if self.eventson:
++            self.ax.figure.canvas.release_mouse(self.ax)
+             self._observers.process("changed", (vmin, vmax))
+ 
+     def on_changed(self, func):

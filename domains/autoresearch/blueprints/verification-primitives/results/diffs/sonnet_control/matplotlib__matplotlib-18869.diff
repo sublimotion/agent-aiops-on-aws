@@ -1,0 +1,58 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index b657a35cf7..dfc03ac600 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -130,6 +130,42 @@ __bibtex__ = r"""@Article{Hunter:2007,
+ }"""
+ 
+ 
++def _parse_to_version_info(version_str):
++    """
++    Parse a version string to a namedtuple analogous to `sys.version_info`.
++
++    See the `_version_info` namedtuple for the field names.
++
++    Examples
++    --------
++    >>> _parse_to_version_info('3.5.0')
++    _version_info(major=3, minor=5, micro=0, releaselevel='final', serial=0)
++    >>> _parse_to_version_info('3.5.0rc2')
++    _version_info(major=3, minor=5, micro=0, releaselevel='candidate', serial=2)
++    >>> _parse_to_version_info('3.5.0.dev820+g6768ef8c4c')
++    _version_info(major=3, minor=5, micro=0, releaselevel='alpha', serial=820)
++    >>> _parse_to_version_info('3.5.0.post820+g6768ef8c4c')
++    _version_info(major=3, minor=5, micro=1, releaselevel='alpha', serial=820)
++    """
++    v = parse_version(version_str)
++    if v.is_devrelease:
++        return _version_info(v.major, v.minor, v.micro, 'alpha', v.dev)
++    elif v.is_prerelease:
++        if v.pre[0] == 'rc':
++            return _version_info(v.major, v.minor, v.micro, 'candidate',
++                                 v.pre[1])
++        else:
++            return _version_info(v.major, v.minor, v.micro, 'alpha', v.pre[1])
++    elif v.is_postrelease:
++        return _version_info(v.major, v.minor, v.micro + 1, 'alpha', v.post)
++    else:
++        return _version_info(v.major, v.minor, v.micro, 'final', 0)
++
++
++_version_info = namedtuple('_version_info',
++                           'major, minor, micro, releaselevel, serial')
++
++
+ def __getattr__(name):
+     if name == "__version__":
+         import setuptools_scm
+@@ -148,6 +184,10 @@ def __getattr__(name):
+         else:  # Get the version from the _version.py setuptools_scm file.
+             __version__ = _version.version
+         return __version__
++    if name == "__version_info__":
++        global __version_info__  # cache it.
++        __version_info__ = _parse_to_version_info(__version__)
++        return __version_info__
+     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+ 
+ 

@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "elapsed_s": 112.5,
+  "output": {
+    "type": "result",
+    "subtype": "success",
+    "is_error": false,
+    "duration_ms": 111169,
+    "duration_api_ms": 79248,
+    "num_turns": 26,
+    "result": "All tests pass. The fix is:\n\n1. **`sympy/core/basic.py`**: Changed `atoms()` with no arguments to return objects with `not expr.args` (no args = leaf node) instead of `isinstance(expr, Atom)`. Also restructured the code to avoid the shared `result` variable between branches.\n\n2. **`sympy/core/tests/test_basic.py`**: Updated the test to reflect the new correct behavior \u2014 `b21.atoms()` now returns `{b1}` (since `b1 = Basic()` has no args and is thus a leaf node), rather than `set()`.",
+    "stop_reason": "end_turn",
+    "session_id": "f0d9f08b-f2e7-4ead-895b-36a407f1fd10",
+    "total_cost_usd": 0.29516925,
+    "usage": {
+      "input_tokens": 27,
+      "cache_creation_input_tokens": 18789,
+      "cache_read_input_tokens": 545965,
+      "output_tokens": 4056,
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 0,
+        "ephemeral_5m_input_tokens": 18789
+      },
+      "inference_geo": "",
+      "iterations": [],
+      "speed": "standard"
+    },
+    "modelUsage": {
+      "arn:aws:bedrock:us-east-1:615299764834:inference-profile/us.anthropic.claude-sonnet-4-6": {
+        "inputTokens": 27,
+        "outputTokens": 4056,
+        "cacheReadInputTokens": 545965,
+        "cacheCreationInputTokens": 18789,
+        "webSearchRequests": 0,
+        "costUSD": 0.29516925,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000
+      }
+    },
+    "permission_denials": [],
+    "fast_mode_state": "off",
+    "uuid": "aeedb55b-6aed-4bc9-83b0-50080d9c954d"
+  },
+  "stderr": ""
+}

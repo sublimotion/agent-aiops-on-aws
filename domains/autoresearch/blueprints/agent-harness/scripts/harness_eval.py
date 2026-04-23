@@ -435,7 +435,7 @@ def _get_git_diff(workspace: str) -> str:
             "git diff", shell=True, capture_output=True, text=True,
             timeout=10, cwd=workspace,
         )
-        return proc.stdout[:50000]
+        return proc.stdout[:100000]
     except Exception:
         return ""
 
@@ -625,8 +625,9 @@ async def run_instrumented_loop(
     if issue.hints:
         user_msg += f"\n\nHints:\n{issue.hints}"
 
+    system_prompt = FIX_SYSTEM_PROMPT + config.get("_prompt_suffix", "")
     messages = [
-        {"role": "system", "content": FIX_SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_msg},
     ]
 
@@ -859,12 +860,17 @@ def setup_workspace(issue: Issue, base_dir: str) -> str:
            os.path.exists(os.path.join(workspace, "pyproject.toml")):
             setup_cmd = "pip install -e . -q 2>/dev/null"
     if setup_cmd:
-        python_bin = "python3.11" if shutil.which("python3.11") else "python3"
+        python_bin = next(
+            (p for p in ("python3.11", "python3.12", "python3.10", "python3")
+             if shutil.which(p)),
+            "python3",
+        )
         venv_dir = os.path.join(workspace, ".venv")
         venv_setup = (
             f"{python_bin} -m venv {venv_dir} && "
             f"ln -sf python3 {venv_dir}/bin/python 2>/dev/null; "
             f"source {venv_dir}/bin/activate && "
+            f"pip install -q setuptools 2>/dev/null; "
             f"{setup_cmd}"
         )
         log.info(f"[{issue.instance_id}] Installing deps...")

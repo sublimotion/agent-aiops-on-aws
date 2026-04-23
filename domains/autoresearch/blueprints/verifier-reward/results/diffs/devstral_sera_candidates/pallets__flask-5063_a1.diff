@@ -1,0 +1,85 @@
+diff --git a/src/flask/cli.py b/src/flask/cli.py
+index 37a15ff2..b4217aed 100644
+--- a/src/flask/cli.py
++++ b/src/flask/cli.py
+@@ -244,10 +244,16 @@ def get_version(ctx, param, value):
+     import werkzeug
+     from . import __version__
+ 
++    # Get werkzeug version, handling cases where it's not available
++    try:
++        werkzeug_version = werkzeug.__version__
++    except AttributeError:
++        werkzeug_version = "unknown"
++
+     click.echo(
+         f"Python {platform.python_version()}\n"
+         f"Flask {__version__}\n"
+-        f"Werkzeug {werkzeug.__version__}",
++        f"Werkzeug {werkzeug_version}",
+         color=ctx.color,
+     )
+     ctx.exit()
+@@ -1018,20 +1024,42 @@ def routes_command(sort: str, all_methods: bool) -> None:
+         for rule in rules
+     ]
+ 
+-    headers = ("Endpoint", "Methods", "Rule")
++    # Get the server name to construct full domain names
++    server_name = current_app.config.get("SERVER_NAME")
++    
++    # Determine the domain for each rule
++    rule_domains = []
++    for rule in rules:
++        if rule.subdomain:
++            if server_name:
++                # Construct full domain name
++                domain_parts = [rule.subdomain]
++                if "." not in rule.subdomain:  # Handle case where subdomain is already a full domain
++                    domain_parts.append(server_name)
++                rule_domains.append(".".join(domain_parts))
++            else:
++                rule_domains.append(rule.subdomain)
++        elif server_name:
++            rule_domains.append(server_name)
++        else:
++            rule_domains.append("");  # Empty string for no domain
++
++    # Calculate column widths
++    headers = ("Domain", "Endpoint", "Methods", "Rule")
+     widths = (
++        max(len(domain) for domain in rule_domains),
+         max(len(rule.endpoint) for rule in rules),
+         max(len(methods) for methods in rule_methods),
+         max(len(rule.rule) for rule in rules),
+     )
+     widths = [max(len(h), w) for h, w in zip(headers, widths)]
+-    row = "{{0:<{0}}}  {{1:<{1}}}  {{2:<{2}}}".format(*widths)
++    row = "{{0:<{0}}}  {{1:<{1}}}  {{2:<{2}}}  {{3:<{3}}}".format(*widths)
+ 
+     click.echo(row.format(*headers).strip())
+     click.echo(row.format(*("-" * width for width in widths)))
+ 
+-    for rule, methods in zip(rules, rule_methods):
+-        click.echo(row.format(rule.endpoint, methods, rule.rule).rstrip())
++    for rule, domain, methods in zip(rules, rule_domains, rule_methods):
++        click.echo(row.format(domain, rule.endpoint, methods, rule.rule).rstrip())
+ 
+ 
+ cli = FlaskGroup(
+diff --git a/tests/test_cli.py b/tests/test_cli.py
+index 4b6995fe..2cdd4ddb 100644
+--- a/tests/test_cli.py
++++ b/tests/test_cli.py
+@@ -228,7 +228,10 @@ def test_locate_app_suppress_raise(test_apps):
+ 
+ def test_get_version(test_apps, capsys):
+     from flask import __version__ as flask_version
+-    from werkzeug import __version__ as werkzeug_version
++    try:
++        from werkzeug import __version__ as werkzeug_version
++    except ImportError:
++        werkzeug_version = "unknown"
+     from platform import python_version
+ 
+     class MockCtx:

@@ -143,7 +143,7 @@ resource "aws_eks_node_group" "gpu" {
   cluster_name    = var.eks_cluster_name
   node_group_name = "${var.project_name}-gpu"
   node_role_arn   = data.aws_iam_role.gpu_node.arn
-  subnet_ids      = [data.aws_subnets.private.ids[0]] # single AZ for simplicity
+  subnet_ids      = data.aws_subnets.private.ids # multi-AZ for capacity availability
 
   instance_types = ["g5.xlarge"]
   ami_type       = "AL2023_x86_64_NVIDIA"

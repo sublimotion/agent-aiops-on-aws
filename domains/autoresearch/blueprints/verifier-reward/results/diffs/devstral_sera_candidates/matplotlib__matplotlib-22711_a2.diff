@@ -1,0 +1,39 @@
+diff --git a/lib/matplotlib/tests/test_widgets.py b/lib/matplotlib/tests/test_widgets.py
+index cf98e3aea8..b3241f67b6 100644
+--- a/lib/matplotlib/tests/test_widgets.py
++++ b/lib/matplotlib/tests/test_widgets.py
+@@ -1123,6 +1123,13 @@ def test_range_slider(orientation):
+     assert_allclose(handle_positions(slider), (0.1, 0.2))
+ 
+     slider.set_val((-1, 10))
++
++    # Test that identical initial values raise an error
++    with pytest.raises(ValueError, match="RangeSlider initial values.*must be different"):
++        widgets.RangeSlider(
++            ax=ax, label="", valmin=0.0, valmax=1.0, orientation=orientation,
++            valinit=[0.25, 0.25]
++        )
+     assert_allclose(slider.val, (0, 1))
+     assert_allclose(handle_positions(slider), (0, 1))
+ 
+diff --git a/lib/matplotlib/widgets.py b/lib/matplotlib/widgets.py
+index da5b40a5ef..d44574edd6 100644
+--- a/lib/matplotlib/widgets.py
++++ b/lib/matplotlib/widgets.py
+@@ -775,6 +775,16 @@ class RangeSlider(SliderBase):
+             )
+ 
+         self._active_handle = None
++        
++        # Check if initial values are identical, which would cause rendering issues
++        if valinit is not None:
++            valinit = np.sort(valinit)
++            if valinit[0] == valinit[1]:
++                raise ValueError(
++                    "RangeSlider initial values (valinit) must be different. "
++                    "Got identical values: {}".format(valinit)
++                )
++        
+         self.set_val(valinit)
+ 
+     def _min_in_bounds(self, min):

@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: download-qwen3-235b-fp8
+  namespace: default
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: OnFailure
+      nodeSelector:
+        node.kubernetes.io/instance-type: p6-b300.48xlarge
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: downloader
+          image: python:3.11-slim
+          command:
+            - bash
+            - -c
+            - |
+              pip install -q huggingface_hub[hf_transfer] && \
+              export HF_HUB_ENABLE_HF_TRANSFER=1 && \
+              hf download Qwen/Qwen3-235B-A22B-FP8 \
+                --local-dir /mnt/nvme/models/qwen3-235b-fp8 \
+                --exclude "*.md" "*.txt" && \
+              echo "Download complete" && \
+              du -sh /mnt/nvme/models/qwen3-235b-fp8/
+          resources:
+            requests:
+              cpu: "8"
+              memory: 16Gi
+            limits:
+              cpu: "16"
+              memory: 32Gi
+          volumeMounts:
+            - name: nvme
+              mountPath: /mnt/nvme
+      volumes:
+        - name: nvme
+          hostPath:
+            path: /mnt/nvme
+            type: Directory

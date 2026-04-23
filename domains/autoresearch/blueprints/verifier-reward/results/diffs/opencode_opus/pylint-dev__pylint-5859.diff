@@ -1,0 +1,50 @@
+diff --git a/pylint/checkers/misc.py b/pylint/checkers/misc.py
+index 69149e61a..60b4b873f 100644
+--- a/pylint/checkers/misc.py
++++ b/pylint/checkers/misc.py
+@@ -43,7 +43,6 @@ if TYPE_CHECKING:
+ 
+ 
+ class ByIdManagedMessagesChecker(BaseChecker):
+-
+     """Checks for messages that are enabled or disabled by id instead of symbol."""
+ 
+     __implements__ = IRawChecker
+@@ -66,7 +65,7 @@ class ByIdManagedMessagesChecker(BaseChecker):
+     def process_module(self, node: nodes.Module) -> None:
+         """Inspect the source file to find messages activated or deactivated by id."""
+         managed_msgs = self._get_by_id_managed_msgs()
+-        for (mod_name, msgid, symbol, lineno, is_disabled) in managed_msgs:
++        for mod_name, msgid, symbol, lineno, is_disabled in managed_msgs:
+             if mod_name == node.name:
+                 verb = "disable" if is_disabled else "enable"
+                 txt = f"'{msgid}' is cryptic: use '# pylint: {verb}={symbol}' instead"
+@@ -75,7 +74,6 @@ class ByIdManagedMessagesChecker(BaseChecker):
+ 
+ 
+ class EncodingChecker(BaseChecker):
+-
+     """Checks for:
+     * warning notes in the code like FIXME, XXX
+     * encoding issues.
+@@ -101,8 +99,7 @@ class EncodingChecker(BaseChecker):
+                 "metavar": "<comma separated values>",
+                 "default": ("FIXME", "XXX", "TODO"),
+                 "help": (
+-                    "List of note tags to take in consideration, "
+-                    "separated by a comma."
++                    "List of note tags to take in consideration, separated by a comma."
+                 ),
+             },
+         ),
+@@ -121,9 +118,9 @@ class EncodingChecker(BaseChecker):
+ 
+         notes = "|".join(re.escape(note) for note in self.config.notes)
+         if self.config.notes_rgx:
+-            regex_string = rf"#\s*({notes}|{self.config.notes_rgx})\b"
++            regex_string = rf"#\s*({notes}|{self.config.notes_rgx})(?:\b|(?=\W|$))"
+         else:
+-            regex_string = rf"#\s*({notes})\b"
++            regex_string = rf"#\s*({notes})(?:\b|(?=\W|$))"
+ 
+         self._fixme_pattern = re.compile(regex_string, re.I)

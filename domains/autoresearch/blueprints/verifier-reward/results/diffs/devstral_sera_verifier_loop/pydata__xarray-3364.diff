@@ -1,0 +1,151 @@
+diff --git a/xarray/core/concat.py b/xarray/core/concat.py
+index ecae2566..9b9ed9af 100644
+--- a/xarray/core/concat.py
++++ b/xarray/core/concat.py
+@@ -16,6 +16,7 @@ def concat(
+     positions=None,
+     fill_value=dtypes.NA,
+     join="outer",
++    drop_missing_vars=True,
+ ):
+     """Concatenate xarray objects along a new or existing dimension.
+ 
+@@ -90,6 +91,10 @@ def concat(
+         - 'override': if indexes are of same size, rewrite indexes to be
+           those of the first object with that dimension. Indexes for the same
+           dimension must have the same size in all objects.
++    drop_missing_vars : bool, optional
++        If True, variables that are not present in all datasets will be dropped.
++        If False, datasets will be filled with NaN values for missing variables.
++        Defaults to True for backward compatibility.
+ 
+     indexers, mode, concat_over : deprecated
+ 
+@@ -128,7 +133,7 @@ def concat(
+             "can only concatenate xarray Dataset and DataArray "
+             "objects, got %s" % type(first_obj)
+         )
+-    return f(objs, dim, data_vars, coords, compat, positions, fill_value, join)
++    return f(objs, dim, data_vars, coords, compat, positions, fill_value, join, drop_missing_vars)
+ 
+ 
+ def _calc_concat_dim_coord(dim):
+@@ -269,6 +274,7 @@ def _dataset_concat(
+     positions,
+     fill_value=dtypes.NA,
+     join="outer",
++    drop_missing_vars=True,
+ ):
+     """
+     Concatenate a sequence of datasets along a new or existing dimension
+@@ -361,14 +367,27 @@ def _dataset_concat(
+             try:
+                 vars = ensure_common_dims([ds.variables[k] for ds in datasets])
+             except KeyError:
+-                raise ValueError("%r is not present in all datasets." % k)
++                if drop_missing_vars:
++                    continue
++                else:
++                    # Create dummy variables with NaN values for datasets that don't have this variable
++                    vars = []
++                    for ds in datasets:
++                        if k in ds.variables:
++                            vars.append(ensure_common_dims([ds.variables[k]])[0])
++                        else:
++                            # Create a dummy variable with NaN values
++                            shape = tuple(dims_sizes.get(d, dim_len) for d in ds.dims)
++                            dummy_var = Variable((dim,) + ds.dims, fill_value * np.ones(shape))
++                            vars.append(dummy_var)
++                    
+             combined = concat_vars(vars, dim, positions)
+             assert isinstance(combined, Variable)
+             result_vars[k] = combined
+ 
+     result = Dataset(result_vars, attrs=result_attrs)
+     absent_coord_names = coord_names - set(result.variables)
+-    if absent_coord_names:
++    if absent_coord_names and drop_missing_vars:
+         raise ValueError(
+             "Variables %r are coordinates in some datasets but not others."
+             % absent_coord_names
+@@ -394,6 +413,7 @@ def _dataarray_concat(
+     positions,
+     fill_value=dtypes.NA,
+     join="outer",
++    drop_missing_vars=True,
+ ):
+     arrays = list(arrays)
+ 
+@@ -422,5 +442,6 @@ def _dataarray_concat(
+         positions,
+         fill_value=fill_value,
+         join=join,
++        drop_missing_vars=drop_missing_vars,
+     )
+     return arrays[0]._from_temp_dataset(ds, name)
+diff --git a/xarray/core/dtypes.py b/xarray/core/dtypes.py
+index 4db2990a..ac5a7fd8 100644
+--- a/xarray/core/dtypes.py
++++ b/xarray/core/dtypes.py
+@@ -38,9 +38,14 @@ NINF = AlwaysLessThan()
+ PROMOTE_TO_OBJECT = [
+     {np.number, np.character},  # numpy promotes to character
+     {np.bool_, np.character},  # numpy promotes to character
+-    {np.bytes_, np.unicode_},  # numpy promotes to unicode
+ ]
+ 
++# numpy promotes to unicode
++if hasattr(np, 'str_'):
++    PROMOTE_TO_OBJECT.append({np.bytes_, np.str_})  # numpy >= 2.0
++else:
++    PROMOTE_TO_OBJECT.append({np.bytes_, np.unicode_})  # numpy < 2.0
++
+ 
+ def maybe_promote(dtype):
+     """Simpler equivalent of pandas.core.common._maybe_promote
+diff --git a/xarray/tests/test_concat.py b/xarray/tests/test_concat.py
+index 0661ebb7..9984509e 100644
+--- a/xarray/tests/test_concat.py
++++ b/xarray/tests/test_concat.py
+@@ -337,6 +337,41 @@ class TestConcatDataset:
+         )
+         actual = concat(datasets, dim="t", fill_value=fill_value)
+         assert_identical(actual, expected)
++        
++    def test_concat_missing_vars(self):
++        # Test concatenating datasets with different variables
++        ds1 = Dataset({"a": ("x", [1, 2]), "x": [0, 1]})
++        ds2 = Dataset({"b": ("x", [3, 4]), "x": [0, 1]})
++        
++        # Default behavior (drop_missing_vars=True) should raise an error
++        with raises_regex(ValueError, "are present in some datasets but not others"):
++            concat([ds1, ds2], dim="y")
++        
++        # With drop_missing_vars=False, should fill missing variables with NaN
++        result = concat([ds1, ds2], dim="y", drop_missing_vars=False)
++        expected = Dataset(
++            {
++                "a": (("y", "x"), [[1, 2], [np.nan, np.nan]]),
++                "b": (("y", "x"), [[np.nan, np.nan], [3, 4]]),
++                "x": [0, 1],
++            }
++        )
++        assert_identical(result, expected)
++        
++        # Test with datasets having different coordinates
++        ds3 = Dataset({"a": ("x", [1, 2]), "x": [0, 1], "z": [10, 20]})
++        ds4 = Dataset({"b": ("x", [3, 4]), "x": [0, 1], "z": [30, 40]})
++        
++        result = concat([ds3, ds4], dim="y", drop_missing_vars=False)
++        expected = Dataset(
++            {
++                "a": (("y", "x"), [[1, 2], [np.nan, np.nan]]),
++                "b": (("y", "x"), [[np.nan, np.nan], [3, 4]]),
++                "x": [0, 1],
++                "z": (("y",), [10, 20, 30, 40]),
++            }
++        )
++        assert_identical(result, expected)
+ 
+ 
+ class TestConcatDataArray:

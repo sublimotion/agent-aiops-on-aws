@@ -1,0 +1,47 @@
+diff --git a/pylint/checkers/misc.py b/pylint/checkers/misc.py
+index 69149e61a..ac4c2c5e4 100644
+--- a/pylint/checkers/misc.py
++++ b/pylint/checkers/misc.py
+@@ -119,11 +119,39 @@ class EncodingChecker(BaseChecker):
+     def open(self):
+         super().open()
+ 
+-        notes = "|".join(re.escape(note) for note in self.config.notes)
++        # Escape each note tag for use in regex pattern
++        # Split notes into punctuation-only and word notes
++        punct_notes = []
++        word_notes = []
++        for note in self.config.notes:
++            if all(not c.isalnum() for c in note):
++                punct_notes.append(re.escape(note))
++            else:
++                word_notes.append(re.escape(note))
++        
++        if word_notes:
++            word_pattern = "|".join(word_notes)
++            word_pattern = rf"\b({word_pattern})\b"
++        else:
++            word_pattern = ""
++            
++        if punct_notes:
++            punct_pattern = "|".join(punct_notes)
++        else:
++            punct_pattern = ""
++            
++        if word_pattern and punct_pattern:
++            notes_pattern = rf"({word_pattern})|({punct_pattern})"
++        elif word_pattern:
++            notes_pattern = word_pattern
++        else:
++            notes_pattern = punct_pattern
++            
+         if self.config.notes_rgx:
+-            regex_string = rf"#\s*({notes}|{self.config.notes_rgx})\b"
++            regex_string = rf"#\s*({notes_pattern}|{self.config.notes_rgx})"
+         else:
+-            regex_string = rf"#\s*({notes})\b"
++            regex_string = rf"#\s*({notes_pattern})"
++            
+ 
+         self._fixme_pattern = re.compile(regex_string, re.I)
+ 

@@ -1,0 +1,17 @@
+diff --git a/sympy/core/mul.py b/sympy/core/mul.py
+index 4f01eeedbd..171f28357d 100644
+--- a/sympy/core/mul.py
++++ b/sympy/core/mul.py
+@@ -1410,6 +1410,12 @@ def ndiv(a, b):
+         if d is not S.One:
+             self2 = n._subs(old, new)/d._subs(old, new)
+             if not self2.is_Mul:
++                # if the substitution leads to an undefined expression
++                # (e.g. zoo or nan), don't use this result -- fall through
++                # to regular substitution so the expression can be
++                # simplified before substituting (see issue 13915)
++                if self2 in (S.NaN, S.ComplexInfinity):
++                    return None
+                 return self2._subs(old, new)
+             if self2 != self:
+                 rv = self2

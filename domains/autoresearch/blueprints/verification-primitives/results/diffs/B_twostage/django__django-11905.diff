@@ -1,0 +1,33 @@
+diff --git a/django/db/models/lookups.py b/django/db/models/lookups.py
+index 9344979c56..f30207b733 100644
+--- a/django/db/models/lookups.py
++++ b/django/db/models/lookups.py
+@@ -1,5 +1,6 @@
+ import itertools
+ import math
++import warnings
+ from copy import copy
+ 
+ from django.core.exceptions import EmptyResultSet
+@@ -9,6 +10,7 @@ from django.db.models.fields import (
+ )
+ from django.db.models.query_utils import RegisterLookupMixin
+ from django.utils.datastructures import OrderedSet
++from django.utils.deprecation import RemovedInDjango40Warning
+ from django.utils.functional import cached_property
+ 
+ 
+@@ -463,6 +465,13 @@ class IsNull(BuiltinLookup):
+     prepare_rhs = False
+ 
+     def as_sql(self, compiler, connection):
++        if not isinstance(self.rhs, bool):
++            warnings.warn(
++                'Using a non-boolean value for an isnull lookup is deprecated, '
++                'use True or False instead.',
++                RemovedInDjango40Warning,
++                stacklevel=2,
++            )
+         sql, params = compiler.compile(self.lhs)
+         if self.rhs:
+             return "%s IS NULL" % sql, params

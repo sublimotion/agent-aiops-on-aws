@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>llm-d on HyperPod — Tiered KV Cache Architecture</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232733;
+    --border: #2d3244;
+    --text: #e2e4eb;
+    --text-dim: #8b90a0;
+    --accent: #6c8cff;
+    --accent-glow: rgba(108,140,255,0.15);
+    --green: #4ade80;
+    --green-dim: rgba(74,222,128,0.12);
+    --amber: #fbbf24;
+    --amber-dim: rgba(251,191,36,0.12);
+    --purple: #a78bfa;
+    --purple-dim: rgba(167,139,250,0.12);
+    --red: #f87171;
+    --cyan: #22d3ee;
+    --cyan-dim: rgba(34,211,238,0.12);
+    --orange: #fb923c;
+    --orange-dim: rgba(251,146,60,0.12);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+  .subtitle {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    margin-bottom: 2rem;
+  }
+
+  .badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.2em 0.6em;
+    border-radius: 4px;
+    vertical-align: middle;
+  }
+  .badge-pass { background: var(--green-dim); color: var(--green); }
+  .badge-version { background: var(--accent-glow); color: var(--accent); }
+
+  /* ---- Validation Summary ---- */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 2.5rem;
+  }
+  .summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+    text-align: center;
+  }
+  .summary-card .num {
+    font-size: 1.75rem;
+    font-weight: 700;
+  }
+  .summary-card .label {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* ---- Section ---- */
+  section { margin-bottom: 2.5rem; }
+  section h2 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  section h2 .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  /* ---- Architecture Diagram ---- */
+  .arch-diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .arch-row {
+    display: flex;
+    align-items: stretch;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  .arch-row:last-child { margin-bottom: 0; }
+
+  .arch-box {
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+    font-size: 0.82rem;
+    flex: 1;
+    position: relative;
+  }
+  .arch-box .box-title {
+    font-weight: 700;
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+  }
+  .arch-box .box-detail {
+    color: var(--text-dim);
+    font-size: 0.75rem;
+  }
+
+  .box-gpu    { background: var(--green-dim); border: 1px solid rgba(74,222,128,0.25); }
+  .box-cpu    { background: var(--amber-dim); border: 1px solid rgba(251,191,36,0.25); }
+  .box-daemon { background: var(--purple-dim); border: 1px solid rgba(167,139,250,0.25); }
+  .box-shm    { background: var(--cyan-dim); border: 1px solid rgba(34,211,238,0.25); }
+  .box-fsx    { background: var(--orange-dim); border: 1px solid rgba(251,146,60,0.25); }
+  .box-gw     { background: var(--accent-glow); border: 1px solid rgba(108,140,255,0.25); }
+  .box-vllm   { background: rgba(248,113,113,0.10); border: 1px solid rgba(248,113,113,0.25); }
+  .box-epp    { background: rgba(34,211,238,0.08); border: 1px solid rgba(34,211,238,0.20); }
+
+  .arrow-down {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    padding: 0.3rem 0;
+    position: relative;
+  }
+  .arrow-down .arrow-label {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    background: var(--surface);
+    padding: 0 0.5rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ---- Tiering Stack ---- */
+  .tier-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    max-width: 700px;
+    margin: 0 auto;
+  }
+
+  .tier-row {
+    display: flex;
+    align-items: stretch;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    background: var(--surface);
+  }
+  .tier-row:first-child { border-radius: 10px 10px 0 0; }
+  .tier-row:last-child { border-bottom: 1px solid var(--border); border-radius: 0 0 10px 10px; }
+
+  .tier-label {
+    width: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.8rem;
+    border-right: 1px solid var(--border);
+    padding: 0.75rem 0.5rem;
+  }
+  .tier-content {
+    flex: 1;
+    padding: 0.75rem 1rem;
+  }
+  .tier-content .tc-title {
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin-bottom: 0.15rem;
+  }
+  .tier-content .tc-detail {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+  .tier-owner {
+    width: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    border-left: 1px solid var(--border);
+    padding: 0.5rem;
+    text-align: center;
+  }
+
+  .tier-l0 .tier-label { color: var(--green); }
+  .tier-l1 .tier-label { color: var(--amber); }
+  .tier-l2 .tier-label { color: var(--purple); }
+  .tier-l2b .tier-label { color: var(--cyan); }
+  .tier-l3 .tier-label { color: var(--orange); }
+
+  .tier-divider {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+  }
+  .tier-divider-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  .tier-divider-text {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+
+  /* ---- Data Flow ---- */
+  .flow-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
+  }
+
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .flow-row:last-child { margin-bottom: 0; }
+
+  .flow-node {
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .flow-arrow {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+  }
+  .flow-label {
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+
+  /* ---- Gotchas ---- */
+  .gotcha-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 0.75rem;
+  }
+  .gotcha-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+  }
+  .gotcha-card .gc-title {
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin-bottom: 0.35rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .gotcha-card .gc-body {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .gotcha-card code {
+    background: rgba(108,140,255,0.1);
+    color: var(--accent);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  /* ---- Comparison Table ---- */
+  .cmp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+  .cmp-table th {
+    text-align: left;
+    font-weight: 600;
+    padding: 0.6rem 0.75rem;
+    border-bottom: 2px solid var(--border);
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .cmp-table td {
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .cmp-table tr:last-child td { border-bottom: none; }
+  .cmp-table .highlight { color: var(--green); font-weight: 600; }
+
+  /* ---- Config Block ---- */
+  .config-block {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.75rem;
+    line-height: 1.7;
+    overflow-x: auto;
+    color: var(--text-dim);
+  }
+  .config-block .hl { color: var(--accent); }
+  .config-block .hlg { color: var(--green); }
+  .config-block .hlp { color: var(--purple); }
+  .config-block .hlo { color: var(--orange); }
+  .config-block .hla { color: var(--amber); }
+  .config-block .comment { color: #555b70; font-style: italic; }
+
+  /* ---- Routing Diagram ---- */
+  .routing-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    flex-wrap: wrap;
+    padding: 1rem 0;
+  }
+  .rf-node {
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-align: center;
+    min-width: 100px;
+  }
+  .rf-arrow {
+    padding: 0 0.4rem;
+    color: var(--text-dim);
+    font-size: 1.1rem;
+  }
+  .rf-note {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    font-weight: 400;
+    display: block;
+    margin-top: 0.15rem;
+  }
+
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    text-align: center;
+  }
+
+  @media (max-width: 700px) {
+    body { padding: 1rem; }
+    .summary-grid { grid-template-columns: repeat(3, 1fr); }
+    .gotcha-grid { grid-template-columns: 1fr; }
+    .routing-flow { flex-direction: column; }
+    .rf-arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+
+<h1>llm-d on HyperPod <span class="badge badge-version">v0.4.7</span></h1>
+<p class="subtitle">Tiered KV Cache Architecture &mdash; L0/L1 (LMCache) + L2/L3 (HyperPod Managed) &mdash; Validated 2026-03-31</p>
+
+<!-- Validation Summary -->
+<div class="summary-grid">
+  <div class="summary-card">
+    <div class="num" style="color:var(--green)">21</div>
+    <div class="label">Tests Passed</div>
+  </div>
+  <div class="summary-card">
+    <div class="num" style="color:var(--red)">0</div>
+    <div class="label">Failed</div>
+  </div>
+  <div class="summary-card">
+    <div class="num" style="color:var(--text-dim)">6</div>
+    <div class="label">Skipped</div>
+  </div>
+  <div class="summary-card">
+    <div class="num" style="color:var(--accent)">7</div>
+    <div class="label">Stages</div>
+  </div>
+  <div class="summary-card">
+    <div class="num" style="color:var(--amber)">1.2 TiB</div>
+    <div class="label">FSx Lustre</div>
+  </div>
+  <div class="summary-card">
+    <div class="num" style="color:var(--purple)">1 GB</div>
+    <div class="label">Shared Memory</div>
+  </div>
+</div>
+
+<!-- Request Routing -->
+<section>
+  <h2><span class="dot" style="background:var(--accent)"></span>End-to-End Request Path</h2>
+  <div class="flow-container">
+    <div class="routing-flow">
+      <div class="rf-node box-gw">Client<span class="rf-note">curl / SDK</span></div>
+      <span class="rf-arrow">&rarr;</span>
+      <div class="rf-node box-gw">Istio Gateway<span class="rf-note">port 80, NLB</span></div>
+      <span class="rf-arrow">&rarr;</span>
+      <div class="rf-node box-epp">EPP<span class="rf-note">ext-proc :9002</span></div>
+      <span class="rf-arrow">&rarr;</span>
+      <div class="rf-node box-vllm">vLLM<span class="rf-note">:8000, Qwen3-0.6B</span></div>
+      <span class="rf-arrow">&rarr;</span>
+      <div class="rf-node box-gw">Response<span class="rf-note">chat completion</span></div>
+    </div>
+    <div style="text-align:center; margin-top:0.5rem;">
+      <span style="font-size:0.72rem; color:var(--text-dim);">
+        HTTPRoute &rarr; InferencePool (GA API) &rarr; endpointPickerRef &rarr; EPP selects pod by prefix score
+      </span>
+    </div>
+  </div>
+</section>
+
+<!-- Tiered Cache Stack -->
+<section>
+  <h2><span class="dot" style="background:var(--green)"></span>Tiered KV Cache Stack</h2>
+  <p style="font-size:0.82rem; color:var(--text-dim); margin-bottom:1rem;">
+    Two independent tiering systems connected at the <code style="background:rgba(167,139,250,0.15);color:var(--purple);padding:0.1em 0.4em;border-radius:3px;font-size:0.78rem;">sagemaker-hyperpod://</code> boundary.
+    LMCache manages L0&rarr;L1&rarr;Remote. The ai-toolkit daemon manages Shared&nbsp;Memory&rarr;FSx internally.
+  </p>
+
+  <div class="tier-stack">
+    <div class="tier-row tier-l0">
+      <div class="tier-label">L0</div>
+      <div class="tier-content">
+        <div class="tc-title" style="color:var(--green)">GPU KV Cache</div>
+        <div class="tc-detail">vLLM prefix cache &mdash; 162K tokens, 17.3 GiB on A10G. Fastest path. Hit rate 59.5% on repeated prompts.</div>
+      </div>
+      <div class="tier-owner">LMCache<br/>(vLLM plugin)</div>
+    </div>
+    <div class="tier-row tier-l1">
+      <div class="tier-label">L1</div>
+      <div class="tier-content">
+        <div class="tc-title" style="color:var(--amber)">CPU Offload</div>
+        <div class="tc-detail">LMCache local CPU &mdash; 5 GB default, LRU eviction. Spills cold KV blocks from GPU. <code>LMCACHE_LOCAL_CPU=True</code></div>
+      </div>
+      <div class="tier-owner">LMCache<br/>(vLLM plugin)</div>
+    </div>
+  </div>
+
+  <div class="tier-divider">
+    <div class="tier-divider-line"></div>
+    <div class="tier-divider-text">sagemaker-hyperpod:// boundary</div>
+    <div class="tier-divider-line"></div>
+  </div>
+
+  <div class="tier-stack">
+    <div class="tier-row tier-l2">
+      <div class="tier-label">L2</div>
+      <div class="tier-content">
+        <div class="tc-title" style="color:var(--purple)">ai-toolkit Daemon</div>
+        <div class="tc-detail">HyperPod DaemonSet on each GPU node, port 9200. LMCache connects via <code>SageMakerHyperPodConnectorAdapter</code>.</div>
+      </div>
+      <div class="tier-owner">HyperPod<br/>(managed)</div>
+    </div>
+    <div class="tier-row tier-l2b">
+      <div class="tier-label" style="font-size:0.7rem">SHM</div>
+      <div class="tier-content">
+        <div class="tc-title" style="color:var(--cyan)">POSIX Shared Memory</div>
+        <div class="tc-detail"><code>/dev/shm/ai_toolkit_cache</code> &mdash; 1 GB, zero-copy IPC between vLLM and daemon. Same-node fast path. hostPath mount required.</div>
+      </div>
+      <div class="tier-owner">ai-toolkit<br/>(daemon)</div>
+    </div>
+    <div class="tier-row tier-l3">
+      <div class="tier-label">L3</div>
+      <div class="tier-content">
+        <div class="tc-title" style="color:var(--orange)">FSx Lustre</div>
+        <div class="tc-detail">1.2 TiB persistent filesystem (fs-0ea95350af6e402f6). Cross-node cache. Daemon evicts cold blocks here. <code>/mnt/fsx</code></div>
+      </div>
+      <div class="tier-owner">ai-toolkit<br/>(daemon)</div>
+    </div>
+  </div>
+</section>
+
+<!-- Two Tiering Systems Comparison -->
+<section>
+  <h2><span class="dot" style="background:var(--purple)"></span>Who Manages What</h2>
+  <div class="flow-container">
+    <table class="cmp-table">
+      <thead>
+        <tr>
+          <th>Layer</th>
+          <th>Storage</th>
+          <th>Managed By</th>
+          <th>Scope</th>
+          <th>Latency</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="color:var(--green); font-weight:600">L0</td>
+          <td>GPU HBM / VRAM</td>
+          <td>LMCache (vLLM plugin)</td>
+          <td>Per-GPU</td>
+          <td class="highlight">&lt; 1 ms</td>
+        </tr>
+        <tr>
+          <td style="color:var(--amber); font-weight:600">L1</td>
+          <td>Host CPU DRAM</td>
+          <td>LMCache (vLLM plugin)</td>
+          <td>Per-pod</td>
+          <td>~ 1 ms</td>
+        </tr>
+        <tr>
+          <td style="color:var(--purple); font-weight:600">L2</td>
+          <td>Shared Memory (POSIX shm)</td>
+          <td>ai-toolkit daemon (HyperPod)</td>
+          <td>Per-node</td>
+          <td>~ 1-5 ms</td>
+        </tr>
+        <tr>
+          <td style="color:var(--orange); font-weight:600">L3</td>
+          <td>FSx Lustre</td>
+          <td>ai-toolkit daemon (HyperPod)</td>
+          <td>Cross-node</td>
+          <td>~ 10-50 ms</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Node Architecture -->
+<section>
+  <h2><span class="dot" style="background:var(--cyan)"></span>Per-Node Architecture (g5.4xlarge)</h2>
+  <div class="arch-diagram">
+    <div style="text-align:center; margin-bottom:0.75rem;">
+      <span style="font-size:0.75rem; color:var(--text-dim);">llmd-validation namespace + aws-hyperpod namespace on same GPU node</span>
+    </div>
+
+    <div class="arch-row">
+      <div class="arch-box box-gw" style="flex:0.7">
+        <div class="box-title">Istio Gateway</div>
+        <div class="box-detail">Envoy proxy, port 80<br/>ext-proc filter &rarr; EPP</div>
+      </div>
+      <div class="arch-box box-epp" style="flex:0.7">
+        <div class="box-title">EPP</div>
+        <div class="box-detail">Endpoint Picker :9002<br/>PrefixCacheScorer (w:3)</div>
+      </div>
+      <div class="arch-box box-vllm" style="flex:1.6">
+        <div class="box-title">vLLM Decode Pod</div>
+        <div class="box-detail">
+          Qwen/Qwen3-0.6B &bull; A10G (1 GPU)<br/>
+          LMCache connector &rarr; L0 GPU &rarr; L1 CPU &rarr; L2 daemon
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow-down">
+      <span class="arrow-label">hostPath /dev/shm (POSIX shared memory IPC)</span>
+    </div>
+
+    <div class="arch-row">
+      <div class="arch-box box-daemon" style="flex:1">
+        <div class="box-title">ai-toolkit DaemonSet</div>
+        <div class="box-detail">
+          aws-hyperpod namespace &bull; port 9200 &bull; uid 1000<br/>
+          Manages: /dev/shm/ai_toolkit_cache (1 GB) &rarr; FSx eviction
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow-down">
+      <span class="arrow-label">FSx CSI mount &bull; PV/PVC &bull; ReadWriteMany</span>
+    </div>
+
+    <div class="arch-row">
+      <div class="arch-box box-fsx" style="flex:1">
+        <div class="box-title">FSx Lustre (1.2 TiB)</div>
+        <div class="box-detail">
+          fs-0ea95350af6e402f6 &bull; 10.1.239.185@tcp:/bukizb4v &bull; 125 MB/s/TiB<br/>
+          HyperPod auto-provisioned via RestrictedInstanceGroups.FSxLustreConfig
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LMCache Config -->
+<section>
+  <h2><span class="dot" style="background:var(--amber)"></span>LMCache Configuration</h2>
+  <div class="config-block">
+<span class="comment"># vLLM args (--kv-transfer-config)</span>
+{
+  "<span class="hl">kv_connector</span>": "<span class="hlg">LMCacheConnectorV1</span>",
+  "<span class="hl">kv_role</span>": "kv_both",
+  "<span class="hl">kv_connector_extra_config</span>": {
+    "<span class="hlp">sagemaker_hyperpod_shared_memory_name</span>": "<span class="hlp">ai_toolkit_cache</span>"  <span class="comment"># must match daemon config</span>
+  }
+}
+
+<span class="comment"># Environment variables (order matters for $(VAR) substitution)</span>
+<span class="hla">LMCACHE_CONFIG_FILE</span>=/etc/lmcache/config.yaml   <span class="comment"># sets extra_config.sagemaker_hyperpod_shared_memory_name</span>
+<span class="hla">LMCACHE_LOCAL_CPU</span>=True                          <span class="comment"># L1 CPU offload (5 GB)</span>
+<span class="hlg">NODE_IP</span>=$(status.hostIP)                         <span class="comment"># MUST be defined BEFORE LMCACHE_REMOTE_URL</span>
+<span class="hlp">LMCACHE_REMOTE_URL</span>=sagemaker-hyperpod://$(NODE_IP):9200  <span class="comment"># L2 daemon</span>
+
+<span class="comment"># Volumes</span>
+hostPath: <span class="hlo">/dev/shm</span> (Directory)  <span class="comment"># NOT emptyDir — must share POSIX shm with host daemon</span>
+PVC: <span class="hlo">fsx-kvcache</span> &rarr; /mnt/fsx   <span class="comment"># FSx Lustre via CSI driver</span>
+  </div>
+</section>
+
+<!-- Gotchas -->
+<section>
+  <h2><span class="dot" style="background:var(--red)"></span>Gotchas Discovered During Validation</h2>
+  <div class="gotcha-grid">
+    <div class="gotcha-card">
+      <div class="gc-title"><span style="color:var(--red)">!</span> Shared Memory Name Mismatch</div>
+      <div class="gc-body">
+        LMCache defaults to <code>shared_memory</code>. ai-toolkit uses <code>ai_toolkit_cache</code>.
+        Must set via <strong>both</strong> <code>kv_connector_extra_config</code> AND <code>LMCACHE_CONFIG_FILE</code>
+        (adapter reads <code>config.extra_config</code>, not vLLM-level config).
+      </div>
+    </div>
+    <div class="gotcha-card">
+      <div class="gc-title"><span style="color:var(--red)">!</span> UID Mismatch on /dev/shm</div>
+      <div class="gc-body">
+        ai-toolkit creates shm as uid 1000 with <code>0600</code>. vLLM runs as uid 2000.
+        Fix: <code>chmod 666 /dev/shm/ai_toolkit_cache</code>.
+        Production: unify UIDs or use supplemental GID.
+      </div>
+    </div>
+    <div class="gotcha-card">
+      <div class="gc-title"><span style="color:var(--red)">!</span> Env Var Ordering</div>
+      <div class="gc-body">
+        K8s <code>$(VAR)</code> substitution only resolves vars defined <strong>earlier</strong> in the env list.
+        <code>NODE_IP</code> must appear before <code>LMCACHE_REMOTE_URL</code>.
+      </div>
+    </div>
+    <div class="gotcha-card">
+      <div class="gc-title"><span style="color:var(--red)">!</span> hostPath, Not emptyDir</div>
+      <div class="gc-body">
+        Must use <code>hostPath: /dev/shm</code> (not <code>emptyDir</code> with <code>medium: Memory</code>)
+        to share POSIX shm with the ai-toolkit daemon running on the host.
+      </div>
+    </div>
+    <div class="gotcha-card">
+      <div class="gc-title"><span style="color:var(--red)">!</span> FSx Root Permissions</div>
+      <div class="gc-body">
+        HyperPod-managed FSx root is <code>755 root:root</code>. vLLM (uid 2000) can't write.
+        Create subdirectory: <code>mkdir -p /mnt/fsx/kvcache && chmod 777</code> via init container.
+      </div>
+    </div>
+    <div class="gotcha-card">
+      <div class="gc-title"><span style="color:var(--amber)">~</span> EKS 1.32 Required</div>
+      <div class="gc-body">
+        <code>RestrictedInstanceGroups</code> (system nodes for operator pods) not supported on K8s 1.33.
+        Inference clusters must target EKS 1.32.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Without vs With HyperPod -->
+<section>
+  <h2><span class="dot" style="background:var(--orange)"></span>With vs Without HyperPod</h2>
+  <div class="flow-container">
+    <table class="cmp-table">
+      <thead>
+        <tr>
+          <th>Capability</th>
+          <th>Vanilla EKS + llm-d</th>
+          <th>HyperPod + llm-d</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>L0 GPU Cache</td>
+          <td class="highlight">Yes (vLLM prefix cache)</td>
+          <td class="highlight">Yes (vLLM prefix cache)</td>
+        </tr>
+        <tr>
+          <td>L1 CPU Offload</td>
+          <td class="highlight">Yes (LMCache)</td>
+          <td class="highlight">Yes (LMCache)</td>
+        </tr>
+        <tr>
+          <td>L2 Shared Memory</td>
+          <td style="color:var(--text-dim)">Manual (self-managed daemon)</td>
+          <td class="highlight">Managed (ai-toolkit DaemonSet)</td>
+        </tr>
+        <tr>
+          <td>L3 Cross-Node Cache</td>
+          <td style="color:var(--text-dim)">Manual (provision FSx, file:// URL)</td>
+          <td class="highlight">Auto-provisioned FSx + daemon tiering</td>
+        </tr>
+        <tr>
+          <td>System Nodes</td>
+          <td style="color:var(--text-dim)">Self-managed nodegroups</td>
+          <td class="highlight">RestrictedInstanceGroups</td>
+        </tr>
+        <tr>
+          <td>Health Monitoring</td>
+          <td style="color:var(--text-dim)">Self-managed</td>
+          <td class="highlight">health-monitoring-agent DaemonSet</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Helm Stack -->
+<section>
+  <h2><span class="dot" style="background:var(--accent)"></span>Deployment Stack</h2>
+  <div class="flow-container">
+    <div class="flow-row">
+      <div class="flow-node box-gw">llm-d-infra v1.4.0</div>
+      <span class="flow-label">Istio Gateway + NLB annotations</span>
+    </div>
+    <div class="flow-row">
+      <div class="flow-node box-epp">inferencepool v1.4.0 (GAIE)</div>
+      <span class="flow-label">InferencePool CRD (GA) + EPP ext-proc</span>
+    </div>
+    <div class="flow-row">
+      <div class="flow-node box-vllm">llm-d-modelservice v0.4.7</div>
+      <span class="flow-label">vLLM v0.15.1 + LMCache + Qwen3-0.6B</span>
+    </div>
+    <div class="flow-row" style="margin-top:0.5rem;">
+      <div class="flow-node box-daemon">HyperPod Inference Cluster</div>
+      <span class="flow-label">ai-toolkit + FSx + RestrictedInstanceGroups + health-monitoring</span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  llm-d on HyperPod &mdash; Validated on llmd-inference-cluster (inference-eks-v132, K8s 1.32) &mdash; g5.4xlarge (A10G) &mdash; 2026-03-31
+</footer>
+
+</body>
+</html>

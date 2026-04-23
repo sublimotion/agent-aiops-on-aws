@@ -40,6 +40,8 @@ copy_report "domains/gpu-serving/blueprints/qwen3-next/results/benchmark-visual-
 copy_report "domains/gpu-serving/blueprints/kimi-k2.5/results/benchmark-visual-20260221.html" "benchmark-visual-kimi-k2.5-20260221.html"
 copy_report "domains/gpu-serving/blueprints/nemotron-super/results/benchmark-report.html" "benchmark-report-nemotron-super.html"
 copy_report "domains/gpu-serving/blueprints/ray-serve-video/results/benchmark-visual-report.html" "benchmark-visual-ray-serve-video-20260327.html"
+copy_report "domains/gpu-serving/blueprints/qwen3-235b-b300/results/benchmark-visual-report.html" "benchmark-visual-qwen3-235b-b300-20260422.html"
+copy_report "domains/gpu-serving/blueprints/kimi-k2.6/results/benchmark-visual-report.html" "benchmark-visual-kimi-k2.6-20260422.html"
 
 # Autoresearch
 copy_report "domains/autoresearch/blueprints/verifier-reward/results/verifier-reward-visual.html" "verifier-reward-visual.html"
@@ -50,11 +52,7 @@ copy_report "domains/autoresearch/blueprints/agent-harness/results/visual-explai
 copy_report "domains/autoresearch/blueprints/agent-harness/results/visual-explainer-20260315.html" "visual-explainer-harness-20260315.html"
 copy_report "domains/autoresearch/blueprints/training-recipes/results/benchmark-report.html" "benchmark-report-training-recipes.html"
 copy_report "domains/autoresearch/blueprints/finetuning-recipes/results/benchmark-report.html" "benchmark-report-finetuning-recipes.html"
-copy_report "domains/autoresearch/blueprints/verification-primitives/results/verification-primitives-visual.html" "verification-primitives-visual.html"
-
-# Agent Runtime
-copy_report "domains/agent-runtime/blueprints/research-agent/results/audit-visual-20260223.html" "audit-visual-research-agent-20260223.html"
-copy_report "domains/agent-runtime/blueprints/research-agent/results/architecture-research-agent-20260223.html" "architecture-research-agent-20260223.html"
+copy_report "domains/autoresearch/blueprints/verification-primitives/results/verification-primitives-consolidated.html" "verification-primitives-consolidated.html"
 
 # Site (cross-domain)
 copy_report "site/compatibility-matrix.html" "compatibility-matrix.html"

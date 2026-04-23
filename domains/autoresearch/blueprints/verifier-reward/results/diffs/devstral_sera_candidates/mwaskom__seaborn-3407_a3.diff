@@ -1,0 +1,70 @@
+diff --git a/seaborn/axisgrid.py b/seaborn/axisgrid.py
+index 75349099..fb7810e5 100644
+--- a/seaborn/axisgrid.py
++++ b/seaborn/axisgrid.py
+@@ -1252,6 +1252,21 @@ class PairGrid(Grid):
+             x_vars = numeric_cols
+         if y_vars is None:
+             y_vars = numeric_cols
++        
++        # For MultiIndex columns, ensure we have the full column tuples
++        if isinstance(data.columns, pd.MultiIndex):
++            if hue is not None and not isinstance(hue, tuple):
++                hue = next((col for col in data.columns if col[0] == hue), None)
++                if hue is None:
++                    raise KeyError(f"Hue variable {hue} not found in MultiIndex columns")
++            if x_vars and not isinstance(x_vars[0], tuple):
++                x_vars = [next((col for col in data.columns if col[0] == x), None) for x in x_vars]
++                if any(x is None for x in x_vars):
++                    raise KeyError(f"Some x_vars not found in MultiIndex columns")
++            if y_vars and not isinstance(y_vars[0], tuple):
++                y_vars = [next((col for col in data.columns if col[0] == y), None) for y in y_vars]
++                if any(y is None for y in y_vars):
++                    raise KeyError(f"Some y_vars not found in MultiIndex columns")
+ 
+         if np.isscalar(x_vars):
+             x_vars = [x_vars]
+@@ -1487,9 +1502,32 @@ class PairGrid(Grid):
+             else:
+                 plt.sca(ax)
+ 
+-            vector = self.data[var]
++            # Get the vector for this variable
++            if isinstance(self.data.columns, pd.MultiIndex):
++                # For MultiIndex, we need to find the full column tuple
++                if not isinstance(var, tuple):
++                    # Find the first column that matches the variable name at level 0
++                    var_tuple = next((col for col in self.data.columns if col[0] == var), None)
++                    if var_tuple is None:
++                        raise KeyError(f"Variable {var} not found in MultiIndex columns")
++                    vector = self.data[var_tuple]
++                else:
++                    vector = self.data[var]
++            else:
++                vector = self.data[var]
++            
+             if self._hue_var is not None:
+-                hue = self.data[self._hue_var]
++                if isinstance(self.data.columns, pd.MultiIndex):
++                    if not isinstance(self._hue_var, tuple):
++                        # Find the first column that matches the hue variable name at level 0
++                        hue_tuple = next((col for col in self.data.columns if col[0] == self._hue_var), None)
++                        if hue_tuple is None:
++                            raise KeyError(f"Hue variable {self._hue_var} not found in MultiIndex columns")
++                        hue = self.data[hue_tuple]
++                    else:
++                        hue = self.data[self._hue_var]
++                else:
++                    hue = self.data[self._hue_var]
+             else:
+                 hue = None
+ 
+@@ -1664,7 +1702,7 @@ class PairGrid(Grid):
+     def _find_numeric_cols(self, data):
+         """Find which variables in a DataFrame are numeric."""
+         numeric_cols = []
+-        for col in data:
++        for col in data.columns:
+             if variable_type(data[col]) == "numeric":
+                 numeric_cols.append(col)
+         return numeric_cols

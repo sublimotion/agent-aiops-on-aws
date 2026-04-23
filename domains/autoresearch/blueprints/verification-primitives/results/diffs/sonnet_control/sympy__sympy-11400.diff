@@ -1,0 +1,21 @@
+diff --git a/sympy/printing/ccode.py b/sympy/printing/ccode.py
+index 30a07a7b59..5d2ec46177 100644
+--- a/sympy/printing/ccode.py
++++ b/sympy/printing/ccode.py
+@@ -248,6 +248,16 @@ def _print_For(self, expr):
+                 '{step}) {{\n{body}\n}}').format(target=target, start=start,
+                 stop=stop, step=step, body=body)
+ 
++    def _print_sinc(self, expr):
++        from sympy.functions.elementary.trigonometric import sin
++        from sympy.core.relational import Ne
++        from sympy.functions import Piecewise
++        _expr = expr.args[0]
++        return self._print(Piecewise(
++            (sin(_expr)/_expr, Ne(_expr, 0)),
++            (1, True)
++        ))
++
+     def _print_sign(self, func):
+         return '((({0}) > 0) - (({0}) < 0))'.format(self._print(func.args[0]))
+ 

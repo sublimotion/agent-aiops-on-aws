@@ -1,0 +1,83 @@
+diff --git a/seaborn/axisgrid.py b/seaborn/axisgrid.py
+index 75349099..fd827078 100644
+--- a/seaborn/axisgrid.py
++++ b/seaborn/axisgrid.py
+@@ -1487,9 +1487,16 @@ class PairGrid(Grid):
+             else:
+                 plt.sca(ax)
+ 
+-            vector = self.data[var]
++            # Handle MultiIndex columns
++            if isinstance(self.data.columns, pd.MultiIndex):
++                vector = self.data[var]
++            else:
++                vector = self.data[var]
+             if self._hue_var is not None:
+-                hue = self.data[self._hue_var]
++                if isinstance(self.data.columns, pd.MultiIndex):
++                    hue = self.data[self._hue_var]
++                else:
++                    hue = self.data[self._hue_var]
+             else:
+                 hue = None
+ 
+@@ -1516,7 +1523,11 @@ class PairGrid(Grid):
+         fixed_color = kwargs.pop("color", None)
+ 
+         for var, ax in zip(self.diag_vars, self.diag_axes):
+-            hue_grouped = self.data[var].groupby(self.hue_vals)
++            # Handle MultiIndex columns
++            if isinstance(self.data.columns, pd.MultiIndex):
++                hue_grouped = self.data[var].groupby(self.hue_vals)
++            else:
++                hue_grouped = self.data[var].groupby(self.hue_vals)
+ 
+             plot_kwargs = kwargs.copy()
+             if str(func.__module__).startswith("seaborn"):
+@@ -1591,7 +1602,11 @@ class PairGrid(Grid):
+         if self._hue_var is not None and self._hue_var not in axes_vars:
+             axes_vars.append(self._hue_var)
+ 
+-        data = self.data[axes_vars]
++        # Handle MultiIndex columns
++        if isinstance(self.data.columns, pd.MultiIndex):
++            data = self.data[axes_vars]
++        else:
++            data = self.data[axes_vars]
+         if self._dropna:
+             data = data.dropna()
+ 
+@@ -1600,7 +1615,10 @@ class PairGrid(Grid):
+         if self._hue_var is None:
+             hue = None
+         else:
+-            hue = data.get(self._hue_var)
++            if isinstance(self.data.columns, pd.MultiIndex):
++                hue = data.get(self._hue_var)
++            else:
++                hue = data.get(self._hue_var)
+ 
+         if "hue" not in kwargs:
+             kwargs.update({
+@@ -1623,7 +1641,11 @@ class PairGrid(Grid):
+         else:
+             axes_vars = [x_var, y_var]
+ 
+-        hue_grouped = self.data.groupby(self.hue_vals)
++        # Handle MultiIndex columns
++        if isinstance(self.data.columns, pd.MultiIndex):
++            hue_grouped = self.data.groupby(self.hue_vals)
++        else:
++            hue_grouped = self.data.groupby(self.hue_vals)
+         for k, label_k in enumerate(self._hue_order):
+ 
+             kws = kwargs.copy()
+@@ -1664,7 +1686,7 @@ class PairGrid(Grid):
+     def _find_numeric_cols(self, data):
+         """Find which variables in a DataFrame are numeric."""
+         numeric_cols = []
+-        for col in data:
++        for col in data.columns:
+             if variable_type(data[col]) == "numeric":
+                 numeric_cols.append(col)
+         return numeric_cols

@@ -1,0 +1,16 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 157903fa..d2487ce4 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -743,7 +743,10 @@ class AssertionRewriter(ast.NodeVisitor):
+ 
+     @staticmethod
+     def is_rewrite_disabled(docstring: str) -> bool:
+-        return "PYTEST_DONT_REWRITE" in docstring
++        # Convert to string if it's not already, to handle cases where the first expression
++        # is a number or other non-string type
++        docstring_str = str(docstring) if not isinstance(docstring, str) else docstring
++        return "PYTEST_DONT_REWRITE" in docstring_str
+ 
+     def variable(self) -> str:
+         """Get a new variable."""

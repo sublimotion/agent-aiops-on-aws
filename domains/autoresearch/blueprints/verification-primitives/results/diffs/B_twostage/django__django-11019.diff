@@ -1,0 +1,86 @@
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 02aa32b207..6027d51395 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -70,11 +70,76 @@ class Media:
+ 
+     @property
+     def _js(self):
+-        js = self._js_lists[0]
+-        # filter(None, ...) avoids calling merge() with empty lists.
+-        for obj in filter(None, self._js_lists[1:]):
+-            js = self.merge(js, obj)
+-        return js
++        return self._merge_all([lst for lst in self._js_lists if lst])
++
++    @classmethod
++    def _merge_all(cls, lists):
++        """
++        Merge multiple lists into a single list, preserving the relative order
++        of elements as specified in each source list. Only warn when two lists
++        specify the same two elements in genuinely opposite orders.
++
++        Unlike sequential pairwise merging, this method avoids false conflicts
++        that arise from intermediate results imposing transitive ordering
++        constraints between otherwise unrelated elements.
++        """
++        # Collect all unique elements in first-seen order.
++        all_elements = []
++        seen = set()
++        for lst in lists:
++            for item in lst:
++                if item not in seen:
++                    seen.add(item)
++                    all_elements.append(item)
++
++        if not all_elements:
++            return []
++
++        # Map each element to its position in all_elements for O(1) lookup.
++        order_index = {item: idx for idx, item in enumerate(all_elements)}
++
++        # Build a dependency graph from adjacent pairs in each source list.
++        # An edge a -> b means "a must come before b" (b depends on a).
++        # successors[a] = set of items b such that a must precede b.
++        # in_degree[b] = number of items that must precede b.
++        in_degree = {item: 0 for item in all_elements}
++        successors = {item: [] for item in all_elements}
++
++        for lst in lists:
++            for i in range(len(lst) - 1):
++                a, b = lst[i], lst[i + 1]
++                # Only add each edge once.
++                if b not in successors[a]:
++                    successors[a].append(b)
++                    in_degree[b] += 1
++
++        # Kahn's topological sort.
++        # Maintain the queue in first-seen order (by all_elements index) so
++        # that the output is stable and matches the intuitive ordering.
++        heap = [
++            (order_index[item], item)
++            for item in all_elements
++            if in_degree[item] == 0
++        ]
++        heapq.heapify(heap)
++        result = []
++
++        while heap:
++            _, item = heapq.heappop(heap)
++            result.append(item)
++            for successor in successors[item]:
++                in_degree[successor] -= 1
++                if in_degree[successor] == 0:
++                    heapq.heappush(heap, (order_index[successor], successor))
++
++        if len(result) < len(all_elements):
++            # Cycle detected: genuine ordering conflict. Fall back to pairwise
++            # merging which will emit appropriate warnings.
++            result = lists[0]
++            for lst in lists[1:]:
++                result = cls.merge(result, lst)
++
++        return result
+ 
+     def render(self):
+         return mark_safe('\n'.join(chain.from_iterable(getattr(self, 'render_' + name)() for name in MEDIA_TYPES)))
