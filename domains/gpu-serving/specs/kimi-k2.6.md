@@ -185,7 +185,7 @@ export SGLANG_JIT_DEEPGEMM_FAST_WARMUP=1  # <3 min cold start vs ~15 min
 |---|---|---|---|
 | GPU VRAM | HBM3e (~1,490 GB available) | Prefix caching | RadixAttention |
 | CPU/NVMe | Host memory (4 TB) | CPU KV offload (v0.19) | HiCache (500GB) |
-| LMCache | Any | **BLOCKED** (MLA) | **BLOCKED** (MLA) |
+| LMCache | Any | **UNVALIDATED** — single-group MLA (see note) | **BLOCKED** — SGLang connector gap (PR #2629, OPEN) |
 
 ### 5. Monitoring
 
@@ -389,7 +389,7 @@ blueprints/kimi-k2.6/results/
 
 - FP8 deployment (INT4 QAT preferred — better tok/s/$ with lower memory footprint)
 - Multi-node distributed inference (single p6-b300.48xlarge)
-- LMCache integration (blocked for MLA models)
+- LMCache integration on SGLang (blocked — SGLang MLA connector PR #2629 OPEN; tracked in issue #3192). vLLM+LMCache on K2.6 is **unvalidated, not blocked** — K2.6 uses single-group MLA which avoids the multi-group bug addressed by LMCache PR #2951 (OPEN, targets GLM-5 / DeepSeek V3). A fresh smoke test on vLLM `dev` + LMCache `dev` is needed to confirm status before committing to this path.
 - Bare-metal deployment (using EKS)
 - Production autoscaling
 - Multi-region deployment

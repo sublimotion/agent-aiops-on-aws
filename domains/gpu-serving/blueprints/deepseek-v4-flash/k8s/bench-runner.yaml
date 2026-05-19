@@ -1,0 +1,68 @@
+# Bench-runner pod — runs benchmark-serving.py and vllm bench serve against the in-cluster vLLM pod.
+# Lands on the m5 system node (no GPU contention with the vLLM pod).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dsv4-bench-runner
+  namespace: default
+  labels:
+    app: dsv4-bench-runner
+spec:
+  restartPolicy: Never
+  # Land on the B300 itself (host network, low resources, no GPU request).
+  # System m5 nodes are full; the B300 has 192 cores / 4 TB RAM with 192 cores idle.
+  nodeSelector:
+    model: deepseek-v4-flash
+  hostNetwork: true
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  containers:
+    - name: bench
+      image: python:3.11-slim
+      command:
+        - sh
+        - -c
+        - |
+          set -euo pipefail
+          apt-get update -qq && apt-get install -y -qq curl >/dev/null
+          pip install -q aiohttp huggingface_hub
+          # Install vllm for `vllm bench serve` (CPU-only is fine — we're a client)
+          pip install -q vllm
+          echo "=== bench-runner ready ==="
+          # Sleep so the pod stays alive for kubectl exec
+          sleep 86400
+      env:
+        # Same node as vLLM (hostNetwork) → talk via localhost
+        - name: VLLM_URL
+          value: http://localhost:8000
+        - name: MODEL_NAME
+          value: DeepSeek-V4-Flash
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+        - name: results
+          mountPath: /results
+        - name: nvme
+          mountPath: /mnt/nvme
+          readOnly: true
+      resources:
+        requests:
+          cpu: "4"
+          memory: 8Gi
+        limits:
+          cpu: "8"
+          memory: 16Gi
+  volumes:
+    - name: scripts
+      configMap:
+        name: dsv4-bench-scripts
+        defaultMode: 0755
+    - name: results
+      emptyDir:
+        sizeLimit: 5Gi
+    - name: nvme
+      hostPath:
+        path: /mnt/nvme
+        type: Directory

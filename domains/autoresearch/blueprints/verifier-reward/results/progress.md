@@ -941,3 +941,55 @@ These are genuinely convincing patches that require codebase-level completeness 
 Cost: T10b iteration ~$2.50 (v015 FP-only $0.09, v015 quick $0.62, v009 quick $0.51, v016 quick $0.56, v017 quick $0.60, v018 quick $0.10, t=0.7 FP test ~$0.08)
 
 Script: `scripts/run_verified_iteration.py`
+
+---
+
+## Next Experiments (from vault backlog — updated 2026-04-28)
+
+> Canonical backlog: `obsidian-notes/01_Projects/Learned-Verifier-Experiment/Experiment-Backlog.md`
+> Full designs, hypotheses, and cost estimates live there. This section is a pointer + summary.
+
+### Free / Immediate (from prior briefings)
+
+| ID | Name | Cost | What It Tests |
+|----|------|------|---------------|
+| E_new8 | Noise tolerance calibration | $0 | Is behavioral RF deployable as RLVR reward? (Imperfect Verifier framework) |
+| E_new5 | Mechanical Tier 0 linters | $0 | AST/regex checks catch 10-20% of failures before ML? |
+| E_new6 | Exploit-resistant feature analysis | $0 | Does 4-feature RF flag BenchJack-style gaming? |
+| E_norm | AST patch normalization | $0-5 | Does normalizing scaffold formatting fix cross-model v009 transfer? |
+
+### Free / Immediate (from 2026-04-28 Sakana deep research)
+
+| ID | Name | Cost | What It Tests |
+|----|------|------|---------------|
+| **E_cond1** | **CMA-ES micro-verifier head** | **$0** | **10K-param head on frozen Qwen3-0.6B, trained with sep-CMA-ES on n=300. Targets AUC > 0.727. Attacks E6 cross-model transfer failure via richer representations vs 4 summary features.** |
+| E_cond3 | Learned verification cascade router | $5-15 | Replace fixed Tier 0→RF→v009 cascade with learned router. Conductor proved 2.4× cost advantage over fixed routing. |
+
+### Moderate Cost
+
+| ID | Name | Cost | What It Tests |
+|----|------|------|---------------|
+| E4 | Segmental process rewards | ~$10 | Early stopping from Parkinson's Law — abort doomed trajectories |
+| E5 | Constraint-guided verification | ~$25 | Extracted behavioral constraints bridge semantic gap between v009 and gold tests |
+| E_new7 | Verifier-as-garbage-collector | ~$5-10 | Retrospective verification on merged commits predicts future bugs |
+| **E_cond2** | **GRPO verification emergence** | **~$20-50** | **Does 7B agent trained with GRPO spontaneously develop verification behaviors? (Conductor showed verification emerges from correctness reward alone)** |
+
+### Later (needs infrastructure)
+
+| ID | Name | Blocker | What It Tests |
+|----|------|---------|---------------|
+| E_new4 | Longitudinal drift detection | Multi-session data | Behavioral feature drift predicts quality regression |
+| E6-SFT | SVG rejection sampling | Fine-tuning infra | SFT on SVG-accepted trajectories improves base pass rate |
+| E7 | PivotRL | RL stack | Focused RL on verification decision points |
+
+### Key insight from Sakana research (2026-04-28)
+
+Sakana's Conductor (7B, GRPO) and Trinity (0.6B + 10K head, CMA-ES) together prove:
+
+1. **Verification emerges from correctness reward alone** — no explicit verification training needed (Conductor)
+2. **CMA-ES beats REINFORCE at tiny parameter counts** — 0.615 vs 0.253 on LiveCodeBench (Trinity)
+3. **10K-param heads on frozen small models can make effective binary decisions** (Trinity)
+
+E_cond1 is the highest-novelty experiment: if a 10K-param CMA-ES head matches the behavioral RF at near-zero inference cost AND transfers cross-model, it's a fundamentally different verification architecture.
+
+Full research: `obsidian-notes/01_Projects/Learned-Verifier-Experiment/Sakana-Conductor-Trinity-Fugu-Deep-Research.md`

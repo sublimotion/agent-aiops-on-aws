@@ -1,0 +1,56 @@
+catalog_id: concurrency-sweep
+use_case: production-mix
+description: >
+  Concurrency sweep for sizing, SLO-max discovery, and KV-cache ceiling
+  characterization. Runs the same workload at increasing concurrency levels
+  to find where latency or memory breaks down. Each level produces a
+  separate artifact; a sizing report references the set.
+
+  Three supported modes (select via sidecar or CLI, card stays the same):
+    1. Fixed levels → power-of-2 from 1 to 256 (default; used for sizing)
+    2. Ramp-until-breakdown → stop when P99 TTFT exceeds threshold or OOM
+    3. Context-length sweep → outer loop of contexts, inner sweep as above
+
+  Cross-tool standard: vLLM bench sweep, SGLang auto_benchmark,
+  GenAI-Perf analyze --sweep-type concurrency, Artificial Analysis AA-SLT.
+
+  Covers the CTO engagement's O1 cell when run with `context_lengths`
+  populated and `stop_condition.p99_ttft_ms` set. Paged-KV and other
+  engine options are sidecar-level choices, not workload variants.
+
+modality: text
+
+dataset:
+  type: synthetic
+  # Either a single context (sizing mode) or a list (KV-ceiling mode).
+  # When `context_lengths` is a list, the runner emits one artifact per
+  # (context, concurrency) pair.
+  context_lengths: [2048]
+  output_tokens: {mean: 512, std_dev: 0}
+
+load:
+  type: concurrency-sweep
+  levels: [1, 2, 4, 8, 16, 32, 64, 128, 256]
+  num_prompts_per_level: 50
+  warmup_requests: 10
+
+  # Optional: when set, replaces the fixed `levels` with a ramp starting at
+  # `start_concurrency` that stops the sweep at the first level meeting any
+  # stop condition. This is the O1 "ramp until breakdown" mode.
+  stop_condition:
+    p99_ttft_ms: null      # e.g. 1500 for CTO O1; leave null for fixed-levels mode
+    oom_detected: false    # set true for KV-ceiling discovery
+
+slo:
+  ttft_p99_ms: 300
+  tpot_p99_ms: 50
+  e2e_p99_ms: 15000
+  error_rate_max: 0.001
+
+# Engine-internal metrics useful across sizing and KV-ceiling use.
+extensions:
+  cache_stats:
+    kv_utilization_pct: required
+    kv_bytes_per_session: optional   # Required for KV-ceiling discovery
+  memory:
+    peak_vram_gb: optional

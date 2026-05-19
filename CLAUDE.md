@@ -28,6 +28,7 @@ Read these files **on demand** based on what you're doing:
 | Creating new files, modules, or blueprints | `.claude/steering/project-structure.md` |
 | About to deploy a model | `mdc get <model> [--engine <engine>]` and `mdc prs <model>` for upstream deployment card + recent PRs |
 | Deploying or modifying a GPU-serving blueprint | `domains/gpu-serving/specs/<matching-spec>.md` |
+| About to deploy a HyperPod blueprint (spec ending in `-hyperpod`) | `.claude/steering/tech-stack.md` §SageMaker HyperPod Inference Operator release tracking, then WebFetch the release-notes URL to confirm the pinned version is current |
 | Deploying an agent-runtime blueprint | `domains/agent-runtime/specs/<name>.md` |
 | Running an autoresearch experiment | `domains/autoresearch/specs/<name>.md` |
 | Running the compound step after deployment | `domains/<domain>/blueprints/<name>/lessons.md` + `.claude/steering/*.md`; compound-learner must generate YAML frontmatter (see `docs/card-format.md`) as its final step, then run `scripts/fe.sh learn <path>` |
@@ -35,6 +36,12 @@ Read these files **on demand** based on what you're doing:
 | Running pre-flight or post-deploy checks | Use the `deployment-orchestrator` skill |
 | Validating GPU hardware before serving (Stage 4a) | Use `gpu-infra` MCP tools: `discover_cluster`, `check_gpu_health`, `run_nccl_test` |
 | Diagnosing GPU hardware issues | Use `gpu-infra` MCP tools: `explain_xid`, `get_gpu_metrics`, `check_gpu_health` |
+| Running or designing benchmarks | `standards/benchmark-commons/PROPOSAL.md` + `docs/inference-optimization-guide.md` |
+| Choosing benchmark workloads | `standards/benchmark-commons/workloads/*.yaml` (7 standard workload cards) |
+| Writing Stage 6 benchmark criteria | `domains/gpu-serving/specs/_template.md` (Stage 6 section) |
+| Interpreting or comparing benchmark results | `docs/inference-optimization-guide.md` (Sections 9-12: cost, methodology, KV cache, kernels) |
+| Building or deploying the benchmark container | `standards/benchmark-commons/container/` (Dockerfile, enrich-benchmark.py, benchmark-job.yaml) |
+| Writing a benchmark.yaml sidecar for a blueprint | `standards/benchmark-commons/examples/nemotron-super/benchmark.yaml` (reference example) |
 
 **Spec routing** — match blueprints to specs by name:
 
@@ -60,7 +67,10 @@ Read these files **on demand** based on what you're doing:
 | `domains/gpu-serving/blueprints/gemma4-4b-hyperpod/` | `domains/gpu-serving/specs/gemma4-4b-hyperpod.md` |
 | `domains/gpu-serving/blueprints/mistral-small-4-hyperpod/` | `domains/gpu-serving/specs/mistral-small-4-hyperpod.md` |
 | `domains/gpu-serving/blueprints/kimi-k2-thinking/` | `domains/gpu-serving/specs/kimi-k2-thinking.md` |
+| `domains/gpu-serving/blueprints/kimi-k2.6-speculative/` | `domains/gpu-serving/specs/kimi-k2.6-speculative.md` |
+| `domains/gpu-serving/blueprints/kimi-k2.6-lmcache-smoke/` | `domains/gpu-serving/specs/kimi-k2.6-lmcache-smoke.md` |
 | `domains/gpu-serving/blueprints/qwen3-235b-b300/` | `domains/gpu-serving/specs/qwen3-235b-b300.md` |
+| `domains/gpu-serving/blueprints/qwen3-235b-speculative/` | `domains/gpu-serving/specs/qwen3-235b-speculative.md` |
 | `domains/agent-runtime/blueprints/research-agent/` | `domains/agent-runtime/specs/research-agent.md` |
 | `domains/autoresearch/blueprints/training-recipes/` | `domains/autoresearch/specs/training-recipes.md` |
 | `domains/autoresearch/blueprints/agent-harness/` | `domains/autoresearch/specs/agent-harness.md` |
@@ -72,6 +82,10 @@ Read these files **on demand** based on what you're doing:
 | `domains/autoresearch/blueprints/verification-primitives/` | `domains/autoresearch/specs/verification-primitives.md` |
 | `domains/autoresearch/blueprints/verification-primitives-swebench/` | `domains/autoresearch/specs/verification-primitives-swebench.md` |
 | `domains/autoresearch/blueprints/boltz2-foldbench/` | `domains/autoresearch/specs/boltz2-foldbench.md` |
+| `domains/autoresearch/blueprints/rejection-sampling-sft/` | `domains/autoresearch/specs/rejection-sampling-sft.md` |
+| `domains/autoresearch/blueprints/vla-cv-distillation/` | `domains/autoresearch/specs/vla-cv-distillation.md` |
+| `domains/autoresearch/blueprints/kernel-optimization-agent/` | `domains/autoresearch/specs/kernel-optimization-agent.md` |
+| `domains/autoresearch/blueprints/mooncake-kv-tiering/` | `domains/autoresearch/specs/mooncake-kv-tiering.md` |
 
 **Blueprint-local context** — for operational details (lessons, results, plans), look inside the blueprint directory itself rather than in specs.
 

@@ -1,0 +1,178 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "created_at": "2026-05-06T10:30:00Z",
+  "source_tool": {
+    "name": "aiperf",
+    "version": "0.6.0",
+    "enrichment_version": "1.0.0"
+  },
+
+  "model": {
+    "name": "Nemotron-3-Super-120B-A12B",
+    "id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
+    "architecture": "hybrid-mamba-moe",
+    "parameters_total": "120B",
+    "parameters_active": "12B",
+    "quantization": "fp8",
+    "max_model_len": 256000
+  },
+
+  "engine": {
+    "name": "sglang",
+    "container_image": "123456789.dkr.ecr.us-east-2.amazonaws.com/dynamo:1.0.0",
+    "base_image": "nvcr.io/nvidia/dynamo:1.0.0",
+    "dockerfile": null,
+    "tensor_parallel": 2,
+    "pipeline_parallel": 1,
+    "data_parallel": null,
+    "expert_parallel": null,
+    "replicas": 2,
+    "reasoning": false,
+    "kv_cache_dtype": "fp8",
+    "attention_backend": "auto",
+    "speculative_decode": null,
+    "extra_args": {
+      "trust-remote-code": true,
+      "tool-call-parser": "qwen3_coder",
+      "reasoning-parser": "nano_v3"
+    }
+  },
+
+  "framework": {
+    "name": "dynamo",
+    "version": "1.0.0",
+    "config": {
+      "mode": "disaggregated",
+      "router": "round-robin",
+      "nixl_enabled": true,
+      "prefill": {
+        "tp_size": 2,
+        "num_workers": 2,
+        "gpus": [4, 5, 6, 7]
+      },
+      "decode": {
+        "tp_size": 2,
+        "num_workers": 2,
+        "gpus": [0, 1, 2, 3]
+      },
+      "kvbm": null,
+      "service_discovery": "etcd"
+    }
+  },
+
+  "infrastructure": {
+    "substrate": "eks",
+    "instance_type": "p6-b200.48xlarge",
+    "region": "us-east-2",
+    "gpu": {
+      "name": "B200",
+      "arch": "sm_100",
+      "count": 8,
+      "vram_gb": 183,
+      "interconnect": "nvswitch"
+    }
+  },
+
+  "workload": {
+    "use_case": "production-mix",
+    "catalog_id": "concurrency-sweep",
+    "modality": "text",
+    "dataset": {
+      "type": "synthetic",
+      "input_tokens": {"mean": 4096, "std_dev": 512},
+      "output_tokens": {"mean": 1024, "std_dev": 128}
+    },
+    "load": {
+      "type": "concurrency-sweep",
+      "levels": [1, 4, 16, 32, 64, 128, 256],
+      "num_prompts_per_level": 100,
+      "warmup_requests": 10,
+      "current_level": 64
+    },
+    "api": {
+      "type": "chat",
+      "streaming": true,
+      "endpoint": "/v1/chat/completions"
+    }
+  },
+
+  "metrics": {
+    "duration_s": 156.3,
+    "completed": 100,
+    "failed": 0,
+    "error_rate": 0.0,
+
+    "ttft_ms": {"mean": 142.5, "p50": 128.3, "p90": 210.4, "p95": 245.8, "p99": 312.6},
+    "tpot_ms": {"mean": 8.2, "p50": 7.9, "p90": 9.8, "p95": 10.5, "p99": 12.3},
+    "itl_ms":  {"mean": 8.0, "p50": 7.6, "p90": 9.5, "p95": 10.2, "p99": 11.8},
+    "e2e_ms":  {"mean": 8540.0, "p50": 8320.0, "p90": 9850.0, "p95": 10200.0, "p99": 11450.0},
+
+    "output_toks_per_s": 4215.8,
+    "request_throughput": 0.64,
+    "total_toks_per_s": 6892.3,
+    "total_input_tokens": 412800,
+    "total_output_tokens": 102400,
+    "max_concurrent_requests": 64
+  },
+
+  "slo": {
+    "targets": {
+      "ttft_p99_ms": 500,
+      "tpot_p99_ms": 30,
+      "e2e_p99_ms": 15000,
+      "error_rate_max": 0.001
+    },
+    "results": {
+      "ttft_p99_ms": {"target": 500, "actual": 312.6, "pass": true},
+      "tpot_p99_ms": {"target": 30, "actual": 12.3, "pass": true},
+      "e2e_p99_ms": {"target": 15000, "actual": 11450.0, "pass": true},
+      "error_rate_max": {"target": 0.001, "actual": 0.0, "pass": true}
+    },
+    "overall_pass": true
+  },
+
+  "extensions": {
+    "gpu_telemetry": {
+      "gpu_utilization_pct": {"mean": 78.4, "max": 92.1},
+      "memory_utilization_pct": {"mean": 62.3, "max": 68.7},
+      "power_draw_w": {"mean": 680, "max": 750},
+      "temperature_c": {"mean": 62, "max": 71}
+    },
+    "cache_stats": {
+      "kv_utilization_pct": {"mean": 45.2, "max": 58.7},
+      "prefix_hit_rate": null,
+      "eviction_rate_per_s": 0.0,
+      "note": "Mamba hybrid state not prefix-cacheable; KV-aware routing only helps attention layers"
+    },
+    "dynamo_specific": {
+      "disagg_speedup": 1.42,
+      "disagg_speedup_note": "vs aggregated agg-tp2-x4 at same concurrency=64",
+      "aggregated_baseline_toks": 2968.0,
+      "ttft_stability": {
+        "ttft_p99_at_c1": 85.2,
+        "ttft_p99_at_c64": 312.6,
+        "ttft_p99_at_c128": 410.3,
+        "ratio_c128_vs_c1": 4.82,
+        "note": "disagg keeps TTFT flatter than aggregated (agg ratio was 8.5x)"
+      },
+      "nixl_transfer_latency_ms": {"mean": 2.1, "p99": 4.8},
+      "routing_overhead_ms": {"mean": 0.8, "p99": 1.4},
+      "prefill_worker_gpu_util_pct": 91.3,
+      "decode_worker_gpu_util_pct": 68.2,
+      "optimal_pd_ratio": "4P:4D",
+      "optimal_pd_ratio_note": "balanced split; 12B active params makes decode fast — decode-heavy 2P:6D underperforms because prefill becomes bottleneck at c>=64"
+    },
+    "cost": {
+      "instance_cost_per_hr": 112.50,
+      "dollars_per_1m_output_tokens": 7.41,
+      "formula": "(112.50 / 4215.8) * (1000000 / 3600)",
+      "aggregated_dollars_per_1m": 10.53,
+      "disagg_cost_efficiency_ratio": 1.42
+    },
+    "per_request": {
+      "uri": "blueprints/nemotron-super/results/concurrency-sweep_c64_per_request.jsonl",
+      "format": "jsonl"
+    }
+  }
+}

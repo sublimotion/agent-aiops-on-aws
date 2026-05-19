@@ -1,0 +1,83 @@
+# Round 3: MTP speculative decoding enabled. Same image / kv-fp8 as r1/r2.
+# Per spec, this tier has guardrails: pre-run gates + output-repetition checks.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vllm-deepseek-v4-flash
+  namespace: default
+  labels:
+    app: vllm-deepseek-v4-flash
+    round: r3-mtp
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    node.kubernetes.io/instance-type: p6-b300.48xlarge
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  hostNetwork: true
+  containers:
+    - name: vllm
+      image: vllm/vllm-openai:nightly-6e889b582b6a0b11f22b3764be174266faa9ff5e
+      command:
+        - bash
+        - -c
+        - |
+          set -euo pipefail
+          pip install -q "transformers==4.56.2"
+
+          # MTP speculative decoding via spec-config. PR #42320 (merged 2026-05-13) fixes the
+          # `post_mix` regression. PR #42930 (merged 2026-05-18) fixes MTP after ROCm mHC integration.
+          # We use the model's own MTP weights (same checkpoint).
+          exec python3 -m vllm.entrypoints.openai.api_server \
+            --model /mnt/nvme/models/DeepSeek-V4-Flash \
+            --served-model-name DeepSeek-V4-Flash \
+            --tensor-parallel-size 8 \
+            --max-model-len 32768 \
+            --gpu-memory-utilization 0.92 \
+            --enable-prefix-caching \
+            --kv-cache-dtype fp8 \
+            --speculative-config '{"method":"deepseek_mtp","num_speculative_tokens":1}' \
+            --trust-remote-code \
+            --host 0.0.0.0 \
+            --port 8000
+      env:
+        - name: VLLM_TORCH_COMPILE_CACHE
+          value: /mnt/nvme/vllm-cache
+        - name: TRITON_CACHE_DIR
+          value: /mnt/nvme/triton-cache
+        - name: HF_HOME
+          value: /mnt/nvme/hf-cache
+        - name: HF_HUB_OFFLINE
+          value: "1"
+      resources:
+        requests:
+          nvidia.com/gpu: "8"
+          cpu: "64"
+          memory: 256Gi
+        limits:
+          nvidia.com/gpu: "8"
+          cpu: "128"
+          memory: 512Gi
+      volumeMounts:
+        - name: nvme
+          mountPath: /mnt/nvme
+        - name: shm
+          mountPath: /dev/shm
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        initialDelaySeconds: 600
+        periodSeconds: 15
+        failureThreshold: 80
+  volumes:
+    - name: nvme
+      hostPath:
+        path: /mnt/nvme
+        type: Directory
+    - name: shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 128Gi

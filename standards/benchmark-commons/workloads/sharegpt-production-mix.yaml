@@ -1,0 +1,76 @@
+catalog_id: sharegpt-production-mix
+use_case: production-mix
+description: |
+  Real conversation distribution from ShareGPT. Captures the heavy-tailed input/output
+  length distribution and turn structure that synthetic fixed-length workloads miss.
+  Use to validate findings from synthetic workloads (qps-sweep, chatbot-short, chatbot-long)
+  before reporting throughput / latency numbers as production-representative.
+
+  Why this exists: synthetic workloads with fixed input_tokens (e.g., random 2048/512)
+  systematically mislead on three dimensions:
+    1. Prefix-cache hit rate — synthetic random has near-0% reuse; real chats hit 20-60%
+       on shared system prompts and multi-turn context.
+    2. KV pressure variance — fixed-length workloads under-report tail latency because
+       every request consumes the same KV. Real conversations have a long tail (p95
+       inputs are 4-8x p50) that exposes scheduler preemption.
+    3. Continuous-batching efficiency — uniform output lengths produce artificially clean
+       step boundaries; real distributions stagger decode completions, which is closer
+       to real production behavior.
+
+  This card mirrors `vllm bench serve --dataset-name sharegpt`. Tools that don't bundle
+  ShareGPT can use the HuggingFace dataset `anon8231489123/ShareGPT_Vicuna_unfiltered`
+  (filter to multi-turn English conversations).
+
+dataset:
+  type: real
+  source: sharegpt
+  hf_dataset: anon8231489123/ShareGPT_Vicuna_unfiltered
+  filter:
+    language: en
+    min_turns: 2
+  # Empirical distribution — for documentation; the dataset itself is authoritative.
+  observed_distribution:
+    input_tokens:  {p50: 240, p90: 1450, p95: 2700, p99: 7800, max: ~16K}
+    output_tokens: {p50: 180, p90: 700,  p95: 1100, p99: 2400}
+    turns_per_conversation: {p50: 2, p90: 6, p99: 18}
+
+load:
+  # Default: realistic Poisson arrival at moderate QPS. Sweep handled by qps-sweep card.
+  type: poisson
+  request_rate: 4.0
+  num_prompts: 500              # larger N — heavy-tailed distributions need volume
+  warmup_requests: 50
+
+slo:
+  # Looser than synthetic chatbot-short because tail inputs blow ttft_p99.
+  # Match what production users actually accept on heterogeneous workloads.
+  ttft_p50_ms: 300
+  ttft_p99_ms: 2000
+  tpot_p50_ms: 30
+  tpot_p99_ms: 80
+  e2e_p99_ms: 30000
+  error_rate_max: 0.001
+
+# Validation gates — required to report a result against this card as "production-representative"
+validation:
+  required_metrics:
+    - prefix_cache_hit_rate     # must report; synthetic random is 0%, expect >= 15% here
+    - input_length_p50_p99      # report distribution actually realized
+    - output_length_p50_p99
+    - per_turn_ttft_distribution  # multi-turn must report TTFT separately for turn 1 vs N
+
+  reliability_flags:
+    - rule: p99_p50_ttft_ratio_gt_5
+      action: flag_unreliable
+      reason: indicates queue saturation or KV preemption, not config-attributable
+    - rule: prefix_cache_hit_rate_lt_0.05
+      action: flag_unrealistic
+      reason: implies dataset filtering broke shared prefixes; rerun
+
+# Cross-checks — when results from this card disagree with synthetic, trust this one.
+cross_check:
+  paired_synthetic_cards: [chatbot-short, chatbot-long, qps-sweep]
+  policy: |
+    Report both synthetic and sharegpt-production-mix results side-by-side. When
+    deltas exceed 25% (any p50/p99 metric), flag the synthetic result as misleading
+    and prefer this card's numbers in headline reporting and cross-blueprint tables.

@@ -1,0 +1,81 @@
+# One-shot Job to RAID0 the 8x local NVMe drives on the B300 node and mount as /mnt/nvme.
+# Pattern matches the kimi-k2.6 + qwen3-235b-b300 setup (28TB RAID0).
+#
+# Why this is needed: AL2023 NVIDIA AMI ships the local NVMe drives unformatted.
+# The 200GB EBS root cannot fit DeepSeek-V4-Flash weights (~150GB) + KV cache + Triton/HF caches.
+# Each B300 instance has 8x ~3.84 TB NVMe SSDs (~30 TB total raw).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: init-nvme-raid0
+  namespace: default
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: OnFailure
+      hostPID: true
+      hostNetwork: true
+      nodeSelector:
+        model: deepseek-v4-flash
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: nvme-init
+          image: amazonlinux:2023
+          securityContext:
+            privileged: true
+          command:
+            - sh
+            - -c
+            - |
+              set -euo pipefail
+              echo "=== Detecting local NVMe drives (excluding root) ==="
+              # Root is on nvme0n1; instance store volumes are nvme1n1..nvmeNn1
+              DRIVES=$(ls /host/dev/nvme*n1 | grep -vE '^/host/dev/nvme0n1$' | sort)
+              echo "Found drives:"
+              echo "$DRIVES"
+              N=$(echo "$DRIVES" | wc -l)
+              echo "Count: $N"
+
+              if [ "$N" -lt 2 ]; then
+                echo "[error] expected ≥2 instance store NVMe drives; got $N"
+                exit 1
+              fi
+
+              # Idempotency: bail cleanly if /mnt/nvme is already a mount point
+              if chroot /host mountpoint -q /mnt/nvme; then
+                echo "[skip] /mnt/nvme already mounted"
+                chroot /host df -h /mnt/nvme
+                exit 0
+              fi
+
+              chroot /host yum install -y mdadm xfsprogs >/dev/null 2>&1
+              chroot /host mkdir -p /mnt/nvme
+
+              # Translate /host/dev/* → /dev/* for chroot
+              DEV_LIST=$(echo "$DRIVES" | sed 's|^/host||' | tr '\n' ' ')
+              echo "RAID0 candidates: $DEV_LIST"
+
+              echo "=== Creating /dev/md0 RAID0 ==="
+              chroot /host mdadm --create /dev/md0 --level=0 --raid-devices="$N" --force --run $DEV_LIST
+
+              echo "=== mkfs.xfs ==="
+              chroot /host mkfs.xfs -f /dev/md0
+
+              echo "=== Mounting /mnt/nvme ==="
+              chroot /host mount /dev/md0 /mnt/nvme
+              chroot /host chmod 1777 /mnt/nvme
+
+              echo "=== Done ==="
+              chroot /host df -h /mnt/nvme
+          volumeMounts:
+            - name: host
+              mountPath: /host
+              mountPropagation: Bidirectional
+      volumes:
+        - name: host
+          hostPath:
+            path: /

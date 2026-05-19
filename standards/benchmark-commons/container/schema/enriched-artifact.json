@@ -1,0 +1,292 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/agent-aiops-on-aws/standards/benchmark-commons/enriched-artifact.json",
+  "title": "Enriched Benchmark Artifact",
+  "description": "Standard format for LLM inference benchmark results with deployment context",
+  "type": "object",
+  "required": ["schema_version", "artifact_id", "created_at", "source_tool", "model", "engine", "infrastructure", "workload", "metrics"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "artifact_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_tool": {
+      "type": "object",
+      "required": ["name", "version", "enrichment_version"],
+      "properties": {
+        "name": {"type": "string",
+                  "enum": ["aiperf", "vllm-bench-serve", "sglang-bench-serving",
+                           "genai-perf", "guidellm", "llmperf", "recon-perf",
+                           "bench-standard.py", "custbench-async", "custbench-legacy",
+                           "custom"]},
+        "version": {"type": "string"},
+        "enrichment_version": {"type": "string"}
+      }
+    },
+    "model": {
+      "type": "object",
+      "required": ["name", "id"],
+      "properties": {
+        "name": {"type": "string"},
+        "id": {"type": "string"},
+        "architecture": {"type": "string"},
+        "parameters_total": {"type": "string"},
+        "parameters_active": {"type": "string"},
+        "quantization": {"type": "string", "enum": ["fp16", "bf16", "fp8", "fp4", "int8", "int4", "awq", "gptq", "mxint4", "none"]},
+        "max_model_len": {"type": "integer"}
+      }
+    },
+    "engine": {
+      "type": "object",
+      "required": ["name", "container_image", "tensor_parallel", "pipeline_parallel", "replicas", "reasoning"],
+      "properties": {
+        "name": {"type": "string", "enum": ["vllm", "sglang", "trt-llm", "sglang-native", "dynamo", "custom"]},
+        "container_image": {"type": "string"},
+        "base_image": {"type": ["string", "null"]},
+        "dockerfile": {"type": ["string", "null"]},
+        "tensor_parallel": {"type": "integer", "minimum": 1},
+        "pipeline_parallel": {"type": "integer", "minimum": 1},
+        "data_parallel": {"type": ["integer", "null"]},
+        "expert_parallel": {"type": ["boolean", "null"]},
+        "replicas": {"type": "integer", "minimum": 1},
+        "reasoning": {"type": "boolean"},
+        "kv_cache_dtype": {"type": ["string", "null"]},
+        "attention_backend": {"type": ["string", "null"]},
+        "speculative_decode": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "properties": {
+                "method": {"type": "string", "enum": ["mtp", "eagle", "eagle3", "draft-model"]},
+                "algorithm": {"type": "string"},
+                "num_tokens": {"type": "integer", "minimum": 1},
+                "num_steps": {"type": "integer", "minimum": 1},
+                "num_draft_tokens": {"type": "integer", "minimum": 1},
+                "eagle_topk": {"type": "integer", "minimum": 1},
+                "draft_model": {"type": "string"},
+                "draft_attention_backend": {"type": "string"}
+              }
+            }
+          ]
+        },
+        "extra_args": {"type": ["object", "null"]}
+      }
+    },
+    "framework": {
+      "type": "object",
+      "required": ["name", "version", "config"],
+      "properties": {
+        "name": {"type": "string", "enum": ["dynamo", "llmd", "ray-serve", "custom"]},
+        "version": {"type": "string"},
+        "config": {"type": "object"}
+      }
+    },
+    "infrastructure": {
+      "type": "object",
+      "required": ["substrate", "instance_type", "gpu"],
+      "properties": {
+        "substrate": {"type": "string", "enum": ["eks", "hyperpod-eks", "hyperpod", "bare-metal", "ec2", "ec2-spot", "local"]},
+        "instance_type": {"type": "string"},
+        "region": {"type": "string"},
+        "gpu": {
+          "type": "object",
+          "required": ["name", "count", "vram_gb", "interconnect"],
+          "properties": {
+            "name": {"type": "string"},
+            "arch": {"type": "string"},
+            "count": {"type": "integer", "minimum": 1},
+            "vram_gb": {"type": "number"},
+            "interconnect": {"type": "string",
+                              "enum": ["nvswitch", "nvswitch-nvl5", "nvswitch-nv18",
+                                       "pcie", "efa", "none"]}
+          }
+        }
+      }
+    },
+    "workload": {
+      "type": "object",
+      "required": ["use_case", "modality", "dataset", "load", "api"],
+      "properties": {
+        "use_case": {"type": "string"},
+        "catalog_id": {"type": ["string", "null"]},
+        "modality": {"type": "string", "enum": ["text", "vision", "audio", "multimodal"]},
+        "dataset": {"type": "object"},
+        "load": {"type": "object"},
+        "api": {
+          "type": "object",
+          "required": ["type", "streaming"],
+          "properties": {
+            "type": {"type": "string"},
+            "streaming": {"type": "boolean"},
+            "endpoint": {"type": "string"}
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Core metrics contract — same shape regardless of source tool. TTFT, TPOT, ITL, E2E are MANDATORY fields (use null percentiles if not captured). output_toks_per_s and request_throughput are both required; embedding workloads legitimately emit output_toks_per_s=0 but MUST populate request_throughput.",
+      "required": ["duration_s", "completed", "failed", "error_rate",
+                   "ttft_ms", "tpot_ms", "itl_ms", "e2e_ms",
+                   "output_toks_per_s", "request_throughput"],
+      "properties": {
+        "duration_s": {"type": "number"},
+        "completed": {"type": "integer"},
+        "failed": {"type": "integer"},
+        "error_rate": {"type": "number", "minimum": 0, "maximum": 1},
+        "ttft_ms": {"$ref": "#/$defs/latency_metric",
+                     "description": "Time from request send to first token received (ms)."},
+        "tpot_ms": {"$ref": "#/$defs/latency_metric",
+                     "description": "Time per output token — computed as (e2e - ttft) / (output_tokens - 1), excludes first token."},
+        "itl_ms": {"$ref": "#/$defs/latency_metric",
+                    "description": "Inter-token latency — mean time between consecutive token arrivals."},
+        "e2e_ms": {"$ref": "#/$defs/latency_metric",
+                    "description": "Total request latency from send to last token."},
+        "output_toks_per_s": {"type": "number",
+                               "description": "total_output_tokens / duration_s. Legitimately 0 for embedding / classifier workloads."},
+        "request_throughput": {"type": ["number", "null"],
+                                "description": "completed / duration_s. Primary metric for embedding workloads."},
+        "total_toks_per_s": {"type": ["number", "null"]},
+        "total_input_tokens": {"type": "integer"},
+        "total_output_tokens": {"type": "integer"},
+        "max_concurrent_requests": {"type": ["integer", "null"]}
+      }
+    },
+    "slo": {
+      "type": "object",
+      "properties": {
+        "targets": {"type": "object"},
+        "results": {"type": "object"},
+        "overall_pass": {"type": "boolean"}
+      }
+    },
+    "power": {
+      "type": "object",
+      "description": "O11 power efficiency — tokens/joule, idle/load power, thermal envelope",
+      "properties": {
+        "source": {"type": "string", "enum": ["dcgm", "nvidia-smi", "pdu", "cloud-proxy"]},
+        "duration_s": {"type": "number"},
+        "avg_fleet_power_watts": {"type": "number"},
+        "total_energy_joules": {"type": "number"},
+        "tokens_per_joule": {"type": ["number", "null"]},
+        "load_fraction": {"type": ["number", "null"], "minimum": 0, "maximum": 1,
+                          "description": "Target load fraction (0.25, 0.50, 0.75, 1.0) for O11 sweep"},
+        "power_watts": {"$ref": "#/$defs/aggregated_metric"},
+        "gpu_util_pct": {"$ref": "#/$defs/aggregated_metric"},
+        "temp_c": {"$ref": "#/$defs/aggregated_metric"}
+      }
+    },
+    "hardware_errors": {
+      "type": "object",
+      "description": "O10 ECC / SDC / interconnect error counters observed during the run",
+      "properties": {
+        "ecc_sbe_delta": {"type": "integer",
+                          "description": "Single-bit corrected ECC errors during run"},
+        "ecc_dbe_delta": {"type": "integer",
+                          "description": "Double-bit detected (uncorrectable) ECC errors during run"},
+        "nvlink_crc_errors_delta": {"type": "integer"},
+        "pcie_replay_delta": {"type": "integer"},
+        "xid_events": {"type": "array", "items": {"type": "string"}},
+        "sentinel_divergences": {"type": "integer",
+                                 "description": "O10 golden-prompt canary divergences (0 expected)"}
+      }
+    },
+    "quality": {
+      "type": "object",
+      "description": "O3 quality-gate results — MUST pass before throughput is reported",
+      "properties": {
+        "gate_passed": {"type": "boolean"},
+        "evals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["eval", "score", "baseline_score", "passed"],
+            "properties": {
+              "eval": {"type": "string",
+                       "enum": ["mmlu", "gsm8k", "humaneval", "banking77", "fiqa",
+                                "docvqa", "librispeech"]},
+              "harness": {"type": "string"},
+              "harness_version": {"type": "string"},
+              "task": {"type": "string"},
+              "score": {"type": ["number", "null"]},
+              "baseline_score": {"type": "number"},
+              "delta": {"type": ["number", "null"]},
+              "tolerance": {"type": "number"},
+              "passed": {"type": "boolean"},
+              "lower_is_better": {"type": "boolean"}
+            }
+          }
+        }
+      }
+    },
+    "stability": {
+      "type": "object",
+      "description": "O5 burn-in — throughput drift, thermal events, error rate over long runs",
+      "properties": {
+        "duration_hours": {"type": "number"},
+        "warmup_minutes": {"type": "number", "default": 10},
+        "hour_1_throughput": {"type": "number"},
+        "final_throughput": {"type": "number"},
+        "throughput_drift_pct": {"type": "number",
+                                 "description": "(final - hour1) / hour1 × 100; O5 gate is |drift| ≤ 2%"},
+        "thermal_events": {"type": "integer", "description": "Thermal throttle events past warmup"},
+        "unrecoverable_errors": {"type": "integer"},
+        "drift_curve_path": {"type": ["string", "null"],
+                             "description": "Relative path to drift time series CSV"},
+        "drift_gate_passed": {"type": "boolean"}
+      }
+    },
+    "cold_start": {
+      "type": "object",
+      "description": "O9 cold-start breakdown — each phase times separately",
+      "properties": {
+        "source": {"type": "string", "enum": ["nvme", "nas", "object-store", "hub"]},
+        "format": {"type": "string", "enum": ["safetensors", "gguf", "trt-engine", "rocm-cache"]},
+        "cache_state": {"type": "string", "enum": ["cold", "warm"]},
+        "total_seconds": {"type": "number"},
+        "weights_load_s": {"type": "number"},
+        "allocator_warmup_s": {"type": "number"},
+        "kernel_compile_s": {"type": "number"},
+        "cuda_graph_capture_s": {"type": "number"},
+        "first_100_latencies_ms": {"type": "array", "items": {"type": "number"}}
+      }
+    },
+    "cost": {"type": "object"},
+    "extensions": {"type": "object"}
+  },
+  "$defs": {
+    "latency_metric": {
+      "type": "object",
+      "description": "Latency distribution in ms. All percentile keys MUST be present; use null when the producer did not capture the value (e.g. TTFT from a non-streaming client). Do not invent values.",
+      "required": ["mean", "p50", "p90", "p95", "p99"],
+      "properties": {
+        "mean": {"type": ["number", "null"]},
+        "p50": {"type": ["number", "null"]},
+        "p90": {"type": ["number", "null"]},
+        "p95": {"type": ["number", "null"]},
+        "p99": {"type": ["number", "null"]}
+      }
+    },
+    "aggregated_metric": {
+      "type": "object",
+      "properties": {
+        "mean": {"type": "number"},
+        "p50": {"type": "number"},
+        "p95": {"type": "number"},
+        "p99": {"type": "number"},
+        "max": {"type": "number"},
+        "min": {"type": "number"},
+        "per_gpu_mean": {"type": "array", "items": {"type": ["number", "null"]}}
+      }
+    }
+  }
+}

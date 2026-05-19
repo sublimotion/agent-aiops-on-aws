@@ -1,0 +1,114 @@
+# K8s Job manifest for running AIPerf benchmarks in-cluster.
+# Deploy alongside the serving engine pod(s).
+#
+# Usage:
+#   1. Create ConfigMap from your blueprint's benchmark.yaml:
+#      kubectl create configmap bench-sidecar --from-file=benchmark.yaml=blueprints/<name>/benchmark.yaml
+#
+#   2. Apply the job:
+#      kubectl apply -f benchmark-job.yaml
+#
+#   3. Collect results:
+#      kubectl cp bench-runner-<hash>:/results ./results/
+#
+# Customization:
+#   - BENCHMARK_TARGET: endpoint of the serving engine (service DNS or pod IP)
+#   - WORKLOAD_INDEX: which workload from the sidecar to run (0-indexed)
+#   - SCRAPE_METRICS: set to "true" to collect engine-internal metrics during run
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: aiperf-benchmark
+  namespace: ml-inference
+  labels:
+    app: aiperf-runner
+    component: benchmark
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: aiperf-runner
+    spec:
+      restartPolicy: Never
+      serviceAccountName: bench-runner
+
+      containers:
+        - name: runner
+          image: "${ECR_REPO}/aiperf-runner:latest"
+          args:
+            - "--sidecar"
+            - "/config/benchmark.yaml"
+            - "--target"
+            - "$(BENCHMARK_TARGET)"
+            - "--workload-index"
+            - "$(WORKLOAD_INDEX)"
+            - "--output-dir"
+            - "/results"
+          env:
+            - name: BENCHMARK_TARGET
+              value: "http://serving-engine.ml-inference.svc:8000"
+            - name: WORKLOAD_INDEX
+              value: "0"
+            - name: SCRAPE_METRICS
+              value: "false"
+          volumeMounts:
+            - name: sidecar-config
+              mountPath: /config
+              readOnly: true
+            - name: results
+              mountPath: /results
+            - name: workloads
+              mountPath: /etc/aiperf/workloads
+              readOnly: true
+          resources:
+            requests:
+              cpu: "2"
+              memory: 4Gi
+            limits:
+              cpu: "4"
+              memory: 8Gi
+
+        # Optional: metrics scraper sidecar
+        # Uncomment to collect engine-internal metrics during the benchmark run
+        # - name: metrics-scraper
+        #   image: "${ECR_REPO}/aiperf-runner:latest"
+        #   command: ["/usr/local/bin/scrape-engine-metrics"]
+        #   args:
+        #     - "--url"
+        #     - "$(BENCHMARK_TARGET)/metrics"
+        #     - "--duration"
+        #     - "300"
+        #     - "--interval"
+        #     - "5"
+        #     - "--output"
+        #     - "/results/engine-metrics.json"
+        #   env:
+        #     - name: BENCHMARK_TARGET
+        #       value: "http://serving-engine.ml-inference.svc:8000"
+        #   volumeMounts:
+        #     - name: results
+        #       mountPath: /results
+        #   resources:
+        #     requests:
+        #       cpu: "100m"
+        #       memory: 128Mi
+
+      volumes:
+        - name: sidecar-config
+          configMap:
+            name: bench-sidecar
+        - name: results
+          emptyDir:
+            sizeLimit: 1Gi
+        - name: workloads
+          configMap:
+            name: aiperf-workloads
+            optional: true  # falls back to baked-in /etc/aiperf/workloads/
+
+---
+# ConfigMap with standard workload definitions (optional — container has them baked in)
+# Create from the workload catalog:
+#   kubectl create configmap aiperf-workloads --from-file=standards/benchmark-commons/workloads/

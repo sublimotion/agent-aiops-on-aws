@@ -1,0 +1,30 @@
+# EKS managed nodegroup for DeepSeek-V4-Flash benchmark on B300 spot.
+#
+# Apply via eksctl OR via aws CLI (preferred since cluster is non-eksctl):
+#
+#   aws eks create-nodegroup --cluster-name qn-sglang-eks-cluster --region us-west-2 \
+#     --nodegroup-name dsv4-b300-spot \
+#     --subnets subnet-001db6882dbb5ac72 \
+#     --instance-types p6-b300.48xlarge \
+#     --capacity-type SPOT \
+#     --scaling-config minSize=0,maxSize=1,desiredSize=1 \
+#     --disk-size 200 \
+#     --ami-type AL2023_x86_64_NVIDIA \
+#     --node-role arn:aws:iam::615299764834:role/gpu-eks-node-group-20260303162535678600000025 \
+#     --taints key=nvidia.com/gpu,value=true,effect=NO_SCHEDULE \
+#     --labels role=gpu,model=deepseek-v4-flash,instance=p6-b300.48xlarge \
+#     --tags Project=deepseek-v4-flash,SpotReclaim=true
+#
+# Notes:
+# - Subnet pinned to usw2-az2 (subnet-001db6882dbb5ac72) — only AZ with B300 capacity per
+#   `aws ec2 describe-instance-type-offerings`.
+# - AL2023_x86_64_NVIDIA AMI required: AL2 kernel lacks ib_umad for NVL5+ Fabric Manager
+#   (memory: B200/B300 driver baseline).
+# - Reusing existing `gpu-eks-node-group-...` IAM role from ray-ft-gpu nodegroup. Verify it
+#   has S3 read access to qn-sglang-models-* bucket if we ever swap to S3 staging.
+# - 200 GB EBS root: container images for vLLM/SGLang are 12-16 GB each; we'll pull both.
+# - capacityType=SPOT: ~$26.50/hr vs ~$50 on-demand. Reclaim risk during 4-6hr full sweep
+#   is meaningful — make scripts resumable per-tier.
+#
+# Alternative for higher availability: use a Mixed Capacity nodegroup with spot allocation
+# strategy or fall back to capacity-block via the EC2 RunInstances path (see scripts/launch-spot.sh).

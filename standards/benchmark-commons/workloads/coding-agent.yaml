@@ -1,0 +1,44 @@
+catalog_id: coding-agent
+use_case: coding-agent
+description: >
+  Agentic coding with tool calls. Models multi-turn agent loops where each
+  "turn" involves: (1) long system prompt + tool definitions (prefix-cacheable),
+  (2) reasoning/planning output, (3) tool call, (4) tool result injected,
+  (5) next reasoning step. Tests prefix caching effectiveness, KV cache
+  retention across turns, and decode performance under moderate concurrency.
+
+  InferenceX equivalent: "agentic-coding" scenario (MVP, trace replay).
+  Our addition: SLO targets, prefix caching measurement, KV cache metrics.
+
+modality: text
+
+dataset:
+  type: synthetic-agentic
+  system_prompt_tokens: 12000  # Claude Code-like: instructions + 20 tool defs
+  input_tokens_first_turn: {mean: 4096, std_dev: 1024}
+  input_tokens_subsequent: {mean: 1024, std_dev: 512}  # Tool results are shorter
+  output_tokens: {mean: 2048, std_dev: 512}
+  turns_per_session: 8
+  inter_turn_delay_s: {min: 2, max: 30}  # Simulates tool execution time
+  prefix_reuse: true  # System prompt shared across all sessions
+
+load:
+  type: constant
+  concurrent_sessions: 4
+  num_sessions: 25
+  warmup_sessions: 4
+
+slo:
+  ttft_p99_ms: 500        # First token must be fast (user is waiting)
+  ttft_warm_p99_ms: 100   # Subsequent turns with cached prefix
+  tpot_p99_ms: 30         # 33+ tok/s streaming target
+  e2e_p99_ms: 60000       # 60s max per turn (reasoning can be long)
+  error_rate_max: 0.001
+
+# Required extensions for this workload (engine-internal metrics)
+extensions:
+  cache_stats:
+    prefix_hit_rate: required    # Must measure: system prompt caching
+    kv_utilization_pct: required # Must measure: memory pressure across turns
+  reasoning:
+    thinking_tokens_ratio: optional  # If reasoning model

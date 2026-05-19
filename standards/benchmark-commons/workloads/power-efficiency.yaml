@@ -1,0 +1,58 @@
+catalog_id: power-efficiency
+use_case: power-and-sdc
+description: >
+  CTO benchmarks O10 + O11 combined: tokens-per-joule at 25 / 50 / 75 /
+  100% load fractions AND continuous ECC / SDC telemetry across the run
+  window. A 1% sentinel traffic slice (golden-prompt set with deterministic
+  outputs) detects silent data corruption.
+
+  The runner's scrape-power.py samples DCGM at 1 Hz — power, GPU util,
+  SM / mem clocks, temp, ECC SBE / DBE, NVLink CRC, PCIe replay. The
+  enriched artifact emits the `power` and `hardware_errors` blocks.
+
+  Cross-check on-device telemetry against wall-socket (PDU on-prem) or
+  published-TDP proxy (cloud). Idle power reported separately — the long
+  tail of notebooks and dev envs runs near idle.
+
+  Source: "GPU Benchmarking - Test Cases.docx" O10 + O11.
+
+modality: text
+
+dataset:
+  type: synthetic
+  input_tokens: {mean: 2048, std_dev: 0}
+  output_tokens: {mean: 256, std_dev: 0}
+
+load:
+  type: ceiling-fraction-sweep
+  fractions: [0.25, 0.50, 0.75, 1.00]
+  duration_per_fraction_s: 900
+
+# 1% of requests are golden prompts with deterministic expected outputs
+sentinel:
+  enabled: true
+  fraction_of_traffic: 0.01
+  prompts_file: "sentinel/golden-prompts.json"
+  # Any output divergence is logged and triggers root-cause investigation
+
+statistics:
+  warmup_s: 300
+  steady_state_s: 900
+  min_repeats: 3
+  max_cv: 0.05
+
+slo:
+  error_rate_max: 0.001
+  sentinel_divergences_max: 0
+
+extensions:
+  power:
+    tokens_per_joule: required
+    idle_power_watts: required        # Separate cell at load fraction = 0
+    wall_socket_delta_pct: optional   # PDU or cloud-proxy delta
+  hardware_errors:
+    ecc_sbe_delta: required
+    ecc_dbe_delta: required
+    nvlink_crc_errors_delta: required
+    pcie_replay_delta: required
+    sentinel_divergences: required

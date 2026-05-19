@@ -1,0 +1,18 @@
+catalog_id: qps-sweep
+use_case: production-mix
+description: Sweep QPS to find the SLO-max operating point.
+modality: text
+
+dataset:
+  type: synthetic
+  input_tokens: {mean: 2048, std_dev: 0}
+  output_tokens: {mean: 512, std_dev: 0}
+
+load:
+  type: sweep
+  rates: [0.5, 1.0, 2.0, 4.0, 8.0, 16.0]
+  num_prompts_per_rate: 100
+
+slo:
+  ttft_p99_ms: 300
+  tpot_p99_ms: 50

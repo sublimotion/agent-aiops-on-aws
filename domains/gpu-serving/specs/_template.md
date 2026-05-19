@@ -84,10 +84,38 @@ Concrete, mechanically checkable conditions for each stage. The deployer agent c
 - [ ] Startup time < _____ minutes (fill in; account for DeepGEMM JIT if applicable)
 
 ### Stage 6 — Benchmark
-- [ ] TTFT P50 < _____ ms at concurrency _____
-- [ ] Throughput > _____ tok/s at batch size _____
+
+**Workload selection**: Pick from the [standard workload catalog](../../../standards/benchmark-commons/workloads/) or define custom workloads. Each benchmark run produces an **enriched artifact** (AIPerf output + deployment context envelope).
+
+| Workload | When to use | Catalog file |
+|----------|-------------|-------------|
+| `concurrency-sweep` | Always — find SLO-max operating point | `workloads/concurrency-sweep.yaml` |
+| `chatbot-short` | Interactive serving validation | `workloads/chatbot-short.yaml` |
+| `coding-agent` | Agentic / tool-calling workloads | `workloads/coding-agent.yaml` |
+| `batch-throughput` | Max throughput ceiling | `workloads/batch-throughput.yaml` |
+| `rag-long-context` | Prefix caching / long-doc workloads | `workloads/rag-long-context.yaml` |
+
+**Required measurements** (minimum for any deployment):
+- [ ] Concurrency sweep completed (1 → saturation, power-of-2 steps)
+- [ ] TTFT P50 < _____ ms, P99 < _____ ms at target concurrency
+- [ ] Throughput > _____ tok/s at target concurrency
 - [ ] No OOM at max concurrent requests = _____
 - [ ] No request timeouts during benchmark run
+- [ ] Error rate < 0.1% at all concurrency levels
+
+**KV cache validation** (required for multi-turn or agentic workloads):
+- [ ] Prefix cache hit rate measured (disable → enable, compare TTFT)
+- [ ] KV cache utilization % at max target concurrency < 95%
+- [ ] If using HiCache/CPU offload: validated net-positive vs baseline
+
+**Engine-internal metrics** (scraped from Prometheus `/metrics` during run):
+- [ ] KV cache utilization (`vllm:gpu_cache_usage_perc` or equivalent)
+- [ ] Running requests (`vllm:num_requests_running`)
+- [ ] Speculative decode acceptance rate (if MTP/spec decode enabled)
+
+**Enriched artifact output**: Store in `blueprints/<name>/results/` following the schema from `standards/benchmark-commons/PROPOSAL.md`. Each artifact includes: model metadata, engine config, infrastructure, workload, core metrics, SLO evaluation, and optional extensions.
+
+> **SLO targets**: Use thresholds from the workload catalog YAML, or override per-spec based on `mdc get <model>` deployment card recommendations.
 
 ### Stage 7 — Readiness Audit
 - [ ] All readiness audit categories pass

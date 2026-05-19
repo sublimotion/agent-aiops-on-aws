@@ -669,6 +669,64 @@ Script: `scripts/run_cross_model_bon.py`
 | **Persona variation (iter 53)** | 3 adversarial personas (security/testing/architect) | **NEGATIVE. All personas reject all 7 patches. Code analysis dominates persona framing. $0.25.** |
 | **T9: Qwen3.5 × OpenCode harness transfer (iter 54)** | Qwen3.5-122B-FP8 × OpenCode diffs, v001∩v009 ensemble | **PARTIAL. Prec=0.50, Rec=0.50, F₀.₅=0.50 (2 TP, 2 FP, 2 FN, 37 TN). Harness helps (0.50 > 0.33 SERA) but model still matters (0.50 < 1.00 Claude). Both FPs on small diffs (<2K). Gold pass 4/43=9%. $1.47 verifier + ~$40 g7e compute.** |
 
+### E_norm: AST Patch Normalization (iter 55+)
+
+**Hypothesis**: AST-level normalization of patches before v009 evaluation closes the cross-scaffold precision gap by removing formatting artifacts.
+
+**Context**: Iter 31 tested heuristic cosmetic filtering (46-53% size reduction) but verdicts didn't change. The blocker was: "Full AST normalization needs original source files." v2 solves this by cloning repos at base_commit (reusing gold_eval.py's Docker volume cache), reading before/after source, and AST round-tripping.
+
+**Run protocol**:
+```bash
+# Step 0: Scaffold discriminability BEFORE normalization
+python3 scripts/normalize_patches_v2.py --discriminability \
+  results/diffs/opencode_sonnet results/diffs/qwen35_opencode results/diffs/devstral_sera_verifier_loop
+
+# Step 1: Normalize all scaffold directories (uses Docker repo cache)
+# Option A: Docker (portable, uses swebench-repo-cache volume from gold_eval.py)
+for model in sonnet haiku opus; do
+  python3 scripts/normalize_patches_v2.py --model $model
+done
+python3 scripts/normalize_patches_v2.py --diff-dir results/diffs/qwen35_opencode --output-dir results/diffs_normalized/qwen35_opencode
+python3 scripts/normalize_patches_v2.py --diff-dir results/diffs/devstral_sera_verifier_loop --output-dir results/diffs_normalized/devstral_sera_verifier_loop
+
+# Option B: Local repos (faster if you have disk space, ~5GB)
+# REPOS=/tmp/swebench-repos
+# for model in sonnet haiku opus; do
+#   python3 scripts/normalize_patches_v2.py --model $model --local-repos $REPOS
+# done
+
+# Step 2: Scaffold discriminability AFTER normalization
+python3 scripts/normalize_patches_v2.py --discriminability \
+  results/diffs_normalized/opencode_sonnet results/diffs_normalized/qwen35_opencode results/diffs_normalized/devstral_sera_verifier_loop
+
+# Step 3: Re-run v009 on normalized patches (control + test)
+# Control: Claude/OpenCode (should stay at 1.00)
+python3 scripts/sweep_versions.py --versions v009 --verifier-model haiku \
+  --patch-source sonnet --diff-dir results/diffs_normalized/opencode_sonnet \
+  --temperature 0.0 --output results/sweep_enorm_control.jsonl
+
+# Test A: Qwen3.5/OpenCode (currently 0.50)
+python3 scripts/sweep_versions.py --versions v009 --verifier-model haiku \
+  --patch-source qwen35 --diff-dir results/diffs_normalized/qwen35_opencode \
+  --temperature 0.0 --output results/sweep_enorm_qwen35.jsonl
+
+# Test B: Devstral/SERA (currently 0.20)
+python3 scripts/sweep_versions.py --versions v009 --verifier-model haiku \
+  --patch-source devstral --diff-dir results/diffs_normalized/devstral_sera_verifier_loop \
+  --temperature 0.0 --output results/sweep_enorm_devstral.jsonl
+```
+
+**Success criteria**:
+- Control precision stays ≥ 0.90 (normalization doesn't strip adversarial cues)
+- Qwen3.5 precision improves from 0.50 toward ≥ 0.70
+- Devstral precision improves from 0.20 toward ≥ 0.40
+- Scaffold discriminability ratio drops after normalization
+
+**Script**: `scripts/normalize_patches.py`
+**Inspired by**: Shopify DSL transpiler, Agentless AST-normalized voting, [[Patch-Normalization-Cross-Model-Verifier-Transfer-Research]]
+
+---
+
 **TERMINATION CONDITION MET**: 27 consecutive iterations (28-54) with 0pp precision improvement on Claude patches. Every conceivable prompt-engineering lever has been tested. T9 confirms verifier transfer depends on BOTH harness (OpenCode > SERA) AND model (Claude > Qwen3.5). The remaining path is Phase 3+ (learned verifier, RLVR). All levers exhausted (12 rubric versions, 5 verifier models, 3 temperature settings, extended thinking, diff preprocessing, 2 patch sources). Recall ceiling (0.33) is caused by semantic mismatch between verification (problem completeness) and gold eval (specific test cases) — confirmed by oracle test (iter 35) and cross-model agreement (iter 36). Next phases require new infrastructure (RLVR, SVG consensus, learned verifier), not more iterations.
 
 ### Iteration 3: Ensemble (zero additional cost, using existing sweep data)

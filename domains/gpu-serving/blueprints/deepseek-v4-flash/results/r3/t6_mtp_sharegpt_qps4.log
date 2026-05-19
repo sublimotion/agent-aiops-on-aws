@@ -1,0 +1,82 @@
+INFO 05-19 18:13:38 [main.py:66] Unspecified platform detected, switching to CPU Platform instead.
+INFO 05-19 18:13:38 [importing.py:45] Triton is installed but 0 active driver(s) found (expected 1). Disabling Triton to prevent runtime errors.
+INFO 05-19 18:13:38 [importing.py:69] Triton not installed or not compatible; certain GPU-related functions will not be available.
+WARNING 05-19 18:13:38 [cpu.py:401] Failed to import from vllm._C: ImportError('libcuda.so.1: cannot open shared object file: No such file or directory')
+Namespace(subparser='bench', bench_type='serve', dispatch_function=<function BenchmarkServingSubcommand.cmd at 0x7f645fbcec00>, trust_remote_code=False, seed=0, num_prompts=200, dataset_name='sharegpt', no_stream=False, dataset_path='/sharegpt/ShareGPT_V3_unfiltered_cleaned_split.json', no_oversample=False, skip_chat_template=False, enable_multimodal_chat=False, disable_shuffle=False, custom_output_len=256, spec_bench_output_len=256, spec_bench_category=None, sonnet_input_len=550, sonnet_output_len=150, sonnet_prefix_len=200, sharegpt_output_len=None, blazedit_min_distance=0.0, blazedit_max_distance=1.0, asr_max_audio_len_sec=inf, asr_min_audio_len_sec=0.0, random_input_len=1024, random_output_len=128, random_range_ratio='0.0', random_prefix_len=0, random_batch_size=1, no_reranker=False, random_mm_base_items_per_request=1, random_mm_num_mm_items_range_ratio=0.0, random_mm_limit_mm_per_prompt={'image': 255, 'video': 1}, random_mm_bucket_config={(256, 256, 1): 0.5, (720, 1280, 1): 0.5, (720, 1280, 16): 0.0}, hf_subset=None, hf_split=None, hf_name=None, hf_output_len=None, prefix_repetition_prefix_len=256, prefix_repetition_suffix_len=256, prefix_repetition_num_prefixes=10, prefix_repetition_output_len=128, speed_bench_dataset_subset='qualitative', speed_bench_output_len=4096, speed_bench_category=None, label=None, backend='openai', base_url='http://localhost:8000', host='127.0.0.1', port=8000, endpoint='/v1/completions', header=None, max_concurrency=None, model='DeepSeek-V4-Flash', input_len=None, output_len=None, tokenizer='/mnt/nvme/models/DeepSeek-V4-Flash', tokenizer_mode='auto', use_beam_search=False, logprobs=None, request_rate=4.0, burstiness=1.0, disable_tqdm=False, num_warmups=0, profile=False, save_result=True, save_detailed=False, append_result=False, metadata=None, result_dir='/results/r3_20260519_180746', result_filename='t6_mtp_sharegpt_qps4.json', ignore_eos=False, percentile_metrics=None, metric_percentiles='99', goodput=None, request_id_prefix='bench-43e2d5c5-', top_p=None, top_k=None, min_p=None, temperature=None, frequency_penalty=None, presence_penalty=None, repetition_penalty=None, served_model_name=None, lora_modules=None, lora_assignment='random', ramp_up_strategy=None, ramp_up_start_rps=None, ramp_up_end_rps=None, ready_check_timeout_sec=0, extra_body=None, skip_tokenizer_init=False, insecure=False, plot_timeline=False, timeline_itl_thresholds='25,50', plot_dataset_stats=False)
+INFO 05-19 18:13:39 [config.py:800] Detected quantization_config.scale_fmt=ue8m0; enabling UE8M0 for DeepGEMM.
+WARNING: vllm bench serve no longer sets temperature==0 (greedy) in requests by default. The default will be determined on the server side and can be model/API specific. For the old behavior, include --temperature=0.
+Starting initial single prompt test run...
+Skipping endpoint ready check.
+Starting main benchmark run...
+Traffic request rate: 4.0
+Burstiness factor: 1.0 (Poisson process)
+Maximum request concurrency: None
+  0%|          | 0/200 [00:00<?, ?it/s]  0%|          | 1/200 [00:01<05:02,  1.52s/it]  1%|          | 2/200 [00:01<02:17,  1.44it/s]  2%|▏         | 3/200 [00:01<01:41,  1.93it/s]  2%|▏         | 4/200 [00:26<33:00, 10.11s/it]  4%|▎         | 7/200 [00:27<12:28,  3.88s/it]  6%|▌         | 11/200 [00:27<05:40,  1.80s/it]  7%|▋         | 14/200 [00:27<03:34,  1.15s/it] 10%|▉         | 19/200 [00:27<01:53,  1.60it/s] 12%|█▏        | 24/200 [00:27<01:07,  2.61it/s] 15%|█▌        | 30/200 [00:28<00:39,  4.26it/s] 18%|█▊        | 35/200 [00:28<00:27,  6.06it/s] 20%|██        | 41/200 [00:28<00:17,  8.85it/s] 23%|██▎       | 46/200 [00:28<00:15,  9.86it/s] 25%|██▌       | 50/200 [00:28<00:13, 11.50it/s] 27%|██▋       | 54/200 [00:29<00:13, 10.92it/s] 28%|██▊       | 57/200 [00:29<00:16,  8.51it/s] 31%|███       | 62/200 [00:30<00:13, 10.51it/s] 32%|███▏      | 64/200 [00:30<00:13, 10.34it/s] 33%|███▎      | 66/200 [00:33<00:55,  2.43it/s] 34%|███▎      | 67/200 [00:50<00:54,  2.43it/s] 34%|███▍      | 68/200 [00:50<04:36,  2.09s/it] 34%|███▍      | 69/200 [00:50<04:08,  1.90s/it] 35%|███▌      | 70/200 [00:53<04:17,  1.98s/it] 36%|███▌      | 72/200 [00:54<03:20,  1.57s/it] 36%|███▋      | 73/200 [00:54<02:46,  1.31s/it] 40%|███▉      | 79/200 [00:54<01:03,  1.92it/s] 44%|████▍     | 88/200 [00:55<00:26,  4.30it/s] 46%|████▋     | 93/200 [00:55<00:18,  5.92it/s] 48%|████▊     | 97/200 [00:55<00:13,  7.50it/s] 50%|█████     | 101/200 [00:55<00:10,  9.63it/s] 52%|█████▎    | 105/200 [00:55<00:07, 12.19it/s] 55%|█████▍    | 109/200 [00:55<00:06, 14.21it/s] 56%|█████▋    | 113/200 [00:56<00:07, 11.70it/s] 58%|█████▊    | 117/200 [00:56<00:06, 12.31it/s] 60%|██████    | 120/200 [00:56<00:05, 14.21it/s] 62%|██████▏   | 123/200 [00:56<00:05, 14.68it/s] 63%|██████▎   | 126/200 [00:56<00:04, 16.89it/s] 64%|██████▍   | 129/200 [00:57<00:04, 17.48it/s] 66%|██████▌   | 132/200 [00:57<00:04, 16.53it/s] 68%|██████▊   | 135/200 [00:57<00:03, 17.03it/s] 69%|██████▉   | 138/200 [00:57<00:03, 18.16it/s] 70%|███████   | 141/200 [00:57<00:03, 17.74it/s] 72%|███████▎  | 145/200 [00:57<00:02, 21.61it/s] 74%|███████▍  | 148/200 [00:58<00:03, 17.10it/s] 76%|███████▌  | 151/200 [00:58<00:02, 17.59it/s] 76%|███████▋  | 153/200 [00:58<00:03, 12.12it/s] 78%|███████▊  | 156/200 [00:58<00:03, 12.47it/s] 80%|███████▉  | 159/200 [00:59<00:03, 13.34it/s] 80%|████████  | 161/200 [00:59<00:02, 13.84it/s] 82%|████████▏ | 163/200 [00:59<00:04,  8.42it/s] 82%|████████▎ | 165/200 [00:59<00:03,  9.57it/s] 85%|████████▌ | 170/200 [01:00<00:02, 13.33it/s] 87%|████████▋ | 174/200 [01:00<00:01, 17.21it/s] 88%|████████▊ | 177/200 [01:00<00:01, 19.41it/s] 90%|█████████ | 180/200 [01:00<00:01, 14.76it/s] 91%|█████████ | 182/200 [01:00<00:01, 15.28it/s] 94%|█████████▎| 187/200 [01:00<00:00, 17.90it/s] 95%|█████████▌| 190/200 [01:01<00:00, 15.50it/s] 96%|█████████▋| 193/200 [01:01<00:00, 13.32it/s] 98%|█████████▊| 195/200 [01:01<00:00, 10.63it/s] 98%|█████████▊| 197/200 [01:02<00:00,  7.99it/s]100%|█████████▉| 199/200 [01:02<00:00,  6.04it/s]100%|██████████| 200/200 [01:02<00:00,  6.26it/s]100%|██████████| 200/200 [01:02<00:00,  3.18it/s]
+Failed requests during benchmark run detected (capping to 10):
+Error 0: Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/site-packages/aiohttp/client_reqrep.py", line 1377, in write_bytes
+    await self._body.write_with_length(writer, content_length)
+  File "/usr/local/lib/python3.11/site-packages/aiohttp/payload.py", line 425, in write_with_length
+    await writer.write(self._value[:content_length])
+  File "/usr/local/lib/python3.11/site-packages/aiohttp/http_writer.py", line 194, in write
+    self._send_headers_with_payload(chunk, False)
+  File "/usr/local/lib/python3.11/site-packages/aiohttp/http_writer.py", line 138, in _send_headers_with_payload
+    self._writelines((headers_buf, chunk))
+  File "/usr/local/lib/python3.11/site-packages/aiohttp/http_writer.py", line 106, in _writelines
+    raise ClientConnectionResetError("Cannot write to closing transport")
+aiohttp.client_exceptions.ClientConnectionResetError: Cannot write to closing transport
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/site-packages/vllm/benchmarks/lib/endpoint_request_func.py", line 197, in async_request_openai_completions
+    async with session.post(url=api_url, json=payload, headers=headers) as response:
+  File "/usr/local/lib/python3.11/site-packages/aiohttp/client.py", line 1521, in __aenter__
+    self._resp: _RetType = await self._coro
+                           ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/aiohttp/client.py", line 788, in _request
+    resp = await handler(req)
+           ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/aiohttp/client.py", line 766, in _connect_and_send_request
+    await resp.start(conn)
+  File "/usr/local/lib/python3.11/site-packages/aiohttp/client_reqrep.py", line 539, in start
+    message, payload = await protocol.read()  # type: ignore[union-attr]
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/aiohttp/streams.py", line 707, in read
+    await self._waiter
+aiohttp.client_exceptions.ClientOSError: [Errno None] Can not write request body for http://localhost:8000/v1/completions
+
+tip: install termplotlib and gnuplot to plot the metrics
+============ Serving Benchmark Result ============
+Successful requests:                     199       
+Failed requests:                         1         
+Request rate configured (RPS):           4.00      
+Benchmark duration (s):                  62.98     
+Total input tokens:                      43639     
+Total generated tokens:                  41348     
+Request throughput (req/s):              3.16      
+Output token throughput (tok/s):         656.49    
+Peak output token throughput (tok/s):    3383.00   
+Peak concurrent requests:                133.00    
+Total token throughput (tok/s):          1349.35   
+---------------Time to First Token----------------
+Mean TTFT (ms):                          6218.01   
+Median TTFT (ms):                        6093.88   
+P99 TTFT (ms):                           13159.65  
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          214.05    
+Median TPOT (ms):                        84.92     
+P99 TPOT (ms):                           2173.49   
+---------------Inter-token Latency----------------
+Mean ITL (ms):                           131.51    
+Median ITL (ms):                         24.19     
+P99 ITL (ms):                            2471.84   
+---------------Speculative Decoding---------------
+Acceptance rate (%):                     70.41     
+Acceptance length:                       1.70      
+Drafts:                                  48784     
+Draft tokens:                            48784     
+Accepted tokens:                         34350     
+Per-position acceptance (%):
+  Position 0:                            70.41     
+==================================================

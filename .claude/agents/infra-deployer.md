@@ -82,6 +82,30 @@ Run GPU diagnostics using the `gpu-infra` MCP tools before deploying the serving
 
 **Validation**: All health checks pass. No uncorrectable ECC errors, no pending row remaps, no Xid errors. NCCL collectives pass for the target TP size. Record results in the deployment log.
 
+### Stage 4b: Observability bootstrap (mandatory if blueprint runs benchmarks)
+Install Prometheus + DCGM exporter + node-exporter on the GPU node BEFORE the serving stack starts. This captures engine histograms (TTFT, TPOT, E2E) and GPU telemetry (HBM BW util, tensor-core activity, XID errors) that the serving stack produces once it's running.
+
+**Why this stage exists**: Kimi K2.6-spec (2026-05-13) ran 95 benchmark points with no TTFT captured. Client-side non-streaming bench drivers cannot observe TTFT — it lives only in engine histograms. Without Prometheus running before the engine, the data is permanently lost when the spot node terminates.
+
+1. Run `.claude/skills/benchmark-runner/scripts/bootstrap-observability.sh <results-bucket> <blueprint-name>` on the GPU node.
+   - This installs the Prometheus + DCGM + node-exporter docker-compose stack.
+   - Binds Prometheus to :9090, DCGM to :9400, node-exporter to :9100.
+   - Configures 7-day local TSDB retention on `/mnt/nvme/prom-data`.
+   - Enables a systemd timer (`prom-sync.timer`) that snapshots to S3 every 10 min.
+
+2. Run `.claude/skills/benchmark-runner/scripts/observability-smoke-test.sh` on the GPU node.
+   - Fails if Prometheus, DCGM, or node-exporter are not healthy.
+   - Fails if fewer than expected GPUs appear in DCGM output.
+   - Fails if all configured scrape targets are down (engine targets allowed down at this stage — they come up in Stage 5).
+
+3. Verify the systemd timer fired at least once: `systemctl list-timers prom-sync.timer`.
+
+4. Confirm an initial snapshot appeared in S3 after ~10 min: `aws s3 ls s3://<results-bucket>/prometheus/<blueprint>/<session>/`.
+
+**Validation**: Smoke test exit code 0. Prometheus queryable at `http://<node-ip>:9090`. DCGM reports all GPUs. S3 prefix populated. Engine histogram presence check runs after Stage 5 (see Stage 5 validation).
+
+**Skip condition**: Only skip if the blueprint is *infrastructure-only* (no benchmarks or evals). If in doubt, run it — cost is ~$0 (runs on the GPU node) and missing data is unrecoverable.
+
 ### Stage 5: Serving stack deployment
 Deploy the inference serving configuration.
 
@@ -90,6 +114,8 @@ Deploy the inference serving configuration.
 3. Run a single test request to confirm inference works.
 
 **Validation**: `curl localhost:8000/health` returns 200. A test completion request returns valid output.
+
+**Post-Stage-5 observability check** (if Stage 4b ran): After serving starts and handles its first request, rerun `observability-smoke-test.sh` — it now additionally validates engine histograms (`*:time_to_first_token_seconds_bucket`, `*:time_per_output_token_seconds_bucket`, `*:e2e_request_latency_seconds_bucket`) are present. Any failure at this check means Prometheus is not seeing engine metrics and benchmark data will be incomplete. Debug before proceeding.
 
 ### Stage 6: Pre-benchmark validation
 Run integration checks before benchmarks.

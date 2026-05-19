@@ -1,0 +1,40 @@
+catalog_id: rag-qa
+use_case: retrieval-augmented-qa
+description: >
+  RAG document Q&A at enterprise-typical context sizes (2K-10K tokens).
+  Documents are retrieved per query and injected as context. Distinct
+  from `rag-long-context.yaml` which tests 16K+ shared-prefix scenarios
+  — this card models the common case where each query pulls 2-5
+  retrieved chunks, no long shared prefix.
+
+  Covers: enterprise knowledge bases, legal document search, medical
+  record Q&A, internal-docs chat.
+
+modality: text
+
+dataset:
+  type: synthetic-rag
+  system_prompt_tokens: 800        # RAG instruction prompt
+  retrieved_context_tokens: {min: 2048, max: 10240, mean: 5000}
+  user_question_tokens: {mean: 128, std_dev: 64}
+  output_tokens: {mean: 384, std_dev: 128}
+  prefix_reuse: false              # Each query has different retrieved chunks
+
+load:
+  type: qps-constrained
+  target_qps: 2
+  duration_s: 900
+  warmup_requests: 10
+
+slo:
+  ttft_p99_ms: 1000                # First token under 1s — question-answering UX
+  tpot_p99_ms: 40                  # ~25 tok/s streaming
+  e2e_p99_ms: 20000
+  error_rate_max: 0.001
+
+extensions:
+  cache_stats:
+    prefix_hit_rate: optional      # Expect low — retrieved contexts differ per query
+    kv_utilization_pct: required
+  rag:
+    context_size_distribution: required

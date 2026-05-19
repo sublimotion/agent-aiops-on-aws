@@ -224,6 +224,28 @@ When model weights consume most GPU VRAM (e.g., GLM-5 FP8 using 175 GB / 183 GB 
 
 System nodes (e.g., m5.xlarge) often lack sufficient CPU or memory for auxiliary services like Redis. Adding `tolerations: [{key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}]` to Redis (or other non-GPU workloads) allows them to schedule on GPU nodes, which typically have abundant CPU and RAM beyond what serving workloads use. For example, on p6-b200.48xlarge nodes running vLLM, 80% of CPU and 90% of memory remain free. This pattern applies to any Kubernetes cluster where auxiliary services need more resources than the system node pool provides. Use resource requests/limits to ensure the auxiliary service does not starve the GPU workload.
 
+### Benchmark Observability (mandatory)
+
+#### Every benchmark GPU node runs Prometheus + DCGM + node-exporter from bootstrap
+<!-- stack: prometheus=2.54.1, dcgm-exporter=3.3.9, node-exporter=1.8.2 | validated: 2026-05-14 -->
+
+Benchmark data is permanently lost if the client-side driver is the only source. TTFT (time-to-first-token) and TPOT (time-per-output-token) live only in engine histograms (`vllm:time_to_first_token_seconds_bucket`, `sglang:time_to_first_token_seconds_bucket`). HBM bandwidth utilization, tensor-core activity, and SM occupancy live only in DCGM. Client-side drivers that measure total request duration and divide by token count produce **latency averages that cannot be decomposed** — indistinguishable from cases where prefill is slow vs decode is slow.
+
+**Requirement**: Every benchmark GPU node MUST launch `.claude/skills/benchmark-runner/templates/observability-stack.docker-compose.yml` at bootstrap time, BEFORE the serving stack. Infra-deployer Stage 4b enforces this. The `observability-smoke-test.sh` check blocks progression to serving deployment until all exporters are healthy. Snapshots sync to S3 every 10 min via systemd timer so data survives spot reclaim.
+
+**Evidence**: Kimi K2.6-spec 2026-05-13 session ran 95 benchmark configs on p6-b300 and captured 0 TTFT data points. Client driver recorded aggregate duration only; Prometheus was never installed. After spot termination, the data was unrecoverable. Post-hoc enrichment produced v1 envelopes with `ttft_ms: null` across all 95 files — a permanent dataset gap.
+
+**Rule**: If a blueprint runs benchmarks (i.e., has `benchmark.yaml` sidecar), Stage 4b is mandatory. Non-benchmark-only blueprints can skip but should still install for GPU telemetry during production traffic.
+
+#### Always use `bench-standard.py` as the bench driver — never a blueprint-local clone
+<!-- validated: 2026-05-14 -->
+
+The canonical bench driver at `.claude/skills/benchmark-runner/scripts/bench-standard.py` is Prometheus-first: it queries engine histograms and DCGM metrics at run end, emits the v1 benchmark-commons envelope directly, and reconciles client-side request counts against Prometheus counters (5% tolerance). Blueprint runner scripts should invoke it with config overrides, not reimplement the client loop.
+
+**Why not a local copy**: Bench drivers encode many subtle rules (settle-time after last response for histogram flush, tokens-per-step math for speculative decode, output-file naming convention matching the standard). Local copies drift and produce outputs that can't be compared across blueprints. The K2.6-spec session ran a local driver and lost TTFT — if the standard driver had been mandatory, the loss would not have happened.
+
+**Rule**: If you find yourself writing `asyncio.gather(...)` in a blueprint's scripts directory to drive serving benchmarks, stop. Invoke `bench-standard.py` instead. Extend the standard driver if a new engine or workload type needs support, then contribute the change upstream so all blueprints inherit it.
+
 ### Ray Serve Multi-Framework Conventions
 
 #### Pin protobuf<5 in any TensorFlow runtime_env on Ray Serve
@@ -239,6 +261,48 @@ Ray's CUDA images (e.g., `rayproject/ray:*-cu125`) ship cuDNN 9.2.1, but TensorF
 #### Set IMDS hop limit to 2 on all EKS nodes for pod IAM credential access
 
 EKS nodes default to `HttpPutResponseHopLimit=1`, which blocks pods from reaching the instance metadata service (IMDS) for IAM credentials. Any Ray Serve deployment accessing AWS services (S3, DynamoDB) from pods will get `NoCredentialsError`. Fix with `aws ec2 modify-instance-metadata-options --http-put-response-hop-limit 2` on all cluster instances. Add this to deployment scripts as a pre-flight step.
+
+**Note for `aws eks create-nodegroup`-provisioned nodegroups**: The hop limit fix has to be applied *after* the instance is up. Re-validated on B300 (2026-05-19) — fresh managed nodegroup booted with hop=1, and pods got `Unable to locate credentials` until the hop limit was bumped. Self-managed and eksctl-provisioned nodegroups can set this via the launch template `metadata_options` block; managed nodegroups created via the AWS CLI cannot, so the post-launch `modify-instance-metadata-options` call is required.
+
+#### EKS managed nodegroups don't auto-label `nvidia.com/gpu.present=true` — device plugin won't schedule
+
+NVIDIA device plugin DaemonSets typically select on `nvidia.com/gpu.present=true`. EKS-managed nodegroups (created via `aws eks create-nodegroup` with `AL2023_x86_64_NVIDIA` AMI) do NOT apply this label automatically — only self-managed and eksctl-provisioned nodegroups do. Without the label, the device plugin never lands on the new node, GPU capacity stays at 0, and serving pods stuck Pending with `Insufficient nvidia.com/gpu`. Fix:
+
+```bash
+kubectl label node <node-name> nvidia.com/gpu.present=true
+```
+
+The DaemonSet pod schedules within ~15s and GPUs are advertised within ~30s. Add this step to nodegroup launch scripts. Validated on B300 nodegroup (2026-05-19).
+
+#### Co-tenant pods with `nvidia.com/gpu:NoSchedule` toleration can claim GPUs on a freshly-launched nodegroup
+
+Pods from unrelated namespaces that tolerate the GPU taint will land on the first GPU node available — including a brand-new expensive nodegroup. Verified case (2026-05-19): a stale `ray-video` cluster with idle workers tolerating `nvidia.com/gpu:NoSchedule` claimed 2 of 8 B300 GPUs the moment the new nodegroup came up, blocking the intended TP=8 vLLM pod. **Mitigation**: scan for pods with the GPU toleration before launching expensive nodegroups (`kubectl get pods -A -o json | jq '.items[] | select(.spec.tolerations[]? | .key=="nvidia.com/gpu") | {ns:.metadata.namespace, name:.metadata.name}'`), or scale them to 0 temporarily, or apply a more specific taint (`dedicated=<workload>:NoSchedule`) on the new nodegroup that only your workload tolerates.
+
+#### Speculative decoding under ~60% draft acceptance rate is a net throughput LOSS
+<!-- stack: vllm>=0.20, mtp/eagle/ngram | validated: 2026-05-19 -->
+
+Speculative decoding (MTP, EAGLE, n-gram) is profitable only above a break-even acceptance rate that depends on the cost ratio of draft vs verification passes. As a rule of thumb, **<60% acceptance is net negative** — the verification pass cost dominates the savings from accepted speculations, and ITL roughly doubles. Validated on DeepSeek V4 Flash B300 TP=8 (2026-05-19): server-reported acceptance was 38% with `num_speculative_tokens=1`, and throughput dropped 5–52% across QPS levels with sharegpt TTFT p50 spiking from 70ms → 6,094ms.
+
+**Required check before promoting MTP/spec-decode to production**:
+1. Run a representative production workload (sharegpt or production-mix, NOT synthetic random — random tokens give the draft head no pattern to learn)
+2. Read `vllm:spec_decode_num_accepted_tokens_total / vllm:spec_decode_num_drafts_total` from `/metrics`
+3. If the ratio is <0.60, document and disable
+
+This applies to all speculative-decode methods, not just MTP. Synthetic random workloads can produce misleadingly high acceptance rates due to the "hello hello" attractor (see `feedback_synthetic_specdec_repetition.md`) — always cross-check with a real-distribution workload.
+
+#### Standard model staging pattern: RAID0 NVMe + S3-cached HF download
+<!-- stack: huggingface_hub>=0.24, hf-cli<1.15 OR snapshot_download API | validated: 2026-05-19 -->
+
+For GPU-serving blueprints on EKS with B-series and other instance-store-equipped instances:
+
+1. **Init NVMe RAID0** (mandatory on B200/B300/p5e/g7e — AL2023 NVIDIA AMI ships local NVMe drives unformatted). One-shot privileged `init-nvme` Job: detect `/dev/nvmeXn1` excluding root, `mdadm --create /dev/md0 --level=0`, `mkfs.xfs`, mount at `/mnt/nvme`, `chmod 1777`. B300 yields ~28 TB. Idempotent: bail cleanly if `/mnt/nvme` is already a mountpoint.
+2. **Use the S3-cached download helper** (`scripts/stage-model-s3-cached.sh`) — checks the cluster's model bucket first (~20 min sync), falls back to HuggingFace (~3 min via Xet, much faster than the older hf_transfer), then mirrors back to S3 for next time.
+3. **DO NOT use `hf` CLI v1.15+ with `--exclude` patterns** — broken: silently falls back to fetching only ~5 files. Use Python `snapshot_download(allow_patterns=...)` instead.
+4. **`HF_HUB_ENABLE_HF_TRANSFER` is deprecated** in `huggingface_hub` 1.15+ — use `HF_XET_HIGH_PERFORMANCE=1` instead. Xet is genuinely fast — measured 149 GB / 46 safetensors in 2 min 48 s on B300.
+5. **GPU node IAM role needs S3 write access** to the cluster's model bucket. Default node roles often have read-only S3; add an inline policy scoped to the specific bucket before running the persist-back step.
+6. **Bucket naming convention**: every cluster has a model bucket created by Terraform. Find it with `aws s3 ls | grep -E "<cluster-prefix>-models-"`. Don't create a new bucket per blueprint — share the cluster's bucket and namespace by `models/<blueprint-name>/`. Spot-reclaim recovery from S3 takes ~20 min vs ~3 min for cold HF re-download (Xet is fast enough that S3 caching is mostly insurance for HF rate limiting / outage rather than a speed win).
+
+Reference implementation: `domains/gpu-serving/blueprints/deepseek-v4-flash/k8s/{init-nvme,download-model,persist-to-s3}.yaml` and `scripts/stage-model-s3-cached.sh`.
 
 #### runtime_env creates isolated virtualenvs per unique pip spec — not per deployment
 <!-- stack: ray=2.44.1 | validated: 2026-03-27 -->
@@ -544,6 +608,42 @@ Standard vLLM images (v0.19.0, latest) lack `gemma4` model_type in their bundled
 <!-- stack: sagemaker-hyperpod=eks-1.32 | validated: 2026-04-06 -->
 
 HyperPod GPU nodes carry `sagemaker.amazonaws.com/RestrictedNode:NoSchedule` and `nvidia.com/gpu:NoSchedule` taints. Add both plus `node.kubernetes.io/disk-pressure:NoSchedule` (stale disk-pressure taints are common after large image pulls — fix with `kubectl debug node/<name> --image=busybox -- sh -c "chroot /host systemctl restart kubelet"`). Source: gemma4-4b-hyperpod lessons.md.
+
+#### SageMaker HyperPod Inference Operator release tracking
+<!-- stack: sagemaker-hyperpod-inference-operator=v3.1.2 | validated: 2026-05-11 | refresh: 2026-08-11 -->
+
+Latest validated HyperPod Inference Operator release: **v3.1.2** (2026-05-06). EKS Add-on version: **v1.2.0-eksbuild.1**. Release notes: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-inference-release-notes.html
+
+Before any `*-hyperpod` deployment, WebFetch the release notes URL above and compare against the version tag in this rule. If a newer release exists, run the version refresh protocol (compound-learner.md §Version Refresh) before proceeding — new releases may add CRD fields (v3.1 added `kubernetes.initContainers`, `customCertificateConfig`, `RequestLimits`; v3.1.2 added `dataCapture`, HuggingFace `modelSourceType`, `dnsConfig`, local NVMe deployment, custom `serviceAccountName`) that blueprint manifests should opt into.
+
+Upgrade path: Helm → `--set image.tag=v3.1` (tag rolls forward within v3.1.x); EKS Add-on → `aws eks update-addon --addon-version v1.2.0-eksbuild.1`. Migration script from Helm to EKS Add-on: `sagemaker-hyperpod-cli/helm_chart/HyperPodHelmChart/charts/inference-operator/migration/helm_to_addon.sh`.
+
+#### HyperPod per-instance-type cluster quotas default to 0-1, separate from EC2 quotas
+<!-- stack: hyperpod=eks | validated: 2026-05-13 | refresh: 2026-08-13 -->
+
+HyperPod cluster-usage quotas are distinct from EC2 service quotas. A 768 vCPU G/VT EC2 quota does NOT grant HyperPod capacity. Each ML instance type has its own quota code in the `sagemaker` service (e.g., `ml.g6e.xlarge` = L-DE7D3776, `ml.g5.2xlarge` = L-596C3331), defaulting to 0-1. Request via `aws service-quotas request-service-quota-increase --service-code sagemaker --quota-code <CODE> --desired-value N`. Turnaround ~30 min. First-time HyperPod deployments block silently without the right quota. Source: qwen3-embedding-8b-hyperpod lessons.md.
+
+#### Race multiple instance types in single-AZ HyperPod clusters to mitigate capacity constraints
+
+HyperPod clusters pin to the subnet list they're created with; if that's one subnet, you're one AZ. `us-east-1` AZ-specific capacity can fail silently for 20+ min with no CloudTrail `RunInstances` error — HyperPod retries internally. Mitigation: add multiple candidate instance groups (e.g., ml.g5.xlarge, ml.g5.2xlarge, ml.g6e.xlarge) each at target=1 and let whichever provisions first win; scale losers to 0. Cost while racing is ~minutes × per-instance rate, bounded.
+
+#### Never scale cert-manager-webhook to 0 as a pod-pressure workaround
+
+Scaling cert-manager-webhook or cert-manager-cainjector to 0 replicas to free pod slots breaks any admission-webhook-backed installer. HyperPod Inference Operator add-on install will fail with `AdmissionRequestDenied: failed calling webhook "webhook.cert-manager.io": no endpoints available for service "cert-manager-webhook"`. Fix pod pressure by adding a second node, not by disabling webhooks.
+
+#### HyperPod pre-installed system controllers run on YOUR worker nodes, not a managed plane
+
+HyperPod system controllers — cert-manager, fsx-csi-controller, s3-csi-controller, hyperpod-inference-system deployments — all schedule as Pods on paid worker nodes. They are NOT in an AWS-managed control plane. Design for this: (a) provision a cheap CPU-only `system-nodes` instance group and nodeSelector the controllers there, or (b) taint GPU nodes with `nvidia.com/gpu:NoSchedule` so only workload pods that explicitly tolerate it land on GPU instances. On a single-node cluster, pre-installed controllers can saturate the node's pod-capacity budget (e.g., g5.2xlarge kubelet `max-pods=14`) before any workload pods schedule. Source: qwen3-embedding-8b-hyperpod lessons.md.
+
+#### vLLM 0.19.1+ removed --task embed flag; use vllm serve with auto-detection
+<!-- stack: vllm>=0.19.1 | validated: 2026-05-13 | refresh: 2026-08-13 -->
+
+vLLM 0.19.1 no longer accepts `--task embed`. Use `vllm serve <model>` subcommand without the task flag. vLLM auto-detects runner/convert modes from the HuggingFace model config — models with `sentence-transformers modules configuration` + `pooling configuration` resolve `--runner auto` → `pooling` and `--convert auto` → `embed` automatically. Container manifests must override `command: ["vllm"]` when passing `serve` as the subcommand; the `vllm/vllm-openai` image's default entrypoint prepends `python -m vllm.entrypoints.openai.api_server` which conflicts with the `serve` subcommand. Applies to all vLLM embedding deployments on v0.19+. Source: qwen3-embedding-8b-hyperpod lessons.md.
+
+#### Burn-in drift gates must be directional, not bidirectional
+<!-- stack: benchmark-commons=burn-in | validated: 2026-05-13 -->
+
+Burn-in stability gates comparing final vs baseline throughput use directional thresholds in `standards/benchmark-commons/workloads/burn-in.yaml` (fixed 2026-05-13): `throughput_drift_pct_max: 2.0` for degradation, `positive_drift_pct_max: 5.0` for improvement. The older `abs(drift) ≤ 2%` rule failed positive drift from warm-cache effects (e.g., prefix cache accumulating benefit over the hour), which is a healthy-system signal, not instability. `container/analyze-burn-in.py` now emits `drift_direction: improvement|degradation` and `gate_rule` alongside the pass/fail verdict. Source: qwen3-embedding-8b-hyperpod lessons.md.
 
 #### FP8 MoE models require TP divisibility check against block_n=128
 <!-- stack: vllm>=0.19.1 | validated: 2026-04-22 | refresh: 2026-07-22 -->

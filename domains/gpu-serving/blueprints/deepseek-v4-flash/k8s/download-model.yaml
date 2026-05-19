@@ -1,0 +1,102 @@
+# Two-tier model staging:
+#   1. If s3://qn-sglang-models-.../models/DeepSeek-V4-Flash/ exists, sync from S3 (fast: ~20 min)
+#   2. Otherwise download from HuggingFace via hf_transfer (slow: ~1.5 hr)
+#   3. After successful HF download, the persist-to-s3 Job mirrors back to S3 for next time
+#
+# This makes the spot-reclaim recovery path: re-launch nodegroup → run this Job → 20 min
+# instead of 1.5 hr from cold HF.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: download-deepseek-v4-flash
+  namespace: default
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: OnFailure
+      nodeSelector:
+        node.kubernetes.io/instance-type: p6-b300.48xlarge
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: downloader
+          image: python:3.11-slim
+          command:
+            - bash
+            - -c
+            - |
+              set -euo pipefail
+
+              S3_PATH=s3://qn-sglang-models-20260303161715850900000007/models/DeepSeek-V4-Flash
+              LOCAL_PATH=/mnt/nvme/models/DeepSeek-V4-Flash
+              REGION=us-west-2
+
+              # Install awscli + hf_transfer-capable hub
+              apt-get update -qq && apt-get install -y -qq curl unzip >/dev/null
+              pip install -q --upgrade "huggingface_hub[hf_transfer]>=0.24.0" awscli
+
+              mkdir -p /mnt/nvme/models
+
+              # Check if S3 cache exists
+              if aws s3 ls "$S3_PATH/config.json" --region "$REGION" >/dev/null 2>&1; then
+                echo "=== S3 cache HIT — syncing from $S3_PATH (expected ~20 min) ==="
+                time aws s3 sync "$S3_PATH" "$LOCAL_PATH" --region "$REGION" --no-progress
+                echo "=== S3 sync complete ==="
+                du -sh "$LOCAL_PATH"
+                exit 0
+              fi
+
+              echo "=== S3 cache MISS — downloading from HuggingFace (expected ~1.5 hr) ==="
+              # Use Xet for high-performance transfer (huggingface_hub 1.15+ replaced hf_transfer)
+              export HF_XET_HIGH_PERFORMANCE=1
+
+              # Use Python API directly — `hf` v1.15 CLI --exclude broke for repo-pattern filtering
+              time python3 - <<'PYEOF'
+              from huggingface_hub import snapshot_download
+              path = snapshot_download(
+                  repo_id="deepseek-ai/DeepSeek-V4-Flash",
+                  local_dir="/mnt/nvme/models/DeepSeek-V4-Flash",
+                  allow_patterns=[
+                      "*.json",
+                      "*.safetensors",
+                      "*.py",
+                      "tokenizer*",
+                      "encoding/*",
+                      "inference/*",
+                  ],
+                  max_workers=16,
+              )
+              print(f"Downloaded to: {path}")
+              PYEOF
+
+              echo "=== HF download complete ==="
+              du -sh "$LOCAL_PATH"
+              echo "Total files:"
+              find "$LOCAL_PATH" -type f | wc -l
+              echo "Safetensors files:"
+              find "$LOCAL_PATH" -name '*.safetensors' | wc -l
+              ls -la "$LOCAL_PATH" | head -10
+
+              echo "=== Sanity check: config.json ==="
+              cat "$LOCAL_PATH/config.json" | head -30
+
+              echo
+              echo "*** Now apply persist-to-s3.yaml to mirror to S3 for next time ***"
+          resources:
+            requests:
+              cpu: "8"
+              memory: 32Gi
+            limits:
+              cpu: "32"
+              memory: 64Gi
+          volumeMounts:
+            - name: nvme
+              mountPath: /mnt/nvme
+      volumes:
+        - name: nvme
+          hostPath:
+            path: /mnt/nvme
+            type: Directory

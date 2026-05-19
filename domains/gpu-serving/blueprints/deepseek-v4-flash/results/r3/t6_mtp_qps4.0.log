@@ -1,0 +1,49 @@
+INFO 05-19 18:10:06 [main.py:66] Unspecified platform detected, switching to CPU Platform instead.
+INFO 05-19 18:10:07 [importing.py:45] Triton is installed but 0 active driver(s) found (expected 1). Disabling Triton to prevent runtime errors.
+INFO 05-19 18:10:07 [importing.py:69] Triton not installed or not compatible; certain GPU-related functions will not be available.
+WARNING 05-19 18:10:07 [cpu.py:401] Failed to import from vllm._C: ImportError('libcuda.so.1: cannot open shared object file: No such file or directory')
+Namespace(subparser='bench', bench_type='serve', dispatch_function=<function BenchmarkServingSubcommand.cmd at 0x7f6645e42c00>, trust_remote_code=False, seed=0, num_prompts=80, dataset_name='random', no_stream=False, dataset_path=None, no_oversample=False, skip_chat_template=False, enable_multimodal_chat=False, disable_shuffle=False, custom_output_len=256, spec_bench_output_len=256, spec_bench_category=None, sonnet_input_len=550, sonnet_output_len=150, sonnet_prefix_len=200, sharegpt_output_len=None, blazedit_min_distance=0.0, blazedit_max_distance=1.0, asr_max_audio_len_sec=inf, asr_min_audio_len_sec=0.0, random_input_len=2048, random_output_len=512, random_range_ratio='0.0', random_prefix_len=0, random_batch_size=1, no_reranker=False, random_mm_base_items_per_request=1, random_mm_num_mm_items_range_ratio=0.0, random_mm_limit_mm_per_prompt={'image': 255, 'video': 1}, random_mm_bucket_config={(256, 256, 1): 0.5, (720, 1280, 1): 0.5, (720, 1280, 16): 0.0}, hf_subset=None, hf_split=None, hf_name=None, hf_output_len=None, prefix_repetition_prefix_len=256, prefix_repetition_suffix_len=256, prefix_repetition_num_prefixes=10, prefix_repetition_output_len=128, speed_bench_dataset_subset='qualitative', speed_bench_output_len=4096, speed_bench_category=None, label=None, backend='openai', base_url='http://localhost:8000', host='127.0.0.1', port=8000, endpoint='/v1/completions', header=None, max_concurrency=None, model='DeepSeek-V4-Flash', input_len=None, output_len=None, tokenizer='/mnt/nvme/models/DeepSeek-V4-Flash', tokenizer_mode='auto', use_beam_search=False, logprobs=None, request_rate=4.0, burstiness=1.0, disable_tqdm=False, num_warmups=0, profile=False, save_result=True, save_detailed=False, append_result=False, metadata=None, result_dir='/results/r3_20260519_180746', result_filename='t6_mtp_qps4.0.json', ignore_eos=False, percentile_metrics=None, metric_percentiles='99', goodput=None, request_id_prefix='bench-e77828fc-', top_p=None, top_k=None, min_p=None, temperature=None, frequency_penalty=None, presence_penalty=None, repetition_penalty=None, served_model_name=None, lora_modules=None, lora_assignment='random', ramp_up_strategy=None, ramp_up_start_rps=None, ramp_up_end_rps=None, ready_check_timeout_sec=0, extra_body=None, skip_tokenizer_init=False, insecure=False, plot_timeline=False, timeline_itl_thresholds='25,50', plot_dataset_stats=False)
+INFO 05-19 18:10:07 [config.py:800] Detected quantization_config.scale_fmt=ue8m0; enabling UE8M0 for DeepGEMM.
+INFO 05-19 18:10:08 [utils.py:90] Sampling input_len from [2048, 2048] and output_len from [512, 512]
+WARNING: vllm bench serve no longer sets temperature==0 (greedy) in requests by default. The default will be determined on the server side and can be model/API specific. For the old behavior, include --temperature=0.
+Starting initial single prompt test run...
+Skipping endpoint ready check.
+Starting main benchmark run...
+Traffic request rate: 4.0
+Burstiness factor: 1.0 (Poisson process)
+Maximum request concurrency: None
+  0%|          | 0/80 [00:00<?, ?it/s]  1%|▏         | 1/80 [00:14<19:01, 14.45s/it]  2%|▎         | 2/80 [00:14<07:54,  6.09s/it]  5%|▌         | 4/80 [00:17<03:47,  3.00s/it]  6%|▋         | 5/80 [00:18<03:00,  2.40s/it]  8%|▊         | 6/80 [00:18<02:12,  1.79s/it] 10%|█         | 8/80 [00:18<01:11,  1.00it/s] 11%|█▏        | 9/80 [00:19<00:59,  1.19it/s] 14%|█▍        | 11/80 [00:28<02:46,  2.42s/it] 16%|█▋        | 13/80 [00:28<01:47,  1.60s/it] 18%|█▊        | 14/80 [00:44<05:06,  4.65s/it] 20%|██        | 16/80 [00:45<03:11,  2.99s/it] 22%|██▎       | 18/80 [00:46<02:08,  2.08s/it] 25%|██▌       | 20/80 [00:46<01:24,  1.41s/it] 28%|██▊       | 22/80 [00:46<00:56,  1.02it/s] 29%|██▉       | 23/80 [00:46<00:46,  1.22it/s] 30%|███       | 24/80 [00:47<00:44,  1.27it/s] 32%|███▎      | 26/80 [00:47<00:29,  1.83it/s] 35%|███▌      | 28/80 [00:48<00:24,  2.17it/s] 39%|███▉      | 31/80 [00:48<00:14,  3.29it/s] 40%|████      | 32/80 [00:48<00:13,  3.67it/s] 41%|████▏     | 33/80 [00:48<00:11,  3.92it/s] 44%|████▍     | 35/80 [00:49<00:10,  4.20it/s] 46%|████▋     | 37/80 [00:49<00:07,  5.64it/s] 49%|████▉     | 39/80 [00:49<00:05,  7.27it/s] 51%|█████▏    | 41/80 [00:49<00:05,  7.39it/s] 54%|█████▍    | 43/80 [00:49<00:04,  8.19it/s] 56%|█████▋    | 45/80 [00:49<00:04,  8.69it/s] 59%|█████▉    | 47/80 [00:50<00:04,  8.15it/s] 60%|██████    | 48/80 [00:50<00:04,  7.04it/s] 61%|██████▏   | 49/80 [00:50<00:05,  6.02it/s] 65%|██████▌   | 52/80 [00:50<00:03,  8.81it/s] 69%|██████▉   | 55/80 [00:50<00:02, 12.03it/s] 71%|███████▏  | 57/80 [00:51<00:02, 10.40it/s] 74%|███████▍  | 59/80 [00:51<00:02,  7.77it/s] 76%|███████▋  | 61/80 [00:51<00:02,  9.12it/s] 80%|████████  | 64/80 [00:52<00:01,  9.56it/s] 82%|████████▎ | 66/80 [00:52<00:02,  6.76it/s] 84%|████████▍ | 67/80 [00:52<00:01,  6.55it/s] 85%|████████▌ | 68/80 [00:52<00:01,  6.24it/s] 88%|████████▊ | 70/80 [00:53<00:01,  8.06it/s] 90%|█████████ | 72/80 [00:53<00:00,  8.17it/s] 94%|█████████▍| 75/80 [00:53<00:00,  9.91it/s] 96%|█████████▋| 77/80 [00:53<00:00,  7.42it/s] 98%|█████████▊| 78/80 [00:54<00:00,  5.55it/s] 99%|█████████▉| 79/80 [00:54<00:00,  5.95it/s]100%|██████████| 80/80 [00:54<00:00,  1.47it/s]
+tip: install termplotlib and gnuplot to plot the metrics
+============ Serving Benchmark Result ============
+Successful requests:                     80        
+Failed requests:                         0         
+Request rate configured (RPS):           4.00      
+Benchmark duration (s):                  54.54     
+Total input tokens:                      163840    
+Total generated tokens:                  40960     
+Request throughput (req/s):              1.47      
+Output token throughput (tok/s):         750.96    
+Peak output token throughput (tok/s):    2732.00   
+Peak concurrent requests:                70.00     
+Total token throughput (tok/s):          3754.79   
+---------------Time to First Token----------------
+Mean TTFT (ms):                          764.25    
+Median TTFT (ms):                        321.32    
+P99 TTFT (ms):                           4223.31   
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          65.32     
+Median TPOT (ms):                        70.75     
+P99 TPOT (ms):                           80.89     
+---------------Inter-token Latency----------------
+Mean ITL (ms):                           81.29     
+Median ITL (ms):                         22.25     
+P99 ITL (ms):                            2354.99   
+---------------Speculative Decoding---------------
+Acceptance rate (%):                     24.43     
+Acceptance length:                       1.24      
+Drafts:                                  65664     
+Draft tokens:                            65664     
+Accepted tokens:                         16039     
+Per-position acceptance (%):
+  Position 0:                            24.43     
+==================================================

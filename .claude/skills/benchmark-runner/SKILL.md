@@ -38,6 +38,26 @@ Use for customer engagements to quantify optimization impact vs customer's basel
 | **T6** | Multi-replica | 2x replicas, round-robin |
 | **T7** | Stress test | 1000+ concurrent requests |
 
+## Always Standard Format — the mandate
+
+**Every benchmark run MUST emit the v1 benchmark-commons envelope directly. No exceptions, no post-processing.**
+
+Use `scripts/bench-standard.py` as the source of truth. It:
+- Drives the engine via OpenAI-compatible or native API
+- Queries Prometheus for TTFT/TPOT/E2E histograms (client-side non-streaming loses TTFT)
+- Queries DCGM for GPU util, HBM BW, tensor-core activity, power, temp, XID errors
+- Emits v1 envelope with filename `<model>_<substrate>_<hw>_<engine-tag>_<workload>_c<N>.json`
+- **Reconciles** client request count vs Prometheus success counter (5% tolerance)
+
+**Motivating failure (Kimi K2.6-spec, 2026-05-13)**: custom bench driver only recorded total request duration. TTFT never captured. Prometheus was running but never scraped. After spot instance terminated, data was unrecoverable. 95 JSON files needed post-hoc enrichment with missing TTFT fields — a permanent gap in the dataset. DON'T REPEAT.
+
+**Prerequisites on every benchmark GPU node** (enforced by infra-deployer Stage 4b):
+- Prometheus + DCGM exporter + node-exporter running (see `templates/observability-stack.docker-compose.yml`)
+- `scripts/observability-smoke-test.sh` passes
+- Systemd timer `prom-sync.timer` syncing snapshots to S3
+
+If you find yourself writing a one-off bench script that parses client timing only, STOP. Invoke `bench-standard.py` instead.
+
 ## Benchmark Execution Rules
 
 These are hard-won operational lessons. Follow them exactly.
@@ -144,6 +164,16 @@ visual-explainer skill (/benchmark-visual)
 | Full phase definitions with exact commands | `references/benchmark-patterns.md` |
 | Metrics collection details + PromQL | `references/metrics-reference.md` |
 | Common failures during benchmarks | `references/troubleshooting.md` |
+| Observability stack setup + smoke test | `references/observability.md` |
+
+## Observability scripts (all runs, always)
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/bootstrap-observability.sh <s3-bucket> <blueprint>` | Install Prometheus + DCGM + node-exporter on the GPU node and enable S3 sync timer. Runs in infra-deployer Stage 4b. |
+| `scripts/observability-smoke-test.sh` | Validate all exporters healthy + engine histograms present. Must pass before Stage 5 serving deployment. |
+| `scripts/sync-prometheus-to-s3.sh` | Snapshot Prometheus TSDB and push to S3 every 10 min (installed as systemd timer). |
+| `scripts/bench-standard.py` | **The standard bench driver.** Prometheus-first, emits v1 envelope. Always use this. |
 
 ## Troubleshooting
 

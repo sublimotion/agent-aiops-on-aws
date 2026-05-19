@@ -1,0 +1,21 @@
+catalog_id: chatbot-short
+use_case: chatbot
+description: Interactive chat, latency-sensitive. Short turns.
+modality: text
+
+dataset:
+  type: synthetic
+  input_tokens: {mean: 256, std_dev: 64}
+  output_tokens: {mean: 128, std_dev: 32}
+
+load:
+  type: constant
+  request_rate: 2.0
+  num_prompts: 100
+  warmup_requests: 30
+
+slo:
+  ttft_p99_ms: 300
+  tpot_p99_ms: 50
+  e2e_p99_ms: 5000
+  error_rate_max: 0.001

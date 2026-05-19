@@ -1,0 +1,46 @@
+catalog_id: shared-prefix-multitenant
+use_case: multi-tenant-saas
+description: >
+  Multiple users (4-16 concurrent) sharing the same long system prompt
+  but sending different queries. Tests whether the engine's prefix cache
+  deduplicates the shared prompt across sessions rather than recomputing
+  it per user. This is the single most important workload shape for ISVs
+  serving multiple customers with a common agent persona or tool-set.
+
+  Differs from `coding-agent.yaml` (which also has a shared system
+  prompt) by focusing on prefix-cache hit rate as the headline metric
+  rather than end-to-end agent loop quality.
+
+  Covers: multi-tenant SaaS backends, ISV customer deployments, shared
+  assistant personas.
+
+modality: text
+
+dataset:
+  type: synthetic-shared-prefix
+  shared_system_prompt_tokens: 4096    # Large shared prompt; sidecar can tune
+  per_user_query_tokens: {mean: 256, std_dev: 128}
+  output_tokens: {mean: 512, std_dev: 128}
+  prefix_reuse: cross-session          # CRITICAL — same prefix across all sessions
+
+load:
+  type: constant
+  concurrent_sessions: 8               # Sidecar-overridable {4, 8, 16}
+  num_sessions: 80
+  warmup_sessions: 8
+
+slo:
+  ttft_p99_ms: 300                     # First token fast because prefix is cached
+  ttft_cold_p99_ms: 1500               # First-ever query (prefix cold) allowance
+  tpot_p99_ms: 40
+  e2e_p99_ms: 20000
+  error_rate_max: 0.001
+
+extensions:
+  cache_stats:
+    prefix_hit_rate: required          # Must be near-100% after warmup — headline metric
+    kv_utilization_pct: required
+    eviction_rate: required            # Shared prefix must not be evicted
+  multitenant:
+    concurrent_users: required
+    ttft_by_session_index: required    # Session 1 vs Session N should both be fast

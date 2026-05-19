@@ -1,0 +1,44 @@
+catalog_id: multi-turn-chat
+use_case: copilot-assistant
+description: >
+  Conversational workload with 1-10 rounds of back-and-forth, modeling
+  copilots, virtual assistants, and customer-support agents. Each
+  session accumulates conversation history; KV cache retention across
+  turns is the primary signal. Prefix reuse is per-session (not
+  cross-session), so tests engine-level L1 cache effectiveness on
+  growing conversation windows.
+
+  Covers: Microsoft Copilot-style chat, Zendesk-style support bots,
+  ChatGPT-turn-by-turn.
+
+modality: text
+
+dataset:
+  type: synthetic-multiturn
+  system_prompt_tokens: 1000       # Modest system prompt (not an agent)
+  user_turn_tokens: {mean: 256, std_dev: 128}
+  assistant_turn_tokens: {mean: 512, std_dev: 256}
+  turns_per_session: {min: 1, max: 10, mean: 5}
+  inter_turn_delay_s: {min: 1, max: 15}    # Think time between user turns
+  prefix_reuse: per-session        # History grows within session; no cross-session sharing
+
+load:
+  type: constant
+  concurrent_sessions: 32           # Sidecar-overridable
+  num_sessions: 100
+  warmup_sessions: 10
+
+slo:
+  ttft_p99_ms: 500                 # First-token SLO per turn
+  ttft_warm_p99_ms: 150            # Subsequent turns benefit from session cache
+  tpot_p99_ms: 50                  # ~20 tok/s streaming
+  e2e_p99_ms: 30000
+  error_rate_max: 0.001
+
+extensions:
+  cache_stats:
+    prefix_hit_rate: required      # Within-session cache reuse
+    kv_utilization_pct: required
+  per_turn:
+    turn_count_distribution: required
+    ttft_by_turn_index: required   # Turn 1 vs Turn 5 vs Turn 10

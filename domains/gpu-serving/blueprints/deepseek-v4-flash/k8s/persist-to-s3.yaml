@@ -1,0 +1,67 @@
+# After the model is downloaded to /mnt/nvme, mirror it to S3 for spot-reclaim resilience.
+# If the spot instance is reclaimed, re-launching only needs to `aws s3 sync` from S3 →
+# /mnt/nvme (~20 min on internal bandwidth) instead of re-downloading from HuggingFace
+# (~1.5 hr at hf_transfer ~30 MB/s).
+#
+# Bucket: qn-sglang-models-20260303161715850900000007 (existing, attached to qn-sglang-eks-cluster)
+# Path: s3://qn-sglang-models-.../models/DeepSeek-V4-Flash/
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: persist-deepseek-v4-flash-to-s3
+  namespace: default
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: OnFailure
+      nodeSelector:
+        node.kubernetes.io/instance-type: p6-b300.48xlarge
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: s3-mirror
+          image: amazon/aws-cli:2.17.20
+          command:
+            - sh
+            - -c
+            - |
+              set -euo pipefail
+              SRC=/mnt/nvme/models/DeepSeek-V4-Flash
+              DST=s3://qn-sglang-models-20260303161715850900000007/models/DeepSeek-V4-Flash
+
+              echo "=== Mirroring $SRC → $DST ==="
+              echo "Source size:"
+              du -sh "$SRC"
+              echo "Source files:"
+              find "$SRC" -type f | wc -l
+
+              # --size-only is sufficient (no need for full content hash); HF weights are immutable.
+              # --no-progress reduces log noise; we still get per-file Upload lines.
+              aws s3 sync "$SRC" "$DST" \
+                --region us-west-2 \
+                --size-only \
+                --no-progress
+
+              echo "=== Verification ==="
+              aws s3 ls --recursive --human-readable --summarize "$DST" --region us-west-2 | tail -5
+
+              echo "=== Mirror complete ==="
+          resources:
+            requests:
+              cpu: "8"
+              memory: 16Gi
+            limits:
+              cpu: "16"
+              memory: 32Gi
+          volumeMounts:
+            - name: nvme
+              mountPath: /mnt/nvme
+              readOnly: true
+      volumes:
+        - name: nvme
+          hostPath:
+            path: /mnt/nvme
+            type: Directory

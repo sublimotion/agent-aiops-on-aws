@@ -1,0 +1,120 @@
+catalog_id: rag-1m-context
+use_case: rag
+description: |
+  Million-token RAG / long-context test case. Stresses prefill scaling, KV cache
+  footprint, and prefix caching at extreme context. Designed for models with
+  native 1M context windows (DeepSeek V4 Flash, Qwen 2.5-1M, Llama 3.1 1M variants)
+  where the architectural efficiency story (compressed/sparse attention, 10%-KV
+  claims, sub-linear FLOPs) only manifests at this scale.
+
+  Why this exists: standard rag-long-context tops out at 16K, and chatbot-long
+  at 32K. Neither exposes the compression / sparse-attention efficiency curves
+  that frontier long-context models advertise. A 16K result on a 1M-context model
+  is a smoke test, not a characterization.
+
+  Workload structure: large shared prefix (the "retrieved corpus") + short unique
+  question per request. This is the realistic RAG production pattern at scale —
+  e.g., feeding an entire codebase, full legal corpus, or a multi-document
+  synthesis task into context.
+
+dataset:
+  type: generated-shared-prefix
+  # Sweep across context tiers. Each is run as a separate measurement.
+  context_tiers:
+    - {label: "64k",  prefix_tokens: 65280,    question_tokens: 256, output_tokens: 1024}
+    - {label: "128k", prefix_tokens: 130816,   question_tokens: 256, output_tokens: 1024}
+    - {label: "256k", prefix_tokens: 261888,   question_tokens: 256, output_tokens: 1024}
+    - {label: "512k", prefix_tokens: 524032,   question_tokens: 256, output_tokens: 1024}
+    - {label: "1m",   prefix_tokens: 1048320,  question_tokens: 256, output_tokens: 1024}
+
+load:
+  # Lower request rate at extreme context — 1M prefill is expensive even on B300.
+  # Concurrency tier is capped by KV pool, not by request_rate.
+  type: constant
+  request_rate: 0.1            # 6 req/min — reasonable for long-doc RAG production
+  num_prompts: 20              # at 1M context, 20 unique queries is sufficient signal
+  warmup_requests: 2           # warms shared prefix into cache
+
+  # Cold vs warm split is critical at 1M — first request pays prefill cost, rest
+  # should hit prefix cache (assuming the engine actually caches at this scale).
+  measurement_protocol: |
+    - First N=2 requests are warmup (prefill cost only — discard from latency stats)
+    - Remaining 18 requests measure warm-cache latency (TTFT should be 10-100x lower)
+    - Report TTFT_cold (request 1) and TTFT_warm (p50 of requests 3-20) separately
+
+slo:
+  # Necessarily looser than 16K cards. Targets calibrated to "production-acceptable
+  # for batch RAG / async workflows", not interactive chat.
+  ttft_cold_p99_ms: 60000      # 60s — full 1M prefill is genuinely expensive
+  ttft_warm_p50_ms: 2000       # 2s — what prefix caching MUST deliver to be useful
+  ttft_warm_p99_ms: 5000
+  tpot_p99_ms: 100             # decode is often slower at long context due to attention scan
+  e2e_p99_ms: 90000            # 60s prefill + 30s for 1K decode at 30 tok/s
+  error_rate_max: 0.001
+
+# Validation gates — required to claim a result against this card
+validation:
+  required_metrics:
+    - ttft_cold_vs_warm_ratio          # must report; if <2x, prefix caching is broken
+    - kv_cache_usage_perc_per_tier     # the headline efficiency curve
+    - flops_per_token_per_tier         # if measurable; validates sub-linear FLOPs claims
+    - per_tier_completion              # must complete each tier; OOM at 1M means card fails
+
+  reliability_flags:
+    - rule: ttft_cold_vs_warm_ratio_lt_2
+      action: flag_unrealistic
+      reason: |
+        Prefix caching is supposed to make warm requests dramatically faster than
+        cold. <2x ratio means the engine isn't caching — known issue on some
+        hybrid-attention models (e.g. vLLM #42948 for DeepSeek V4 Flash).
+        Report the result, but flag prefix caching as broken for this engine/model.
+
+    - rule: oom_at_any_tier
+      action: record_max_supported_context
+      reason: |
+        OOM at e.g. 512k on 8xB200 means the model effectively does NOT support 1M
+        in this configuration, regardless of card claims. Report the highest tier
+        that completes successfully.
+
+    - rule: degenerate_output_tokens
+      action: flag_unreliable
+      reason: |
+        At extreme context, models can collapse to repetition (esp. with
+        speculative decoding). Sample 5 outputs per tier; reject if any token
+        repeats >5x consecutively. Same guardrail as W0 sharegpt cross-check.
+
+    - rule: kv_growth_superlinear
+      action: highlight_architecture_failure
+      reason: |
+        For models advertising compressed/sparse attention (CSA+HCA, NSA, MLA,
+        etc.), KV usage at 1M / KV usage at 100K should be ≤ ~12x (sub-linear).
+        Linear or super-linear growth means the compression isn't working at
+        scale — major finding, must be reported as HIGH-severity lesson.
+
+# Cross-checks
+cross_check:
+  paired_cards: [rag-long-context, chatbot-long]
+  policy: |
+    Always report rag-long-context (16K) and chatbot-long (32K) results alongside
+    rag-1m-context. The shape of the curve from 16K → 32K → 1M is the actual
+    architectural story. A single 1M datapoint without the curve is unfalsifiable
+    — could be noise, could be quantization artifact, could be the real win.
+
+  vendor_claim_validation: |
+    If a model card or vendor blog claims efficiency wins at long context (e.g.
+    DeepSeek V4 Flash: "10% KV cache, 27% FLOPs vs V3.2 at 1M"), this workload
+    card is the canonical place to verify. Compute the ratios from
+    `kv_cache_usage_perc_per_tier` and `flops_per_token_per_tier` and report
+    deltas vs the claim.
+
+  applicable_models:
+    - DeepSeek-V4-Flash (1M native)
+    - DeepSeek-V4-Pro (1M native)
+    - Qwen2.5-1M (1M extended)
+    - Llama-3.1-*-1M (1M variants)
+    - Kimi-K2.6 (256K — sweep stops at 256k tier)
+    - GLM-5.1 (varies)
+
+  not_applicable_models: |
+    Skip on models with native context <256K. Running 1M on a 32K-trained model
+    measures the rope/yarn extrapolation noise floor, not the architecture.

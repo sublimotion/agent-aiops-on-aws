@@ -1,0 +1,169 @@
+# Kimi K2.6 Speculative Decode — Benchmark Sidecar
+# Captures deployment context for the v1 benchmark-commons envelope.
+# See results/standard/*.json for enriched per-config artifacts (produced by scripts/enrich-to-standard.py).
+
+model:
+  name: Kimi-K2.6
+  id: moonshotai/Kimi-K2.6
+  architecture: moe-mla-fp8
+  parameters_total: "1T"
+  parameters_active: "32B"
+  quantization: fp8
+  max_model_len: 131072
+
+draft_model:
+  name: Kimi-K2.6-EAGLE3
+  id: lightseekorg/kimi-k2.6-eagle3
+  architecture: eagle3
+  parameters_total: "~3B"
+  quantization: bf16
+
+engine:
+  name: sglang
+  container_image: lmsysorg/sglang:v0.5.10-cu130
+  base_image: lmsysorg/sglang:v0.5.10-cu130
+  dockerfile: null
+  tensor_parallel: 8
+  pipeline_parallel: 1
+  data_parallel: null
+  expert_parallel: null
+  replicas: 1
+  reasoning: false
+  kv_cache_dtype: fp8
+  attention_backend: trtllm_mha
+  # Speculative decode configuration varies per phase — see `configurations` below
+  speculative_decode:
+    algorithm: EAGLE3
+    draft_model: lightseekorg/kimi-k2.6-eagle3
+    draft_attention_backend: trtllm_mha
+    # num_steps / num_draft_tokens / eagle_topk swept per config
+  extra_args:
+    reasoning-parser: kimi_k2
+    tool-call-parser: kimi_k2
+    trust-remote-code: true
+
+framework:
+  name: sglang-native
+  version: v0.5.10-cu130
+  config: {}
+
+infrastructure:
+  substrate: ec2-spot
+  instance_type: p6-b300.48xlarge
+  region: us-east-1
+  az_id: use1-az6
+  gpu:
+    name: B300
+    arch: sm_103
+    count: 8
+    vram_gb: 275
+    interconnect: nvswitch-nv18
+
+# Configurations tested — each produces one artifact per concurrency level
+configurations:
+  # Phase 1b: 13 EAGLE3 hyperparameter variants (sweep num_steps × num_draft_tokens)
+  - tag: sglang-eagle3-s{num_steps}d{num_draft_tokens}k{eagle_topk}
+    phase: phase-1b
+    num_steps_values: [1, 2, 3, 4]
+    num_draft_tokens_values: [2, 4, 6, 8]
+    eagle_topk_values: [1]
+    prune_rule: "num_steps > num_draft_tokens"
+
+  # Phase 4: fullstack (winner + HiCache)
+  - tag: sglang-eagle3-s4d4k1-hicache200
+    phase: phase-4
+    num_steps: 4
+    num_draft_tokens: 4
+    eagle_topk: 1
+    extra_args_add:
+      enable-hierarchical-cache: true
+      hicache-size: 200
+
+  # Phase 5a: default stack (matches Phase 4)
+  - tag: sglang-eagle3-s4d4-hicache-cudagraphs
+    phase: phase-5
+    variant: default
+    num_steps: 4
+    num_draft_tokens: 4
+    eagle_topk: 1
+    extra_args_add:
+      enable-hierarchical-cache: true
+      hicache-size: 200
+
+  # Phase 5b: no CUDA graphs (ablation)
+  - tag: sglang-eagle3-s4d4-no-cudagraphs
+    phase: phase-5
+    variant: no_cuda_graph
+    num_steps: 4
+    num_draft_tokens: 4
+    eagle_topk: 1
+    extra_args_add:
+      disable-cuda-graph: true
+
+  # Phase 5c: TP4 + DP2 (multi-tenant sweet spot)
+  - tag: sglang-eagle3-s4d4-tp4dp2-hicache
+    phase: phase-5
+    variant: tp4_dp2
+    num_steps: 4
+    num_draft_tokens: 4
+    eagle_topk: 1
+    engine_overrides:
+      tensor_parallel: 4
+      data_parallel: 2
+    extra_args_add:
+      enable-hierarchical-cache: true
+      hicache-size: 200
+
+workloads:
+  - catalog_id: concurrency-sweep
+    override:
+      load:
+        levels: [1, 8, 32, 64, 128, 256, 512]
+        num_prompts_per_level: variable  # 4×conc for c<=128, then batched
+      dataset:
+        input_tokens: {mean: 512, std_dev: 0}
+        output_tokens: {mean: 256, std_dev: 0}
+      api:
+        type: completions
+        streaming: false
+        endpoint: /generate
+
+# SLO targets (from spec success criteria)
+slo:
+  ttft_p99_ms: 500       # NOT MEASURED this session — custbench records e2e only
+  tpot_p99_ms: 30
+  e2e_p99_ms: 15000
+  error_rate_max: 0.001
+  single_stream_tok_per_s_min: 192    # 1.5× 128 baseline
+  aggregate_at_c128_min: 6000
+
+# Spec-specific targets (EAGLE3)
+speculative_targets:
+  accept_rate_min: 0.5
+  accept_length_min: 2.0
+  single_stream_speedup_min: 1.5       # vs no-spec baseline
+
+# Cost
+cost:
+  instance_type: p6-b300.48xlarge
+  spot_price_per_hr: 25.65             # measured in us-east-1c, 2026-05-13
+  on_demand_price_per_hr: 89.15
+  utilization_target: 0.70
+
+# Baseline comparison (from K2.6 spec, pressure_test_*.json)
+baseline_reference:
+  blueprint: domains/gpu-serving/blueprints/kimi-k2.6
+  engine_peak_tok_per_s:
+    vllm_c512: 10437
+    sglang_c512: 3400
+  engine_per_req_c1:
+    vllm: 75.8
+    sglang: 89.7
+
+# Session cost
+session:
+  date: 2026-05-13
+  gpu_hours: 9
+  total_usd: 230
+  phases_completed: [phase-0, phase-1, phase-1b, phase-4, phase-5a, phase-5b, phase-5c, phase-5d]
+  phases_dropped: [phase-2-vllm-eagle3, phase-3-dynamic-mla]

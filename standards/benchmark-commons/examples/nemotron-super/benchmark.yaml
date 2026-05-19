@@ -1,0 +1,133 @@
+# Nemotron-3-Super Benchmark Sidecar
+# This file provides the deployment context that AIPerf doesn't know about.
+# One sidecar per blueprint; referenced by the enrichment wrapper to produce artifacts.
+
+model:
+  name: Nemotron-3-Super-120B-A12B
+  id: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+  architecture: hybrid-mamba-moe  # Mamba-2 + LatentMoE + Select Attention
+  parameters_total: "120B"
+  parameters_active: "12B"
+  quantization: fp8
+  max_model_len: 256000
+
+engine:
+  name: sglang
+  container_image: "123456789.dkr.ecr.us-east-2.amazonaws.com/dynamo:1.0.0"
+  base_image: "nvcr.io/nvidia/dynamo:1.0.0"
+  dockerfile: null  # stock Dynamo image
+  tensor_parallel: 2
+  pipeline_parallel: 1
+  data_parallel: null
+  expert_parallel: null
+  replicas: 2  # 2 decode workers (disaggregated mode)
+  reasoning: false
+  kv_cache_dtype: fp8
+  attention_backend: auto
+  speculative_decode: null
+  extra_args:
+    trust-remote-code: true
+    tool-call-parser: qwen3_coder
+    reasoning-parser: nano_v3
+    disaggregation-mode: decode  # this worker pool handles decode
+
+framework:
+  name: dynamo
+  version: "1.0.0"
+  config:
+    mode: disaggregated
+    router: round-robin  # prefix-hash limited value for Mamba hybrid
+    nixl_enabled: true
+    prefill:
+      tp_size: 2
+      num_workers: 2
+      gpus: [4, 5, 6, 7]
+    decode:
+      tp_size: 2
+      num_workers: 2
+      gpus: [0, 1, 2, 3]
+    kvbm: null  # Mamba hybrid cache incompatible with block reuse
+    service_discovery: etcd
+
+infrastructure:
+  substrate: eks
+  instance_type: p6-b200.48xlarge
+  region: us-east-2
+  gpu:
+    name: B200
+    arch: sm_100
+    count: 8
+    vram_gb: 183
+    interconnect: nvswitch
+
+# Workloads to run (references standard catalog + custom)
+workloads:
+  - catalog_id: concurrency-sweep
+    override:
+      load:
+        levels: [1, 4, 16, 32, 64, 128, 256]
+        num_prompts_per_level: 100
+      dataset:
+        input_tokens: {mean: 4096, std_dev: 512}
+        output_tokens: {mean: 1024, std_dev: 128}
+
+  - catalog_id: coding-agent
+    override:
+      load:
+        type: constant
+        request_rate: 4.0
+        duration_s: 180
+
+  - catalog_id: null
+    custom:
+      name: long-context-128k
+      use_case: custom
+      dataset:
+        type: synthetic
+        input_tokens: {mean: 131072, std_dev: 0}
+        output_tokens: {mean: 256, std_dev: 64}
+      load:
+        type: constant
+        request_rate: 0.1
+        duration_s: 300
+        max_concurrency: 1
+
+# SLO targets (from spec success criteria)
+slo:
+  ttft_p99_ms: 500       # 4K context, low concurrency
+  tpot_p99_ms: 30        # streaming decode (ITL target)
+  e2e_p99_ms: 15000      # 4K input, 1K output
+  error_rate_max: 0.001
+  throughput_floor_toks: 3000  # at concurrency 64, aggregated mode
+
+# Dynamo-specific success criteria
+dynamo_targets:
+  disagg_speedup_min: 1.3          # at concurrency >= 32
+  ttft_stability_max_ratio: 2.0    # p99 at c=128 vs c=1
+  all_backends_serve: true
+  disagg_mode_functional: true
+
+# Cost & Intelligence-Adjusted Metrics (IAC)
+# Reference: https://artificialanalysis.ai/agents/coding-agents
+cost:
+  instance_type: p6-b200.48xlarge
+  spot_price_per_hr: 48.00           # current spot rate
+  on_demand_price_per_hr: 98.00      # for comparison
+  utilization_target: 0.70           # 30% headroom for p99 latency
+  # Derived by adapter (don't set manually):
+  # cost_per_m_output_tokens: computed from spot_price / measured throughput
+
+# Intelligence-adjusted cost (optional — requires external eval data)
+# Enables cost-per-success and true-cost comparisons across models & configs
+intelligence:
+  eval_source: swe-bench-verified    # or: custom-harness, terminal-bench, etc.
+  pass_rate: null                    # fill after eval (0.0-1.0)
+  tokens_per_task:                   # average token consumption per coding task
+    input: null
+    output: null
+    cached_input_ratio: null         # fraction of input tokens served from prefix cache
+  human_intervention_cost: 25.00     # USD per failed task (15 min @ $100/hr default)
+  # Derived by adapter:
+  # cost_per_task: (input × $/input + output × $/output) adjusted for cache
+  # cost_per_success: cost_per_task / pass_rate
+  # true_cost: cost_per_task + (1 - pass_rate) × human_intervention_cost

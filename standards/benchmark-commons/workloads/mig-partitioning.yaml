@@ -1,0 +1,42 @@
+catalog_id: mig-partitioning
+use_case: multi-tenant-partitioning
+description: >
+  Characterise multi-tenant GPU partitioning. Measure aggregate QPS per
+  partition profile, target-slice P99 latency under noisy-neighbour
+  pressure, and the wall-clock time to reconfigure the partitioning
+  (GPU reset + pod reschedule + readiness).
+
+  Partition profiles are a HARDWARE choice declared in the sidecar's
+  `infrastructure.partition_profile:` field. The card does not enumerate
+  MIG / CPX / SR-IOV profiles — each profile gets its own sidecar and
+  its own run, which lets the matrix cover every profile on every
+  supported hardware without modifying the card.
+
+  Example profiles (for reference; each goes in a separate sidecar):
+    - NVIDIA MIG on p5/p5en: 1g.10gb, 2g.20gb, 3g.40gb, 4g.40gb, 7g.80gb
+    - AMD: CPX / SPX compute partition, SR-IOV 2/4/8 VFs
+
+modality: text
+
+dataset:
+  type: synthetic
+  input_tokens: {mean: 512, std_dev: 0}
+  output_tokens: {mean: 128, std_dev: 0}
+
+load:
+  type: ensemble-steady
+  duration_s: 600
+  noisy_neighbour:
+    enabled: true
+    adjacent_slice_pressure_pct: 100
+
+slo:
+  p99_ttft_ms: 500
+  error_rate_max: 0.001
+
+extensions:
+  partition:
+    aggregate_qps: required
+    target_slice_p99_under_pressure_ms: required
+    isolation_score: required
+    reconfig_time_s: required   # Captured by the runner across a profile change

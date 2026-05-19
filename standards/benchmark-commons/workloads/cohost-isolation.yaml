@@ -1,0 +1,57 @@
+catalog_id: cohost-isolation
+use_case: multi-model-isolation
+description: >
+  Measure whether multiple models can share GPU resources cleanly. Drives
+  each co-tenant model with its own load generator, then applies
+  noisy-neighbour pressure by ramping one tenant to 100% load and
+  measuring the others' P99 latency. Rotates the noisy role through every
+  tenant.
+
+  The ensemble composition (which models, which traces, which rates) is
+  supplied by the sidecar's `workload_overrides.cohost_ensemble:` block.
+  The card itself only defines the protocol: steady state at half
+  ceiling → rotating 100% pressure → per-tenant isolation score.
+
+  Covers the CTO engagement's O2 cell when the sidecar supplies the
+  5-model banking ensemble. A two-model co-host (LLM + embedding) uses
+  the same card with a smaller ensemble.
+
+modality: multi-model
+
+dataset:
+  # Sidecar supplies `workload_overrides.cohost_ensemble` with:
+  #   - model_role
+  #   - trace (catalog_id of a single-model workload card)
+  #   - rate_fraction_of_ceiling (default 0.5)
+  # If missing, the runner errors out — this card is deliberately
+  # incomplete without a sidecar ensemble.
+  type: ensemble-from-sidecar
+
+load:
+  type: ensemble-steady
+  duration_s: 900
+  noisy_neighbour:
+    enabled: true
+    ramp_to_pct: 100
+    rotate_role: true      # Each model takes the noisy role in turn
+    per_role_duration_s: 600
+
+topologies:
+  - id: full-share
+    description: All models on one GPU with priority routing
+  - id: mig-partitioned
+    description: MIG slices on NVIDIA or compute-partitioned on AMD
+  - id: csp-native
+    description: Vertex AI / SageMaker multi-model endpoint equivalent
+  - id: siloed
+    description: One model per GPU (baseline)
+
+slo:
+  per_model_p99_ttft_ms: 2000
+  error_rate_max: 0.001
+
+extensions:
+  isolation:
+    per_model_p99_degradation_pct: required
+    aggregate_qps_per_gpu: required
+    isolation_score: required   # Normalized: 0 = perfect isolation, 1 = full contention

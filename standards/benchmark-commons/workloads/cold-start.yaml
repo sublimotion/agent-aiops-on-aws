@@ -1,0 +1,43 @@
+catalog_id: cold-start
+use_case: cold-start-breakdown
+description: >
+  Measure the load-to-first-token time that bounds auto-scaling
+  responsiveness and failover recovery. Records weights-transfer,
+  allocator warmup, kernel autotune / first compile, CUDA graph capture,
+  and the latency curve of the first 100 inferences.
+
+  Source, format, and filesystem-cache state are SIDECAR choices
+  declared under `infrastructure.model_source:`, `model.format:`, and
+  `infrastructure.fs_cache_state:`. The runner's serving-stack probe
+  drops the OS FS cache when `fs_cache_state: cold`. The card itself
+  does not enumerate (source × format × cache-state); the matrix is
+  enumerated by the engagement spec or a per-model plan.
+
+  Example axes (each combination goes in its own sidecar):
+    - source: nvme / nas / object-store / hub
+    - format: safetensors / gguf / trt-engine / rocm-cache
+    - fs_cache_state: cold / warm
+
+modality: text
+
+dataset:
+  type: single-probe
+  input_tokens: {mean: 512, std_dev: 0}
+  output_tokens: {mean: 64, std_dev: 0}
+
+load:
+  type: first-100
+  warmup_requests: 0       # O9 wants cold-start-inclusive latency for the first batch
+  num_prompts: 100
+
+slo:
+  # No numeric SLO — this is a characterisation, not a pass/fail gate
+  placeholder: true
+
+extensions:
+  cold_start:
+    weights_load_s: required
+    allocator_warmup_s: required
+    kernel_compile_s: required
+    cuda_graph_capture_s: required
+    first_100_latencies_ms: required

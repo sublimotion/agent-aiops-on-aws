@@ -1,0 +1,53 @@
+[create] Nodegroup dsv4-b300-spot on p6-b300.48xlarge (SPOT) in subnet-001db6882dbb5ac72
+{
+    "nodegroup": {
+        "nodegroupName": "dsv4-b300-spot",
+        "nodegroupArn": "arn:aws:eks:us-west-2:615299764834:nodegroup/qn-sglang-eks-cluster/dsv4-b300-spot/c6cf2061-c3fc-85cc-fbfb-e0412562a7b6",
+        "clusterName": "qn-sglang-eks-cluster",
+        "version": "1.32",
+        "releaseVersion": "1.32.13-20260512",
+        "createdAt": "2026-05-19T11:03:38.056000-04:00",
+        "modifiedAt": "2026-05-19T11:03:38.056000-04:00",
+        "status": "CREATING",
+        "capacityType": "SPOT",
+        "scalingConfig": {
+            "minSize": 0,
+            "maxSize": 1,
+            "desiredSize": 1
+        },
+        "instanceTypes": [
+            "p6-b300.48xlarge"
+        ],
+        "subnets": [
+            "subnet-001db6882dbb5ac72"
+        ],
+        "amiType": "AL2023_x86_64_NVIDIA",
+        "nodeRole": "arn:aws:iam::615299764834:role/gpu-eks-node-group-20260303162535678600000025",
+        "labels": {
+            "role": "gpu",
+            "instance": "p6-b300.48xlarge",
+            "model": "deepseek-v4-flash"
+        },
+        "taints": [
+            {
+                "key": "nvidia.com/gpu",
+                "value": "true",
+                "effect": "NO_SCHEDULE"
+            }
+        ],
+        "diskSize": 200,
+        "health": {
+            "issues": []
+        },
+        "updateConfig": {
+            "maxUnavailable": 1
+        },
+        "tags": {
+            "Project": "deepseek-v4-flash",
+            "SpecRef": "domains/gpu-serving/specs/deepseek-v4-flash.md",
+            "SpotReclaim": "true"
+        }
+    }
+}
+[wait] Nodegroup ACTIVE (typically 3-8 min)
+[done] Nodegroup ready. Verify with: kubectl get nodes -l model=deepseek-v4-flash

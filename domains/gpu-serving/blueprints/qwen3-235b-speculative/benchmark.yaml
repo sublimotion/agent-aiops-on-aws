@@ -1,0 +1,159 @@
+# Qwen3-235B Speculative Decode — Benchmark Sidecar
+# Mirrors kimi-k2.6-speculative/benchmark.yaml structure.
+# Consumed by bench-standard.py to emit v1 benchmark-commons envelopes.
+
+model:
+  name: Qwen3-235B-A22B-FP8
+  id: Qwen/Qwen3-235B-A22B-FP8
+  architecture: moe
+  parameters_total: "235B"
+  parameters_active: "22B"
+  quantization: fp8
+  max_model_len: 40960  # FP8 variant: NO YaRN, ceiling is 40960 (NOT 131072)
+
+draft_model:
+  name: Qwen3-235B-A22B-EAGLE3
+  id: lmsys/Qwen3-235B-A22B-EAGLE3
+  architecture: eagle3
+  parameters_total: "1B"
+  quantization: bf16
+  # Model card reports: gsm8k 224 tok/s @ accept length 3.538,
+  # mtbench 241 tok/s @ accept length 3.019 (single-stream, TP8)
+
+engine:
+  name: sglang
+  container_image: lmsysorg/sglang:v0.5.10-cu130
+  base_image: lmsysorg/sglang:v0.5.10-cu130
+  dockerfile: null
+  tensor_parallel: 4
+  pipeline_parallel: 1
+  data_parallel: null
+  expert_parallel: null
+  replicas: 1
+  reasoning: false
+  kv_cache_dtype: auto
+  attention_backend: trtllm_mha
+  speculative_decode:
+    algorithm: EAGLE3
+    draft_model: lmsys/Qwen3-235B-A22B-EAGLE3
+    draft_attention_backend: trtllm_mha
+    # num_steps / num_draft_tokens / eagle_topk swept per config
+  extra_args:
+    tool-call-parser: hermes          # Per baseline L#4 (qwen3_xml broken)
+    reasoning-parser: deepseek_r1     # Per baseline L#5 (official Qwen3 recipe)
+    trust-remote-code: true
+
+framework:
+  name: sglang-native
+  version: v0.5.10-cu130
+  config: {}
+
+infrastructure:
+  substrate: ec2-spot
+  instance_type: p6-b300.48xlarge
+  region: us-west-2
+  az_id: usw2-az2
+  gpu:
+    name: B300
+    arch: sm_103
+    count: 8
+    vram_gb: 275
+    interconnect: nvswitch-nv18
+
+# Configurations tested — each produces one v1 envelope per concurrency level
+configurations:
+  # Phase 1: default EAGLE3 per model card
+  - tag: sglang-eagle3-s3d4k1-default
+    phase: phase-1
+    num_steps: 3
+    num_draft_tokens: 4
+    eagle_topk: 1
+
+  # Phase 1b: hyperparameter sweep (13 configs after pruning num_steps > num_draft_tokens)
+  - tag: sglang-eagle3-s{num_steps}d{num_draft_tokens}k{eagle_topk}
+    phase: phase-1b
+    num_steps_values: [1, 2, 3, 4]
+    num_draft_tokens_values: [2, 4, 6, 8]
+    eagle_topk_values: [1]
+    prune_rule: "num_steps > num_draft_tokens"
+
+  # Phase 4: winner + HiCache
+  - tag: sglang-eagle3-{winner}-hicache200
+    phase: phase-4
+    from_phase_1b: WINNER.env
+    extra_args_add:
+      enable-hierarchical-cache: true
+      hicache-size: 200
+
+  # Phase 5 frontier
+  - tag: sglang-eagle3-{winner}-hicache-cudagraphs
+    phase: phase-5
+    variant: default
+    extra_args_add:
+      enable-hierarchical-cache: true
+      hicache-size: 200
+
+  - tag: sglang-eagle3-{winner}-no-cudagraphs
+    phase: phase-5
+    variant: no_cuda_graph
+    extra_args_add:
+      disable-cuda-graph: true
+
+  - tag: sglang-eagle3-{winner}-tp4dp2-hicache
+    phase: phase-5
+    variant: tp4_dp2
+    engine_overrides:
+      tensor_parallel: 2
+      data_parallel: 2
+    extra_args_add:
+      enable-hierarchical-cache: true
+      hicache-size: 200
+
+workloads:
+  - catalog_id: concurrency-sweep
+    override:
+      load:
+        levels: [1, 8, 32, 64, 128, 256, 512]
+        num_prompts_per_level: variable
+      dataset:
+        input_tokens: {mean: 2048, std_dev: 0}
+        output_tokens: {mean: 512, std_dev: 0}
+      api:
+        type: chat
+        streaming: true
+        endpoint: /v1/chat/completions
+
+# SLO targets (from spec success criteria)
+slo:
+  ttft_p99_ms: 500
+  tpot_p99_ms: 30
+  e2e_p99_ms: 15000
+  error_rate_max: 0.001
+  single_stream_tok_per_s_min: 150     # 1.5× 103 baseline
+  aggregate_at_c128_min: 6000
+
+speculative_targets:
+  accept_rate_min: 0.6
+  accept_length_min: 2.5
+  single_stream_speedup_min: 1.3
+
+cost:
+  instance_type: p6-b300.48xlarge
+  spot_price_per_hr: 25.47              # us-west-2b, confirmed 2026-05-14
+  on_demand_price_per_hr: 89.15
+  utilization_target: 0.70
+
+baseline_reference:
+  blueprint: domains/gpu-serving/blueprints/qwen3-235b-b300
+  engine_peak_tok_per_s:
+    vllm_tp4_c512: 11820
+    vllm_tp2dp4ep_c512: 13877
+  engine_per_req_c1:
+    vllm_tp4: 102.8
+
+session:
+  planned_date: 2026-05-14
+  planned_gpu_hours: 7
+  planned_total_usd: 187
+  budget_ceiling_usd: 350
+  phases_planned: [phase-0, phase-1, phase-1b, phase-4, phase-5a, phase-5b, phase-5c, phase-5d]

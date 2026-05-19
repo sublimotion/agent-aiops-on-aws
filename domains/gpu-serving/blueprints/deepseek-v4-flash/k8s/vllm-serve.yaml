@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vllm-deepseek-v4-flash
+  namespace: default
+  labels:
+    app: vllm-deepseek-v4-flash
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    node.kubernetes.io/instance-type: p6-b300.48xlarge
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  hostNetwork: true
+  containers:
+    - name: vllm
+      # vLLM nightly 2026-05-19 (commit 6e889b58). Includes:
+      #   - PR #42320 (MTP HC state handling fix; merged 2026-05-13, commit f1cc7aa)
+      #   - PR #41694 (DSv4 PP support; merged 2026-05-10)
+      #   - PR #43004/#43039/#43073 (DSv4 module refactor)
+      # Defaults to cu129; B300 driver (CUDA 13) supports 12.x forward-compat.
+      # cu130 line stalled at v0.20.0 (Apr 28) — predates DSv4 fixes, do NOT use.
+      image: vllm/vllm-openai:nightly-6e889b582b6a0b11f22b3764be174266faa9ff5e
+      command:
+        - bash
+        - -c
+        - |
+          set -euo pipefail
+
+          # Pin transformers to 4.56.x — vLLM #42741 reports 4.57+ breaks DSv4 load.
+          # PR #42806 (transformers ≥ 4.57 normalized compress_ratios) is OPEN, not merged.
+          pip install -q "transformers==4.56.2"
+
+          exec python3 -m vllm.entrypoints.openai.api_server \
+            --model /mnt/nvme/models/DeepSeek-V4-Flash \
+            --served-model-name DeepSeek-V4-Flash \
+            --tensor-parallel-size 8 \
+            --max-model-len 32768 \
+            --gpu-memory-utilization 0.90 \
+            --no-enable-prefix-caching \
+            --kv-cache-dtype fp8 \
+            --trust-remote-code \
+            --host 0.0.0.0 \
+            --port 8000
+      env:
+        - name: VLLM_TORCH_COMPILE_CACHE
+          value: /mnt/nvme/vllm-cache
+        - name: TRITON_CACHE_DIR
+          value: /mnt/nvme/triton-cache
+        - name: HF_HOME
+          value: /mnt/nvme/hf-cache
+        - name: HF_HUB_OFFLINE
+          value: "1"
+      resources:
+        requests:
+          nvidia.com/gpu: "8"
+          cpu: "64"
+          memory: 256Gi
+        limits:
+          nvidia.com/gpu: "8"
+          cpu: "128"
+          memory: 512Gi
+      volumeMounts:
+        - name: nvme
+          mountPath: /mnt/nvme
+        - name: shm
+          mountPath: /dev/shm
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        initialDelaySeconds: 600   # ~10 min: DeepGEMM JIT + 1M context budget allocation
+        periodSeconds: 15
+        failureThreshold: 80       # 20 min total before declared failed
+  volumes:
+    - name: nvme
+      hostPath:
+        path: /mnt/nvme
+        type: Directory
+    - name: shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 128Gi

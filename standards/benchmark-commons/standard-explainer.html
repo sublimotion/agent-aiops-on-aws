@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Benchmark Artifact — Spec, Schema & Hero Examples</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --surface-2: #242740;
+      --border: #2e3151;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --accent: #6366f1;
+      --accent-soft: rgba(99,102,241,0.15);
+      --green: #22c55e;
+      --green-soft: rgba(34,197,94,0.12);
+      --red: #ef4444;
+      --red-soft: rgba(239,68,68,0.12);
+      --yellow: #f59e0b;
+      --yellow-soft: rgba(245,158,11,0.12);
+      --blue: #3b82f6;
+      --blue-soft: rgba(59,130,246,0.12);
+      --purple: #8b5cf6;
+      --json-string: #a5f3a0;
+      --json-number: #fbbf24;
+      --json-bool: #c084fc;
+      --json-null: #71717a;
+      --json-key: #60a5fa;
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc; --surface: #ffffff; --surface-2: #f1f5f9;
+      --border: #e2e8f0; --text: #0f172a; --text-muted: #64748b;
+      --accent-soft: rgba(99,102,241,0.08);
+      --json-string: #15803d; --json-number: #b45309; --json-bool: #7c3aed;
+      --json-null: #94a3b8; --json-key: #2563eb;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); line-height: 1.55; }
+    header {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem; display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    header .meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .theme-toggle {
+      background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+      padding: 0.4rem 0.9rem; border-radius: 6px; cursor: pointer;
+      font-size: 0.8rem; font-family: inherit;
+    }
+    main { max-width: 1280px; margin: 0 auto; padding: 2rem; }
+
+    /* Hero banner */
+    .hero-banner {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 1.5rem 1.75rem; margin-bottom: 2rem;
+    }
+    .hero-banner h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
+    .hero-banner p { font-size: 0.88rem; color: var(--text-muted); }
+    .hero-banner .pills { display: flex; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap; }
+    .pill {
+      background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
+      padding: 0.28rem 0.6rem; font-size: 0.72rem; font-family: 'JetBrains Mono', monospace;
+      color: var(--text-muted);
+    }
+    .pill.accent { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+    .code {
+      background: var(--surface-2); padding: 0.6rem 0.8rem; border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; margin-top: 0.75rem;
+      overflow-x: auto; border: 1px solid var(--border);
+    }
+
+    /* Envelope tree */
+    .envelope-diagram {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 1.5rem 1.75rem; margin-bottom: 2rem;
+    }
+    .envelope-diagram h2 { font-size: 1rem; margin-bottom: 0.35rem; }
+    .env-subtitle { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1.5rem; }
+    .env-tree {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.75rem;
+    }
+    .env-block {
+      background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 0.85rem 1rem; cursor: pointer; transition: border-color 0.15s;
+    }
+    .env-block:hover { border-color: var(--accent); }
+    .env-block .block-name {
+      font-family: 'JetBrains Mono', monospace; font-weight: 600;
+      font-size: 0.85rem; color: var(--json-key); margin-bottom: 0.2rem;
+    }
+    .env-block .block-required {
+      font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--red); margin-left: 0.4rem; font-weight: 600;
+    }
+    .env-block .block-optional {
+      font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--text-muted); margin-left: 0.4rem;
+    }
+    .env-block .block-desc { font-size: 0.78rem; color: var(--text-muted); }
+    .env-block .block-fields {
+      margin-top: 0.4rem; display: flex; flex-wrap: wrap; gap: 3px;
+    }
+    .env-block .block-fields .f {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
+      color: var(--text); background: var(--bg); padding: 1px 6px; border-radius: 3px;
+    }
+
+    /* Hero example carousel */
+    .tabs { display: flex; gap: 2px; background: var(--surface-2); border-radius: 8px 8px 0 0;
+      padding: 0.4rem 0.4rem 0; border: 1px solid var(--border); border-bottom: none;
+    }
+    .tab {
+      background: transparent; color: var(--text-muted); border: none; padding: 0.55rem 0.95rem;
+      cursor: pointer; font-family: inherit; font-size: 0.82rem; font-weight: 500;
+      border-radius: 6px 6px 0 0; border-bottom: 2px solid transparent;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active {
+      color: var(--accent); background: var(--surface);
+      border-bottom-color: var(--accent);
+    }
+    .hero-panel {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 0 0 12px 12px;
+      padding: 1.25rem 1.5rem; margin-bottom: 2rem;
+    }
+    .hero-panel h3 { font-size: 0.95rem; margin-bottom: 0.3rem; }
+    .hero-panel .hero-desc { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem; }
+    .hero-panel .hero-desc code {
+      font-family: 'JetBrains Mono', monospace; background: var(--surface-2);
+      padding: 0 4px; border-radius: 3px; color: var(--json-key);
+    }
+
+    /* JSON render with hover annotations */
+    .json-view {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; line-height: 1.55;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      padding: 1rem 1.25rem; overflow-x: auto; max-height: 620px; overflow-y: auto;
+      position: relative;
+    }
+    .json-view .tok-str { color: var(--json-string); }
+    .json-view .tok-num { color: var(--json-number); }
+    .json-view .tok-bool { color: var(--json-bool); }
+    .json-view .tok-null { color: var(--json-null); font-style: italic; }
+    .json-view .tok-key { color: var(--json-key); }
+    .json-view .tok-path {
+      cursor: help; border-bottom: 1px dotted currentColor; transition: background 0.1s;
+    }
+    .json-view .tok-path:hover { background: var(--accent-soft); }
+    .json-view .toggle {
+      cursor: pointer; user-select: none; color: var(--text-muted); display: inline-block;
+      width: 1em; text-align: center;
+    }
+    .json-view .collapsed > .children { display: none; }
+    .json-view .collapsed > .toggle::before { content: '▶'; }
+    .json-view .toggle::before { content: '▼'; }
+
+    /* Tooltip */
+    .tooltip {
+      position: fixed; background: var(--surface-2); border: 1px solid var(--accent);
+      border-radius: 6px; padding: 0.6rem 0.8rem; font-family: 'Inter', sans-serif;
+      font-size: 0.82rem; color: var(--text); max-width: 360px; z-index: 200;
+      pointer-events: none; box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      display: none;
+    }
+    .tooltip.visible { display: block; }
+    .tooltip .tt-path {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.74rem;
+      color: var(--accent); margin-bottom: 0.3rem; font-weight: 600;
+    }
+
+    /* Schema explorer */
+    .schema-tree { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; line-height: 1.65; }
+    .schema-node { padding-left: 1.2rem; border-left: 1px solid var(--border); margin-left: 0.25rem; }
+    .schema-node.root { padding-left: 0; border-left: none; margin-left: 0; }
+    .schema-name { color: var(--json-key); font-weight: 600; cursor: pointer; user-select: none; }
+    .schema-name:hover { text-decoration: underline; }
+    .schema-type { color: var(--text-muted); font-size: 0.74rem; margin-left: 0.4rem; }
+    .schema-req { color: var(--red); font-size: 0.64rem; margin-left: 0.35rem; font-weight: 600; text-transform: uppercase; }
+    .schema-enum { color: var(--json-string); font-size: 0.74rem; margin-left: 0.35rem; }
+    .schema-desc { color: var(--text-muted); font-size: 0.76rem; font-family: 'Inter', sans-serif; margin-left: 1.2rem; margin-bottom: 0.35rem; }
+    .collapsed > .schema-children { display: none; }
+    .schema-caret { color: var(--text-muted); margin-right: 0.25rem; }
+
+    /* Workload cards grid */
+    .workload-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 0.75rem;
+    }
+    .wc {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 0.9rem 1rem;
+    }
+    .wc .wc-id {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;
+      color: var(--accent); font-weight: 600; margin-bottom: 0.25rem;
+    }
+    .wc .wc-meta {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
+      color: var(--text-muted); margin-bottom: 0.5rem;
+    }
+    .wc .wc-desc { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.65rem; }
+    .wc .wc-spec {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 3px 10px;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      padding: 0.5rem 0.65rem; font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+    }
+    .wc .wc-spec .sp-label {
+      color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.62rem;
+    }
+    .wc .wc-spec .sp-value { color: var(--text); }
+    .wc .wc-spec .sp-value.null { color: var(--json-null); font-style: italic; }
+    .wc .wc-slo {
+      margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 4px;
+    }
+    .wc .wc-slo .slo-pill {
+      background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px;
+      padding: 2px 7px; font-family: 'JetBrains Mono', monospace; font-size: 0.66rem; color: var(--text-muted);
+    }
+    .wc .wc-slo .slo-pill strong { color: var(--accent); font-weight: 600; }
+
+    /* Producer checklist */
+    .checklist {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 1.25rem 1.5rem; margin-bottom: 2rem;
+    }
+    .checklist h2 { font-size: 1rem; margin-bottom: 0.75rem; }
+    .checklist ul { list-style: none; padding: 0; }
+    .checklist li {
+      padding: 0.4rem 0; border-bottom: 1px solid var(--border);
+      font-size: 0.85rem; display: flex; align-items: flex-start; gap: 0.5rem;
+    }
+    .checklist li:last-child { border-bottom: none; }
+    .checklist li::before {
+      content: '▸'; color: var(--accent); flex-shrink: 0; margin-top: 0.1rem;
+    }
+    .checklist li code {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;
+      background: var(--surface-2); padding: 0 5px; border-radius: 3px; color: var(--json-key);
+    }
+
+    section { margin-bottom: 2rem; }
+    section h2.section-title {
+      font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+    }
+    footer { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.72rem; border-top: 1px solid var(--border); }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Benchmark Artifact — Spec, Schema &amp; Hero Examples</h1>
+    <div class="meta">v1 envelope reference · single-page explainer · schema <span id="schema-id"></span></div>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">Toggle theme</button>
+</header>
+
+<main>
+  <!-- Hero banner -->
+  <div class="hero-banner">
+    <h2>One format, every producer</h2>
+    <p>
+      The <strong>v1 benchmark-commons envelope</strong> is the shared output contract for LLM inference benchmarks in this repo.
+      Producers (vLLM bench-serve, SGLang, AIPerf, GenAI-Perf, guidellm, LLMPerf, recon-perf, <code>bench-standard.py</code>) emit the same structure.
+      Consumers (<code>compare.py</code>, the results-vault dashboard, benchmark-analyst agent, Grafana/Athena/CloudWatch) read one format.
+      The envelope captures model identity, engine config, deployment context, workload card, full latency distributions, SLO evaluation,
+      and optional extensions (GPU telemetry, cost, speculative-decode stats, reconciliation).
+    </p>
+    <p style="margin-top: 0.75rem; font-weight: 600; color: var(--accent);">Keep your tool. Standardize the output.</p>
+    <div class="pills">
+      <span class="pill accent">schema v1.1</span>
+      <span class="pill">JSON Schema Draft 2020-12</span>
+      <span class="pill">EKS · HyperPod · EC2 spot · local</span>
+      <span class="pill">17 workload cards</span>
+      <span class="pill">9 supported tools</span>
+    </div>
+    <div class="code"># Validate any artifact against the schema
+python3 standards/benchmark-commons/container/validate-artifact.py path/to/artifact.json</div>
+  </div>
+
+  <!-- What is required -->
+  <div class="envelope-diagram" style="margin-bottom: 2rem;">
+    <h2>What's required vs optional</h2>
+    <div class="env-subtitle">Top-level blocks and metric fields that every conformant artifact MUST contain.</div>
+    <div class="summary-grid" style="margin-bottom: 0;">
+      <div class="summary-card">
+        <div class="label">Required top-level blocks</div>
+        <div class="value" style="font-size: 0.92rem; color: var(--red);" id="req-top"></div>
+        <div class="sub">Producer MUST populate all of these.</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Required metric fields</div>
+        <div class="value" style="font-size: 0.92rem; color: var(--red);" id="req-metrics"></div>
+        <div class="sub">Latency percentiles MAY be <code>null</code> when not captured — do NOT invent values.</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Optional blocks</div>
+        <div class="value" style="font-size: 0.88rem; color: var(--text-muted);">framework · slo · power · quality · stability · cold_start · cost · extensions</div>
+        <div class="sub">Populate what the producer can measure.</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Contract rules</div>
+        <div class="value" style="font-size: 0.88rem;">5 hard rules</div>
+        <div class="sub">null &gt; invented · same shape for every latency · filename convention · semver on schema · catalog_id = comparability</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Envelope structure diagram -->
+  <section>
+    <h2 class="section-title">Envelope structure (click a block to scroll to schema detail)</h2>
+    <div class="envelope-diagram">
+      <h2>The shape at a glance</h2>
+      <div class="env-subtitle">Top-level blocks. Required = field must be present. Optional = producer MAY omit.</div>
+      <div class="env-tree" id="env-tree"></div>
+    </div>
+  </section>
+
+  <!-- Hero examples carousel -->
+  <section>
+    <h2 class="section-title">Hero examples — three real artifacts</h2>
+    <div class="tabs" id="hero-tabs"></div>
+    <div class="hero-panel" id="hero-panel"></div>
+  </section>
+
+  <!-- Schema explorer -->
+  <section>
+    <h2 class="section-title">Schema explorer (click keys to expand/collapse)</h2>
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem;">
+      <div id="schema-root" class="schema-tree"></div>
+    </div>
+  </section>
+
+  <!-- Workload cards -->
+  <section>
+    <h2 class="section-title">Workload cards (<span id="wc-count"></span>)</h2>
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem;">
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+        Each artifact references one workload card via <code>workload.catalog_id</code>. Cards live in
+        <code>standards/benchmark-commons/workloads/</code>. Multiple engines and hardware targets produce
+        comparable results <em>only when they share a catalog_id</em>.
+      </p>
+      <div class="workload-grid" id="workload-grid"></div>
+    </div>
+  </section>
+
+  <!-- Metric definitions table -->
+  <section>
+    <h2 class="section-title">Core metric contract — definitions</h2>
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.5rem;">
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+        Every latency metric uses the same shape: <code>{mean, p50, p90, p95, p99}</code>. All in <strong>milliseconds</strong>. Use <code>null</code> for percentiles the producer did not capture — do NOT invent values. <code>min</code>/<code>max</code>/<code>std</code> belong in <code>extensions.latency_detail</code>.
+      </p>
+      <table id="metric-table" style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+        <thead>
+          <tr style="background: var(--surface-2);">
+            <th style="padding: 0.5rem 0.75rem; text-align: left; font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">Metric</th>
+            <th style="padding: 0.5rem 0.75rem; text-align: left; font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">Definition</th>
+            <th style="padding: 0.5rem 0.75rem; text-align: left; font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">Unit</th>
+          </tr>
+        </thead>
+        <tbody style="font-family: 'JetBrains Mono', monospace;">
+          <tr><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border); color: var(--json-key);">ttft_ms</td><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border); font-family: Inter, sans-serif;">Time from request send to first token received.</td><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border);">ms</td></tr>
+          <tr><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border); color: var(--json-key);">tpot_ms</td><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border); font-family: Inter, sans-serif;"><code>(e2e - ttft) / (output_tokens - 1)</code> — excludes first token.</td><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border);">ms</td></tr>
+          <tr><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border); color: var(--json-key);">itl_ms</td><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border); font-family: Inter, sans-serif;">Mean time between consecutive token arrivals.</td><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border);">ms</td></tr>
+          <tr><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border); color: var(--json-key);">e2e_ms</td><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border); font-family: Inter, sans-serif;">Total request latency from send to last token.</td><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border);">ms</td></tr>
+          <tr><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border); color: var(--json-key);">output_toks_per_s</td><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border); font-family: Inter, sans-serif;"><code>total_output_tokens / duration_s</code>. Legitimately <code>0</code> for embedding/classifier workloads.</td><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border);">tok/s</td></tr>
+          <tr><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border); color: var(--json-key);">request_throughput</td><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border); font-family: Inter, sans-serif;"><code>completed / duration_s</code>. Primary metric for embedding workloads.</td><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border);">req/s</td></tr>
+          <tr><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border); color: var(--json-key);">total_toks_per_s</td><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border); font-family: Inter, sans-serif;"><code>(total_input + total_output) / duration_s</code>.</td><td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--border);">tok/s</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Producer checklist -->
+  <section>
+    <h2 class="section-title">Producer checklist — minimum viable v1 envelope</h2>
+    <div class="checklist">
+      <h2>If you're writing a producer or consumer, get these right first</h2>
+      <ul>
+        <li>Emit <code>schema_version: "1.0.0"</code> and a fresh UUIDv4 <code>artifact_id</code> per run.</li>
+        <li>Populate <strong>all required top-level blocks</strong>: <code>source_tool</code>, <code>model</code>, <code>engine</code>, <code>infrastructure</code>, <code>workload</code>, <code>metrics</code>.</li>
+        <li>Under <code>metrics</code>, <strong>every one</strong> of <code>ttft_ms</code>, <code>tpot_ms</code>, <code>itl_ms</code>, <code>e2e_ms</code> is required with <code>{mean, p50, p90, p95, p99}</code> — all ms.</li>
+        <li>If a latency percentile is <strong>not measured</strong>, emit <code>null</code> rather than inventing a value. Consumers detect and honour <code>null</code>. Invented values corrupt cross-team comparisons.</li>
+        <li>Populate <code>output_toks_per_s</code> <em>and</em> <code>request_throughput</code> — both are required. For embedding / classifier workloads, <code>output_toks_per_s</code> is legitimately <code>0</code>; use <code>request_throughput</code> as the primary metric.</li>
+        <li>Set <code>workload.catalog_id</code> to a known card (see grid) — this is what makes artifacts comparable across teams. Use <code>catalog_id: null</code> only for custom workloads (see Appendix A in PROPOSAL.md).</li>
+        <li>Compute <code>slo.results[*].pass</code> as <code>actual ≤ target</code> strictly. A <code>null</code> <code>actual</code> means <code>pass: null</code>, never <code>true</code>.</li>
+        <li>Name output files as <code>{model}_{substrate}_{instance}_{engine}_{workload}_{timestamp}.json</code> — every field separated by underscores.</li>
+        <li>Scrape engine <code>/metrics</code> to populate <code>extensions.gpu_telemetry</code> and <code>extensions.cache_stats</code>. Client-side timing alone loses TTFT, KV cache, and queue-wait info. <code>bench-standard.py</code> does this for you.</li>
+        <li>Validate with <code>python3 container/validate-artifact.py artifact.json</code> before committing or publishing.</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<div class="tooltip" id="tooltip"></div>
+
+<footer>
+  Generated from <code>container/schema/enriched-artifact.json</code> + <code>workloads/*.yaml</code> + hero artifacts · regenerate with
+  <code>python3 standards/benchmark-commons/build-spec-explainer.py</code>
+</footer>
+
+<script>
+const DATA = {"schema": {"$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://github.com/agent-aiops-on-aws/standards/benchmark-commons/enriched-artifact.json", "title": "Enriched Benchmark Artifact", "description": "Standard format for LLM inference benchmark results with deployment context", "type": "object", "required": ["schema_version", "artifact_id", "created_at", "source_tool", "model", "engine", "infrastructure", "workload", "metrics"], "properties": {"schema_version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"}, "artifact_id": {"type": "string", "format": "uuid"}, "created_at": {"type": "string", "format": "date-time"}, "source_tool": {"type": "object", "required": ["name", "version", "enrichment_version"], "properties": {"name": {"type": "string", "enum": ["aiperf", "vllm-bench-serve", "sglang-bench-serving", "genai-perf", "guidellm", "llmperf", "recon-perf", "bench-standard.py", "custbench-async", "custbench-legacy", "custom"]}, "version": {"type": "string"}, "enrichment_version": {"type": "string"}}}, "model": {"type": "object", "required": ["name", "id"], "properties": {"name": {"type": "string"}, "id": {"type": "string"}, "architecture": {"type": "string"}, "parameters_total": {"type": "string"}, "parameters_active": {"type": "string"}, "quantization": {"type": "string", "enum": ["fp16", "bf16", "fp8", "fp4", "int8", "int4", "awq", "gptq", "mxint4", "none"]}, "max_model_len": {"type": "integer"}}}, "engine": {"type": "object", "required": ["name", "container_image", "tensor_parallel", "pipeline_parallel", "replicas", "reasoning"], "properties": {"name": {"type": "string", "enum": ["vllm", "sglang", "trt-llm", "sglang-native", "dynamo", "custom"]}, "container_image": {"type": "string"}, "base_image": {"type": ["string", "null"]}, "dockerfile": {"type": ["string", "null"]}, "tensor_parallel": {"type": "integer", "minimum": 1}, "pipeline_parallel": {"type": "integer", "minimum": 1}, "data_parallel": {"type": ["integer", "null"]}, "expert_parallel": {"type": ["boolean", "null"]}, "replicas": {"type": "integer", "minimum": 1}, "reasoning": {"type": "boolean"}, "kv_cache_dtype": {"type": ["string", "null"]}, "attention_backend": {"type": ["string", "null"]}, "speculative_decode": {"oneOf": [{"type": "null"}, {"type": "object", "properties": {"method": {"type": "string", "enum": ["mtp", "eagle", "eagle3", "draft-model"]}, "algorithm": {"type": "string"}, "num_tokens": {"type": "integer", "minimum": 1}, "num_steps": {"type": "integer", "minimum": 1}, "num_draft_tokens": {"type": "integer", "minimum": 1}, "eagle_topk": {"type": "integer", "minimum": 1}, "draft_model": {"type": "string"}, "draft_attention_backend": {"type": "string"}}}]}, "extra_args": {"type": ["object", "null"]}}}, "framework": {"type": "object", "required": ["name", "version", "config"], "properties": {"name": {"type": "string", "enum": ["dynamo", "llmd", "ray-serve", "custom"]}, "version": {"type": "string"}, "config": {"type": "object"}}}, "infrastructure": {"type": "object", "required": ["substrate", "instance_type", "gpu"], "properties": {"substrate": {"type": "string", "enum": ["eks", "hyperpod-eks", "hyperpod", "bare-metal", "ec2", "ec2-spot", "local"]}, "instance_type": {"type": "string"}, "region": {"type": "string"}, "gpu": {"type": "object", "required": ["name", "count", "vram_gb", "interconnect"], "properties": {"name": {"type": "string"}, "arch": {"type": "string"}, "count": {"type": "integer", "minimum": 1}, "vram_gb": {"type": "number"}, "interconnect": {"type": "string", "enum": ["nvswitch", "nvswitch-nvl5", "nvswitch-nv18", "pcie", "efa", "none"]}}}}}, "workload": {"type": "object", "required": ["use_case", "modality", "dataset", "load", "api"], "properties": {"use_case": {"type": "string"}, "catalog_id": {"type": ["string", "null"]}, "modality": {"type": "string", "enum": ["text", "vision", "audio", "multimodal"]}, "dataset": {"type": "object"}, "load": {"type": "object"}, "api": {"type": "object", "required": ["type", "streaming"], "properties": {"type": {"type": "string"}, "streaming": {"type": "boolean"}, "endpoint": {"type": "string"}}}}}, "metrics": {"type": "object", "description": "Core metrics contract — same shape regardless of source tool. TTFT, TPOT, ITL, E2E are MANDATORY fields (use null percentiles if not captured). output_toks_per_s and request_throughput are both required; embedding workloads legitimately emit output_toks_per_s=0 but MUST populate request_throughput.", "required": ["duration_s", "completed", "failed", "error_rate", "ttft_ms", "tpot_ms", "itl_ms", "e2e_ms", "output_toks_per_s", "request_throughput"], "properties": {"duration_s": {"type": "number"}, "completed": {"type": "integer"}, "failed": {"type": "integer"}, "error_rate": {"type": "number", "minimum": 0, "maximum": 1}, "ttft_ms": {"$ref": "#/$defs/latency_metric", "description": "Time from request send to first token received (ms)."}, "tpot_ms": {"$ref": "#/$defs/latency_metric", "description": "Time per output token — computed as (e2e - ttft) / (output_tokens - 1), excludes first token."}, "itl_ms": {"$ref": "#/$defs/latency_metric", "description": "Inter-token latency — mean time between consecutive token arrivals."}, "e2e_ms": {"$ref": "#/$defs/latency_metric", "description": "Total request latency from send to last token."}, "output_toks_per_s": {"type": "number", "description": "total_output_tokens / duration_s. Legitimately 0 for embedding / classifier workloads."}, "request_throughput": {"type": ["number", "null"], "description": "completed / duration_s. Primary metric for embedding workloads."}, "total_toks_per_s": {"type": ["number", "null"]}, "total_input_tokens": {"type": "integer"}, "total_output_tokens": {"type": "integer"}, "max_concurrent_requests": {"type": ["integer", "null"]}}}, "slo": {"type": "object", "properties": {"targets": {"type": "object"}, "results": {"type": "object"}, "overall_pass": {"type": "boolean"}}}, "power": {"type": "object", "description": "O11 power efficiency — tokens/joule, idle/load power, thermal envelope", "properties": {"source": {"type": "string", "enum": ["dcgm", "nvidia-smi", "pdu", "cloud-proxy"]}, "duration_s": {"type": "number"}, "avg_fleet_power_watts": {"type": "number"}, "total_energy_joules": {"type": "number"}, "tokens_per_joule": {"type": ["number", "null"]}, "load_fraction": {"type": ["number", "null"], "minimum": 0, "maximum": 1, "description": "Target load fraction (0.25, 0.50, 0.75, 1.0) for O11 sweep"}, "power_watts": {"$ref": "#/$defs/aggregated_metric"}, "gpu_util_pct": {"$ref": "#/$defs/aggregated_metric"}, "temp_c": {"$ref": "#/$defs/aggregated_metric"}}}, "hardware_errors": {"type": "object", "description": "O10 ECC / SDC / interconnect error counters observed during the run", "properties": {"ecc_sbe_delta": {"type": "integer", "description": "Single-bit corrected ECC errors during run"}, "ecc_dbe_delta": {"type": "integer", "description": "Double-bit detected (uncorrectable) ECC errors during run"}, "nvlink_crc_errors_delta": {"type": "integer"}, "pcie_replay_delta": {"type": "integer"}, "xid_events": {"type": "array", "items": {"type": "string"}}, "sentinel_divergences": {"type": "integer", "description": "O10 golden-prompt canary divergences (0 expected)"}}}, "quality": {"type": "object", "description": "O3 quality-gate results — MUST pass before throughput is reported", "properties": {"gate_passed": {"type": "boolean"}, "evals": {"type": "array", "items": {"type": "object", "required": ["eval", "score", "baseline_score", "passed"], "properties": {"eval": {"type": "string", "enum": ["mmlu", "gsm8k", "humaneval", "banking77", "fiqa", "docvqa", "librispeech"]}, "harness": {"type": "string"}, "harness_version": {"type": "string"}, "task": {"type": "string"}, "score": {"type": ["number", "null"]}, "baseline_score": {"type": "number"}, "delta": {"type": ["number", "null"]}, "tolerance": {"type": "number"}, "passed": {"type": "boolean"}, "lower_is_better": {"type": "boolean"}}}}}}, "stability": {"type": "object", "description": "O5 burn-in — throughput drift, thermal events, error rate over long runs", "properties": {"duration_hours": {"type": "number"}, "warmup_minutes": {"type": "number", "default": 10}, "hour_1_throughput": {"type": "number"}, "final_throughput": {"type": "number"}, "throughput_drift_pct": {"type": "number", "description": "(final - hour1) / hour1 × 100; O5 gate is |drift| ≤ 2%"}, "thermal_events": {"type": "integer", "description": "Thermal throttle events past warmup"}, "unrecoverable_errors": {"type": "integer"}, "drift_curve_path": {"type": ["string", "null"], "description": "Relative path to drift time series CSV"}, "drift_gate_passed": {"type": "boolean"}}}, "cold_start": {"type": "object", "description": "O9 cold-start breakdown — each phase times separately", "properties": {"source": {"type": "string", "enum": ["nvme", "nas", "object-store", "hub"]}, "format": {"type": "string", "enum": ["safetensors", "gguf", "trt-engine", "rocm-cache"]}, "cache_state": {"type": "string", "enum": ["cold", "warm"]}, "total_seconds": {"type": "number"}, "weights_load_s": {"type": "number"}, "allocator_warmup_s": {"type": "number"}, "kernel_compile_s": {"type": "number"}, "cuda_graph_capture_s": {"type": "number"}, "first_100_latencies_ms": {"type": "array", "items": {"type": "number"}}}}, "cost": {"type": "object"}, "extensions": {"type": "object"}}, "$defs": {"latency_metric": {"type": "object", "description": "Latency distribution in ms. All percentile keys MUST be present; use null when the producer did not capture the value (e.g. TTFT from a non-streaming client). Do not invent values.", "required": ["mean", "p50", "p90", "p95", "p99"], "properties": {"mean": {"type": ["number", "null"]}, "p50": {"type": ["number", "null"]}, "p90": {"type": ["number", "null"]}, "p95": {"type": ["number", "null"]}, "p99": {"type": ["number", "null"]}}}, "aggregated_metric": {"type": "object", "properties": {"mean": {"type": "number"}, "p50": {"type": "number"}, "p95": {"type": "number"}, "p99": {"type": "number"}, "max": {"type": "number"}, "min": {"type": "number"}, "per_gpu_mean": {"type": "array", "items": {"type": ["number", "null"]}}}}}}, "heroes": [{"label": "Qwen3-Embedding-8B", "short": "Embedding model — native v1 emitter", "description": "Reference producer. Written natively as v1 envelope — no enrichment step. Demonstrates embedding-workload shape: <code>output_toks_per_s = 0</code> is valid (vectors don't have tokens); <code>request_throughput</code> is the meaningful metric.", "badges": ["native v1", "embedding", "small GPU (A10G)"], "json": {"schema_version": "1.0.0", "artifact_id": "98969471-1f96-4c70-8599-d2590c9747b0", "created_at": "2026-05-13T00:00:00Z", "source_tool": {"name": "custom", "version": "0.1.0-embedding-bench", "enrichment_version": "1.0.0"}, "model": {"name": "Qwen3-Embedding-8B", "id": "Qwen/Qwen3-Embedding-8B", "architecture": "embedding", "parameters_total": "8B", "quantization": "bf16", "max_model_len": 8192}, "engine": {"name": "vllm", "version": "0.19.1", "container_image": "vllm/vllm-openai:v0.19.1", "tensor_parallel": 1, "pipeline_parallel": 1, "data_parallel": null, "expert_parallel": null, "replicas": 1, "reasoning": false, "kv_cache_dtype": "auto", "attention_backend": "default", "speculative_decoding": null, "extra_args": {"task": "embed", "trust-remote-code": true}}, "infrastructure": {"substrate": "hyperpod-eks", "instance_type": "ml.g5.4xlarge", "region": "us-east-1", "gpu": {"name": "A10G", "arch": "sm_86", "count": 1, "vram_gb": 24, "interconnect": "none"}, "eks": {"cluster_version": "1.32", "node_count": 1}, "hyperpod": {"cluster_name": "finetune-g5-cluster", "instance_group": "llmd-validation", "deep_health_checks": true, "auto_recovery": true}}, "workload": {"use_case": "custom", "catalog_id": "concurrency-sweep", "modality": "text", "dataset": {"type": "synthetic", "input_tokens": {"mean": 512, "std_dev": 256}, "output_tokens": {"mean": 0, "std_dev": 0}, "note": "embedding workload — no output tokens, output is a 4096-dim vector"}, "load": {"type": "concurrency-sweep", "levels": [1, 2, 4, 8, 16, 32], "num_prompts_per_level": null, "warmup_requests": 0, "current_level": 32}, "api": {"type": "embeddings", "streaming": false, "endpoint": "/v1/embeddings"}}, "metrics": {"duration_s": 0.8336830139160156, "completed": 100, "failed": 0, "error_rate": 0.0, "e2e_ms": {"mean": 233.2164454460144, "p50": 240.20695686340332, "p90": 240.20695686340332, "p95": null, "p99": 322.88098335266113}, "output_toks_per_s": 0.0, "request_throughput": 119.94966711661213, "total_input_tokens": 0, "total_output_tokens": 0, "max_concurrent_requests": 32}, "slo": {"targets": {"request_throughput_min": 100.0, "error_rate_max": 0.001}, "results": {"request_throughput_min": {"target": 100.0, "actual": 119.94966711661213, "pass": true}, "error_rate_max": {"target": 0.001, "actual": 0.0, "pass": true}}, "overall_pass": true}, "extensions": {"sweep_levels": [{"concurrency": 1, "completed": 5, "failed": 0, "duration_s": 0.8677971363067627, "request_throughput": 5.761715256723918, "e2e_ms": {"mean": 171.40560150146484, "p50": 179.28099632263184, "p99": 182.07097053527832}}, {"concurrency": 2, "completed": 10, "failed": 0, "duration_s": 0.5393831729888916, "request_throughput": 18.539695898533243, "e2e_ms": {"mean": 104.1234016418457, "p50": 100.54647922515869, "p99": 137.36796379089355}}, {"concurrency": 4, "completed": 20, "failed": 0, "duration_s": 0.7225558757781982, "request_throughput": 27.67952025642286, "e2e_ms": {"mean": 134.25463438034058, "p50": 137.40146160125732, "p99": 156.61191940307617}}, {"concurrency": 8, "completed": 40, "failed": 0, "duration_s": 0.7665541172027588, "request_throughput": 52.18157348885484, "e2e_ms": {"mean": 145.1979160308838, "p50": 149.01447296142578, "p99": 177.9041290283203}}, {"concurrency": 16, "completed": 80, "failed": 0, "duration_s": 1.082218885421753, "request_throughput": 73.92219917583779, "e2e_ms": {"mean": 195.62114775180817, "p50": 185.93227863311768, "p99": 299.62611198425293}}, {"concurrency": 32, "completed": 100, "failed": 0, "duration_s": 0.8336830139160156, "request_throughput": 119.94966711661213, "e2e_ms": {"mean": 233.2164454460144, "p50": 240.20695686340332, "p99": 322.88098335266113}}], "raw_tool_output": {"uri": "results/smoke-bench.json", "format": "json"}}}}, {"label": "Kimi K2.6 EAGLE3 winner", "short": "Speculative decode — `extensions.speculative_decode_stats`", "description": "Shows how the <code>speculative_decode</code> engine sub-block and the <code>speculative_decode_stats</code> extension work together. Caveat: <code>ttft_ms</code> is <code>null</code> — the bench driver didn't scrape Prometheus. Every v1 field is populated honestly; missing data is marked missing rather than invented.", "badges": ["enriched", "EAGLE3 spec decode", "B300", "TTFT missing — honest gap"], "json": {"schema_version": "1.0.0", "artifact_id": "b1ccbcd9-9fbf-475d-9f96-97268b80bdb4", "created_at": "2026-05-13T22:00:00Z", "source_tool": {"name": "custbench-async", "version": "0.1.0", "enrichment_version": "1.0.0"}, "model": {"name": "Kimi-K2.6", "id": "moonshotai/Kimi-K2.6", "architecture": "moe-mla-fp8", "parameters_total": "1T", "parameters_active": "32B", "quantization": "fp8", "max_model_len": 131072}, "engine": {"name": "sglang", "container_image": "lmsysorg/sglang:v0.5.10-cu130", "base_image": "lmsysorg/sglang:v0.5.10-cu130", "dockerfile": null, "tensor_parallel": 8, "pipeline_parallel": 1, "data_parallel": null, "expert_parallel": null, "replicas": 1, "reasoning": false, "kv_cache_dtype": "fp8", "attention_backend": "trtllm_mha", "speculative_decode": {"algorithm": "EAGLE3", "draft_model": "lightseekorg/kimi-k2.6-eagle3", "num_steps": 4, "num_draft_tokens": 4, "eagle_topk": 1, "draft_attention_backend": "trtllm_mha"}, "extra_args": {"enable-hierarchical-cache": true, "hicache-size": 200, "reasoning-parser": "kimi_k2", "tool-call-parser": "kimi_k2", "trust-remote-code": true}}, "framework": {"name": "sglang-native", "version": "v0.5.10-cu130", "config": {}}, "infrastructure": {"substrate": "ec2-spot", "instance_type": "p6-b300.48xlarge", "region": "us-east-1", "gpu": {"name": "B300", "arch": "sm_103", "count": 8, "vram_gb": 275, "interconnect": "nvswitch-nv18"}}, "workload": {"use_case": "concurrency-sweep", "catalog_id": "concurrency-sweep", "modality": "text", "dataset": {"type": "synthetic", "input_tokens": {"mean": 512, "std_dev": 0}, "output_tokens": {"mean": 256, "std_dev": 0}}, "api": {"type": "completions", "streaming": false, "endpoint": "/generate"}, "load": {"type": "concurrency-sweep", "levels": [1, 8, 32, 64, 128, 256, 512], "num_prompts_per_level": 128, "warmup_requests": 0, "current_level": 128}}, "metrics": {"duration_s": 5.616, "completed": 128, "failed": 0, "error_rate": 0.0, "ttft_ms": {"mean": null, "p50": null, "p90": null, "p95": null, "p99": null, "note": "Not measured — custbench-async records e2e only; TTFT not separable"}, "tpot_ms": {"mean": 15.95, "p50": 15.95, "p90": null, "p95": null, "p99": null}, "itl_ms": {"mean": 15.95, "p50": 15.95, "p90": null, "p95": null, "p99": null}, "e2e_ms": {"mean": 4704.0, "p50": 4704.0, "p90": 5612.0, "p95": 5613.5, "p99": 5615.0}, "output_toks_per_s": 5834.4, "request_throughput": 22.792, "total_toks_per_s": 5834.4, "total_input_tokens": 65536, "total_output_tokens": 32768, "max_concurrent_requests": 128}, "slo": {"targets": {"ttft_p99_ms": 500, "tpot_p99_ms": 30, "e2e_p99_ms": 15000, "error_rate_max": 0.001}, "results": {"ttft_p99_ms": {"target": 500, "actual": null, "pass": null}, "tpot_p99_ms": {"target": 30, "actual": 15.95, "pass": true}, "e2e_p99_ms": {"target": 15000, "actual": 5615.0, "pass": true}, "error_rate_max": {"target": 0.001, "actual": 0.0, "pass": true}}, "overall_pass": true}, "extensions": {"speculative_decode_stats": {"accept_rate_mean": 1.0, "accept_length_mean": 5.02, "effective_tokens_per_step": 5.02}, "cost": {"instance_cost_per_hr": 25.65, "dollars_per_1m_output_tokens": 1.22, "formula": "(25.65 / 5834.4) * (1000000 / 3600)"}, "session_metadata": {"phase": "phase-4", "variant": null, "engine_config_tag": "sglang-eagle3-s4d4k1-hicache200", "blueprint": "domains/gpu-serving/blueprints/kimi-k2.6-speculative", "run_date": "2026-05-13"}}}}, {"label": "Nemotron-3-Super disagg", "short": "Disaggregated P/D via Dynamo — `framework` block", "description": "Demonstrates the <code>framework</code> block (Dynamo with 4 prefill + 4 decode workers), SLO evaluation against real thresholds, and cost derivation. Enriched from legacy custbench flat format.", "badges": ["enriched", "disagg P/D", "Dynamo framework", "B200"], "json": {"schema_version": "1.0.0", "artifact_id": "77bbbd22-6942-41b4-a012-9103bc13a57e", "created_at": "2026-03-12T11:44:10Z", "source_tool": {"name": "custbench-legacy", "version": "0.1.0", "enrichment_version": "1.0.0"}, "model": {"name": "Nemotron-3-Super-120B-A12B", "id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8", "architecture": "hybrid-mamba-moe", "parameters_total": "120B", "parameters_active": "12B", "quantization": "fp8", "max_model_len": 256000}, "engine": {"name": "sglang", "container_image": null, "base_image": "nvcr.io/nvidia/dynamo:1.0.0", "dockerfile": null, "tensor_parallel": null, "pipeline_parallel": 1, "data_parallel": null, "expert_parallel": null, "replicas": 8, "reasoning": false, "kv_cache_dtype": "fp8", "attention_backend": "auto", "speculative_decode": null, "extra_args": {"trust-remote-code": true, "tool-call-parser": "qwen3_coder", "reasoning-parser": "nano_v3"}, "engine_config_tag": "sglang-disagg-4p4d"}, "framework": {"name": "dynamo", "version": "1.0.0", "config": {"mode": "disaggregated", "router": "round-robin", "nixl_enabled": true, "prefill": {"num_workers": 4}, "decode": {"num_workers": 4}}}, "infrastructure": {"substrate": "eks", "instance_type": "p6-b200.48xlarge", "region": "us-east-2", "gpu": {"name": "B200", "arch": "sm_100", "count": 8, "vram_gb": 183, "interconnect": "nvswitch-nvl5"}}, "workload": {"use_case": "concurrency-sweep", "catalog_id": "concurrency-sweep", "modality": "text", "dataset": {"type": "synthetic", "input_tokens": {"mean": 4096, "std_dev": 0}, "output_tokens": {"mean": 1024, "std_dev": 0}}, "load": {"type": "concurrency", "concurrency": 1, "num_prompts": 50, "warmup_requests": 0}, "api": {"type": "chat", "streaming": true, "endpoint": "/v1/chat/completions"}}, "metrics": {"duration_s": 6.57, "completed": 50, "failed": 0, "error_rate": 0.0, "ttft_ms": {"mean": null, "p50": null, "p90": null, "p95": null, "p99": null}, "tpot_ms": {"mean": null, "p50": null, "p90": null, "p95": null, "p99": null}, "itl_ms": {"mean": null, "p50": null, "p90": null, "p95": null, "p99": null}, "e2e_ms": {"mean": 116.35, "p50": 116.35, "p90": 126.68, "p95": 373.69, "p99": 620.7}, "output_toks_per_s": 0.0, "request_throughput": 7.61, "total_toks_per_s": 0.0, "total_input_tokens": 204800, "total_output_tokens": null, "max_concurrent_requests": 1}, "slo": {"targets": {"ttft_p99_ms": 500, "tpot_p99_ms": 30, "e2e_p99_ms": 15000, "error_rate_max": 0.001}, "results": {"ttft_p99_ms": {"target": 500, "actual": null, "pass": null}, "tpot_p99_ms": {"target": 30, "actual": null, "pass": null}, "e2e_p99_ms": {"target": 15000, "actual": 620.7, "pass": true}, "error_rate_max": {"target": 0.001, "actual": 0.0, "pass": true}}, "overall_pass": true}, "extensions": {"cost": {"instance_cost_per_hr": 48.0, "dollars_per_1m_output_tokens": null, "formula": null}, "session_metadata": {"engine_config_tag": "sglang-disagg-4p4d", "source_filename": "disagg-sglang-4p4d_c1_in4096_out1024_20260312-114410.json", "mode": "disagg", "blueprint": "domains/gpu-serving/blueprints/nemotron-super", "run_date": "20260312", "enrichment_note": "Generated from legacy custbench flat format. TPOT derived from itl_ms (inter-token latency — includes first token gap). Per-request artifacts not preserved in v1 envelope."}}}}], "annotations": {"schema_version": "MAJOR.MINOR.PATCH. v1.x envelopes are backwards-compatible; v2.x requires producer update.", "artifact_id": "UUIDv4. MUST be unique per run. Consumers use this as a primary key.", "created_at": "ISO 8601 UTC. Time the benchmark completed (not when the file was written).", "source_tool.name": "Producer identity. Known values: aiperf, vllm-bench-serve, sglang-bench-serving, custom, bench-standard.py.", "source_tool.enrichment_version": "Version of the enrichment layer that hoisted source-tool output into the v1 envelope.", "model.id": "HuggingFace-style id (org/model). Used by consumers to match across sessions.", "model.architecture": "Free-form architecture tag. Common values: dense, moe, mla-moe, hybrid-mamba-moe, eagle3.", "model.parameters_active": "Params touched per forward pass. For MoE = active experts only. For dense = equals parameters_total.", "model.quantization": "fp16, bf16, fp8, int8, int4, awq, gptq, etc. Affects HBM footprint.", "engine.tensor_parallel": "TP size. For disagg, applies within each prefill/decode group.", "engine.speculative_decode": "null if not used. Non-null object with algorithm/draft/num_steps/etc.", "engine.kv_cache_dtype": "fp16 / fp8 / int8. Halves KV memory per step at fp8.", "engine.extra_args": "Free-form key/value from the engine CLI. Always include parser flags.", "framework.name": "Orchestration layer above engines. null for single-engine serving. dynamo/ray-serve/llm-d/etc for disagg or fleet.", "framework.config.mode": "aggregated = one engine handles prefill+decode. disaggregated = separate prefill/decode workers.", "infrastructure.substrate": "eks / hyperpod / ec2-spot / local. Dictates the security + scaling story.", "infrastructure.gpu.arch": "sm_XX compute capability. sm_80=A100, sm_90=H100/H200, sm_100=B200, sm_103=B300.", "infrastructure.gpu.interconnect": "nvswitch vs pcie. Affects NCCL collective BW ceiling by 10-20×.", "workload.catalog_id": "References workloads/*.yaml. If null, an ad-hoc workload — describe in use_case + dataset.", "workload.load.type": "constant (fixed rate) / concurrency (fixed in-flight) / concurrency-sweep (multi-level).", "workload.load.warmup_requests": "Not included in metrics. MUST populate engine caches before measurement.", "metrics.ttft_ms": "Time from request submission to first output token. Critical for streaming UX. Captured from engine histogram.", "metrics.tpot_ms": "Time per output token (inter-token latency after first). Capturing point: decode-path only.", "metrics.itl_ms": "Inter-token latency — superset of TPOT. For streaming APIs, approximately equals TPOT.", "metrics.e2e_ms": "End-to-end request latency. Includes queue + prefill + decode. SLO target field.", "metrics.output_toks_per_s": "Aggregate output tokens generated per second across all in-flight requests. 0 is VALID for embedding/classifier workloads.", "metrics.request_throughput": "Requests completed per second. Primary metric for embedding/classifier workloads.", "metrics.total_toks_per_s": "Input + output tokens per second. Used for cost-per-token derivation.", "metrics.error_rate": "failed / (completed + failed). MUST be 0 for a valid SLO pass.", "slo.targets": "Thresholds set by the customer or spec. SHOULD come from the workload card's SLO block.", "slo.results.ttft_p99_ms.pass": "true only if actual ≤ target AND actual is not null.", "slo.overall_pass": "true only if every required SLO is pass=true. A null actual DOES NOT pass.", "extensions.gpu_telemetry": "DCGM-derived. GPU util, HBM BW util, tensor-core util, power, temp. Required for roofline analysis.", "extensions.cache_stats": "Engine /metrics: kv_utilization_pct, prefix_hit_rate, preemption_count.", "extensions.speculative_decode_stats": "accept_rate × accept_length = effective tokens per decode step. 2-6 is typical for good drafts.", "extensions.cost": "Instance $/hr and derived $/M output tokens. formula string documents the calc.", "extensions.reconciliation": "Client-counted requests vs engine-counted. reconciled=false flags silent failures (requests client never saw)."}, "workloads": [{"catalog_id": "batch-throughput", "use_case": "batch", "modality": "text", "description": "No description", "dataset_type": "synthetic", "isl": "2048", "osl": "512", "load_type": "open-loop", "request_rate": "null", "concurrency": null, "num_prompts": "500", "ttft_p99_ms": null, "tpot_p99_ms": null, "e2e_p99_ms": null, "file": "batch-throughput.yaml"}, {"catalog_id": "burn-in", "use_case": "stability-burnin", "modality": "mixed", "description": "Continuous-run stability under sustained load. Drive at a high fraction of the previously-measured offline ceiling for the configured duration. Slice the run into fixed-length windows; each window emits a raw benchmark JSON that `container/", "dataset_type": "mix-from-sidecar", "isl": "2048", "osl": "512", "load_type": "sustained", "request_rate": null, "concurrency": null, "num_prompts": null, "ttft_p99_ms": null, "tpot_p99_ms": null, "e2e_p99_ms": null, "file": "burn-in.yaml"}, {"catalog_id": "chatbot-long", "use_case": "chatbot", "modality": "text", "description": "No description", "dataset_type": "synthetic", "isl": "32768", "osl": "512", "load_type": "constant", "request_rate": "0.5", "concurrency": null, "num_prompts": "50", "ttft_p99_ms": "2000", "tpot_p99_ms": "50", "e2e_p99_ms": "30000", "file": "chatbot-long.yaml"}, {"catalog_id": "chatbot-short", "use_case": "chatbot", "modality": "text", "description": "No description", "dataset_type": "synthetic", "isl": "256", "osl": "128", "load_type": "constant", "request_rate": "2.0", "concurrency": null, "num_prompts": "100", "ttft_p99_ms": "300", "tpot_p99_ms": "50", "e2e_p99_ms": "5000", "file": "chatbot-short.yaml"}, {"catalog_id": "coding-agent", "use_case": "coding-agent", "modality": "text", "description": "Agentic coding with tool calls. Models multi-turn agent loops where each \"turn\" involves: (1) long system prompt + tool definitions (prefix-cacheable), (2) reasoning/planning output, (3) tool call, (4) tool result injected, (5) next reasoni", "dataset_type": "synthetic-agentic", "isl": "4096", "osl": "2048", "load_type": "constant", "request_rate": null, "concurrency": "4", "num_prompts": "25", "ttft_p99_ms": "500", "tpot_p99_ms": "30", "e2e_p99_ms": "60000", "file": "coding-agent.yaml"}, {"catalog_id": "cohost-isolation", "use_case": "multi-model-isolation", "modality": "multi-model", "description": "Measure whether multiple models can share GPU resources cleanly. Drives each co-tenant model with its own load generator, then applies noisy-neighbour pressure by ramping one tenant to 100% load and measuring the others' P99 latency. Rotate", "dataset_type": "ensemble-from-sidecar", "isl": null, "osl": null, "load_type": "ensemble-steady", "request_rate": null, "concurrency": null, "num_prompts": null, "ttft_p99_ms": null, "tpot_p99_ms": null, "e2e_p99_ms": null, "file": "cohost-isolation.yaml"}, {"catalog_id": "cold-start", "use_case": "cold-start-breakdown", "modality": "text", "description": "Measure the load-to-first-token time that bounds auto-scaling responsiveness and failover recovery. Records weights-transfer, allocator warmup, kernel autotune / first compile, CUDA graph capture, and the latency curve of the first 100 infe", "dataset_type": "single-probe", "isl": "512", "osl": "64", "load_type": "first-100", "request_rate": null, "concurrency": null, "num_prompts": "100", "ttft_p99_ms": null, "tpot_p99_ms": null, "e2e_p99_ms": null, "file": "cold-start.yaml"}, {"catalog_id": "concurrency-sweep", "use_case": "production-mix", "modality": "text", "description": "Concurrency sweep for sizing, SLO-max discovery, and KV-cache ceiling characterization. Runs the same workload at increasing concurrency levels to find where latency or memory breaks down. Each level produces a separate artifact; a sizing r", "dataset_type": "synthetic", "isl": "2048", "osl": "512", "load_type": "concurrency-sweep", "request_rate": null, "concurrency": null, "num_prompts": null, "ttft_p99_ms": "300", "tpot_p99_ms": "50", "e2e_p99_ms": "15000", "file": "concurrency-sweep.yaml"}, {"catalog_id": "mig-partitioning", "use_case": "multi-tenant-partitioning", "modality": "text", "description": "Characterise multi-tenant GPU partitioning. Measure aggregate QPS per partition profile, target-slice P99 latency under noisy-neighbour pressure, and the wall-clock time to reconfigure the partitioning (GPU reset + pod reschedule + readines", "dataset_type": "synthetic", "isl": "512", "osl": "128", "load_type": "ensemble-steady", "request_rate": null, "concurrency": null, "num_prompts": null, "ttft_p99_ms": null, "tpot_p99_ms": null, "e2e_p99_ms": null, "file": "mig-partitioning.yaml"}, {"catalog_id": "multi-turn-chat", "use_case": "copilot-assistant", "modality": "text", "description": "Conversational workload with 1-10 rounds of back-and-forth, modeling copilots, virtual assistants, and customer-support agents. Each session accumulates conversation history; KV cache retention across turns is the primary signal. Prefix reu", "dataset_type": "synthetic-multiturn", "isl": "1000", "osl": null, "load_type": "constant", "request_rate": null, "concurrency": "32", "num_prompts": "100", "ttft_p99_ms": "500", "tpot_p99_ms": "50", "e2e_p99_ms": "30000", "file": "multi-turn-chat.yaml"}, {"catalog_id": "power-efficiency", "use_case": "power-and-sdc", "modality": "text", "description": "CTO benchmarks O10 + O11 combined: tokens-per-joule at 25 / 50 / 75 / 100% load fractions AND continuous ECC / SDC telemetry across the run window. A 1% sentinel traffic slice (golden-prompt set with deterministic outputs) detects silent da", "dataset_type": "synthetic", "isl": "2048", "osl": "256", "load_type": "ceiling-fraction-sweep", "request_rate": null, "concurrency": null, "num_prompts": null, "ttft_p99_ms": null, "tpot_p99_ms": null, "e2e_p99_ms": null, "file": "power-efficiency.yaml"}, {"catalog_id": "production-mix", "use_case": "pre-prod-validation", "modality": "text", "description": "Trace replay of real conversation data at varying concurrency. Unlike the other workload cards which use synthetic datasets, this card replays recorded production traffic (ShareGPT, LMSYS-Chat-1M, or customer-specific redacted traces) to va", "dataset_type": "trace-replay", "isl": null, "osl": null, "load_type": "concurrency-sweep", "request_rate": null, "concurrency": null, "num_prompts": null, "ttft_p99_ms": "800", "tpot_p99_ms": "50", "e2e_p99_ms": "30000", "file": "production-mix.yaml"}, {"catalog_id": "qps-sweep", "use_case": "production-mix", "modality": "text", "description": "No description", "dataset_type": "synthetic", "isl": "2048", "osl": "512", "load_type": "sweep", "request_rate": null, "concurrency": null, "num_prompts": null, "ttft_p99_ms": "300", "tpot_p99_ms": "50", "e2e_p99_ms": null, "file": "qps-sweep.yaml"}, {"catalog_id": "quantization-pareto", "use_case": "quantization-tradeoff", "modality": "text", "description": "Measure throughput (Offline + Server) for a single precision checkpoint and require a passing quality gate before the throughput row is emitted.", "dataset_type": "synthetic", "isl": "2048", "osl": "256", "load_type": "max-rate", "request_rate": null, "concurrency": null, "num_prompts": null, "ttft_p99_ms": null, "tpot_p99_ms": null, "e2e_p99_ms": null, "file": "quantization-pareto.yaml"}, {"catalog_id": "rag-long-context", "use_case": "rag", "modality": "text", "description": "RAG with retrieved documents. Tests shared-prefix caching and long prefill. Multiple requests share the same document corpus prefix (system prompt + retrieved chunks), with unique user queries appended. Measures prefix cache effectiveness: ", "dataset_type": "generated-shared-prefix", "isl": "16384", "osl": "256", "load_type": "constant", "request_rate": "1.0", "concurrency": null, "num_prompts": "100", "ttft_p99_ms": "500", "tpot_p99_ms": "50", "e2e_p99_ms": "20000", "file": "rag-long-context.yaml"}, {"catalog_id": "rag-qa", "use_case": "retrieval-augmented-qa", "modality": "text", "description": "RAG document Q&A at enterprise-typical context sizes (2K-10K tokens). Documents are retrieved per query and injected as context. Distinct from `rag-long-context.yaml` which tests 16K+ shared-prefix scenarios — this card models the common ca", "dataset_type": "synthetic-rag", "isl": "800", "osl": "384", "load_type": "qps-constrained", "request_rate": null, "concurrency": null, "num_prompts": null, "ttft_p99_ms": "1000", "tpot_p99_ms": "40", "e2e_p99_ms": "20000", "file": "rag-qa.yaml"}, {"catalog_id": "shared-prefix-multitenant", "use_case": "multi-tenant-saas", "modality": "text", "description": "Multiple users (4-16 concurrent) sharing the same long system prompt but sending different queries. Tests whether the engine's prefix cache deduplicates the shared prompt across sessions rather than recomputing it per user. This is the sing", "dataset_type": "synthetic-shared-prefix", "isl": null, "osl": "512", "load_type": "constant", "request_rate": null, "concurrency": "8", "num_prompts": "80", "ttft_p99_ms": "300", "tpot_p99_ms": "40", "e2e_p99_ms": "20000", "file": "shared-prefix-multitenant.yaml"}]};
+const ANN = DATA.annotations;
+const SCHEMA = DATA.schema;
+
+document.getElementById('schema-id').textContent = SCHEMA['$id'] || 'enriched-artifact.json';
+
+// Populate required-field summary cards from the schema
+(function populateRequired() {
+  const top = (SCHEMA.required || []).filter(x => !['schema_version','artifact_id','created_at','source_tool'].includes(x));
+  document.getElementById('req-top').textContent = ['schema_version','artifact_id','created_at','source_tool'].concat(top).join(' · ');
+  const metricsReq = ((SCHEMA.properties && SCHEMA.properties.metrics && SCHEMA.properties.metrics.required) || []);
+  document.getElementById('req-metrics').textContent = metricsReq.join(' · ');
+})();
+
+// ---------- Envelope tree ----------
+(function renderEnvelope() {
+  const topRequired = (SCHEMA.required || []);
+  const metricsRequired = ((SCHEMA.properties && SCHEMA.properties.metrics && SCHEMA.properties.metrics.required) || []);
+  const blocks = [
+    ['schema_version', 'required', 'SemVer of the envelope. v1.x is backwards-compatible.', ['1.0.0']],
+    ['artifact_id', 'required', 'UUIDv4, unique per run.', ['uuid']],
+    ['created_at', 'required', 'ISO 8601 UTC when the run completed.', ['2026-05-13T...']],
+    ['source_tool', 'required', 'Producer identity.', ['name', 'version', 'enrichment_version']],
+    ['model', 'required', 'Model identity + architecture + quantization.', ['name', 'id', 'architecture', 'parameters_total', 'parameters_active', 'quantization', 'max_model_len']],
+    ['engine', 'required', 'Engine config (TP/PP/DP, spec decode, extra args).', ['name', 'container_image', 'tensor_parallel', 'kv_cache_dtype', 'speculative_decode', 'extra_args']],
+    ['framework', 'optional', 'Orchestration above engine (Dynamo, Ray Serve, llm-d).', ['name', 'version', 'config']],
+    ['infrastructure', 'required', 'Substrate, instance, GPU type, interconnect.', ['substrate', 'instance_type', 'region', 'gpu.*']],
+    ['workload', 'required', 'Catalog_id + dataset + load pattern.', ['use_case', 'catalog_id', 'dataset', 'load', 'api']],
+    ['metrics', 'required', 'TTFT, TPOT, ITL, E2E all required (null percentiles OK). Throughput required.', metricsRequired.filter(k => !['duration_s','completed','failed','error_rate'].includes(k))],
+    ['slo', 'optional', 'Targets + per-SLO pass/fail + overall_pass.', ['targets', 'results', 'overall_pass']],
+    ['extensions', 'optional', 'Well-known keys: gpu_telemetry, cache_stats, speculative_decode_stats, cost, reconciliation, per_request, raw_tool_output.', ['gpu_telemetry', 'cache_stats', 'cost', 'speculative_decode_stats', 'reconciliation']],
+  ];
+  const el = document.getElementById('env-tree');
+  el.innerHTML = blocks.map(([name, req, desc, fields]) => `
+    <div class="env-block" onclick="scrollToSchema('${name}')">
+      <div class="block-name">${name}<span class="${req === 'required' ? 'block-required' : 'block-optional'}">${req}</span></div>
+      <div class="block-desc">${desc}</div>
+      <div class="block-fields">${fields.map(f => `<span class="f">${f}</span>`).join('')}</div>
+    </div>
+  `).join('');
+})();
+
+// ---------- Hero tabs ----------
+let activeHero = 0;
+(function renderHeroTabs() {
+  const tabs = document.getElementById('hero-tabs');
+  tabs.innerHTML = DATA.heroes.map((h, i) => `
+    <button class="tab ${i === 0 ? 'active' : ''}" data-idx="${i}">${h.label}</button>
+  `).join('');
+  tabs.querySelectorAll('.tab').forEach(t => {
+    t.onclick = () => {
+      activeHero = parseInt(t.dataset.idx, 10);
+      tabs.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === t));
+      renderHeroPanel();
+    };
+  });
+  renderHeroPanel();
+})();
+
+function renderHeroPanel() {
+  const h = DATA.heroes[activeHero];
+  const el = document.getElementById('hero-panel');
+  el.innerHTML = `
+    <h3>${h.label}</h3>
+    <div class="hero-desc">${h.short}</div>
+    <div class="hero-desc">${h.description}</div>
+    <div class="pills" style="margin-bottom: 0.75rem;">
+      ${h.badges.map(b => `<span class="pill">${b}</span>`).join('')}
+    </div>
+    <div class="json-view" id="json-view-${activeHero}"></div>
+  `;
+  renderJSON(document.getElementById(`json-view-${activeHero}`), h.json, '');
+}
+
+// ---------- JSON renderer with hover annotations ----------
+function renderJSON(container, obj, path) {
+  container.innerHTML = '';
+  container.appendChild(jsonNode(obj, path, true));
+}
+
+function jsonNode(val, path, isRoot) {
+  if (val === null) return span('tok-null', 'null', path);
+  if (typeof val === 'boolean') return span('tok-bool', String(val), path);
+  if (typeof val === 'number') return span('tok-num', String(val), path);
+  if (typeof val === 'string') return span('tok-str', JSON.stringify(val), path);
+  if (Array.isArray(val)) return arrayNode(val, path);
+  if (typeof val === 'object') return objectNode(val, path, isRoot);
+  return span('', String(val), path);
+}
+
+function span(cls, text, path) {
+  const s = document.createElement('span');
+  s.className = cls;
+  s.textContent = text;
+  return s;
+}
+
+function objectNode(obj, path, open) {
+  const wrap = document.createElement('div');
+  wrap.className = 'json-obj' + (open ? '' : ' collapsed');
+
+  const toggle = document.createElement('span');
+  toggle.className = 'toggle';
+  toggle.onclick = () => wrap.classList.toggle('collapsed');
+  wrap.appendChild(toggle);
+
+  const openBrace = document.createElement('span');
+  openBrace.textContent = '{';
+  wrap.appendChild(openBrace);
+
+  const children = document.createElement('div');
+  children.className = 'children';
+  children.style.paddingLeft = '1.2rem';
+
+  const keys = Object.keys(obj);
+  keys.forEach((k, i) => {
+    const line = document.createElement('div');
+    const childPath = path ? `${path}.${k}` : k;
+    const key = document.createElement('span');
+    key.className = 'tok-key';
+    key.textContent = JSON.stringify(k);
+    // Annotation hover target
+    if (ANN[childPath]) {
+      key.classList.add('tok-path');
+      key.dataset.path = childPath;
+      key.dataset.desc = ANN[childPath];
+    }
+    line.appendChild(key);
+    line.appendChild(document.createTextNode(': '));
+    line.appendChild(jsonNode(obj[k], childPath, false));
+    if (i < keys.length - 1) line.appendChild(document.createTextNode(','));
+    children.appendChild(line);
+  });
+  wrap.appendChild(children);
+
+  const closeBrace = document.createElement('span');
+  closeBrace.textContent = '}';
+  wrap.appendChild(closeBrace);
+
+  return wrap;
+}
+
+function arrayNode(arr, path) {
+  const wrap = document.createElement('span');
+  if (arr.length === 0) { wrap.textContent = '[]'; return wrap; }
+  if (arr.length <= 8 && arr.every(x => x === null || ['string','number','boolean'].includes(typeof x))) {
+    // inline short arrays
+    wrap.appendChild(document.createTextNode('['));
+    arr.forEach((v, i) => {
+      wrap.appendChild(jsonNode(v, `${path}[${i}]`, false));
+      if (i < arr.length - 1) wrap.appendChild(document.createTextNode(', '));
+    });
+    wrap.appendChild(document.createTextNode(']'));
+    return wrap;
+  }
+  wrap.appendChild(document.createTextNode('['));
+  arr.forEach((v, i) => {
+    const line = document.createElement('div');
+    line.style.paddingLeft = '1.2rem';
+    line.appendChild(jsonNode(v, `${path}[${i}]`, false));
+    if (i < arr.length - 1) line.appendChild(document.createTextNode(','));
+    wrap.appendChild(line);
+  });
+  wrap.appendChild(document.createTextNode(']'));
+  return wrap;
+}
+
+// Tooltip on hover over annotated keys
+const tt = document.getElementById('tooltip');
+document.addEventListener('mouseover', e => {
+  const t = e.target.closest('.tok-path');
+  if (!t) return;
+  tt.innerHTML = `<div class="tt-path">${t.dataset.path}</div>${t.dataset.desc}`;
+  tt.classList.add('visible');
+});
+document.addEventListener('mousemove', e => {
+  if (!tt.classList.contains('visible')) return;
+  const rect = tt.getBoundingClientRect();
+  let x = e.clientX + 14;
+  let y = e.clientY + 14;
+  if (x + rect.width > window.innerWidth - 10) x = e.clientX - rect.width - 14;
+  if (y + rect.height > window.innerHeight - 10) y = e.clientY - rect.height - 14;
+  tt.style.left = x + 'px';
+  tt.style.top = y + 'px';
+});
+document.addEventListener('mouseout', e => {
+  if (e.target.closest('.tok-path')) tt.classList.remove('visible');
+});
+
+// ---------- Schema explorer ----------
+(function renderSchema() {
+  const root = document.getElementById('schema-root');
+  root.appendChild(schemaNode('(root)', SCHEMA, SCHEMA.required || [], true));
+})();
+
+function schemaNode(name, node, parentRequired, isRoot) {
+  const wrap = document.createElement('div');
+  wrap.className = 'schema-node' + (isRoot ? ' root' : '');
+
+  const header = document.createElement('div');
+  const props = node.properties || {};
+  const hasChildren = Object.keys(props).length > 0;
+
+  if (hasChildren) {
+    const caret = document.createElement('span');
+    caret.className = 'schema-caret';
+    caret.textContent = '▼';
+    header.appendChild(caret);
+    const nameEl = document.createElement('span');
+    nameEl.className = 'schema-name';
+    nameEl.textContent = name;
+    nameEl.onclick = () => {
+      wrap.classList.toggle('collapsed');
+      caret.textContent = wrap.classList.contains('collapsed') ? '▶' : '▼';
+    };
+    header.appendChild(nameEl);
+  } else {
+    const nameEl = document.createElement('span');
+    nameEl.className = 'schema-name';
+    nameEl.textContent = name;
+    header.appendChild(nameEl);
+  }
+  // Type
+  const typeEl = document.createElement('span');
+  typeEl.className = 'schema-type';
+  let typeStr = node.type || (node.enum ? 'enum' : 'any');
+  if (Array.isArray(typeStr)) typeStr = typeStr.join(' | ');
+  if (node.format) typeStr += ` <${node.format}>`;
+  typeEl.textContent = typeStr;
+  header.appendChild(typeEl);
+
+  // Required marker
+  if (parentRequired.includes(name)) {
+    const req = document.createElement('span');
+    req.className = 'schema-req';
+    req.textContent = 'REQ';
+    header.appendChild(req);
+  }
+
+  // Enum
+  if (node.enum) {
+    const en = document.createElement('span');
+    en.className = 'schema-enum';
+    en.textContent = '= [' + node.enum.join(', ') + ']';
+    header.appendChild(en);
+  }
+
+  wrap.appendChild(header);
+
+  // Description (from schema if present, else from ANN if matches a known path)
+  if (node.description) {
+    const d = document.createElement('div');
+    d.className = 'schema-desc';
+    d.textContent = node.description;
+    wrap.appendChild(d);
+  }
+
+  if (hasChildren) {
+    const childrenWrap = document.createElement('div');
+    childrenWrap.className = 'schema-children';
+    const required = node.required || [];
+    Object.entries(props).forEach(([k, v]) => {
+      childrenWrap.appendChild(schemaNode(k, v, required, false));
+    });
+    wrap.appendChild(childrenWrap);
+  }
+  return wrap;
+}
+
+function scrollToSchema(topLevelKey) {
+  // Find the schema node whose name matches
+  const nodes = document.querySelectorAll('.schema-node');
+  for (const n of nodes) {
+    const name = n.querySelector('.schema-name');
+    if (name && name.textContent === topLevelKey) {
+      n.scrollIntoView({behavior: 'smooth', block: 'center'});
+      name.style.background = 'var(--accent-soft)';
+      setTimeout(() => name.style.background = '', 1200);
+      return;
+    }
+  }
+}
+
+// ---------- Workload cards ----------
+(function renderWorkloads() {
+  const el = document.getElementById('workload-grid');
+  const nullish = v => (v === null || v === undefined || v === '' || v === 'null')
+    ? '<span class="sp-value null">—</span>'
+    : `<span class="sp-value">${v}</span>`;
+  const sloPill = (label, v) => v
+    ? `<span class="slo-pill">${label} <strong>${v}ms</strong></span>`
+    : '';
+  el.innerHTML = DATA.workloads.map(w => `
+    <div class="wc">
+      <div class="wc-id">${w.catalog_id}</div>
+      <div class="wc-meta">${w.use_case || '—'} · ${w.modality}</div>
+      <div class="wc-desc">${w.description}</div>
+      <div class="wc-spec">
+        <span class="sp-label">ISL</span>${nullish(w.isl ? w.isl + ' tok' : null)}
+        <span class="sp-label">OSL</span>${nullish(w.osl ? w.osl + ' tok' : null)}
+        <span class="sp-label">Dataset</span>${nullish(w.dataset_type)}
+        <span class="sp-label">Load</span>${nullish(w.load_type)}
+        <span class="sp-label">Rate / Conc</span>${nullish(w.request_rate ? w.request_rate + ' QPS' : (w.concurrency ? 'c=' + w.concurrency : null))}
+        <span class="sp-label">Prompts</span>${nullish(w.num_prompts)}
+      </div>
+      <div class="wc-slo">
+        ${sloPill('TTFT p99', w.ttft_p99_ms)}
+        ${sloPill('TPOT p99', w.tpot_p99_ms)}
+        ${sloPill('E2E p99', w.e2e_p99_ms)}
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('wc-count').textContent = DATA.workloads.length;
+})();
+
+// ---------- Theme ----------
+function toggleTheme() {
+  const html = document.documentElement;
+  html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+}
+</script>
+</body>
+</html>

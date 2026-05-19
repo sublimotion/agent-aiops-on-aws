@@ -1,0 +1,42 @@
+catalog_id: rag-long-context
+use_case: rag
+description: >
+  RAG with retrieved documents. Tests shared-prefix caching and long prefill.
+  Multiple requests share the same document corpus prefix (system prompt +
+  retrieved chunks), with unique user queries appended. Measures prefix cache
+  effectiveness: cold TTFT (first request, no cache) vs warm TTFT (subsequent
+  requests sharing the same prefix).
+
+  Key insight from our measurements: prefix caching delivers 103x TTFT
+  improvement (cold 5928ms → warm 57ms on Kimi K2.6). This workload
+  specifically validates that benefit.
+
+modality: text
+
+dataset:
+  type: generated-shared-prefix
+  shared_prefix_tokens: 12288  # Simulates shared retrieved document chunks
+  unique_suffix_tokens: {mean: 4096, std_dev: 1024}  # User query + context
+  input_tokens: {mean: 16384, std_dev: 0}  # Total = prefix + suffix
+  output_tokens: {mean: 256, std_dev: 64}
+  prefix_groups: 4  # 4 distinct document sets, requests within each share prefix
+
+load:
+  type: constant
+  request_rate: 1.0
+  num_prompts: 100
+  warmup_requests: 20  # First 5 per prefix group establish cache
+
+slo:
+  ttft_cold_p99_ms: 3000   # First request per prefix (no cache)
+  ttft_warm_p99_ms: 500    # Subsequent requests (cached prefix)
+  tpot_p99_ms: 50
+  e2e_p99_ms: 20000
+  error_rate_max: 0.001
+
+# Required extensions for this workload
+extensions:
+  cache_stats:
+    prefix_hit_rate: required       # Must measure: validates caching works
+    kv_utilization_pct: required    # Must measure: long contexts fill cache fast
+    cold_vs_warm_ttft_ratio: required  # Must report: quantifies caching benefit

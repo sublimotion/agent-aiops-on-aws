@@ -1,0 +1,117 @@
+catalog_id: video-summary
+use_case: video-understanding
+description: >
+  Video-language workload for VLM serving benchmarks. The model receives a
+  short clip (typically 3-60 seconds) sampled at a configurable frame rate,
+  plus a text instruction (summarize / Q&A / caption), and emits a text
+  response. Tests the encoder-bound regime that pure text and single-image
+  workloads do not.
+
+  Why this card exists:
+  - Video shifts the bottleneck from decode HBM bandwidth (text) to
+    encoder prefill: the ViT runs once per sampled frame, then a long
+    multimodal sequence is fed to the LLM trunk. A 30-second clip at 1 fps
+    with 256 image-tokens/frame is a 7,680-token prefill BEFORE any text.
+  - Per-modality optimization tiers diverge here. T5 kernel/compile of the
+    encoder is the highest-leverage lever (see notes); T1 FP8 quantization
+    typically applies only to the LLM trunk, not the ViT, capping its delta;
+    T3 speculative decode usually has near-zero acceptance on short
+    structured outputs.
+  - On multi-GPU PCIe substrates (g6e.12xl, g7e.48xl), Data-Parallel
+    replicas (DPP) outperform Tensor-Parallel sharding for this workload —
+    encoder all-reduce per frame compounds badly. TP only wins when the
+    model itself does not fit a single GPU.
+
+  Supported modes (select via sidecar / CLI, card stays the same):
+    1. Fixed concurrency, fixed clip length (smoke / SLO check)
+    2. Concurrency sweep at fixed clip length (sizing for fleet capacity)
+    3. Clip-length sweep at fixed concurrency (encoder-cost-vs-length curve)
+    4. Frame-rate sweep at fixed clip length (T5 / T2 caching headroom)
+
+  Cross-tool standard: vLLM video chat completions
+  (`{"type":"video_url",...}`), SGLang `--enable-video-input`,
+  GenAI-Perf with `--media-source video`, custom OpenAI-compat clients.
+
+modality: video
+
+dataset:
+  type: synthetic
+  # The benchmark runner generates synthetic clips deterministically (color
+  # gradient + frame-index overlay) when no corpus is mirrored. For
+  # comparable cross-vendor numbers, mirror a real corpus to S3 (Charades,
+  # ActivityNet, MSR-VTT clipped subsets) and reference it via
+  # `dataset.corpus_uri` in the sidecar.
+  corpus_uri: null
+
+  # Clip-length distribution. When `clip_length_axis` is a list, the runner
+  # emits one artifact per (clip_length, concurrency) pair.
+  clip_length_axis_s: [10]                    # seconds per clip
+  frame_rate_fps: 1                           # sampled fps fed to the model
+  resolution: {width: 480, height: 360}       # downsampled before encoder
+
+  # Tokens-per-frame is model-dependent (Qwen3-VL ~256 at 480x360, Qwen2.5-Omni
+  # variable). The runner reads back actual prompt_tokens from `usage` in the
+  # response and writes them into `extensions.video.image_tokens_per_frame`.
+  expected_image_tokens_per_frame: 256
+
+  output_tokens: {mean: 256, std_dev: 64}     # short summary; tune per use_case
+
+  prompt: "Summarize the contents of this video in two to four sentences."
+
+load:
+  type: concurrency-sweep
+  levels: [1, 2, 4, 8, 16]
+  num_prompts_per_level: 20
+  warmup_requests: 5
+
+  # Optional ramp-until-breakdown mode. Encoder OOM is the typical floor
+  # because each concurrent request keeps frames worth of tokens in KV
+  # while waiting for decode.
+  stop_condition:
+    p99_ttft_ms: null
+    oom_detected: false
+    encoder_oom: false                        # video-specific: ViT VRAM exceeds budget
+
+api:
+  type: chat
+  endpoint: /v1/chat/completions
+  streaming: true
+  # vLLM 0.19+ uses image_url / video_url shapes that mirror the OpenAI
+  # multimodal spec. Some servers only accept base64 data URLs; others also
+  # accept file:// or http(s)://. Pin the chosen shape in the sidecar so
+  # cross-vendor comparisons are valid.
+  multimodal_payload_shape: video_url        # one of: video_url, video_path, base64_data_url
+
+slo:
+  # Headline target for interactive video Q&A workloads. Loosen for batch
+  # summarization (e.g., nightly archive ingest).
+  ttft_p99_ms: 3000                          # ViT N-frames prefill is slow; honest target
+  e2e_p99_ms: 30000                          # short summary on 10s clip
+  error_rate_max: 0.001
+  rtfx_min: null                             # video-RTFx = clip_seconds / wall_seconds; set per use_case
+
+# Video-specific extensions every adapter SHOULD populate.
+extensions:
+  video:
+    # Per-clip-length breakdown when running a clip-length sweep.
+    per_clip_length:
+      schema:
+        clip_length_s: number
+        completed: integer
+        failed: integer
+        ttft_ms: latency_metric              # encoder-prefill heavy
+        e2e_ms: latency_metric
+        rtfx_p50: number                     # clip_seconds / wall_seconds
+        request_throughput: number
+        image_tokens_per_frame: integer
+        prompt_tokens_p50: integer           # frames * tokens_per_frame + text overhead
+    encoder:
+      torch_compile_landed: boolean          # whether T5 ViT compile is on (Qwen3-VL: vLLM PR #40116)
+      ttft_share_pct: number                 # fraction of e2e attributable to encoder prefill
+    parallelism_pattern: tp_or_dpp           # one of: TP, DPP. DPP is preferred on PCIe for video.
+  cache_stats:
+    kv_utilization_pct: required
+    frame_token_cache_hits_pct: optional     # vLLM ≥0.21 frame-level cache (not in 0.19.1)
+  memory:
+    peak_vram_gb: optional
+    encoder_peak_vram_gb: optional           # ViT activation peak; useful for OOM diagnosis

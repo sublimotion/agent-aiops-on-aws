@@ -1,0 +1,69 @@
+catalog_id: burn-in
+use_case: stability-burnin
+description: >
+  Continuous-run stability under sustained load. Drive at a high
+  fraction of the previously-measured offline ceiling for the configured
+  duration. Slice the run into fixed-length windows; each window emits a
+  raw benchmark JSON that `container/analyze-burn-in.py` consolidates into
+  a drift curve + stability verdict.
+
+  Gates: throughput degradation within `slo.throughput_drift_pct_max`
+  (directional — positive drift from warm-cache effects is accepted up to
+  `slo.positive_drift_pct_max`); zero unrecoverable errors; no thermal
+  throttle past the configured warmup window.
+
+  The traffic shape is defined by the sidecar's `workload_overrides.mix:`
+  block — a map of single-model workload card IDs to composition
+  fractions. The card itself does not know whether the traffic is
+  banking, e-commerce, or coding; it only enforces the protocol.
+
+  Covers the CTO engagement's O5 cell when the sidecar supplies the
+  60/25/15 banking mix and `duration_hours: 72`, `rate_fraction: 0.85`.
+
+modality: mixed
+
+dataset:
+  # Sidecar supplies:
+  #   workload_overrides.mix:
+  #     chatbot-long: 0.60
+  #     batch-embed-1024: 0.25
+  #     pair-score-k50: 0.15
+  # If omitted, the runner falls back to the single default trace below.
+  type: mix-from-sidecar
+  fallback:
+    input_tokens: {mean: 2048, std_dev: 512}
+    output_tokens: {mean: 512, std_dev: 128}
+
+load:
+  type: sustained
+  # Both values are sidecar-overridable via workload_overrides.
+  rate_fraction_of_ceiling: 0.85
+  duration_hours: 1        # Default pre-prod soak; CTO O5 overrides to 72
+  # Typical overrides:
+  #   quick        0.5h    — inside a deploy loop
+  #   pre-prod     1-2h    — overnight-before-release check (default)
+  #   CTO O5       72h     — engagement-level capacity study
+
+# Slice the run into fixed-length benchmark windows. Each window emits its
+# own raw JSON; analyze-burn-in.py consolidates.
+sampling:
+  slice_duration_minutes: 5
+  warmup_minutes: 10
+
+slo:
+  # Directional drift gates: negative drift (degradation) is strictly
+  # bounded; positive drift (improvement, usually from warm-cache effects
+  # as prefix cache fills) is allowed a wider band because it's a signal
+  # of healthy operation, not instability.
+  throughput_drift_pct_max: 2.0        # |negative drift| ≤ 2%  (fails if throughput drops >2%)
+  positive_drift_pct_max: 5.0          # positive drift ≤ 5%    (fails if something is suspiciously speeding up)
+  unrecoverable_errors_max: 0
+  thermal_throttle_events_post_warmup_max: 0
+
+extensions:
+  stability:
+    drift_curve: required
+    thermal_event_log: required
+    ecc_delta: required
+  power:
+    continuous_sampling: required

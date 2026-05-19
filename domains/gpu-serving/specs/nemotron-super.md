@@ -242,7 +242,7 @@ cuda_graph_config:
 | vLLM (pinned) | vLLM nightly per HF model card commit | `<ecr>/vllm-nemotron:latest` | Nemotron-3-Super arch + `--trust-remote-code` |
 | SGLang | `lmsysorg/sglang:v0.5.9` | `<ecr>/sglang:v0.5.9` | `nano_v3` parser included |
 | TRT-LLM | `nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc5` | `<ecr>/trtllm:1.3.0rc5` | PyTorch backend for hybrid arch |
-| Benchmark runner | `python:3.11-slim` | `<ecr>/bench-runner:latest` | genai-perf or custom bench tools |
+| Benchmark runner | `python:3.11-slim` | `<ecr>/bench-runner:latest` | AIPerf or custom bench tools |
 
 > **Dynamo container**: Check whether Dynamo ships a unified container with all backends bundled, or if each backend requires a separate image. PR #7216 recipes use K8s DynamoGraphDeployment CRD which may handle image selection.
 
@@ -350,20 +350,27 @@ Run P1a steps 1a-1 and 1a-2 with the second-best backend from P0 to validate the
 
 ### Workloads
 
-| Workload | Dataset / Pattern | Description | Latency Focus |
-|----------|-------------------|-------------|---------------|
-| `synthetic` | `random`, configurable in/out | Controlled baseline | TTFT + ITL + throughput |
-| `multi-turn` | `sharegpt`, multi-turn conversations | Prefix reuse test | KV-aware routing effectiveness |
-| `tool-call` | `bfcl`, function calling | Agentic tool use via `qwen3_coder` parser | Functional correctness |
+Mapped to the [standard workload catalog](../../../standards/benchmark-commons/workloads/):
+
+| Workload | Catalog mapping | Description | Latency Focus |
+|----------|----------------|-------------|---------------|
+| `synthetic 4K/1K` | `concurrency-sweep` | Controlled baseline, power-of-2 concurrency | Throughput ceiling |
+| `multi-turn` | `chatbot-long` (extended) | sharegpt multi-turn → prefix reuse test | KV-aware routing effectiveness |
+| `tool-call` | `coding-agent` | BFCL function calling via `qwen3_coder` parser | Functional correctness + TTFT warm |
+| `long-context 128K` | Custom (`catalog_id: null`) | 128K input, single request | TTFT scaling |
+
+**Enriched artifact output**: All benchmark results stored in `blueprints/nemotron-super/results/` using the enriched artifact schema. Each run captures engine-internal metrics (KV cache utilization, prefix hit rate) in the `extensions` block.
 
 ### Concurrency Levels
 
-| Level | Concurrency | Purpose |
-|-------|-------------|---------|
-| Low | 1 | Single-request latency baseline |
-| Medium | 4-16 | Interactive use |
-| High | 32-64 | Batch / swarm agents |
-| Stress | 128-256 | Throughput ceiling, disagg advantage zone |
+| Level | Concurrency | Purpose | Reference (from optimization guide) |
+|-------|-------------|---------|------|
+| Low | 1 | Single-request latency baseline | TP-optimal regime (low batch) |
+| Medium | 4-16 | Interactive use | Hybrid TEP zone |
+| High | 32-64 | Batch / swarm agents | EP starts to dominate |
+| Stress | 128-256 | Throughput ceiling, disagg advantage zone | Pure DEP regime |
+
+See `docs/inference-optimization-guide.md` Section 1 (Parallelism Strategy Selection) for why the bottleneck shifts at each level.
 
 ---
 
@@ -397,6 +404,18 @@ Run P1a steps 1a-1 and 1a-2 with the second-best backend from P0 to validate the
 | NIXL transfer latency | ms | KV cache GPU-to-GPU transfer time (prefill -> decode) |
 | Routing overhead | ms | Dynamo frontend + router latency vs direct backend |
 | Optimal P:D ratio | ratio | Best prefill:decode GPU allocation at peak throughput |
+
+### Engine-Internal Metrics (scraped from Prometheus `/metrics` during benchmark)
+
+| Metric | Source | Why it matters |
+|--------|--------|----------------|
+| KV cache utilization % | `vllm:gpu_cache_usage_perc` / SGLang equivalent | Find concurrency ceiling before eviction |
+| Prefix cache hit rate | `vllm:cache_hit_rate` | Validate KV-aware routing effectiveness |
+| Running requests | `vllm:num_requests_running` | Confirm batch size matches config |
+| Block eviction rate | Custom scrape (count evictions/sec) | Detect memory pressure during multi-turn |
+| MTP acceptance rate | Engine-specific (if MTP enabled in future) | Validate speculative decode quality |
+
+> These engine-internal metrics are the **key differentiator** vs InferenceX-style benchmarks (which only capture client-side latency). See `docs/inference-optimization-guide.md` Section 11 for the full KV cache benchmarking protocol.
 
 ### Cost Efficiency
 

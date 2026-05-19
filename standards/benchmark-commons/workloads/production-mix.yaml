@@ -1,0 +1,52 @@
+catalog_id: production-mix
+use_case: pre-prod-validation
+description: >
+  Trace replay of real conversation data at varying concurrency. Unlike
+  the other workload cards which use synthetic datasets, this card
+  replays recorded production traffic (ShareGPT, LMSYS-Chat-1M, or
+  customer-specific redacted traces) to validate pre-production
+  deployments. The concurrency sweep lets the operator find the SLO-max
+  operating point against the actual distribution of request shapes
+  they'll see in prod.
+
+  Any customer moving from PoC to production should run this card as
+  the final gate before cutover.
+
+  Distinct from `concurrency-sweep.yaml` — that card uses synthetic
+  fixed-shape prompts; this card uses variable-length real traces where
+  the distribution of {input_tokens, output_tokens, prefix overlap} is
+  the point.
+
+modality: text
+
+dataset:
+  type: trace-replay
+  # Sidecar supplies the trace:
+  #   workload_overrides.trace:
+  #     source: sharegpt | lmsys-chat-1m | custom
+  #     path: s3://.../trace.jsonl
+  #     sample_size: 500
+  fallback:
+    source: sharegpt
+    sample_size: 200
+
+load:
+  type: concurrency-sweep
+  levels: [1, 4, 16, 32, 64, 128]
+  warmup_requests: 20
+  per_level_duration_s: 300
+
+slo:
+  ttft_p99_ms: 800                   # Production UX target; override per customer
+  tpot_p99_ms: 50
+  e2e_p99_ms: 30000
+  error_rate_max: 0.005              # Slightly relaxed — real traces have long-tail outliers
+
+extensions:
+  cache_stats:
+    prefix_hit_rate: required        # Real traces have natural prefix overlap (assistants)
+    kv_utilization_pct: required
+  distribution:
+    input_tokens_histogram: required
+    output_tokens_histogram: required
+    ttft_histogram_by_concurrency: required

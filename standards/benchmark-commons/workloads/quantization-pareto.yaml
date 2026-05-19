@@ -1,0 +1,45 @@
+catalog_id: quantization-pareto
+use_case: quantization-tradeoff
+description: >
+  Measure throughput (Offline + Server) for a single precision checkpoint
+  and require a passing quality gate before the throughput row is emitted.
+
+  Precision is a SIDECAR choice — each precision gets its own sidecar and
+  its own run. This card does not sweep precisions internally. The
+  engagement spec or a per-model matrix enumerates the (card × sidecar)
+  pairs.
+
+  Quality evals are also declared in the sidecar's `quality_baselines:`
+  block (per-eval baseline score + tolerance). Which evals to run is
+  passed to the runner via `--quality-eval mmlu,gsm8k,...`. Pick evals
+  appropriate for the model modality (text: MMLU/GSM8K/HumanEval; VLM:
+  DocVQA; embedding: MTEB Banking77/FiQA; speech: LibriSpeech WER).
+
+modality: text
+
+dataset:
+  type: synthetic
+  input_tokens: {mean: 2048, std_dev: 512}
+  output_tokens: {mean: 256, std_dev: 64}
+
+load:
+  # MLPerf-Inference-style: Offline (max rate) AND Server (QPS target with
+  # latency SLO). Both modes run per sidecar.
+  modes:
+    - id: offline
+      type: max-rate
+      duration_s: 900
+    - id: server
+      type: qps-constrained
+      target_qps: 4         # Sidecar-overridable via workload_overrides.target_qps
+      latency_slo_ms: 1000
+      duration_s: 900
+
+slo:
+  error_rate_max: 0.001
+  quality_gate_required: true   # Runner MUST run quality eval first; fails on tolerance breach
+
+extensions:
+  # O11 hook: record tokens/joule alongside throughput for each precision run
+  power:
+    tokens_per_joule: required
