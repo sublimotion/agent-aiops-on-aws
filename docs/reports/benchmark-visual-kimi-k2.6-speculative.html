@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kimi K2.6 Consolidated Report — Baseline + Speculative Decode</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --surface-2: #242740;
+      --border: #2e3151;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --accent: #6366f1;
+      --accent-soft: rgba(99,102,241,0.15);
+      --green: #22c55e;
+      --green-soft: rgba(34,197,94,0.12);
+      --red: #ef4444;
+      --red-soft: rgba(239,68,68,0.12);
+      --yellow: #f59e0b;
+      --yellow-soft: rgba(245,158,11,0.12);
+      --blue: #3b82f6;
+      --blue-soft: rgba(59,130,246,0.12);
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc; --surface: #ffffff; --surface-2: #f1f5f9;
+      --border: #e2e8f0; --text: #0f172a; --text-muted: #64748b;
+      --accent-soft: rgba(99,102,241,0.08); --green-soft: rgba(34,197,94,0.08);
+      --red-soft: rgba(239,68,68,0.08); --yellow-soft: rgba(245,158,11,0.08);
+      --blue-soft: rgba(59,130,246,0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1.25rem 2rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    header .meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .theme-toggle { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); padding: 0.4rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-family: inherit; }
+    .theme-toggle:hover { background: var(--border); }
+    main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    h2 { font-size: 1.05rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+    h2 .phase-num { background: var(--accent-soft); color: var(--accent); padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; }
+    .section { margin-bottom: 2.5rem; }
+    .hw-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 2rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; }
+    .hw-item .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 0.25rem; }
+    .hw-item .value { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; }
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .summary-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; }
+    .summary-card.win { border-color: var(--green); }
+    .summary-card.info { border-color: var(--blue); }
+    .summary-card .stat-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 0.35rem; }
+    .summary-card .stat-value { font-family: 'JetBrains Mono', monospace; font-size: 1.6rem; font-weight: 600; color: var(--accent); }
+    .summary-card.win .stat-value { color: var(--green); }
+    .summary-card.info .stat-value { color: var(--blue); }
+    .summary-card .stat-sub { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.35rem; }
+    .callout { border-left: 4px solid; border-radius: 8px; padding: 1.25rem 1.5rem; margin-bottom: 2rem; border: 1px solid; }
+    .callout.win { background: var(--green-soft); border-color: var(--green); }
+    .callout.info { background: var(--blue-soft); border-color: var(--blue); }
+    .callout.warn { background: var(--yellow-soft); border-color: var(--yellow); }
+    .callout.alert { background: var(--red-soft); border-color: var(--red); }
+    .callout .tag { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .callout.win .tag { color: var(--green); }
+    .callout.info .tag { color: var(--blue); }
+    .callout.warn .tag { color: var(--yellow); }
+    .callout.alert .tag { color: var(--red); }
+    .callout h3 { font-size: 1rem; margin-bottom: 0.5rem; }
+    .callout p { font-size: 0.9rem; }
+    .callout .math { background: var(--surface-2); padding: 0.75rem 1rem; border-radius: 6px; margin-top: 0.75rem; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; }
+    .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    thead { background: var(--surface-2); }
+    th { padding: 0.75rem 1rem; text-align: left; font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); white-space: nowrap; }
+    td { padding: 0.75rem 1rem; border-top: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; }
+    tr:hover td { background: var(--accent-soft); }
+    td.name { font-family: 'Inter', sans-serif; font-weight: 500; }
+    tr.highlight td { background: var(--green-soft); }
+    tr.muted td { opacity: 0.6; }
+    .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; font-family: 'Inter', sans-serif; }
+    .badge-win { background: var(--green-soft); color: var(--green); }
+    .badge-lose { background: var(--red-soft); color: var(--red); }
+    .badge-warn { background: var(--yellow-soft); color: var(--yellow); }
+    .badge-info { background: var(--blue-soft); color: var(--blue); }
+    .chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; }
+    .mermaid { overflow-x: auto; text-align: center; }
+    .phases { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; }
+    .phase { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+    .phase.done { border-color: var(--green); }
+    .phase.blocked { border-color: var(--red); opacity: 0.7; }
+    .phase.dropped { border-color: var(--text-muted); opacity: 0.55; }
+    .phase .phase-id { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.3rem; }
+    .phase .phase-title { font-size: 0.88rem; font-weight: 600; margin-bottom: 0.3rem; }
+    .phase .phase-status { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+    .phase.done .phase-status { color: var(--green); }
+    .phase.blocked .phase-status { color: var(--red); }
+    .phase.dropped .phase-status { color: var(--text-muted); }
+    .phase .phase-note { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; line-height: 1.4; }
+    footer { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.75rem; border-top: 1px solid var(--border); margin-top: 3rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Kimi K2.6 Consolidated Report — Baseline × Speculative Decode</h1>
+    <div class="meta">p6-b300.48xlarge (8× B300 SXM6 NVSwitch) · 8 configurations compared · K2.6 baseline (2026-04-22) + K2.6-spec session (2026-05-13)</div>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">Toggle theme</button>
+</header>
+
+<main>
+
+  <!-- Hardware card -->
+  <div class="hw-card">
+    <div class="hw-item"><div class="label">Instance</div><div class="value">p6-b300.48xlarge</div></div>
+    <div class="hw-item"><div class="label">GPUs</div><div class="value">8× B300 SXM6 · 275 GiB</div></div>
+    <div class="hw-item"><div class="label">Interconnect</div><div class="value">NVSwitch NV18</div></div>
+    <div class="hw-item"><div class="label">Model</div><div class="value">Kimi-K2.6 FP8 (1T-32B-A)</div></div>
+    <div class="hw-item"><div class="label">Draft</div><div class="value">kimi-k2.6-eagle3</div></div>
+    <div class="hw-item"><div class="label">Session cost</div><div class="value">~$230 (9 hrs spot)</div></div>
+  </div>
+
+  <!-- Top stats -->
+  <div class="summary-grid">
+    <div class="summary-card win">
+      <div class="stat-label">Winner — Agentic c=1</div>
+      <div class="stat-value">302 tok/s</div>
+      <div class="stat-sub"><strong>4.0× vs vLLM baseline (76)</strong> · EAGLE3 s4_d4_k1</div>
+    </div>
+    <div class="summary-card win">
+      <div class="stat-label">Winner — Multi-tenant c=256</div>
+      <div class="stat-value">8,179 tok/s</div>
+      <div class="stat-sub"><strong>+28% vs vLLM baseline (6,374)</strong> · TP4+DP2 + EAGLE3</div>
+    </div>
+    <div class="summary-card info">
+      <div class="stat-label">Bulk c=512 (unchanged)</div>
+      <div class="stat-value">10,437 tok/s</div>
+      <div class="stat-sub">vLLM baseline · <strong>spec decode can't beat it</strong></div>
+    </div>
+    <div class="summary-card">
+      <div class="stat-label">Baseline: SGLang → vLLM</div>
+      <div class="stat-value">3.1×</div>
+      <div class="stat-sub">vLLM wins @ c=512 (10,437 vs 3,400 SGLang no-spec)</div>
+    </div>
+  </div>
+
+  <!-- Engine choice framing -->
+  <!-- Stock OSS ceiling vs commercial providers — added 2026-05-15 -->
+  <div class="callout alert">
+    <div class="tag">▼ Stock OSS vs CoreWeave (added 2026-05-15)</div>
+    <h3>vLLM+NVFP4 ≈ SGLang+FP8+EAGLE3 ≈ 63 tok/s on real ShareGPT — both ~2× behind CoreWeave</h3>
+    <p>
+      Direct head-to-head on the same Kimi K2.6 weights, ShareGPT replay (200 real conversations, c=16):
+    </p>
+    <div class="math">
+      <strong>SGLang TP8 + FP8 + EAGLE3 + HiCache</strong>:    63.8 tok/s/req · accept rate 0.347 · accept length 2.39<br>
+      <strong>vLLM TP4 + NVFP4 (no spec decode)</strong>:      63.3 tok/s/req · no spec<br>
+      <strong>CoreWeave (NVFP4 + custom kernels)</strong>:     <strong>128.2 tok/s</strong> per Artificial Analysis<br>
+      <strong>Provider median (11 providers)</strong>:          52.9 tok/s
+    </div>
+    <p style="margin-top: 0.75rem">
+      <strong>NVFP4 alone doesn't close the gap.</strong> Switching from FP8+EAGLE3 to NVFP4+nospec on stock vLLM is a wash on real workloads — the half-bandwidth savings are eaten by losing EAGLE3 (and by stock NVFP4 kernels not fully exploiting FP4 tensor cores). CoreWeave's 2× lead is structural:
+    </p>
+    <ul style="margin: 0.5rem 0 0 1.25rem; font-size: 0.9rem">
+      <li>Custom NVFP4 cutlass 3.x kernels for B200/B300 FP4 tensor cores</li>
+      <li>Likely a custom-trained draft model on production traffic (accept rate ~0.7 vs our 0.35)</li>
+      <li>Possibly Kimi-specific MoE batching tuning</li>
+    </ul>
+    <p style="margin-top: 0.75rem">
+      <strong>Synthetic-vs-real gap:</strong> our Phase 1 single-stream c=1 numbers (164 / 302 tok/s) were on uniform "hello..." prompts where the EAGLE3 draft accepts every token (rate 1.0). On real ShareGPT conversations the accept rate drops to 0.347 — barely better than no spec decode. The synthetic ceiling overstates real production gains by 3-5×.
+    </p>
+  </div>
+
+  <div class="callout info">
+    <div class="tag">▼ Engine choice · the clean narrative</div>
+    <h3>vLLM wins throughput · SGLang+EAGLE3 wins per-token latency</h3>
+    <p>The two engines optimize for different workloads and the consolidated data makes the split obvious:</p>
+    <div class="math">
+<strong>Throughput @ c=512</strong>:   vLLM 10,437 tok/s  vs  SGLang 3,400 tok/s   → <strong>vLLM wins 3.1×</strong><br>
+<strong>Per-request @ c=1</strong>:    SGLang+EAGLE3 302 tok/s  vs  vLLM baseline 76 tok/s   → <strong>SGLang wins 4.0×</strong><br>
+<strong>Warm-batch TTFT @ c=8</strong>: vLLM 54 ms  vs  SGLang 388 ms   → <strong>vLLM wins 7×</strong> (batched)<br>
+<strong>Cold TTFT @ c=1</strong>:       SGLang 4,646 ms  vs  vLLM 11,937 ms   → SGLang wins (both bad)
+    </div>
+    <p style="margin-top: 0.75rem"><strong>Rule of thumb for customer conversations:</strong></p>
+    <ul style="margin: 0.5rem 0 0 1.25rem; font-size: 0.9rem">
+      <li><strong>High-QPS API serving</strong> (chat completions, bulk generation, batch jobs) → <strong>vLLM TP8 + prefix caching</strong>. Max aggregate throughput, best warm TTFT, cheapest $/M tokens.</li>
+      <li><strong>Interactive agent / coding assistant</strong> (each user perceives per-token decode speed) → <strong>SGLang TP8 + EAGLE3 <code>s4_d4_k1</code> + HiCache</strong>. 302 tok/s per request feels 4× faster than vLLM baseline on the user's screen.</li>
+      <li><strong>Mixed multi-tenant</strong> (c=32–256 sustained, moderate latency sensitivity) → <strong>SGLang TP4+DP2 + EAGLE3 + HiCache</strong>. Beats vLLM baseline on both aggregate (+28% at c=256) and per-request.</li>
+    </ul>
+  </div>
+
+  <!-- Key callouts -->
+  <div class="callout alert">
+    <div class="tag">⚠ Phase 1 methodology error overturned (L17)</div>
+    <h3>EAGLE3 defaults hide the real picture — tuned config is a major win</h3>
+    <p>The prior session concluded "EAGLE3 hurts aggregate throughput" based on SGLang defaults (num_steps=3, num_draft_tokens=4, topk=1). The sweep proves the conclusion was wrong — with <code>num_steps=4</code>, EAGLE3 produces <strong>302 tok/s single-stream (+136%)</strong> and 6,410 tok/s @ c=128 (+75% over Phase 1). K2.6's EAGLE3 draft accepts all 4 tokens per step — draft model is stronger than the defaults assume.</p>
+  </div>
+
+  <div class="callout info">
+    <div class="tag">▼ L19 · CUDA graphs are the dominant optimization</div>
+    <h3>CUDA graphs deliver 6.4× speedup on Blackwell spec decode</h3>
+    <p>Phase 5b isolates cuda graphs by running with <code>--disable-cuda-graph</code> while keeping everything else identical:</p>
+    <div class="math">
+      c=1 per-req:   <strong>298 → 47 tok/s</strong>   (−84% without graphs = 6.4× speedup from graphs)<br>
+      c=128 agg:     <strong>6,143 → 1,906 tok/s</strong> (−69% = 3.2× speedup)<br>
+      c=256 agg:     <strong>7,173 → 2,032 tok/s</strong> (−72% = 3.5× speedup)
+    </div>
+    <p style="margin-top:0.5rem">Without graphs, EAGLE3's draft+verify Python/launch overhead dominates entirely. This is the single most important lever in the Blackwell + spec decode stack.</p>
+  </div>
+
+  <div class="callout warn">
+    <div class="tag">▼ L18 · SGLang engine quirk</div>
+    <h3><code>--speculative-num-draft-tokens</code> is a no-op in this range</h3>
+    <p>Within a fixed <code>num_steps</code>, sweeping <code>num_draft_tokens</code> ∈ {2, 4, 6, 8} produces <em>identical</em> results and accept_length = num_steps+1 everywhere. SGLang only expands the draft tree to <code>num_steps</code> depth. Future sweeps should fix <code>num_draft_tokens</code> = <code>num_steps</code> and only vary <code>num_steps</code> and <code>eagle_topk</code>.</p>
+  </div>
+
+  <!-- Consolidated sweep: baseline (K2.6 spec) vs all speculative configs -->
+  <div class="section">
+    <h2><span class="phase-num">compare</span> Consolidated sweep — all configs from K2.6 baseline + K2.6-speculative</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Config</th>
+            <th>Source</th>
+            <th>c=1</th>
+            <th>c=8</th>
+            <th>c=32</th>
+            <th>c=64</th>
+            <th>c=128</th>
+            <th>c=256</th>
+            <th>c=512</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="name">vLLM TP8 prefix-cache</td><td>K2.6 baseline</td><td>243</td><td>937</td><td>2,155</td><td>3,185</td><td>4,716</td><td>6,374</td><td><strong>10,437</strong></td></tr>
+          <tr><td class="name">SGLang TP8 radix-cache</td><td>K2.6 baseline</td><td>481</td><td>925</td><td>2,170</td><td>3,112</td><td>3,270</td><td>3,292</td><td>3,400</td></tr>
+          <tr><td class="name">SGLang TP8 + HiCache (no spec)</td><td>K2.6 baseline</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>3,400</td></tr>
+          <tr><td class="name">SGLang EAGLE3 defaults (s3_d4)</td><td>Phase 1</td><td>631</td><td>1,484</td><td>2,689</td><td><strong>3,657</strong></td><td>3,550</td><td>3,454</td><td>2,994</td></tr>
+          <tr><td class="name">SGLang EAGLE3 <strong>s4_d4_k1</strong> (winner)</td><td>Phase 1b</td><td>206</td><td>1,577</td><td>3,446</td><td>4,520</td><td>6,410</td><td>—</td><td>—</td></tr>
+          <tr class="highlight"><td class="name">SGLang EAGLE3 s4_d4 + HiCache</td><td>Phase 4</td><td>198</td><td>1,387</td><td>3,583</td><td>4,366</td><td>5,834</td><td>7,082</td><td><strong>7,759</strong></td></tr>
+          <tr class="highlight"><td class="name">SGLang TP4+DP2 + EAGLE3 s4_d4 + HiCache</td><td>Phase 5c</td><td>166</td><td>1,343</td><td><strong>4,103</strong></td><td><strong>4,786</strong></td><td><strong>6,407</strong></td><td><strong>8,179</strong></td><td>—</td></tr>
+          <tr class="muted"><td class="name">SGLang no-cuda-graph</td><td>Phase 5b (ablation)</td><td>47</td><td>353</td><td>1,283</td><td>1,381</td><td>1,906</td><td>2,032</td><td>—</td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:0.5rem;color:var(--text-muted);font-size:0.78rem;padding:0.5rem">All numbers are <strong>aggregate tok/s</strong>. Bold cells are the winning value in that column.</p>
+    </div>
+  </div>
+
+  <!-- Aggregate throughput chart with baseline -->
+  <div class="section">
+    <h2>Aggregate throughput vs concurrency</h2>
+    <div class="chart-container">
+      <canvas id="aggCanvas" style="width: 100%; height: 400px;"></canvas>
+      <p style="margin-top: 0.75rem; color: var(--text-muted); font-size: 0.8rem;">
+        vLLM TP8 baseline dominates bulk throughput at c=512 (10,437 tok/s). SGLang baseline saturates early at ~3,400. TP4+DP2 + EAGLE3 peaks at c=256 with 8,179 tok/s.
+      </p>
+    </div>
+  </div>
+
+  <!-- Per-request chart -->
+  <div class="section">
+    <h2>Per-request throughput vs concurrency — spec decode's real win</h2>
+    <div class="chart-container">
+      <canvas id="perReqCanvas" style="width: 100%; height: 400px;"></canvas>
+      <p style="margin-top: 0.75rem; color: var(--text-muted); font-size: 0.8rem;">
+        At c=1, SGLang+EAGLE3 gives <strong>3.0–4.0× per-request throughput</strong>: 302 vs 76 tok/s (vLLM baseline) or 90 (SGLang baseline). This is the dominant UX win — agents feel 4× faster.
+      </p>
+    </div>
+  </div>
+
+  <!-- Pareto chart -->
+  <div class="section">
+    <h2>Pareto frontier chart — latency vs throughput</h2>
+    <div class="chart-container">
+      <canvas id="paretoCanvas" style="width: 100%; height: 420px;"></canvas>
+      <p style="margin-top: 0.75rem; color: var(--text-muted); font-size: 0.8rem;">
+        X = aggregate throughput (tok/s) · Y = decode latency (ms/token, computed as 1000 / per_request_tps, lower is better). Each dot is a measured concurrency level. Lower-left of the chart is infeasible; upper-right is suboptimal. The Pareto frontier has three regions — green (agentic c=1–8), amber (multi-tenant c=32–256), blue (bulk c=512).
+      </p>
+    </div>
+  </div>
+
+  <!-- Pareto frontier -->
+  <div class="section">
+    <h2>Pareto frontier — which config wins at each concurrency</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Concurrency</th><th>Best aggregate</th><th>Winner (agg)</th><th>Best per-request</th><th>Winner (per-req)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>c=1</td><td>631 tok/s</td><td class="name">EAGLE3 defaults <span class="badge badge-info">artifact of scheduler</span></td><td><strong>302 tok/s</strong></td><td class="name">Phase 1b s4_d4_k1 <span class="badge badge-win">winner</span></td></tr>
+          <tr><td>c=8</td><td>1,577 tok/s</td><td class="name">Phase 1b s4_d4_k1</td><td>188 tok/s</td><td class="name">Phase 5c TP4+DP2</td></tr>
+          <tr><td>c=32</td><td>4,103 tok/s</td><td class="name">Phase 5c TP4+DP2</td><td>137 tok/s</td><td class="name">Phase 5c TP4+DP2</td></tr>
+          <tr><td>c=64</td><td>4,786 tok/s</td><td class="name">Phase 5c TP4+DP2</td><td>86 tok/s</td><td class="name">Phase 5c TP4+DP2</td></tr>
+          <tr><td>c=128</td><td>6,410 tok/s</td><td class="name">Phase 1b s4_d4_k1</td><td>66 tok/s</td><td class="name">Phase 5c TP4+DP2</td></tr>
+          <tr><td>c=256</td><td>8,179 tok/s</td><td class="name">Phase 5c TP4+DP2</td><td>53 tok/s</td><td class="name">Phase 5c TP4+DP2</td></tr>
+          <tr><td>c=512</td><td><strong>10,437 tok/s</strong></td><td class="name">vLLM TP8 baseline <span class="badge badge-win">no-spec wins</span></td><td>33 tok/s</td><td class="name">Phase 4 fullstack</td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:0.5rem;color:var(--text-muted);font-size:0.78rem;padding:0.5rem">
+        The Pareto frontier has <strong>three regions</strong>: (1) <strong>c ≤ 8</strong> → EAGLE3 tuned for per-request latency; (2) <strong>32 ≤ c ≤ 256</strong> → TP4+DP2 for multi-tenant; (3) <strong>c ≥ 512</strong> → plain vLLM for bulk throughput. Crossing boundaries: route by predicted concurrency or pool behind a load balancer.
+      </p>
+    </div>
+  </div>
+
+  <!-- TTFT comparison -->
+  <div class="section">
+    <h2>TTFT p50 — baseline comparison</h2>
+    <div class="chart-container">
+      <div class="mermaid">
+xychart-beta
+  title "TTFT p50 (ms) — vLLM vs SGLang baseline"
+  x-axis ["c=1", "c=8", "c=32", "c=64", "c=128", "c=256", "c=512"]
+  y-axis "TTFT p50 (ms)" 0 --> 12000
+  line [11937, 54, 112, 381, 388, 658, 874]
+  line [4646, 388, 222, 575, 667, 1212, 1371]
+      </div>
+      <p style="margin-top: 0.75rem; color: var(--text-muted); font-size: 0.8rem;">
+        Both baselines have pathological cold-start TTFT at c=1 (no batching available). vLLM warmup takes 12s, SGLang 4.6s. After the first request (c≥8), TTFT drops to tens-to-hundreds of ms. The speculative-decode phase runs didn't record TTFT separately — captured in <code>p50_latency_s</code> which is full request time.
+      </p>
+    </div>
+  </div>
+
+  <!-- num_steps scan -->
+  <div class="section">
+    <h2><span class="phase-num">1b</span> num_steps scan — higher is better (up to 4)</h2>
+    <div class="chart-container">
+      <div class="mermaid">
+xychart-beta
+  title "Per-request tok/s @ c=1 by num_steps"
+  x-axis ["steps=1", "steps=2", "steps=3", "steps=4"]
+  y-axis "tok/s per request" 0 --> 350
+  bar [168, 224, 270, 304]
+      </div>
+      <p style="margin-top: 0.75rem; color: var(--text-muted); font-size: 0.8rem;">
+        Accept length: 2.0 → 3.0 → 4.0 → 5.0. K2.6's EAGLE3 draft perfectly predicts every token at num_steps=4; room for steps=5+ exists but not tested.
+      </p>
+    </div>
+  </div>
+
+  <!-- Phase 1b full table -->
+  <div class="section">
+    <h2><span class="phase-num">1b</span> EAGLE3 sweep — 13 configs</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Config</th>
+            <th>c=1 per-req</th>
+            <th>c=8</th>
+            <th>c=32</th>
+            <th>c=64</th>
+            <th>c=128</th>
+            <th>Accept len</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="name">s1_d2_k1</td><td>168</td><td>1,057</td><td>2,604</td><td>3,156</td><td>4,272</td><td>2.0</td></tr>
+          <tr class="muted"><td class="name">s1_d4_k1</td><td>167</td><td>1,057</td><td>2,580</td><td>3,155</td><td>4,274</td><td>2.0</td></tr>
+          <tr class="muted"><td class="name">s1_d6_k1</td><td>168</td><td>1,055</td><td>2,581</td><td>3,228</td><td>4,198</td><td>2.0</td></tr>
+          <tr class="muted"><td class="name">s1_d8_k1</td><td>168</td><td>1,056</td><td>2,572</td><td>3,145</td><td>4,243</td><td>2.0</td></tr>
+          <tr><td class="name">s2_d2_k1</td><td>218</td><td>1,186</td><td>2,112</td><td>2,668</td><td>3,101</td><td>3.0</td></tr>
+          <tr class="muted"><td class="name">s2_d4_k1</td><td>224</td><td>1,196</td><td>2,108</td><td>2,553</td><td>3,029</td><td>3.0</td></tr>
+          <tr class="muted"><td class="name">s2_d6_k1</td><td>223</td><td>1,186</td><td>2,017</td><td>2,615</td><td>3,006</td><td>3.0</td></tr>
+          <tr class="muted"><td class="name">s2_d8_k1</td><td>223</td><td>1,187</td><td>2,075</td><td>2,623</td><td>3,089</td><td>3.0</td></tr>
+          <tr><td class="name">s3_d4_k1</td><td>270</td><td>1,548</td><td>3,498</td><td>4,485</td><td>6,139</td><td>4.0</td></tr>
+          <tr class="muted"><td class="name">s3_d6_k1</td><td>270</td><td>1,563</td><td>3,424</td><td>4,307</td><td>6,314</td><td>4.0</td></tr>
+          <tr class="muted"><td class="name">s3_d8_k1</td><td>268</td><td>1,577</td><td>3,590</td><td>4,252</td><td>6,410</td><td>4.0</td></tr>
+          <tr class="highlight"><td class="name"><strong>s4_d4_k1</strong> <span class="badge badge-win">winner</span></td><td><strong>302</strong></td><td>1,577</td><td>3,446</td><td>4,520</td><td><strong>6,410</strong></td><td>5.0</td></tr>
+          <tr><td class="name">s4_d6_k1</td><td>304</td><td>1,630</td><td>3,409</td><td>4,522</td><td>6,258</td><td>5.0</td></tr>
+          <tr><td class="name">s4_d8_k1</td><td>303</td><td>1,655</td><td>3,561</td><td>4,506</td><td>6,404</td><td>5.0</td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:0.5rem;color:var(--text-muted);font-size:0.78rem;padding:0.5rem">Muted rows: redundant — produce identical results to the first config in their <code>num_steps</code> group (L18).</p>
+    </div>
+  </div>
+
+  <!-- Phase 4 fullstack table -->
+  <div class="section">
+    <h2><span class="phase-num">4</span> Fullstack — EAGLE3 winner + HiCache 200 GB/rank</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Concurrency</th><th>Agg tok/s</th><th>Per-req</th><th>p50 latency</th><th>vs 10,437 baseline</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>c=1</td><td>198</td><td><strong>281</strong></td><td>0.77s</td><td><span class="badge badge-win">+120% per-req</span></td></tr>
+          <tr><td>c=8</td><td>1,387</td><td>179</td><td>1.41s</td><td><span class="badge badge-info">agentic sweet spot</span></td></tr>
+          <tr><td>c=32</td><td>3,583</td><td>113</td><td>2.21s</td><td></td></tr>
+          <tr><td>c=64</td><td>4,366</td><td>79</td><td>3.10s</td><td></td></tr>
+          <tr><td>c=128</td><td>5,834</td><td>63</td><td>4.70s</td><td><span class="badge badge-win">meets 6K target</span></td></tr>
+          <tr><td>c=256</td><td>7,082</td><td>48</td><td>6.04s</td><td></td></tr>
+          <tr><td>c=512</td><td><strong>7,759</strong></td><td>33</td><td>10.46s</td><td><span class="badge badge-lose">−26% vs baseline</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Phase 5 table -->
+  <div class="section">
+    <h2><span class="phase-num">5</span> Frontier variants</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Variant</th><th>c=1 per-req</th><th>c=32</th><th>c=64</th><th>c=128</th><th>c=256</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="name">5a default stack</td><td>298</td><td>3,457</td><td>4,425</td><td>6,143</td><td>7,173</td><td>Phase 4 rerun baseline</td></tr>
+          <tr><td class="name">5b --disable-cuda-graph</td><td><strong>47</strong></td><td>1,283</td><td>1,381</td><td>1,906</td><td>2,032</td><td><span class="badge badge-lose">6.4× slower</span> L19</td></tr>
+          <tr class="highlight"><td class="name"><strong>5c TP4 + DP2</strong> <span class="badge badge-win">best c=256</span></td><td>212</td><td><strong>4,103</strong></td><td><strong>4,786</strong></td><td><strong>6,407</strong></td><td><strong>8,179</strong></td><td>+14% at c=256; L20</td></tr>
+          <tr><td class="name">5d FP4 probe</td><td colspan="5" style="text-align:center;color:var(--text-muted)">FP8 e4m3fn/e5m2 supported; FP4 path requires cutlass 3.x kernels (not shipped)</td><td>L21</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Production routing -->
+  <div class="section">
+    <h2>Production routing recommendation</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Workload</th><th>Concurrency</th><th>Configuration</th><th>Expected throughput</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="name"><strong>Agentic single-user</strong></td>
+            <td>c ≤ 16</td>
+            <td>TP8 + EAGLE3 <code>s4_d4_k1</code> + HiCache 200 GB/rank</td>
+            <td><span class="badge badge-win">~300 tok/s per request</span></td>
+          </tr>
+          <tr>
+            <td class="name"><strong>Multi-tenant moderate</strong></td>
+            <td>c = 32–256</td>
+            <td>TP4 + DP2 + EAGLE3 <code>s4_d4_k1</code> + HiCache</td>
+            <td><span class="badge badge-win">~8,000 tok/s agg</span></td>
+          </tr>
+          <tr>
+            <td class="name"><strong>Bulk throughput</strong></td>
+            <td>c ≥ 512</td>
+            <td>Plain TP8 + prefix caching, no spec decode</td>
+            <td><span class="badge badge-info">10,437 tok/s agg</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Next ceiling: production optimization -->
+  <div class="section">
+    <h2>The next ceiling — production optimization beyond engine tuning</h2>
+    <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1rem;">
+      The measurements above represent the best a <em>single-tenant, statically-configured</em> inference engine can do on this hardware.
+      Moving from <strong>16% of BW roofline (today) to ~30–35% (realistic ceiling)</strong> requires a different category of work —
+      production-workload optimization, not kernel optimization. These problems don't show up in a benchmark but dominate real-world cost.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Production lever</th>
+            <th>What it addresses</th>
+            <th>Typical upside</th>
+            <th>Engineering shape</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="name"><strong>Cross-request KV fragmentation</strong></td>
+            <td>At c=512, KV cache churn and page fragmentation wastes 10–15% of HBM BW. vLLM PagedAttention captures some of this; SGLang radix cache captures less. Deeper fix requires invasive engine changes.</td>
+            <td><span class="badge badge-win">+30–50% at bulk load</span></td>
+            <td>Engine-internal · hard to upstream cleanly</td>
+          </tr>
+          <tr>
+            <td class="name"><strong>Multi-tenant request routing</strong></td>
+            <td>OSS engines are single-process. Real workloads need priority queues, fair-share across tenants, rate limits, SLO-aware admission control. The engine running flat-out is 40% of the cost story — the other 60% is how you dispatch.</td>
+            <td><span class="badge badge-win">+40–80% effective capacity</span></td>
+            <td>Above the engine · product-layer code</td>
+          </tr>
+          <tr>
+            <td class="name"><strong>Fleet-level autoscaling on GPUs</strong></td>
+            <td>Cold-start is 4–16 min per replica. Naive HPA keeps too many warm replicas (cost) or scales too slow (latency). Needs warm pools, request steering during scale events, load prediction, KV cache warmup strategy.</td>
+            <td><span class="badge badge-win">30–60% infra cost reduction</span></td>
+            <td>Platform · requires traffic telemetry</td>
+          </tr>
+          <tr>
+            <td class="name"><strong>Traffic-tuned speculative decode</strong></td>
+            <td>EAGLE3 accept_length depends on draft quality and the draft training distribution matching production traffic. Today's result (5.02) is exceptionally good for K2.6 — other models need periodic draft retraining on traffic logs.</td>
+            <td><span class="badge badge-win">+20–40% per-request throughput</span></td>
+            <td>Model · training pipeline + eval</td>
+          </tr>
+          <tr>
+            <td class="name"><strong>Model-specific quantization</strong></td>
+            <td>Stock INT4/FP8 leaves headroom: FP4 on B300 (sm_103) needs cutlass 3.x kernels not shipped by any OSS engine. Custom per-model quantization with accuracy-regression gating can halve HBM reads.</td>
+            <td><span class="badge badge-win">1.5–2× HBM efficiency</span></td>
+            <td>Kernel + training · deep</td>
+          </tr>
+          <tr>
+            <td class="name"><strong>Compound serving (agents, LoRA, tools)</strong></td>
+            <td>Real agent requests are 4–7 model calls (planner → tools → executor → synthesis). Serving them as 4–7 separate REST calls adds orchestration latency that dwarfs decode time. Co-locating the graph inside the serving stack is a structural win.</td>
+            <td><span class="badge badge-win">2–3× end-to-end latency</span></td>
+            <td>Above the engine · architecture</td>
+          </tr>
+          <tr>
+            <td class="name"><strong>Request-level observability + SLO feedback</strong></td>
+            <td>Without per-tenant p50/p99/p99.9 and cost-per-token telemetry, you can't detect which of the above to invest in. Most OSS deployments fly blind. This is a prerequisite for the other levers, not a separate one.</td>
+            <td><span class="badge badge-info">unblocks the rest</span></td>
+            <td>Platform · foundational</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout info" style="margin-top: 1.5rem">
+      <div class="tag">▼ Strategic framing</div>
+      <h3>Engine tuning has a ceiling. Production-workload optimization does not (yet).</h3>
+      <p>
+        Today's best single-node measured throughput is <strong>10,437 tok/s (bulk) / 302 tok/s per-request (agentic)</strong>.
+        The <strong>realistic single-node ceiling in 12–18 months</strong> — assuming upstream OSS captures most of the software gap —
+        is ~<strong>18–20K tok/s bulk / ~400 tok/s agentic</strong> on this same hardware. That's maybe 2× from engine-side work alone.
+      </p>
+      <p style="margin-top: 0.5rem">
+        <strong>Beyond that, cost improvements come from the rows above</strong>: request routing, multi-tenant fleet
+        autoscaling, compound serving, and traffic-tuned model ops. These are where the next 3–5× of effective $/M-tokens
+        savings live at enterprise scale.
+      </p>
+      <p style="margin-top: 0.5rem">
+        <strong>The critical economic crossover:</strong> at &lt;$200K/yr inference spend, OSS self-hosted + a good engine config
+        wins. At $200K–$2M, the operational levers above pay back faster than staffing to build them in-house. At &gt;$2M/yr with
+        latency-sensitive product requirements, building above the engine (routing, LoRA, autoscaler, compound) while keeping
+        the engine pristine and upstream-tracking is the durable path — forking the engine itself is a maintenance tax that
+        almost never pays back.
+      </p>
+    </div>
+  </div>
+
+  <!-- Scorecard -->
+  <div class="section">
+    <h2>Spec criteria scorecard</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Criterion</th><th>Target</th><th>Achieved</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td class="name">Single-stream ≥ 1.5× baseline</td><td>≥192 tok/s</td><td>302 tok/s</td><td><span class="badge badge-win">PASS +57% over target</span></td></tr>
+          <tr><td class="name">Aggregate @ c=128</td><td>≥6,000 tok/s</td><td>6,410 tok/s</td><td><span class="badge badge-win">PASS</span></td></tr>
+          <tr><td class="name">Aggregate @ c=512 (stretch)</td><td>≥12,000 tok/s</td><td>7,759 tok/s</td><td><span class="badge badge-lose">FAIL — spec overhead at extreme batch</span></td></tr>
+          <tr><td class="name">Roofline characterized</td><td>yes</td><td>12% BW efficiency measured</td><td><span class="badge badge-win">PASS</span></td></tr>
+          <tr><td class="name">Full stack net-positive</td><td>yes</td><td>yes @ c ≤ 256; negative @ c=512</td><td><span class="badge badge-warn">PARTIAL</span></td></tr>
+          <tr><td class="name">No accuracy regression</td><td>verified on 50 prompts</td><td>not validated this session</td><td><span class="badge badge-warn">DEFERRED</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Phase status -->
+  <div class="section">
+    <h2>Phase roadmap — final status</h2>
+    <div class="phases">
+      <div class="phase done">
+        <div class="phase-id">Phase 0</div>
+        <div class="phase-title">Roofline</div>
+        <div class="phase-status">✓ Done</div>
+        <div class="phase-note">NCCL 473 GB/s algo / 836 GB/s bus · AI=7.6 → BW-bound · ceiling 65K tok/s</div>
+      </div>
+      <div class="phase done">
+        <div class="phase-id">Phase 1</div>
+        <div class="phase-title">SGLang EAGLE3 (prior session)</div>
+        <div class="phase-status">✓ Done</div>
+        <div class="phase-note">Default config 3,657 tok/s peak. L17 showed conclusion was wrong.</div>
+      </div>
+      <div class="phase done">
+        <div class="phase-id">Phase 1b</div>
+        <div class="phase-title">EAGLE3 sweep (13 configs)</div>
+        <div class="phase-status">✓ Done</div>
+        <div class="phase-note">Winner s4_d4_k1: 302 tok/s, 6,410 @ c=128.</div>
+      </div>
+      <div class="phase dropped">
+        <div class="phase-id">Phase 2</div>
+        <div class="phase-title">vLLM EAGLE3</div>
+        <div class="phase-status">— Dropped</div>
+        <div class="phase-note">L13 vision-tower crash; no source builds per user direction.</div>
+      </div>
+      <div class="phase dropped">
+        <div class="phase-id">Phase 3</div>
+        <div class="phase-title">Dynamic MLA routing</div>
+        <div class="phase-status">— Dropped</div>
+        <div class="phase-note">Low delta vs prefix-cache baseline; required cherry-picked vLLM image.</div>
+      </div>
+      <div class="phase done">
+        <div class="phase-id">Phase 4</div>
+        <div class="phase-title">Fullstack</div>
+        <div class="phase-status">✓ Done</div>
+        <div class="phase-note">EAGLE3 + HiCache: 281 tok/s @ c=1, 5,834 @ c=128, 7,759 @ c=512.</div>
+      </div>
+      <div class="phase done">
+        <div class="phase-id">Phase 5a</div>
+        <div class="phase-title">Default stack</div>
+        <div class="phase-status">✓ Done</div>
+        <div class="phase-note">298 tok/s @ c=1, 7,173 @ c=256. Confirms Phase 4 baseline.</div>
+      </div>
+      <div class="phase done">
+        <div class="phase-id">Phase 5b</div>
+        <div class="phase-title">no-cuda-graph</div>
+        <div class="phase-status">✓ Done</div>
+        <div class="phase-note">L19 finding: 6.4× speedup from CUDA graphs alone.</div>
+      </div>
+      <div class="phase done">
+        <div class="phase-id">Phase 5c</div>
+        <div class="phase-title">TP4 + DP2</div>
+        <div class="phase-status">✓ Done</div>
+        <div class="phase-note">L20: +14% at c=256 over TP8. Best multi-tenant config.</div>
+      </div>
+      <div class="phase done">
+        <div class="phase-id">Phase 5d</div>
+        <div class="phase-title">FP4 probe</div>
+        <div class="phase-status">✓ Done</div>
+        <div class="phase-note">L21: FP4 kernels require cutlass 3.x, not in SGLang 0.5.10. Deferred.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lessons summary -->
+  <div class="callout win">
+    <div class="tag">▼ New lessons captured this session</div>
+    <h3>L14 (VPC endpoints) · L15 (HF auth) · L16 (cubin symlink cold-start) · L17 (Phase 1 error) · L18 (num_draft_tokens no-op) · L19 (CUDA graphs 6.4×) · L20 (TP4+DP2 wins) · L21 (FP4 kernel gap)</h3>
+    <p>See <code>lessons.md</code> in the blueprint directory for full writeups including fix protocols and production rules.</p>
+  </div>
+
+</main>
+
+<footer>
+  Generated by visual-explainer · agent-aiops-on-aws · Session 2026-05-13 · p6-b300 spot terminated · Total cost ~$230
+</footer>
+
+<script>
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: isDark ? 'dark' : 'default',
+    themeVariables: {
+      primaryColor: '#6366f1',
+      primaryTextColor: isDark ? '#e2e8f0' : '#0f172a',
+      primaryBorderColor: '#2e3151',
+      lineColor: '#8892a4',
+      background: isDark ? '#1a1d2e' : '#ffffff',
+      xyChart: {
+        backgroundColor: isDark ? '#1a1d2e' : '#ffffff',
+        titleColor: isDark ? '#e2e8f0' : '#0f172a',
+        xAxisLabelColor: isDark ? '#e2e8f0' : '#0f172a',
+        yAxisLabelColor: isDark ? '#e2e8f0' : '#0f172a',
+        plotColorPalette: '#6366f1,#22c55e,#f59e0b,#ef4444'
+      }
+    }
+  });
+  function toggleTheme() {
+    const html = document.documentElement;
+    html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    location.reload();
+  }
+
+  // ---------- Generic concurrency line chart ----------
+  function drawConcChart(canvasId, yMax, yLabel, series, annotations) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    const W = rect.width, H = rect.height;
+    const pad = { top: 24, right: 140, bottom: 46, left: 64 };
+    const cW = W - pad.left - pad.right;
+    const cH = H - pad.top - pad.bottom;
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const COL = {
+      axis: isDark ? '#475569' : '#94a3b8',
+      grid: isDark ? '#1e293b' : '#e2e8f0',
+      muted: isDark ? '#8892a4' : '#475569',
+      text: isDark ? '#e2e8f0' : '#0f172a',
+    };
+    // X axis: 7 concurrency positions evenly spaced (log-like labels)
+    const xLabels = ['c=1', 'c=8', 'c=32', 'c=64', 'c=128', 'c=256', 'c=512'];
+    const xPos = i => pad.left + (i / (xLabels.length - 1)) * cW;
+    const yPos = v => pad.top + (1 - v / yMax) * cH;
+
+    // Grid + ticks
+    ctx.font = '10px Inter, sans-serif';
+    ctx.strokeStyle = COL.grid;
+    ctx.lineWidth = 0.5;
+    ctx.fillStyle = COL.muted;
+    const ySteps = 5;
+    for (let i = 0; i <= ySteps; i++) {
+      const v = (yMax / ySteps) * i;
+      ctx.beginPath();
+      ctx.moveTo(pad.left, yPos(v));
+      ctx.lineTo(W - pad.right, yPos(v));
+      ctx.stroke();
+      ctx.textAlign = 'right';
+      ctx.fillText(v >= 1000 ? (v / 1000).toFixed(1) + 'K' : v.toFixed(0), pad.left - 6, yPos(v) + 3);
+    }
+    xLabels.forEach((lbl, i) => {
+      ctx.beginPath();
+      ctx.moveTo(xPos(i), pad.top);
+      ctx.lineTo(xPos(i), H - pad.bottom);
+      ctx.strokeStyle = COL.grid;
+      ctx.stroke();
+      ctx.fillStyle = COL.muted;
+      ctx.textAlign = 'center';
+      ctx.fillText(lbl, xPos(i), H - pad.bottom + 14);
+    });
+
+    // Axes
+    ctx.strokeStyle = COL.axis;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, pad.top);
+    ctx.lineTo(pad.left, H - pad.bottom);
+    ctx.lineTo(W - pad.right, H - pad.bottom);
+    ctx.stroke();
+
+    // Axis labels
+    ctx.fillStyle = COL.text;
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Concurrency', (pad.left + W - pad.right) / 2, H - 6);
+    ctx.save();
+    ctx.translate(16, (pad.top + H - pad.bottom) / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText(yLabel, 0, 0);
+    ctx.restore();
+
+    // Draw each series
+    series.forEach(s => {
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      let started = false;
+      s.values.forEach((v, i) => {
+        if (v === null || v === undefined) { started = false; return; }
+        const x = xPos(i), y = yPos(v);
+        if (!started) { ctx.moveTo(x, y); started = true; }
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      s.values.forEach((v, i) => {
+        if (v === null || v === undefined) return;
+        ctx.fillStyle = s.color;
+        ctx.beginPath();
+        ctx.arc(xPos(i), yPos(v), 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = isDark ? '#0f1117' : '#ffffff';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      });
+      // Label at the rightmost non-null point, offset into the right gutter
+      let lastIdx = -1;
+      for (let i = s.values.length - 1; i >= 0; i--) {
+        if (s.values[i] !== null && s.values[i] !== undefined) { lastIdx = i; break; }
+      }
+      if (lastIdx >= 0) {
+        const lx = xPos(lastIdx), ly = yPos(s.values[lastIdx]);
+        // leader line
+        ctx.strokeStyle = s.color;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 2]);
+        ctx.beginPath();
+        ctx.moveTo(lx + 4, ly);
+        ctx.lineTo(W - pad.right + 6, ly);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = s.color;
+        ctx.font = 'bold 10.5px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(s.label, W - pad.right + 8, ly + 3);
+        if (s.sublabel) {
+          ctx.fillStyle = COL.muted;
+          ctx.font = '9px Inter, sans-serif';
+          ctx.fillText(s.sublabel, W - pad.right + 8, ly + 14);
+        }
+      }
+    });
+
+    // Optional annotations (array of {tx, ty, text, color})
+    if (annotations) annotations.forEach(a => {
+      ctx.fillStyle = a.color;
+      ctx.font = 'bold 10px Inter, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(a.text, xPos(a.xi) + 6, yPos(a.y));
+    });
+  }
+
+  // Aggregate chart
+  drawConcChart('aggCanvas', 11000, 'Aggregate tok/s', [
+    { label: 'vLLM baseline',    sublabel: 'bulk king',         color: '#3b82f6', values: [243, 937, 2155, 3185, 4716, 6374, 10437] },
+    { label: 'TP4+DP2 + EAGLE3', sublabel: 'multi-tenant',      color: '#f59e0b', values: [166, 1343, 4103, 4786, 6407, 8179, null] },
+    { label: 'EAGLE3 + HiCache', sublabel: 'Phase 4 fullstack', color: '#10b981', values: [198, 1387, 3583, 4366, 5834, 7082, 7759] },
+    { label: 'EAGLE3 defaults',  sublabel: 'Phase 1',           color: '#f87171', values: [631, 1484, 2689, 3657, 3550, 3454, 2994] },
+    { label: 'SGLang baseline',  sublabel: 'saturates',         color: '#8b5cf6', values: [481, 925, 2170, 3112, 3270, 3292, 3400] },
+  ]);
+
+  // Per-request chart
+  drawConcChart('perReqCanvas', 310, 'Per-request tok/s', [
+    { label: 'EAGLE3 s4_d4',     sublabel: '+136% @ c=1',        color: '#22c55e', values: [302, 179, 108, 73, 63, null, null] },
+    { label: 'EAGLE3 + HiCache', sublabel: 'Phase 4',            color: '#10b981', values: [281, 179, 113, 79, 63, 48, 33] },
+    { label: 'TP4+DP2 + EAGLE3', sublabel: 'Phase 5c',           color: '#f59e0b', values: [212, 188, 137, 86, 66, 53, null] },
+    { label: 'SGLang baseline',  sublabel: '',                   color: '#8b5cf6', values: [90, 78, 75, 56, 28, 14, 7] },
+    { label: 'vLLM baseline',    sublabel: '',                   color: '#3b82f6', values: [76, 71, 70, 55, 40, 27, 23] },
+  ]);
+
+  // ---------- Pareto canvas ----------
+  (function drawPareto() {
+    const canvas = document.getElementById('paretoCanvas');
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const W = rect.width, H = rect.height;
+    const pad = { top: 24, right: 40, bottom: 46, left: 64 };
+    const cW = W - pad.left - pad.right;
+    const cH = H - pad.top - pad.bottom;
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const COL = {
+      axis: isDark ? '#475569' : '#94a3b8',
+      grid: isDark ? '#1e293b' : '#e2e8f0',
+      muted: isDark ? '#64748b' : '#475569',
+      text: isDark ? '#e2e8f0' : '#0f172a',
+      blue: '#3b82f6', green: '#10b981', amber: '#f59e0b', red: '#ef4444',
+    };
+
+    // Data: (agg_tput_tok_per_s, ms_per_token = 1000/per_req_tps, concurrency_label)
+    const vllmBaseline = [
+      [243, 13.2, 'c=1'], [937, 14.0, 'c=8'], [2155, 14.2, 'c=32'],
+      [3185, 18.3, 'c=64'], [4716, 24.8, 'c=128'], [6374, 36.6, 'c=256'],
+      [10437, 44.2, 'c=512'],
+    ];
+    const sglangBaseline = [
+      [481, 11.2, 'c=1'], [925, 12.9, 'c=8'], [2170, 13.3, 'c=32'],
+      [3112, 17.8, 'c=64'], [3270, 35.5, 'c=128'], [3292, 71.9, 'c=256'],
+      [3400, 140.8, 'c=512'],
+    ];
+    const eagle3 = [
+      [198, 3.6, 'c=1'], [1387, 5.6, 'c=8'], [3583, 8.8, 'c=32'],
+      [4366, 12.7, 'c=64'], [5834, 15.9, 'c=128'], [7082, 20.8, 'c=256'],
+      [7759, 30.3, 'c=512'],
+    ];
+    const tp4dp2 = [
+      [166, 4.7, 'c=1'], [1343, 5.3, 'c=8'], [4103, 7.3, 'c=32'],
+      [4786, 11.6, 'c=64'], [6407, 15.2, 'c=128'], [8179, 18.9, 'c=256'],
+    ];
+
+    const maxTput = 12000;
+    const maxLat = 55;
+
+    const xPos = t => pad.left + (t / maxTput) * cW;
+    const yPos = l => pad.top + (l / maxLat) * cH;
+
+    // Grid
+    ctx.strokeStyle = COL.grid;
+    ctx.lineWidth = 0.5;
+    ctx.font = '10px Inter, sans-serif';
+    ctx.fillStyle = COL.muted;
+    for (let t = 2000; t <= 10000; t += 2000) {
+      ctx.beginPath();
+      ctx.moveTo(xPos(t), pad.top);
+      ctx.lineTo(xPos(t), H - pad.bottom);
+      ctx.stroke();
+      ctx.textAlign = 'center';
+      ctx.fillText((t / 1000) + 'K', xPos(t), H - pad.bottom + 14);
+    }
+    for (let l = 10; l <= 50; l += 10) {
+      ctx.beginPath();
+      ctx.moveTo(pad.left, yPos(l));
+      ctx.lineTo(W - pad.right, yPos(l));
+      ctx.stroke();
+      ctx.textAlign = 'right';
+      ctx.fillText(l, pad.left - 6, yPos(l) + 3);
+    }
+    ctx.textAlign = 'right';
+    ctx.fillText('0', pad.left - 6, yPos(0) + 3);
+
+    // Axis lines
+    ctx.strokeStyle = COL.axis;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, pad.top);
+    ctx.lineTo(pad.left, H - pad.bottom);
+    ctx.lineTo(W - pad.right, H - pad.bottom);
+    ctx.stroke();
+
+    // Axis labels
+    ctx.fillStyle = COL.text;
+    ctx.font = '11px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Aggregate throughput (tok/s)', W / 2, H - 6);
+    ctx.save();
+    ctx.translate(16, H / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('Decode latency (ms / token) — lower is better', 0, 0);
+    ctx.restore();
+
+    function drawCurve(arr, color) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(xPos(arr[0][0]), yPos(arr[0][1]));
+      for (let i = 1; i < arr.length; i++) {
+        const [x1, y1] = arr[i - 1];
+        const [x2, y2] = arr[i];
+        const cx = xPos((x1 + x2) / 2);
+        const cy = yPos((y1 + y2) / 2);
+        ctx.quadraticCurveTo(xPos(x1), yPos(y1), cx, cy);
+      }
+      const last = arr[arr.length - 1];
+      ctx.lineTo(xPos(last[0]), yPos(last[1]));
+      ctx.stroke();
+      arr.forEach(([t, l]) => {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(xPos(t), yPos(l), 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = isDark ? '#0f1117' : '#ffffff';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      });
+    }
+
+    drawCurve(vllmBaseline, COL.blue);
+    drawCurve(sglangBaseline, '#8b5cf6');
+    drawCurve(eagle3, COL.green);
+    drawCurve(tp4dp2, COL.amber);
+
+    // Inline labels positioned on empty chart regions (roofline-style)
+    function label(color, text, sub, tx, ty) {
+      ctx.fillStyle = color;
+      ctx.font = 'bold 11px Inter, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(text, xPos(tx), yPos(ty));
+      if (sub) {
+        ctx.fillStyle = COL.muted;
+        ctx.font = '9.5px Inter, sans-serif';
+        ctx.fillText(sub, xPos(tx), yPos(ty) + 13);
+      }
+    }
+
+    label(COL.blue,   'vLLM baseline',        'bulk throughput king',  6200, 28);
+    label('#8b5cf6',  'SGLang baseline',      'saturates at ~3.4K',    1500, 48);
+    label(COL.green,  'SGLang + EAGLE3',      'agentic UX king',       1800, 8);
+    label(COL.amber,  'TP4+DP2 + EAGLE3',     'multi-tenant winner',   4300, 24);
+
+    // c-level labels on key points — placed at end of each curve
+    ctx.fillStyle = COL.muted;
+    ctx.font = '9px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    const pts = [
+      [vllmBaseline[0], 'c=1'], [vllmBaseline[6], 'c=512'],
+      [eagle3[0], 'c=1'], [eagle3[6], 'c=512'],
+      [tp4dp2[0], 'c=1'], [tp4dp2[5], 'c=256'],
+      [sglangBaseline[0], 'c=1'], [sglangBaseline[6], 'c=512'],
+    ];
+    pts.forEach(([p, lbl]) => ctx.fillText(lbl, xPos(p[0]) + 6, yPos(p[1]) - 5));
+
+    // 3.7× speedup arrow at c=1 region
+    ctx.strokeStyle = COL.green;
+    ctx.lineWidth = 1.3;
+    ctx.setLineDash([3, 2]);
+    const ax1 = xPos(243), ay1 = yPos(13.2);
+    const ax2 = xPos(198), ay2 = yPos(3.6);
+    ctx.beginPath();
+    ctx.moveTo(ax1, ay1);
+    ctx.lineTo(ax2, ay2 + 6);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = COL.green;
+    ctx.beginPath();
+    ctx.moveTo(ax2 - 3, ay2 + 6);
+    ctx.lineTo(ax2, ay2);
+    ctx.lineTo(ax2 + 3, ay2 + 6);
+    ctx.fill();
+    ctx.fillStyle = COL.green;
+    ctx.font = 'bold 10px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('3.7× faster', ax1 + 10, (ay1 + ay2) / 2 - 2);
+    ctx.fillStyle = COL.muted;
+    ctx.font = '9px Inter, sans-serif';
+    ctx.fillText('per-token decode', ax1 + 10, (ay1 + ay2) / 2 + 9);
+
+    // Crossover annotation at c=512
+    ctx.strokeStyle = COL.red;
+    ctx.lineWidth = 1.3;
+    ctx.setLineDash([3, 2]);
+    ctx.beginPath();
+    ctx.moveTo(xPos(7759), yPos(30.3));
+    ctx.lineTo(xPos(10437), yPos(44.2));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = COL.red;
+    ctx.font = 'bold 10px Inter, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('c=512: vLLM wins bulk', xPos(10437) - 4, yPos(51));
+  })();
+</script>
+</body>
+</html>

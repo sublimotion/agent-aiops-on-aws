@@ -11,8 +11,16 @@ DRY_RUN=false
 [[ "${1:-}" == "--dry-run" ]] && DRY_RUN=true
 
 echo "==> Collecting reports into $REPORTS"
+# Preserve cross-domain files that have no source under domains/
+BACKUP="$DOCS/reports.bak"
+rm -rf "$BACKUP"
+mkdir -p "$BACKUP"
+for f in compatibility-matrix.html model-comparison.html provider-comparison.html site-benchmark-report.html pareto-frontier.html pareto-mockups.html benchmark-visual-deepseek-v4-flash-20260519.html; do
+  [[ -f "$REPORTS/$f" ]] && cp "$REPORTS/$f" "$BACKUP/$f"
+done
 rm -rf "$REPORTS"
 mkdir -p "$REPORTS"
+trap 'rm -rf "$BACKUP"' EXIT
 
 copied=0
 skipped=0
@@ -42,6 +50,16 @@ copy_report "domains/gpu-serving/blueprints/nemotron-super/results/benchmark-rep
 copy_report "domains/gpu-serving/blueprints/ray-serve-video/results/benchmark-visual-report.html" "benchmark-visual-ray-serve-video-20260327.html"
 copy_report "domains/gpu-serving/blueprints/qwen3-235b-b300/results/benchmark-visual-report.html" "benchmark-visual-qwen3-235b-b300-20260422.html"
 copy_report "domains/gpu-serving/blueprints/kimi-k2.6/results/benchmark-visual-report.html" "benchmark-visual-kimi-k2.6-20260422.html"
+copy_report "domains/gpu-serving/blueprints/kimi-k2.6-speculative/docs/benchmark-report.html" "benchmark-visual-kimi-k2.6-speculative.html"
+copy_report "domains/gpu-serving/blueprints/kimi-k2.6-speculative/docs/roofline-explainer.html" "roofline-explainer-kimi-k2.6.html"
+copy_report "domains/gpu-serving/blueprints/qwen3-235b-speculative/docs/benchmark-report.html" "benchmark-visual-qwen3-235b-speculative.html"
+
+# GPU Serving — HyperPod & EKS
+copy_report "domains/gpu-serving/blueprints/gemma4-hyperpod/results/hyperpod-3model-visual-20260407.html" "hyperpod-3model-visual-20260407.html"
+copy_report "domains/gpu-serving/blueprints/qwen3-embedding-8b-hyperpod/results/visual-report.html" "qwen3-embedding-8b-hyperpod-visual.html"
+copy_report "domains/gpu-serving/blueprints/qwen3-reranker-4b-eks/results/visual-report.html" "qwen3-reranker-4b-eks-visual.html"
+copy_report "domains/gpu-serving/blueprints/voxtral-4b-eks/results/visual-report.html" "voxtral-4b-eks-visual.html"
+copy_report "domains/gpu-serving/blueprints/deepseek-ocr-2-eks/results/visual-report.html" "deepseek-ocr-2-eks-visual.html"
 
 # Autoresearch
 copy_report "domains/autoresearch/blueprints/verifier-reward/results/verifier-reward-visual.html" "verifier-reward-visual.html"
@@ -53,12 +71,17 @@ copy_report "domains/autoresearch/blueprints/agent-harness/results/visual-explai
 copy_report "domains/autoresearch/blueprints/training-recipes/results/benchmark-report.html" "benchmark-report-training-recipes.html"
 copy_report "domains/autoresearch/blueprints/finetuning-recipes/results/benchmark-report.html" "benchmark-report-finetuning-recipes.html"
 copy_report "domains/autoresearch/blueprints/verification-primitives/results/verification-primitives-consolidated.html" "verification-primitives-consolidated.html"
+copy_report "domains/autoresearch/blueprints/verification-flywheel/results/flywheel-visual-20260426.html" "flywheel-visual-20260426.html"
+copy_report "domains/autoresearch/blueprints/learned-verifier/results/verification-visual-explainer.html" "learned-verifier-visual.html"
+copy_report "domains/autoresearch/blueprints/kernel-optimization-agent/results/report-visual.html" "kernel-optimization-visual.html"
+copy_report "domains/autoresearch/blueprints/tiny-judge/results/judge-visual.html" "tiny-judge-visual.html"
+copy_report "domains/autoresearch/blueprints/pivot-analysis/results/pivot-visual.html" "pivot-analysis-visual.html"
+copy_report "domains/autoresearch/blueprints/self-coding-agent-loop/spec-explainer.html" "self-coding-agent-loop-visual.html"
 
-# Site (cross-domain)
-copy_report "site/compatibility-matrix.html" "compatibility-matrix.html"
-copy_report "site/model-comparison.html" "model-comparison.html"
-copy_report "site/provider-comparison.html" "provider-comparison.html"
-copy_report "site/benchmark-report.html" "site-benchmark-report.html"
+# Cross-domain (existing files in docs/reports/ — preserved across rebuilds)
+for f in compatibility-matrix.html model-comparison.html provider-comparison.html site-benchmark-report.html pareto-frontier.html pareto-mockups.html benchmark-visual-deepseek-v4-flash-20260519.html; do
+  if [[ -f "$DOCS/reports.bak/$f" ]]; then cp "$DOCS/reports.bak/$f" "$REPORTS/$f"; copied=$((copied+1)); echo "  + $f (preserved)"; fi
+done
 
 echo "==> Collected $copied reports ($skipped skipped)"
 
@@ -71,7 +94,7 @@ fi
 echo "==> Pushing to upstream gh-pages branch"
 
 TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
+trap 'rm -rf "$TMPDIR" "$BACKUP"' EXIT
 
 cd "$TMPDIR"
 git init -q
