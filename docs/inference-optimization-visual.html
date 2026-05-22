@@ -170,13 +170,13 @@
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
               <span style="font-size: 12px; font-weight: 600; color: var(--text);">EAGLE3 Speculative Decode</span>
-              <span style="font-size: 10px; color: var(--muted); margin-left: 8px;">3-4 tokens per decode step instead of 1</span>
+              <span style="font-size: 10px; color: var(--muted); margin-left: 8px;">+136% c=1 tuned; net-neg c&gt;256 (stock draft)</span>
             </div>
-            <div style="font-size: 14px; font-weight: 700; color: var(--amber);">+50-100%</div>
+            <div style="font-size: 14px; font-weight: 700; color: var(--amber);">+136% / −26%</div>
           </div>
           <div style="height: 6px; background: #334155; border-radius: 3px; margin-top: 8px;"><div style="width: 60%; height: 100%; background: var(--amber); border-radius: 3px;"></div></div>
         </div>
-        <div style="width: 80px; text-align: right; font-size: 9px; color: var(--amber);">HIGH PRIORITY<br>UNTESTED</div>
+        <div style="width: 80px; text-align: right; font-size: 9px; color: var(--amber);">TESTED<br>draft fine-tune = unlock</div>
       </div>
 
       <div style="display: flex; align-items: center; gap: 12px;">
@@ -223,6 +223,66 @@
         </div>
         <div style="width: 80px; text-align: right; font-size: 9px; color: var(--red);">Only multi-node<br>or miss >40%</div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 2b: SPEC-DECODE POTENTIAL vs ACTUAL ═══════════ -->
+<div class="section">
+  <div class="section-title">Speculative Decoding: Potential vs Actual (the Stock-Draft Trap)</div>
+  <div class="card">
+    <div style="background: #1e293b; border-left: 3px solid var(--amber); padding: 12px 14px; border-radius: 6px; margin-bottom: 14px;">
+      <div style="font-size: 12px; color: var(--text); line-height: 1.6;">
+        <strong style="color: var(--amber);">The dominant factor in real-world spec-decode performance is whether the draft model has been fine-tuned on the target's serving distribution.</strong>
+        Off-the-shelf EAGLE3 drafts (<code>lightseekorg/kimi-k2.6-eagle3</code>, <code>lmsys/Qwen3-235B-A22B-EAGLE3</code>) are trained on generic mixtures and do not match production traffic.
+        Synthetic benchmarks (<code>vllm bench --dataset-name random</code>) inflate stock-draft EAGLE3 by <strong>3–5×</strong> over real ShareGPT traffic.
+      </div>
+    </div>
+
+    <div class="grid-2" style="gap: 16px;">
+      <div style="background: #0f172a; border-radius: 8px; padding: 14px; border: 1px solid var(--green);">
+        <div style="font-size: 12px; font-weight: 700; color: var(--green); margin-bottom: 10px;">Synthetic (theoretical potential)</div>
+        <div style="font-size: 11px; color: var(--text); line-height: 1.9;">
+          Accept rate: <strong>1.00</strong><br>
+          Accept length: <strong>5.0</strong><br>
+          Per-req tok/s (K2.6 c=1): <strong>325</strong>
+        </div>
+        <div style="margin-top: 10px; font-size: 10px; color: var(--dim);">What a perfectly-aligned draft <em>could</em> deliver. Used in most published EAGLE3 / MTP throughput claims.</div>
+      </div>
+      <div style="background: #0f172a; border-radius: 8px; padding: 14px; border: 1px solid var(--red);">
+        <div style="font-size: 12px; font-weight: 700; color: var(--red); margin-bottom: 10px;">ShareGPT (actual, stock draft)</div>
+        <div style="font-size: 11px; color: var(--text); line-height: 1.9;">
+          Accept rate: <strong>0.156</strong><br>
+          Accept length: <strong>1.62</strong><br>
+          Per-req tok/s (K2.6 c=1): <strong>54</strong>
+        </div>
+        <div style="margin-top: 10px; font-size: 10px; color: var(--dim);">What ships in production with off-the-shelf draft weights.</div>
+      </div>
+    </div>
+
+    <div style="margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+      <div style="background: #0f172a; border-radius: 8px; padding: 12px; border: 1px solid var(--border);">
+        <div style="font-size: 11px; font-weight: 600; color: var(--blue); margin-bottom: 6px;">Kimi K2.6 (B300, SGLang EAGLE3 s4_d4_k1, tuned)</div>
+        <div style="font-size: 10px; color: var(--muted); line-height: 1.7;">
+          c=1 single-stream: 128 → <strong style="color:var(--green)">302 tok/s (+136%)</strong><br>
+          c=128: <strong style="color:var(--green)">6,410 tok/s</strong> (net positive)<br>
+          c=512 fullstack: 7,759 vs <strong style="color:var(--red)">10,437 no-spec (−26%)</strong><br>
+          SGLang defaults s3_d4_k1: <strong style="color:var(--red)">−65% @ c=64</strong> — do not ship.
+        </div>
+      </div>
+      <div style="background: #0f172a; border-radius: 8px; padding: 12px; border: 1px solid var(--border);">
+        <div style="font-size: 11px; font-weight: 600; color: var(--blue); margin-bottom: 6px;">Qwen3-235B (B300, FP8 TP8, SGLang EAGLE3)</div>
+        <div style="font-size: 10px; color: var(--muted); line-height: 1.7;">
+          Draft accept length: 3.0–3.5 (vs K2.6's 5.0 → less headroom)<br>
+          ShareGPT c=16: <strong>63.8 tok/s/req</strong>, tied with vLLM no-spec (63.3)<br>
+          <strong style="color:var(--red)">~2× behind CoreWeave's 128.2</strong> (custom NVFP4 + custom-trained draft)<br>
+          DP+EP+EAGLE3: crashes (SGLang 0.5.10).
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 14px; padding: 10px 12px; background: #0f172a; border-radius: 6px; border-left: 3px solid var(--blue); font-size: 10px; color: var(--muted); line-height: 1.7;">
+      <strong style="color: var(--text);">Reporting rule:</strong> always quote both synthetic and ShareGPT/production numbers. Treat synthetic figures as <em>upper bound</em>, not deliverable. Both the −26% K2.6 regression at c=512 and the 2× CoreWeave gap on Qwen3 are properties of the <strong>draft</strong>, not of EAGLE3 itself — budget for draft fine-tuning on real traffic, or evict spec-decode from the rollout plan.
     </div>
   </div>
 </div>
@@ -449,7 +509,7 @@
           <div style="font-size: 12px; font-weight: 700; color: var(--red); margin-bottom: 8px;">&gt;100 tok/s/user</div>
           <div style="font-size: 10px; color: var(--muted); margin-bottom: 4px;">Agentic, fast mode</div>
           <ul style="font-size: 10px; color: var(--text); line-height: 1.8; padding-left: 14px;">
-            <li>EAGLE3/MTP enabled? <span style="color:var(--amber)">→ up to 21x cost reduction</span></li>
+            <li>EAGLE3/MTP enabled? <span style="color:var(--amber)">→ up to 21x cost reduction (theoretical, draft-fine-tuned)</span></li>
             <li>Small batch → use TP, NOT EP</li>
             <li>Accept higher $/token (this is the race car)</li>
           </ul>
@@ -612,7 +672,7 @@
           <li>Enable CUDA graphs (default in vLLM/SGLang)</li>
           <li>Verify MoE tile config exists for your GPU</li>
           <li>Enable prefix caching (--enable-prefix-caching)</li>
-          <li>Add EAGLE3 if draft model available</li>
+          <li>Add EAGLE3 only if draft is fine-tuned on your traffic (stock drafts net-negative past c≈256)</li>
           <li>Test dynamic MLA routing for short prefills</li>
           <li>Right-size: B200 unless you need &gt;100 sessions @ 128K</li>
           <li>Measure with standard workload catalog</li>

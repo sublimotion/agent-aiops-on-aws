@@ -197,9 +197,37 @@ From InferenceX data at fixed 50 tok/s/user:
 - At 150 tok/s/user: $2.35 → $0.11/M tokens (**21x cheaper**)
 - B200 Disagg FP4: MTP provides 30-50% throughput uplift across the frontier
 
-**Our results:**
-- GLM-5 on B200 with MTP (`--speculative-config.method mtp --speculative-config.num_speculative_tokens 1`): Measurable throughput gain at decode
-- Kimi K2.6: MTP not yet supported in vLLM for this architecture
+**Our results (B300, SGLang EAGLE3 with stock off-the-shelf draft models):**
+- **GLM-5 on B200 with MTP** (`--speculative-config.method mtp --speculative-config.num_speculative_tokens 1`): Measurable throughput gain at decode (built-in MTP heads, distribution-aligned).
+- **Kimi K2.6 + `lightseekorg/kimi-k2.6-eagle3`** (`s4_d4_k1` after tuning):
+  - Single-stream: **128 → 302 tok/s (+136%)** at c=1.
+  - c=128: 6,410 tok/s — net positive.
+  - c=512 fullstack (HiCache 200 GB/rank): 7,759 tok/s vs **10,437 tok/s no-spec baseline (−26%)**. EAGLE3 is net-negative past c≈256.
+  - SGLang defaults (`s3_d4_k1`) collapse to **3,657 tok/s @ c=64 (−65%)** — defaults are mistuned for K2.6, do not ship them.
+- **Qwen3-235B + `lmsys/Qwen3-235B-A22B-EAGLE3`** (FP8 TP8, SGLang):
+  - Advertised draft accept length 3.0–3.5 (vs Kimi's 5.0) — lower theoretical headroom.
+  - ShareGPT @ c=16: **63.8 tok/s/req**, statistically tied with vLLM TP4 NVFP4 no-spec (63.3) and **~2× behind CoreWeave's tuned stack (128.2)**. The gap is attributed to custom NVFP4 kernels + a *custom-trained* draft, not stock EAGLE3.
+  - DP+EP+EAGLE3 combo crashes (SGLang 0.5.10); single-node EP+EAGLE3 regresses 14–39%.
+- **Kimi K2.6 vLLM**: MTP not yet supported in vLLM for this architecture; EAGLE3 requires custom image.
+
+### Potential vs Actual: the Stock-Draft Trap
+
+> **The dominant factor in real-world spec-decode performance is whether the draft model has been fine-tuned on the target model's serving distribution.** Off-the-shelf EAGLE3 drafts (`lightseekorg/kimi-k2.6-eagle3`, `lmsys/Qwen3-235B-A22B-EAGLE3`) are trained on generic mixtures and do not match production traffic.
+
+Synthetic benchmarks systematically overstate stock-draft EAGLE3 by 3–5× (Kimi K2.6 measured):
+
+| Metric | Synthetic (`vllm bench --dataset-name random`) | Real ShareGPT |
+|---|---|---|
+| Accept rate | **1.00** | **0.156** |
+| Accept length | **5.0** | **1.62** |
+| Per-req tok/s | 325 | **54** |
+
+**Why this matters for reporting**: Most published EAGLE3 / MTP throughput numbers (including some of our internal sweeps) use synthetic prompts. They represent the *upper bound* of what a perfectly-aligned draft could deliver, not what the stock draft delivers in production. Always:
+
+1. Quote both synthetic and ShareGPT/production-distribution numbers.
+2. Treat synthetic figures as **theoretical potential** that requires draft fine-tuning to realize.
+3. Assume the **2× CoreWeave gap on Qwen3** and the **−26% regression at c=512 on Kimi** both close substantially with a draft fine-tuned on actual traffic — neither is a property of EAGLE3 itself.
+4. For new model rollouts, budget for draft fine-tuning (or eviction of spec-decode from the rollout plan) rather than relying on stock weights.
 
 ### MTP vs External Draft Model
 
@@ -753,13 +781,13 @@ Apply in this order — each subsequent optimization has decreasing marginal val
 1. CUDA graphs (14.9x) — always on, free
 2. Correct MoE tile config (+23%) — check config exists for your GPU
 3. Prefix caching (103x TTFT for repeated prefixes) — always on
-4. EAGLE3 speculative decode (expected 1.5-3x single-stream) — HIGH PRIORITY UNTESTED
+4. EAGLE3 speculative decode — TESTED on Kimi K2.6 + Qwen3-235B (B300). +136% single-stream on K2.6 (`s4_d4_k1`); net-negative past c≈256 with stock draft. Real ShareGPT accept rate 0.156 vs 1.00 synthetic — draft fine-tuning on production traffic is the unlock, not the algorithm. See §3.
 5. Dynamic MLA/MHA routing (expected 2-3x TTFT for <1K) — HIGH PRIORITY UNTESTED
 6. HiCache (only if KV pressure at target concurrency)
 7. Disagg P/D (only if multi-node or prefix cache miss rate >40%)
 ```
 
-Items 4-5 are the highest-leverage untested optimizations for K2.6 coding agents.
+Item 5 is the highest-leverage untested optimization for K2.6 coding agents. Item 4 is realized only with a workload-tuned draft.
 
 ---
 
