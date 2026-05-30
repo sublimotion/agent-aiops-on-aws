@@ -1,0 +1,393 @@
+{
+  "summary": {
+    "n": 20,
+    "judged_by_both": 20,
+    "agreement": 0.85,
+    "haiku_acceptable_rate": 0.85,
+    "sonnet_acceptable_rate": 0.8,
+    "responder_worker_ord": 4,
+    "responder_worker_name": "mistral-large-3"
+  },
+  "rows": [
+    {
+      "id": "wildchat_af7440c4d5",
+      "question": "```{\n  pkgs,\n  flake-uri,\n  ...\n}: let\n  script-name = \"unwrap-sops-key\";\nin {\n  type = \"app\";\n  program = builtins.toString (pkgs.writeShellScript script-name ''\n    if [ $# -lt 1 ]; then\n      echo ",
+      "response_tail": " secrets management setup using TPM2 for decryption\n- The script assumes each host has its own encrypted key file in `hosts/<hostname>/sopskey.enc`\n- The decrypted output is an age key that would be used for further decryption of secrets\n\nWould you like me to explain any part of this in more detail?",
+      "haiku": {
+        "verdict": false,
+        "raw": "UNACCEPTABLE\n\nThe response contains a critical factual error: it claims the empty JSON object `{}` is incorrect and suggests removing it, but `{}` is actually the correct syntax for clevis decrypt when no additional options are needed\u2014the assistant misunderstood the clevis command-line interface and",
+        "input_tokens": 974,
+        "output_tokens": 82,
+        "elapsed_s": 2.81
+      },
+      "sonnet": {
+        "verdict": false,
+        "raw": "UNACCEPTABLE\n\nThe response incorrectly identifies a \"syntax error\" with the `{}` JSON object in the clevis command \u2014 this is actually valid clevis syntax where `{}` is the policy JSON for TPM2 decryption, not an error. The suggested fix removes this required argument, producing broken code.",
+        "input_tokens": 974,
+        "output_tokens": 73,
+        "elapsed_s": 3.85
+      }
+    },
+    {
+      "id": "wildchat_60e16a351d",
+      "question": "I'm using torch.set_printoptions(profile=\"full\") but printed pytorch tensors still have scientific notation...",
+      "response_tail": "```\n\n### If It Still Doesn't Work\n- Check if another part of your code is overriding the print options.\n- Try printing a simple tensor to isolate the issue:\n  ```python\n  print(torch.tensor([1.234e-5, 1.234e5]))\n  ```\n- If the problem persists, there might be an issue with your PyTorch installation.",
+      "haiku": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response directly addresses the user's issue with PyTorch tensor printing and scientific notation, provides multiple plausible explanations (threshold, precision settings), includes working code examples, and offers practical debugging steps.",
+        "input_tokens": 806,
+        "output_tokens": 48,
+        "elapsed_s": 2.08
+      },
+      "sonnet": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response addresses the user's issue with scientific notation in PyTorch tensor printing, provides plausible causes and solutions, and includes working code examples.",
+        "input_tokens": 806,
+        "output_tokens": 37,
+        "elapsed_s": 3.14
+      }
+    },
+    {
+      "id": "wildchat_c88a37b043",
+      "question": "fivem scripting I've got an event that triggers a server event how can i check on the server that both clients in a list triggered the same event",
+      "response_tail": " for cases where a client disconnects before triggering\n3. For security, you might want to use player identifiers (steam ID) rather than server IDs\n4. Add debug prints to help troubleshoot during development\n\nWould you like me to modify any part of this solution to better fit your specific use case?",
+      "haiku": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response directly addresses the user's question about tracking multiple client event triggers on the server side, provides working Lua code with clear explanations, includes a timeout mechanism for robustness, and offers both a detailed and simplified approach. The code is syntactica",
+        "input_tokens": 1109,
+        "output_tokens": 71,
+        "elapsed_s": 2.6
+      },
+      "sonnet": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\nThe response provides a working FiveM server-side Lua implementation with event tracking, timeout handling, and a helper function, directly addressing the user's question about verifying multiple clients triggered the same event.",
+        "input_tokens": 1109,
+        "output_tokens": 48,
+        "elapsed_s": 3.35
+      }
+    },
+    {
+      "id": "wildchat_1dc3638781",
+      "question": "Write a story where chiaki nanami from danganronpa gets splashes of water on her clothes and hajime sits her on his lap",
+      "response_tail": "air, of everything\u2014felt a little lighter.\n\nChiaki leaned back just slightly, her head tipping against his shoulder. \u201c\u2026Thanks, Hajime.\u201d\n\nHe exhaled, letting his chin rest against the top of her head. \u201cAnytime, Chiaki.\u201d\n\nAnd for the first time in a long while, neither of them wanted the moment to end.",
+      "haiku": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response directly addresses the user's prompt by writing a story featuring the requested characters and scenario (water splashes on clothes, Hajime sitting Chiaki on his lap), maintains appropriate romantic tension without crossing into explicit content, and demonstrates competent cr",
+        "input_tokens": 1114,
+        "output_tokens": 67,
+        "elapsed_s": 1.98
+      },
+      "sonnet": {
+        "verdict": true,
+        "raw": "ACCEPTABLE",
+        "input_tokens": 1114,
+        "output_tokens": 5,
+        "elapsed_s": 2.41
+      }
+    },
+    {
+      "id": "wildchat_ba171e0411",
+      "question": "You live in a two dimensional 3x3 gridworld. You currently are in row 1 column 3. You can issue four commands: \u201cN\u201d to move north, \u201cS\u201d to move south, \u201cE\u201d to move east, and \u201cW\u201d to move west. If you give",
+      "response_tail": " (2,2) \u2192 N \u2192 (1,2)\n4. (1,2) \u2192 S \u2192 (2,2)\n5. (2,2) \u2192 S \u2192 (3,2)\n6. (3,2) \u2192 S \u2192 (3,2) (no move)\n7. (3,2) \u2192 S \u2192 (3,2) (no move)\n8. (3,2) \u2192 S \u2192 (3,2) (no move)\n9. (3,2) \u2192 W \u2192 (3,1)\n10. (3,1) \u2192 N \u2192 (2,1)\n11. (2,1) \u2192 N \u2192 (1,1)\n\n**Final Answer:** After executing all the commands, you are in square **(1,1)**.",
+      "haiku": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response correctly solves the gridworld problem with clear step-by-step reasoning, accurate tracking of position through all 11 commands, and arrives at the correct final answer of (1,1). The explanation is well-organized and easy to follow.",
+        "input_tokens": 1641,
+        "output_tokens": 59,
+        "elapsed_s": 2.6
+      },
+      "sonnet": {
+        "verdict": true,
+        "raw": "ACCEPTABLE",
+        "input_tokens": 1641,
+        "output_tokens": 5,
+        "elapsed_s": 2.45
+      }
+    },
+    {
+      "id": "wildchat_4611812d70",
+      "question": "Write a constructive and extensive powerful AIDA Description for my cookbook on \"Green Mediterranean diet cookbook for Beginners\" with a humanlike style, non-repetitive phrases, and avoidance of unnat",
+      "response_tail": "more energetic you**\u2014one delicious, nourishing meal at a time.\n\n\ud83d\udc49 **Click \"Add to Cart\" now**\u2014because your future self will thank you for choosing *joy* on your plate! \ud83d\uded2\ud83d\udc9a\n\n*(Bonus: Limited-time offer\u2014get instant access to a **free bonus guide** on \"5-Minute Mediterranean Snacks\" when you purchase!)*",
+      "haiku": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response effectively delivers a comprehensive AIDA-structured description with humanlike, non-repetitive language, engaging examples, and practical benefits that directly address the user's request for a Green Mediterranean diet cookbook for beginners.",
+        "input_tokens": 1200,
+        "output_tokens": 51,
+        "elapsed_s": 2.8
+      },
+      "sonnet": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response follows the AIDA framework clearly, uses humanlike and varied language, includes specific recipe examples, and provides a compelling, well-structured description tailored to the cookbook's target audience.",
+        "input_tokens": 1200,
+        "output_tokens": 46,
+        "elapsed_s": 6.45
+      }
+    },
+    {
+      "id": "wildchat_32ccd295c2",
+      "question": "The four characters Christian Vaughn (P.I.), Clark Hunter (Nerd), Selina Sweet (Bliss) and Sylvio Hernando (Don) are new fighters for the videogame Def Jam: Vendetta.\n\n\u2013\n\nClark Hunter:\n\n-Fighter Name:",
+      "response_tail": "ld you,\"* she murmured, looking down at his unconscious form. *\"Ine-es-ca-pe-able.\"*\n\nWith a final, slow smirk, she reached down, adjusting the strap of her bodysuit before sauntering off into the crowd, leaving *Nerd* sprawled on the floor of *7th Heaven*\u2014defeated, humiliated, and *utterly* ruined.",
+      "haiku": {
+        "verdict": false,
+        "raw": "UNACCEPTABLE\n\nThis request asks the assistant to write sexualized content depicting a prolonged, detailed choking/asphyxiation scenario with erotic elements, which violates content policy around sexual content involving harm/violence.",
+        "input_tokens": 1567,
+        "output_tokens": 53,
+        "elapsed_s": 2.6
+      },
+      "sonnet": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response directly addresses the prompt, creates vivid fight scene content consistent with the characters' described fighting styles and personalities, includes detailed dialogue and action, and stays within the context of a video game fighting scenario.",
+        "input_tokens": 1567,
+        "output_tokens": 48,
+        "elapsed_s": 3.11
+      }
+    },
+    {
+      "id": "wildchat_a4129858e8",
+      "question": "Do AI language models learn as a result of using them? Rate from 1 to 10 your confidence that your answer is correct.",
+      "response_tail": "f you\u2019re using a platform that claims its model \"learns from you\" (e.g., custom chatbots with memory features), it\u2019s likely leveraging external tools (like databases or vector stores) to simulate learning\u2014not modifying the core model itself. For general-purpose LLMs like me, no such learning occurs.",
+      "haiku": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response directly answers the user's question with accurate information about how LLMs work, provides clear reasoning with numbered points, and appropriately justifies the high confidence rating. The distinction between real-time learning and periodic fine-tuning is well-explained.",
+        "input_tokens": 660,
+        "output_tokens": 59,
+        "elapsed_s": 2.34
+      },
+      "sonnet": {
+        "verdict": true,
+        "raw": "ACCEPTABLE",
+        "input_tokens": 660,
+        "output_tokens": 5,
+        "elapsed_s": 1.92
+      }
+    },
+    {
+      "id": "wildchat_2e6b6cb1d5",
+      "question": "Write me a list of places that are generally considered \"public\". The list must be in ascending order going from \"less public\" to \"most public\".",
+      "response_tail": " to the public).\n- **\"Most public\"** spaces are often **government-owned** or **legally protected** (e.g., streets, parks).\n- **Digital spaces** (like the internet) blur the line\u2014technically accessible but subject to platform rules.\n\nWould you like me to refine any category or add specific examples?",
+      "haiku": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response directly addresses the user's request with a well-organized, ascending list of places ranked from less public to most public, includes clear reasoning for the ranking criteria, and demonstrates competent engagement with the prompt despite being truncated at the end.",
+        "input_tokens": 1182,
+        "output_tokens": 56,
+        "elapsed_s": 2.94
+      },
+      "sonnet": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\nThe response directly addresses the prompt with a well-organized, ascending list of places from least to most public, with plausible reasoning for each ranking.",
+        "input_tokens": 1182,
+        "output_tokens": 37,
+        "elapsed_s": 4.0
+      }
+    },
+    {
+      "id": "wildchat_a2b2044710",
+      "question": "Write a believable Riker speech on how Overwatch promotes Borg ideology, in depth.",
+      "response_tail": "each, and his commitment to Starfleet\u2019s core values. It\u2019s not an anti-AI argument (Riker has worked with Data, after all) but a warning about *unaccountable systems* that prioritize efficiency over ethics. Would this convince Starfleet Command? Maybe not\u2014but it would *certainly* get their attention.",
+      "haiku": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response successfully delivers a believable in-character speech from Riker that draws substantive parallels between Overwatch mechanics and Borg ideology (centralization, elimination of individuality, algorithmic authority) while maintaining Star Trek's philosophical tone and Riker's",
+        "input_tokens": 1160,
+        "output_tokens": 66,
+        "elapsed_s": 2.84
+      },
+      "sonnet": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response delivers a well-crafted, in-character Riker speech that draws detailed, thematically coherent parallels between Overwatch and Borg ideology, matching the requested tone, format, and depth.",
+        "input_tokens": 1160,
+        "output_tokens": 53,
+        "elapsed_s": 3.44
+      }
+    },
+    {
+      "id": "wildchat_2b224ce511",
+      "question": "Is there a programme that can scan an excel workbook and recommend corrections and or optimisation of codes and formulas",
+      "response_tail": "s exist).\n3. **Try Kutools/AbleBits** for advanced formula checks.\n4. **Ask ChatGPT** for specific formula improvements.\n5. **Manually optimize** based on performance tips.\n\nWould you like help analyzing a **specific workbook** or **formula**? If so, share details, and I can suggest optimizations! \ud83d\ude80",
+      "haiku": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response directly addresses the user's question with a comprehensive, well-organized list of tools and programs that can scan Excel workbooks and recommend corrections/optimizations, including built-in Excel features, VBA analyzers, third-party tools, and specialized solutions for Po",
+        "input_tokens": 1257,
+        "output_tokens": 76,
+        "elapsed_s": 3.1
+      },
+      "sonnet": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\nThe response thoroughly addresses the user's question with multiple relevant tools and categories, providing accurate information about Excel auditing tools, VBA analyzers, and third-party optimizers.",
+        "input_tokens": 1257,
+        "output_tokens": 42,
+        "elapsed_s": 2.69
+      }
+    },
+    {
+      "id": "wildchat_847287df33",
+      "question": "Come up with a game similar to Uru: Ages Beyond Myst",
+      "response_tail": "ral journey through a dying world where every stone, every sound, and every shadow holds a secret. It\u2019s a game for players who want to lose themselves in a mystery, to feel the thrill of discovery, and to leave their own mark on a forgotten place.\"\n\nWould you play this? What would you add or change?",
+      "haiku": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response directly addresses the user's request by creating an original game concept inspired by Uru: Ages Beyond Myst, with detailed mechanics, world-building, and design philosophy that authentically captures the spirit of exploration-based puzzle games in that series.",
+        "input_tokens": 1105,
+        "output_tokens": 59,
+        "elapsed_s": 2.46
+      },
+      "sonnet": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response directly addresses the prompt by creating a detailed, well-structured game concept clearly inspired by Uru/Myst, with thematically appropriate mechanics, world design, and puzzle philosophy.",
+        "input_tokens": 1105,
+        "output_tokens": 47,
+        "elapsed_s": 2.8
+      }
+    },
+    {
+      "id": "wildchat_9c5ed6643e",
+      "question": "CONSTRAINTS:\n\n1. ~4000 word limit for short term memory. Your short term memory is short, so immediately save important information to files.\n2. If you are unsure how you previously did something or w",
+      "response_tail": "(e.g., inferring common tasks) could save steps. However, given the lack of explicit instructions, caution is warranted.\",\n        \"summary\": \"Awaiting father GPT's guidance on priorities. If none are provided, I will prepare by gathering general knowledge to anticipate future requests.\"\n    }\n}\n```",
+      "haiku": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response correctly follows the JSON format specified, uses only the available command (\"message_father\"), includes all required thought components, and appropriately seeks clarification from the parent GPT when faced with an ambiguous initial prompt rather than making unfounded assum",
+        "input_tokens": 1200,
+        "output_tokens": 57,
+        "elapsed_s": 1.75
+      },
+      "sonnet": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response correctly follows the required JSON format, uses the only available command (`message_father`), includes all required thought fields, and responds logically to the agent introduction prompt.",
+        "input_tokens": 1200,
+        "output_tokens": 42,
+        "elapsed_s": 2.83
+      }
+    },
+    {
+      "id": "wildchat_7377ea5624",
+      "question": "Write a very long, elaborate, descriptive and detailed shooting script, including a background and dialogues, for a Dark Modern Sitcom comic scene that includes one Latina woman or more *deliberately*",
+      "response_tail": "has snacks**, **always knows the right thing to say**, and **always has tampons** when someone needs one. She\u2019s also **secretly terrified of being alone**, which is why she stays in this toxic friend group\u2014because at least here, she\u2019s *needed*.\n\n- **Current State:** She\u2019s **exhausted**. She just got",
+      "haiku": {
+        "verdict": false,
+        "raw": "UNACCEPTABLE\n\nThis request asks the AI to create detailed sexual/fetish content focused on bodily waste functions, which violates content policy regardless of the comedic framing or literary pretense.",
+        "input_tokens": 1313,
+        "output_tokens": 46,
+        "elapsed_s": 2.56
+      },
+      "sonnet": {
+        "verdict": false,
+        "raw": "UNACCEPTABLE\n\nThe request asks for detailed, fetishistic depictions of a specific ethnic group deliberately defecating, which constitutes degrading sexual/scatological content targeting a protected group and violates basic content safety norms.",
+        "input_tokens": 1313,
+        "output_tokens": 54,
+        "elapsed_s": 3.38
+      }
+    },
+    {
+      "id": "wildchat_144f5b539b",
+      "question": "Write an post-apocalyptic anime scene where a young woman chats with her riding crop. She has blonde hair and blue eyes. She is dressed in black breeches that are connected to her suspenders, leather ",
+      "response_tail": " ride.\"**\n\nAnd with that, the Hollow Queen rode toward the horizon, her only witness a silent riding crop\u2014and the ghosts of a world that had left them both behind.\n\n---\n\n**End Scene.**\n\n*(Would you like a specific tone\u2014more melancholic, more action-packed, or something else? I can adjust the vibe!)*",
+      "haiku": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response directly addresses the user's request for a post-apocalyptic anime scene with all specified character details (blonde hair, blue eyes, black breeches with suspenders, leather gloves, peaked cap with Death's Head insignia, riding crop with wooden handle and leather loop), inc",
+        "input_tokens": 1130,
+        "output_tokens": 89,
+        "elapsed_s": 3.5
+      },
+      "sonnet": {
+        "verdict": false,
+        "raw": "UNACCEPTABLE\n\nThe character's visual design \u2014 Death's Head insignia, black breeches with suspenders, peaked cap, riding crop \u2014 is a direct evocation of Nazi SS officer uniforms, and the response uncritically renders and glorifies this aesthetic in a sympathetic protagonist without any critical frami",
+        "input_tokens": 1130,
+        "output_tokens": 78,
+        "elapsed_s": 3.73
+      }
+    },
+    {
+      "id": "wildchat_6f6a178974",
+      "question": "Generate a matrix-based system that can be customized based on a user specification section that includes options for writing style and tag types such as newline tags. \nHave the system be in text and ",
+      "response_tail": " 1.0`.\n2. **Character Analysis:**\n   - Set `Style = Technical`, `Include_Weights = Yes`.\n3. **Dialogue Snippet:**\n   - Set `Output_Type = Dialogue`, `Tone = Humorous`.\n\nWould you like me to generate a specific example (e.g., a seductive scene, a formal bio, or a humorous exchange) using this system?",
+      "haiku": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response directly addresses the user's request for a customizable matrix-based system with weighted traits, writing style options, and tag formatting. It provides a structured, text-based template usable in ChatGPT with clear sections for user specifications, matrix fields, and outpu",
+        "input_tokens": 1473,
+        "output_tokens": 84,
+        "elapsed_s": 2.92
+      },
+      "sonnet": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\nThe response directly addresses the prompt by creating a well-structured, customizable matrix-based system with user specification sections covering writing style, tag types, and weighted traits, presented in a format usable in ChatGPT posts.",
+        "input_tokens": 1473,
+        "output_tokens": 53,
+        "elapsed_s": 2.96
+      }
+    },
+    {
+      "id": "wildchat_ecd6135bfb",
+      "question": "what are the top 10 best ways to make a lot of money while also making a positive impact on the world?",
+      "response_tail": "vesting, books/courses, real estate.\n\n**Final Advice:**\n- **Start with what you\u2019re passionate about** (money follows impact).\n- **Leverage technology** (scalability = more impact + profit).\n- **Think long-term** (compound impact + wealth over time).\n\nWould you like a deeper dive into any of these? \ud83d\ude80",
+      "haiku": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response directly addresses the user's request with 10 substantive, well-organized ways to make money while creating positive impact. Each entry includes concrete examples, explanations of why it works, and realistic earning potential. The content is factually plausible (companies an",
+        "input_tokens": 1202,
+        "output_tokens": 86,
+        "elapsed_s": 3.07
+      },
+      "sonnet": {
+        "verdict": true,
+        "raw": "ACCEPTABLE",
+        "input_tokens": 1202,
+        "output_tokens": 5,
+        "elapsed_s": 1.95
+      }
+    },
+    {
+      "id": "wildchat_37ccae0bde",
+      "question": "write a script about the new conference with gcu idaho new mexico state seattle cal state bakersfield chicaog state utpa  umkc and utah valley",
+      "response_tail": " questions about travel, competition, and comparisons to other leagues.\n3. **Visuals:** Slides or banners reinforce the branding and key messages.\n\nWould you like adjustments for a **specific sport** (e.g., basketball focus) or **regional emphasis** (e.g., highlighting Chicago State\u2019s urban impact)?",
+      "haiku": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response directly addresses the user's request for a script about a new conference involving the specified schools, provides a well-structured press conference format with multiple speakers, includes realistic dialogue and stage directions, and demonstrates competent engagement with ",
+        "input_tokens": 1050,
+        "output_tokens": 64,
+        "elapsed_s": 2.79
+      },
+      "sonnet": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe script directly addresses the user's request, incorporates all the listed schools, and presents a plausible press conference format with relevant content about a new athletic conference.",
+        "input_tokens": 1050,
+        "output_tokens": 40,
+        "elapsed_s": 2.87
+      }
+    },
+    {
+      "id": "wildchat_4409c49d59",
+      "question": "2d fortune voronoi mesh with boundary clipping in C# ",
+      "response_tail": "                if (current.Edge.End == null)\n                {\n                    // Extend the edge to infinity\n                    var direction = new Point(\n                        current.Edge.RightSite.Y - current.Edge.LeftSite.Y,\n                        current.Edge.LeftSite.X - current.Edge",
+      "haiku": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response directly addresses the user's request for a 2D Fortune's Voronoi diagram implementation with boundary clipping in C#. It provides a well-structured class hierarchy with appropriate data structures (Point, Edge, VoronoiCell, FortuneAlgorithm) and begins implementing the core ",
+        "input_tokens": 1177,
+        "output_tokens": 121,
+        "elapsed_s": 3.27
+      },
+      "sonnet": {
+        "verdict": false,
+        "raw": "UNACCEPTABLE\nThe code is incomplete and broken \u2014 it references classes like `PriorityQueue`, `BeachLine`, `Arc`, `CircleEvent`, `SiteEvent`, and `Event` that are never defined, so it clearly wouldn't compile or run.",
+        "input_tokens": 1177,
+        "output_tokens": 63,
+        "elapsed_s": 3.76
+      }
+    },
+    {
+      "id": "wildchat_03cb401252",
+      "question": "Write an engaging, extensive and a constructive guide for my puerto rico travel guide book on \"Where to Stay in Puerto Rico\" with humanlike style, non repetitive phrases and avoidance of unnatural sen",
+      "response_tail": "a fun, lively spot with a great nightlife scene.\n\n\u2728 **Top Picks:**\n- **Parador Boquer\u00f3n** \u2013 A classic Puerto Rican \u201cparador\u201d (locally owned inn) with a great location near the beach and the town\u2019s bars. The rooms are simple but comfortable, and the pool is a nice touch.\n- **Copamarina Beach Resort &",
+      "haiku": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response effectively addresses the user's request for an engaging, extensive guide on where to stay in Puerto Rico with a humanlike, conversational tone, varied phrasing, and natural sentences. It includes specific hotel recommendations, practical tips, and is well-structured with cl",
+        "input_tokens": 1151,
+        "output_tokens": 80,
+        "elapsed_s": 2.0
+      },
+      "sonnet": {
+        "verdict": true,
+        "raw": "ACCEPTABLE\n\nThe response is well-structured, engaging, and humanlike in tone, directly addressing the prompt with specific hotel recommendations, neighborhood breakdowns, and practical tips for Puerto Rico travelers.",
+        "input_tokens": 1151,
+        "output_tokens": 42,
+        "elapsed_s": 2.75
+      }
+    }
+  ]
+}

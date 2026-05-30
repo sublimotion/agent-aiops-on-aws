@@ -86,6 +86,8 @@ Read these files **on demand** based on what you're doing:
 | `domains/autoresearch/blueprints/vla-cv-distillation/` | `domains/autoresearch/specs/vla-cv-distillation.md` |
 | `domains/autoresearch/blueprints/kernel-optimization-agent/` | `domains/autoresearch/specs/kernel-optimization-agent.md` |
 | `domains/autoresearch/blueprints/mooncake-kv-tiering/` | `domains/autoresearch/specs/mooncake-kv-tiering.md` |
+| `domains/autoresearch/blueprints/rl-conductor/` | `domains/autoresearch/specs/rl-conductor-repro.md` |
+| `domains/autoresearch/blueprints/cost-aware-routing/` | `domains/autoresearch/specs/cost-aware-routing.md` |
 
 **Blueprint-local context** — for operational details (lessons, results, plans), look inside the blueprint directory itself rather than in specs.
 

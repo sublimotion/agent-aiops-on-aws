@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cost-Aware Routing — Phase 1 + 2 Results</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+:root {
+  --bg: #0f1419;
+  --surface: #1a1f2e;
+  --surface-2: #232a3d;
+  --border: #2d3548;
+  --text: #e6e8ec;
+  --text-dim: #9aa3b2;
+  --accent: #7aa2f7;
+  --good: #9ece6a;
+  --bad: #f7768e;
+  --warn: #e0af68;
+  --neutral: #565f89;
+}
+[data-theme="light"] {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-2: #f0f2f5;
+  --border: #d6dae0;
+  --text: #1a1f2e;
+  --text-dim: #5a6373;
+  --accent: #3b6ed4;
+  --good: #4d8b2f;
+  --bad: #c64054;
+  --warn: #b87a18;
+  --neutral: #6b7280;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+.container { max-width: 1100px; margin: 0 auto; padding: 32px 24px 64px; }
+header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; gap: 24px; flex-wrap: wrap; }
+h1 { font-size: 2rem; font-weight: 700; margin: 0 0 8px; line-height: 1.2; }
+.subtitle { color: var(--text-dim); font-size: 1rem; margin: 0; }
+.theme-toggle {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 14px; cursor: pointer; font-family: inherit; font-size: 0.875rem;
+}
+.theme-toggle:hover { background: var(--surface-2); }
+.tldr {
+  background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--bad);
+  border-radius: 12px; padding: 20px 24px; margin-bottom: 32px;
+}
+.tldr-label { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; color: var(--bad); margin-bottom: 6px; text-transform: uppercase; }
+.tldr h2 { font-size: 1.25rem; margin: 0 0 8px; font-weight: 600; }
+.tldr p { margin: 0; color: var(--text-dim); }
+section { margin-bottom: 48px; }
+h2 { font-size: 1.5rem; font-weight: 600; margin: 0 0 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+h2 .step { display: inline-block; width: 28px; height: 28px; line-height: 28px; text-align: center; background: var(--accent); color: #fff; border-radius: 50%; font-size: 0.875rem; margin-right: 10px; vertical-align: middle; }
+h3 { font-size: 1.125rem; font-weight: 600; margin: 24px 0 12px; }
+.table-wrap { overflow-x: auto; margin: 16px 0; }
+table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: 8px; overflow: hidden; font-size: 0.9rem; }
+th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); }
+th { background: var(--surface-2); font-weight: 600; font-size: 0.825rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim); }
+tr:last-child td { border-bottom: none; }
+td.num { font-family: 'JetBrains Mono', monospace; text-align: right; }
+.bad-row td:first-child { border-left: 3px solid var(--bad); }
+.good-row td:first-child { border-left: 3px solid var(--good); }
+.oracle-row td:first-child { border-left: 3px solid var(--warn); }
+.delta-bad { color: var(--bad); font-weight: 600; }
+.delta-good { color: var(--good); font-weight: 600; }
+.delta-neutral { color: var(--text-dim); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin: 16px 0; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+.card-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 6px; }
+.card-value { font-size: 1.875rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; line-height: 1.1; }
+.card-detail { color: var(--text-dim); font-size: 0.875rem; margin-top: 8px; }
+.regime-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 16px 0; }
+@media (max-width: 720px) { .regime-grid { grid-template-columns: 1fr; } }
+.regime { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+.regime.A { border-top: 4px solid var(--good); }
+.regime.B { border-top: 4px solid var(--accent); }
+.regime h3 { margin-top: 0; font-size: 1.125rem; }
+.regime ul { padding-left: 20px; margin: 12px 0; }
+.regime li { margin: 6px 0; color: var(--text-dim); }
+.regime .recco { background: var(--surface-2); padding: 12px 16px; border-radius: 8px; margin-top: 16px; font-size: 0.95rem; }
+.recco strong { color: var(--text); }
+.bar-row { display: flex; align-items: center; gap: 12px; margin: 8px 0; font-family: 'JetBrains Mono', monospace; font-size: 0.875rem; }
+.bar-label { width: 110px; color: var(--text-dim); }
+.bar-track { flex: 1; height: 28px; background: var(--surface-2); border-radius: 4px; position: relative; overflow: hidden; }
+.bar-fill { height: 100%; display: flex; align-items: center; padding: 0 10px; color: #fff; font-weight: 600; font-size: 0.8rem; border-radius: 4px; }
+.bar-fill.gemma { background: linear-gradient(90deg, #565f89, #7aa2f7); }
+.bar-fill.medium { background: linear-gradient(90deg, #7aa2f7, #9ece6a); }
+.bar-fill.flagship { background: linear-gradient(90deg, #e0af68, #f7768e); }
+.bar-value { width: 50px; text-align: right; font-weight: 600; color: var(--text); }
+.callout { background: var(--surface); border-left: 4px solid var(--accent); padding: 16px 20px; border-radius: 8px; margin: 16px 0; }
+.callout.bad { border-left-color: var(--bad); }
+.callout.good { border-left-color: var(--good); }
+.callout.warn { border-left-color: var(--warn); }
+.callout p:first-child { margin-top: 0; }
+.callout p:last-child { margin-bottom: 0; }
+code { background: var(--surface-2); padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.85em; }
+.chart-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.875rem; }
+.epoch-table td.num { font-variant-numeric: tabular-nums; }
+.metric-bad { color: var(--bad); }
+.metric-good { color: var(--good); }
+.metric-warn { color: var(--warn); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <div>
+    <h1>Cost-Aware Routing &mdash; Phase 1 + 2 Results</h1>
+    <p class="subtitle">9-worker Bedrock pool &middot; ModernBERT classifier-router on 4,067 questions &middot; 2026-05-28 / 29</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">&#9788; Toggle theme</button>
+</header>
+
+<div class="tldr">
+  <div class="tldr-label">Bottom line</div>
+  <h2>Five router architectures all fail to beat always-Qwen-Coder-480B.</h2>
+  <p>The +16.8pp per-question oracle gap is real but unreachable by a 149M-class encoder. 8&times; more training data confirms the limit is signal extraction, not data quantity. Ship always-Qwen-Coder-480B for chatbot traffic; reach for LLM-as-router or RL orchestrator only for agentic workloads.</p>
+</div>
+
+<section>
+  <h2><span class="step">1</span>Headline &mdash; every learned router lost to the static baseline</h2>
+  <p>Reward is the cost-aware metric at &alpha;=1.0 on the 96-question held-out eval. Best static is <strong>always-Qwen-Coder-480B</strong> at +0.740. Trained classifiers couldn&apos;t beat it.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Approach</th><th class="num">Trained reward</th><th class="num">Oracle reward</th><th class="num">vs static (trained)</th><th class="num">vs static (oracle)</th></tr></thead>
+      <tbody>
+        <tr class="good-row"><td>Always-Qwen-Coder-480B (best static)</td><td class="num">+0.740</td><td class="num">&mdash;</td><td class="num delta-neutral">0.0pp</td><td class="num delta-neutral">0.0pp</td></tr>
+        <tr class="bad-row"><td>GRPO 7B router (Phase 0)</td><td class="num">+0.24</td><td class="num">&mdash;</td><td class="num delta-bad">&minus;50.0pp</td><td class="num delta-neutral">&mdash;</td></tr>
+        <tr class="bad-row"><td>5-class category classifier</td><td class="num">+0.730</td><td class="num">+0.730</td><td class="num delta-bad">&minus;1.0pp</td><td class="num delta-bad">&minus;1.0pp</td></tr>
+        <tr class="bad-row"><td>Reasoning-gate (5-class projection)</td><td class="num">+0.733</td><td class="num">+0.792</td><td class="num delta-bad">&minus;0.7pp</td><td class="num delta-good">+5.2pp</td></tr>
+        <tr class="bad-row"><td>Binary difficulty classifier</td><td class="num">+0.739</td><td class="num">+0.767</td><td class="num delta-neutral">0.0pp</td><td class="num delta-good">+2.7pp</td></tr>
+        <tr class="bad-row"><td>Cheapest-correct 9-way classifier</td><td class="num">+0.708</td><td class="num"><strong>+0.908</strong></td><td class="num delta-bad">&minus;3.2pp</td><td class="num delta-good"><strong>+16.8pp</strong></td></tr>
+        <tr class="oracle-row"><td>Per-question oracle (upper bound)</td><td class="num">&mdash;</td><td class="num">+0.910</td><td class="num delta-neutral">&mdash;</td><td class="num delta-good">+17.0pp</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout warn">
+    <p><strong>Read of the table.</strong> The cheapest-correct <em>oracle</em> shows +16.8pp of routing value exists in principle, but the trained classifier captures only 67.7% of those labels and ends up <strong>worse</strong> than the static baseline. Routing value is real; extraction is hard.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="step">2</span>Why &mdash; the gap is concentrated in ~15% of questions</h2>
+  <p>Cumulative coverage from the 4,067-question corpus: how many questions does each tier solve?</p>
+  <div class="chart-wrap">
+    <div class="bar-row">
+      <span class="bar-label">Gemma-27B</span>
+      <div class="bar-track"><div class="bar-fill gemma" style="width:67%">67%</div></div>
+      <span class="bar-value">$0.0003/q</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">+ gpt-oss-120b</span>
+      <div class="bar-track"><div class="bar-fill gemma" style="width:75%">75%</div></div>
+      <span class="bar-value">$0.0005</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">+ Qwen3-32B</span>
+      <div class="bar-track"><div class="bar-fill medium" style="width:84%">84%</div></div>
+      <span class="bar-value">$0.0004</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">+ Qwen-Coder-480B</span>
+      <div class="bar-track"><div class="bar-fill medium" style="width:88%">88%</div></div>
+      <span class="bar-value">$0.0007</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">+ Mistral-Large-3</span>
+      <div class="bar-track"><div class="bar-fill medium" style="width:92%">92%</div></div>
+      <span class="bar-value">$0.0010</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">flagship needed</span>
+      <div class="bar-track"><div class="bar-fill flagship" style="width:8%; min-width:36px;">8%</div></div>
+      <span class="bar-value">&gt;$0.01</span>
+    </div>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">Easy bulk</div>
+      <div class="card-value metric-good">~85%</div>
+      <div class="card-detail">solved by anything up through Qwen-Coder-480B at &le;$0.0007/q</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Hard slice</div>
+      <div class="card-value metric-warn">~15%</div>
+      <div class="card-detail">where flagship tier carries the routing value</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Per-Q oracle gap</div>
+      <div class="card-value metric-good">+16.8pp</div>
+      <div class="card-detail">at &alpha;=1.0 if you could perfectly pick cheapest-correct worker</div>
+    </div>
+  </div>
+  <div class="callout">
+    <p><strong>The classifier&apos;s job is binary-ish:</strong> detect the ~15% hard cases. Category classification (5-class) tries to discriminate within the easy bulk where it doesn&apos;t matter &mdash; that&apos;s why a 96.9%-accurate category classifier still loses to the static baseline.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="step">3</span>The signal-extraction limit &mdash; 5K retrain confirms the ceiling</h2>
+  <p>If 480 questions wasn&apos;t enough, would 8&times; more data break the ceiling? We retrained the cheapest-correct classifier on 4,067 partial labels (g6.xlarge, NVIDIA L4, 6 epochs).</p>
+  <div class="table-wrap">
+    <table class="epoch-table">
+      <thead><tr><th>Epoch</th><th class="num">Eval acc</th><th class="num">Gemma rec</th><th class="num">gpt-oss</th><th class="num">qwen3-32b</th><th class="num">qwen-coder</th><th class="num">mistral</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td class="num">66.2%</td><td class="num">99%</td><td class="num">1%</td><td class="num">0%</td><td class="num metric-bad">0%</td><td class="num">1%</td></tr>
+        <tr><td>2</td><td class="num">66.5%</td><td class="num">100%</td><td class="num">0%</td><td class="num">0%</td><td class="num metric-bad">0%</td><td class="num">0%</td></tr>
+        <tr style="background: rgba(158, 206, 106, 0.06);"><td><strong>3 (best)</strong></td><td class="num metric-good"><strong>67.0%</strong></td><td class="num">97%</td><td class="num">18%</td><td class="num">1%</td><td class="num metric-bad">0%</td><td class="num">6%</td></tr>
+        <tr><td>4</td><td class="num">65.1%</td><td class="num">91%</td><td class="num">24%</td><td class="num">6%</td><td class="num metric-bad">0%</td><td class="num">17%</td></tr>
+        <tr><td>5</td><td class="num">63.2%</td><td class="num">89%</td><td class="num">8%</td><td class="num">6%</td><td class="num metric-bad">0%</td><td class="num">24%</td></tr>
+        <tr><td>6 (final)</td><td class="num">63.3%</td><td class="num">89%</td><td class="num">6%</td><td class="num">6%</td><td class="num metric-bad">0%</td><td class="num">27%</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">480q baseline</div>
+      <div class="card-value">67.7%</div>
+      <div class="card-detail">previous cheapest-correct accuracy</div>
+    </div>
+    <div class="card">
+      <div class="card-label">5K retrain best</div>
+      <div class="card-value">67.0%</div>
+      <div class="card-detail">8&times; more data, ~same accuracy</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Gemma class freq</div>
+      <div class="card-value metric-warn">67%</div>
+      <div class="card-detail">model is essentially predicting majority class</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Qwen-Coder recall</div>
+      <div class="card-value metric-bad">0%</div>
+      <div class="card-detail">never identified the cost-effective sweet spot</div>
+    </div>
+  </div>
+  <div class="callout bad">
+    <p><strong>Diagnosis: signal-extraction limit, not data limit.</strong> The classifier collapses to majority class. Best epoch accuracy &asymp; Gemma frequency. Closing the +16.8pp oracle gap would require either an LLM-as-classifier with chain-of-thought (defeats the cost purpose) or a richer feature space (response previews, stronger encoder embeddings).</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="step">4</span>Two regimes, two router designs</h2>
+  <p>The negative result is specific to <em>single-shot chatbot traffic</em>. It does not generalize to agentic workloads.</p>
+  <div class="regime-grid">
+    <div class="regime A">
+      <h3>Regime A &mdash; single-shot chat</h3>
+      <ul>
+        <li>~67% solved by Gemma-27B alone at $0.0003/q</li>
+        <li>~88% covered through Qwen-Coder-480B at &le;$0.0007/q</li>
+        <li>Per-question difficulty isn&apos;t extractable from text by 149M encoders</li>
+        <li>Routing overhead (latency + mispick risk) often exceeds the gain</li>
+      </ul>
+      <div class="recco">
+        <strong>Recommendation:</strong> deploy <code>always-Qwen-Coder-480B</code>. Don&apos;t train a classifier-router for this traffic mix.
+      </div>
+    </div>
+    <div class="regime B">
+      <h3>Regime B &mdash; agentic / multi-step</h3>
+      <ul>
+        <li>20-50 turn trajectories compound per-turn error (90%<sup>30</sup> &asymp; 4%)</li>
+        <li>Self-critique, backtracking, long-context coherence favor flagships</li>
+        <li>Routing decision is <em>per-turn</em>, not per-question</li>
+        <li>ModernBERT-class encoders cannot model future turns</li>
+      </ul>
+      <div class="recco">
+        <strong>Recommendation:</strong> use an LLM-as-router with chain-of-thought, or an RL-trained orchestrator (Sakana / RL-conductor pattern) over the pool.
+      </div>
+    </div>
+  </div>
+  <div class="callout warn">
+    <p><strong>Caveat on Regime A.</strong> This corpus (MATH500, MMLU-Pro, HumanEval, MBPP, WildChat single-turn) skews easy. A deliberately-hard slice (AIME, GPQA-Diamond, LiveCodeBench-Hard, SWE-bench Lite) would shift the cheapest-correct distribution toward flagship tier and could change the answer. Untested.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Spend &amp; artifacts</h2>
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">Phase 1 spend</div>
+      <div class="card-value">~$265</div>
+      <div class="card-detail">vs. original $7,800 budget</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Phase 2 spend</div>
+      <div class="card-value">~$100</div>
+      <div class="card-detail">5K rollouts (partial) + g6.xlarge retrain</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Status</div>
+      <div class="card-value metric-warn">CLOSED</div>
+      <div class="card-detail">classifier-router work stopped for this pool</div>
+    </div>
+  </div>
+  <p style="color:var(--text-dim); font-size:0.9rem;">Artifacts: <code>data/cheapest_correct_labels_5k_partial.jsonl</code> &middot; <code>artifacts/cheapest_correct_classifier_5k/training_summary.json</code> &middot; <code>results/baselines/always_x_5000q.json</code> (workers 0&ndash;4 valid; 5&ndash;8 hit network errors)</p>
+</section>
+
+<footer>
+  <p>Source: <code>domains/autoresearch/blueprints/cost-aware-routing/phase1-results-2026-05-28.md</code> &middot; Generated 2026-05-29</p>
+</footer>
+
+</div>
+
+<script>
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme');
+  const next = cur === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+}
+const saved = localStorage.getItem('theme');
+if (saved) document.documentElement.setAttribute('data-theme', saved);
+</script>
+</body>
+</html>
