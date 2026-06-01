@@ -22,16 +22,35 @@ gpu_arch: ""            # sm_120 (Blackwell) | sm_90 (Hopper) | sm_80 (Ampere)
 deployment_date: ""     # YYYY-MM-DD
 
 outcome: ""             # success | partial | failure
+# failure_categories: closed vocabulary. The machine-readable source of truth is
+# CATEGORY_TO_RULE in standards/serving-commons/resolver/corpus.py; this list must
+# match its keys (a conformance test enforces it). Categories marked [codified]
+# have a deterministic resolver rule that catches them from the declared config.
 failure_categories: []  # any of:
-                        #   ami         — wrong AMI (missing kernel module, driver mismatch)
-                        #   nccl        — NCCL collective failure or performance regression
-                        #   driver      — GPU driver / CUDA version mismatch
-                        #   oom         — out of memory (model too large for config)
-                        #   efa         — EFA / network fabric issue
-                        #   kv_eviction — KV cache eviction causing quality degradation
-                        #   tool_timeout — agent tool call timeout (agent-runtime domain)
-                        #   container   — container runtime issue (docker vs nerdctl, image pull)
-                        #   other       — describe in lessons body
+                        #   # --- config-checkable (a resolver rule catches these) ---
+                        #   fp8_block_size_mismatch          — [codified] FP8 MoE moe_intermediate_size/TP not divisible by block_n=128
+                        #   max_position_embeddings_mismatch — [codified] max_model_len exceeds the model's max_position_embeddings
+                        #   ami                              — [codified] wrong AMI (missing kernel module, e.g. B200 NVL5+ needs AL2023)
+                        #   kv_eviction                      — [codified] KV/HiCache sizing (eviction or init assertion)
+                        #   # --- hardware / platform (not yet codified) ---
+                        #   nccl                             — NCCL collective failure or performance regression
+                        #   driver                           — GPU driver / CUDA version mismatch
+                        #   efa                              — EFA / network fabric issue
+                        #   oom                              — out of memory (model too large for config)
+                        #   disk_pressure                    — node disk pressure (large image pulls, stale kubelet)
+                        #   kubeconfig_context_switch        — wrong kube context / cluster targeted
+                        #   # --- container / image / deps ---
+                        #   container                        — container runtime issue (docker vs nerdctl, image pull)
+                        #   image_compatibility              — image lacks model_type / arch support
+                        #   dependency_conflict              — Python/runtime dependency clash
+                        #   missing_shared_lib               — missing .so (e.g. libGL) at runtime
+                        #   tls_incompatibility              — TLS mismatch (e.g. Ray Redis client vs ElastiCache)
+                        #   huggingface_cli_deprecation      — huggingface-cli renamed to hf (hub v1.11+)
+                        #   # --- serving / model behavior ---
+                        #   tool_call_parser_incompatibility — wrong --tool-call-parser for the model
+                        #   tool_timeout                     — agent tool call timeout (agent-runtime domain)
+                        #   # --- catch-all ---
+                        #   other                            — describe in lessons body
 
 cards_used:
   mdc: []               # model deployment cards consulted, e.g. [glm-5-sglang]

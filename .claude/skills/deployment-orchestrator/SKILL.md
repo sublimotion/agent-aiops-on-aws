@@ -76,6 +76,16 @@ print('Configs found:', configs)
 "
 ```
 
+#### Serving-Config Resolver (fail-closed)
+Run the deterministic resolver over the blueprint's sidecar. Exit code 2 = hard-rule FAIL (must fix the sidecar before deploying); 0 = clean. WARN/INFO and `prior-failure:*` corpus findings do not block but must be read.
+```bash
+python3 standards/serving-commons/resolver/validate-serving-config.py \
+  --sidecar domains/gpu-serving/blueprints/<name>/benchmark.yaml \
+  --corpus-root .   # replays prior lessons.md failure_categories for this model/engine
+# exit 2 => FAIL: apply the printed fix (TP, max_model_len, AMI, ...) and re-run.
+```
+This codifies the FP8/TP, max-model-len, AMI, LMCache/MLA, HiCache, and spec-decode rules — see `standards/serving-commons/README.md`. The model-load recovery notes below describe the *symptoms*; this gate catches them from the declared config first.
+
 ### AgentCore Runtime Pre-Flight
 
 #### Foundation
@@ -156,7 +166,7 @@ aws eks create-access-entry --cluster-name <cluster> \
 
 **Symptom**: vLLM/SGLang pod crashes or hangs during model loading
 **Recovery**:
-1. **FP8 + MoE TP incompatibility**: Verify all weight dimensions divisible by `block_k=128` at target TP. TP=8 on shared experts with `input_size=512` → `64/partition` → ValueError. Fall back to TP=4.
+1. **FP8 + MoE TP incompatibility**: Verify all weight dimensions divisible by `block_k=128` at target TP. TP=8 on shared experts with `input_size=512` → `64/partition` → ValueError. Fall back to TP=4. **This is now codified** — the serving-config resolver (`rule fp8-moe-tp-divisibility`) catches it deterministically from the sidecar before deploy, given `model.moe_intermediate_size`. Reaching this recovery step means the pre-flight gate was skipped or the sidecar lacked `moe_intermediate_size`.
 2. **Missing model in framework registry**: Check `transformers.AutoConfig.from_pretrained()` → `architectures` field. Verify model is in SGLang/vLLM registry.
 3. **Hybrid architecture**: Models with mamba layers trigger different cache mode. Prefix caching may conflict with MTP. Test with `--no-enable-prefix-caching` if MTP is needed.
 4. **JIT compilation startup**: First launch with DeepGEMM/TensorRT can take 10-15 min. Wait for health endpoint, don't restart prematurely.

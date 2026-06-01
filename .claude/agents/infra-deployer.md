@@ -28,7 +28,19 @@ Load deployment cards AND run the blueprint-reviewer to catch structural issues 
 5. If no model card exists, run `mdc sync` to pull the latest upstream docs. If no GPU card exists, check `gpu-infra cards` for available instance types.
 6. Record both cards' key recommendations in the deployment log.
 
-**Validation**: Both a model deployment card and a GPU architecture card were found. Their recommendations are noted in the deployment log. Any conflicts or upstream PRs are flagged.
+**0c. Serving-config gate (fail-closed)**:
+Run the deterministic serving-config resolver over the blueprint's `benchmark.yaml` sidecar. This is the config-level analog of blueprint-reviewer: it checks hard-won serving rules (FP8 MoE TP divisibility, `max_model_len` vs `max_position_embeddings`, B200 AL2023 AMI, LMCache/MLA incompatibility, HiCache sizing, spec-decode acceptance) that an LLM cannot reinterpret, and replays prior recorded failures from every blueprint's `lessons.md`.
+```bash
+python3 standards/serving-commons/resolver/validate-serving-config.py \
+  --sidecar domains/gpu-serving/blueprints/<name>/benchmark.yaml \
+  --card    <model-deployment-card.json> \   # optional: supplies moe_intermediate_size etc.
+  --corpus-root .                             # replays prior lessons.md failures
+```
+1. **Block deployment on exit code 2** (one or more hard-rule FAILs) — the report prints the verbatim consequence, source citation, and deterministic fix. Apply the fix to the sidecar before proceeding (e.g. change TP, set `max_model_len`, switch AMI family).
+2. If the FP8 MoE check only WARNs ("moe_intermediate_size unknown"), add `model.moe_intermediate_size` to the sidecar from the model's `config.json` (or the mdc card) and re-run — do not deploy an FP8 MoE config with the divisibility check unverified.
+3. WARN/INFO findings (including `prior-failure:*` from the corpus) do not block, but record them in the deployment log and confirm any codified rule they reference actually fired.
+
+**Validation**: Both cards were found and noted in the deployment log; the serving-config resolver exits 0 (no hard-rule FAILs) or every FAIL has been remediated in the sidecar. Any conflicts, upstream PRs, or surfaced prior-failure findings are flagged.
 
 ### Stage 1: Foundation
 Deploy the base infrastructure (EKS, VPC, S3, FSx).

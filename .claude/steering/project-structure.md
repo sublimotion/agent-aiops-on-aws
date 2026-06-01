@@ -90,12 +90,39 @@ agent-aiops-on-aws/
 │               ├── README.md        # Architecture and quick start
 │               └── lessons.md
 │
+├── standards/                  # Cross-domain "commons": declarative spec → pure resolver → fail-closed
+│   ├── benchmark-commons/      # Workload card → benchmark argv (compile_card; raises UnsupportedWorkload)
+│   │   ├── runner/             # registry.py + compiler.py + platforms/ + tests/
+│   │   └── workloads/          # 7 standard workload cards (catalog source of truth)
+│   └── serving-commons/        # Serving config → validated config (compile_serving_config; raises InvalidServingConfig)
+│       └── resolver/           # model.py + registry.py + compiler.py + corpus.py + CLI + tests/
+│
 ├── scripts/                    # Shared utility scripts
 │   └── stage-images-ecr.sh    # Mirror images to private ECR
 │
 ├── CLAUDE.md                   # Root context (routing layer)
 └── README.md                   # Project documentation
 ```
+
+## Standards (the "commons" tier)
+
+`standards/` holds the deterministic, fail-closed resolvers shared across domains.
+Each follows the same shape — a **declarative input** is parsed into a typed model,
+a **pure compiler** runs a **registry** of rules over it, and an **invalid input
+raises** rather than silently degrading. A stdlib `unittest` conformance suite is
+the contract: green = correct by construction. This is where hard-won knowledge
+gets codified so an LLM cannot reinterpret it.
+
+| Package | Input | Output | Raises on | Gate |
+|---------|-------|--------|-----------|------|
+| `benchmark-commons` | workload card + benchmark.yaml sidecar | compiled benchmark argv | `UnsupportedWorkload` | benchmark-runner skill |
+| `serving-commons` | benchmark.yaml sidecar (+ mdc card, + lessons corpus) | `ValidationReport` (fail/warn/info) | `InvalidServingConfig` | infra-deployer **Stage 0c** |
+
+`serving-commons/resolver/corpus.py` is the I/O boundary that harvests every
+blueprint's `lessons.md` field-note frontmatter — its `CATEGORY_TO_RULE` dict is
+the **single source of truth** for the `failure_categories` vocabulary (kept in
+sync with `docs/card-format.md` by the conformance test). To add a serving rule,
+see `standards/serving-commons/CONTRIBUTING.md`.
 
 ## Module Structure
 

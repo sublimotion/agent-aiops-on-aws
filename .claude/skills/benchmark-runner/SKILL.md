@@ -58,6 +58,22 @@ Use `scripts/bench-standard.py` as the source of truth. It:
 
 If you find yourself writing a one-off bench script that parses client timing only, STOP. Invoke `bench-standard.py` instead.
 
+## Card → command is compiled, not interpreted
+
+**You do not decide what flags a workload runs with. `compile_card` does.** The
+mapping from a workload card to concrete benchmark argv lives in
+`standards/benchmark-commons/runner/registry.py` + `compiler.py` and is a pure,
+tested function. Your job is to pick the right **card** and **sidecar** — not to
+hand-write `--dataset-name` / `--request-rate` / `--goodput` flags.
+
+- To run a workload: `runner/run-benchmark.sh --workload <card> --sidecar <yaml> --tool <vllm|sglang> [--dry-run]`. Dry-run prints the exact compiled argv.
+- If compilation **raises `UnsupportedWorkload`**: the card or sidecar is wrong, or the `(dataset.type, load.type)` pair needs a registry handler. **Fix the declaration or add a handler — do NOT improvise a one-off driver.**
+- If a card resolves to an **orchestrated** executor (agentic, multi-turn, cohost, burn-in, cold-start, audio, video): it cannot run via the vendor bench tools. Use the named executor in `runner/orchestrators.py`.
+- Adding a new card, dataset type, or load type? Follow `runner/CONTRIBUTING.md` and make `python3 -m unittest discover -s runner/tests` pass. That test is the gate; green = correct by construction.
+- The same sidecar is **also** the input to the serving-config resolver (`standards/serving-commons/`), which gates the *deployment* (FP8/TP divisibility, AMI, spec-decode, etc.) at Stage 0c — distinct from this skill, which gates the *benchmark*. A sidecar that fails `validate-serving-config.py` describes a config that should not be deployed, let alone benchmarked.
+
+This is why the framework is deterministic: the SKILL guides *which* benchmark to run; the compiler owns *exactly what* executes. No interpretation in between.
+
 ## Benchmark Execution Rules
 
 These are hard-won operational lessons. Follow them exactly.
