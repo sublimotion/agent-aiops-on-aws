@@ -41,6 +41,11 @@ What's explicitly out of scope.
 ## Known Limitations
 Constraints to be aware of.
 
+## Carryover Audit (spec-design gate)
+Before running this experiment, confirm no lesson from a prior blueprint was left behind:
+- [ ] Ran the `carryover-auditor` agent on this spec (or equivalent self-check): scanned every `domains/**/lessons.md` whose stack (`model`/`engine`/`gpu_arch`/`hardware`/`failure_categories`) overlaps this experiment.
+- [ ] Every applicable prior lesson — especially `outcome: failure`/`partial` — is reflected here as a protocol step, environment check, or success criterion, OR noted as not applicable, citing its source (`<blueprint>/lessons.md` #N).
+
 ---
 
 > **Note**: Operational artifacts (lessons learned, experiment results, analysis)

@@ -63,12 +63,24 @@ When generating from artifacts, note the source: `> Generated from enriched arti
 - End with the note about operational artifacts belonging in the blueprint directory, not the spec.
 - Write the file to `domains/gpu-serving/specs/<name>.md` where `<name>` matches what the blueprint directory will be called.
 
+## Carryover self-check (before finalizing)
+
+A spec's most common defect is **forgetting a lesson a prior deployment already learned**. Before writing the file, do an adversarial pass keyed off the structured lessons corpus — do not rely on memory:
+
+1. Identify the target stack: `model`, `engine`, `hardware`, `gpu_arch`, `domain`, and techniques (disagg, LMCache/HiCache, MoE FP8, speculative decode, tool calling, Mamba/hybrid KV, EFA/NCCL multi-GPU, Ray, …).
+2. `find domains -name lessons.md`, then read the frontmatter of each. Pull every prior lesson whose `model`/`engine`/`gpu_arch`/`hardware` or `failure_categories` overlaps the target stack. Weight `outcome: failure`/`partial` highest — those are the costliest to forget.
+3. For each applicable prior lesson, ask: does this spec's components, required args, or **Verification Criteria** reflect it? If not, fold it into Known Limitations or a verification criterion. Cite the source (`<blueprint>/lessons.md` #N).
+4. For deeper coverage, recommend the user run the `carryover-auditor` agent against the finished spec — it does this adversarially and ranks gaps by severity (codified vs non-codified).
+
+This is the spec-design analog of the deployer's Stage 0 gate: catch the forgotten lesson while the spec is being written, not after a RALPH loop rediscovers it.
+
 ## After writing
 
 Remind the user to:
 1. Update the CLAUDE.md routing table with the new `blueprint -> spec` mapping.
 2. Update `.claude/steering/project-structure.md` spec listing.
 3. Create the blueprint directory when ready: `mkdir domains/gpu-serving/blueprints/<name>`.
+4. Run the `carryover-auditor` agent on the new spec to confirm no prior-deployment lesson was left behind.
 
 ## Style
 

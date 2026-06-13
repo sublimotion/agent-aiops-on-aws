@@ -11,6 +11,12 @@ Read `domains/agent-runtime/specs/<name>.md` before starting. All operational ar
 
 ## Deployment Stages
 
+### Stage 0 — Carryover audit (pre-deployment gate)
+
+Before touching infrastructure, invoke the `carryover-auditor` agent against the target spec. It scans every `domains/**/lessons.md` whose stack overlaps this deployment (here: prior agent-runtime lessons — tool timeouts, session-state, container/IAM patterns) and flags any prior lesson, especially `outcome: failure`/`partial`, that the spec failed to carry forward.
+
+**Block deployment on any P0 carryover gap.** Most gaps should be caught at spec-design time (spec-writer / template Stage 0); this is the backstop for specs written without that pass, or for lessons added since.
+
 ### Stage 1 — Foundation (Terraform)
 
 Apply the networking and storage layer:

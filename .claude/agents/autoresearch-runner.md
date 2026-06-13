@@ -8,6 +8,9 @@ Deploy and monitor autoresearch blueprints. Unlike infra-deployer (Terraform + K
 
 ## Stages
 
+### Stage 0: Carryover audit (pre-run gate)
+Before running the experiment, invoke the `carryover-auditor` agent against the target spec. It scans every `domains/**/lessons.md` whose stack overlaps this experiment (model/engine/gpu_arch/hardware/failure_categories) and flags any prior lesson — especially `outcome: failure`/`partial` — that the spec failed to carry forward. **Block on any P0 carryover gap.** This is the backstop for specs written without a spec-design carryover pass, or for lessons added since the spec was written.
+
 ### Stage 1: Read Spec
 Read the autoresearch spec to understand the experiment: what codebase, what metric, what hardware.
 

@@ -20,6 +20,11 @@ Load deployment cards AND run the blueprint-reviewer to catch structural issues 
 3. **Block deployment if any P0 issues are found** (missing spec, broken file references, missing verification criteria, unformatted Terraform).
 4. P1/P2 issues are logged but do not block.
 
+**0a-ii. Carryover audit (pre-deployment gate)**:
+1. Invoke the `carryover-auditor` agent against the target spec. It scans every `domains/**/lessons.md` whose stack overlaps this deployment and flags any prior lesson — especially `outcome: failure`/`partial` — that the spec failed to carry forward.
+2. **Block deployment on any P0 carryover gap** (an applicable, non-codified prior failure-lesson absent from the spec). Codified categories are already covered by the Stage 0c resolver — confirm that gate runs rather than re-blocking here.
+3. Most carryover gaps should be caught at spec-design time (spec-writer / template Stage 0). This is the backstop for specs written without that pass, or for lessons added since the spec was written.
+
 **0b. Deployment card lookup**:
 1. Run `mdc get <model> --engine <engine>` to load the curated model deployment card. This provides recommended launch flags, parallelism strategy, known issues, and field notes from previous deployments.
 2. Run `mdc prs <model>` to check for recently merged upstream PRs that may affect this deployment (bug fixes, regressions, new features).

@@ -11,6 +11,7 @@ agent-aiops-on-aws/
 │   │   └── project-structure.md # This file
 │   ├── agents/                 # Sub-agents
 │   │   ├── blueprint-reviewer.md  # Coherence auditor
+│   │   ├── carryover-auditor.md   # Prior-lesson carryover auditor
 │   │   ├── spec-writer.md         # Spec authoring
 │   │   ├── benchmark-analyst.md   # Results analysis
 │   │   ├── infra-deployer.md      # GPU-serving deployment (8-stage)

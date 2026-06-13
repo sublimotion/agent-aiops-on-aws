@@ -70,6 +70,11 @@ Check `mdc prs <model>` for recently merged upstream PRs that may affect this de
 
 Concrete, mechanically checkable conditions for each stage. The deployer agent checks each criterion and records pass/fail in the readiness audit. A criterion is either deterministic (command returns expected output) or metric-bounded (value within threshold).
 
+### Stage 0 — Carryover Audit (spec-design gate)
+- [ ] Ran the `carryover-auditor` agent against this spec (or did the equivalent self-check): scanned every `domains/**/lessons.md` whose stack (`model`/`engine`/`gpu_arch`/`hardware`/`failure_categories`) overlaps this deployment.
+- [ ] Every applicable prior lesson — especially `outcome: failure`/`partial` — is reflected here as a component requirement, required arg, or verification criterion, OR explicitly noted as not applicable. Each carried lesson cites its source (`<blueprint>/lessons.md` #N).
+- [ ] No P0 carryover gap remains (an applicable, non-codified prior failure-lesson absent from this spec).
+
 ### Stage 0c — Serving-Config Resolver (fail-closed)
 - [ ] `python3 standards/serving-commons/resolver/validate-serving-config.py --sidecar blueprints/<name>/benchmark.yaml --corpus-root .` exits 0 (no hard-rule FAILs)
 - [ ] If model is FP8 MoE: `model.moe_intermediate_size` is present in the sidecar (or mdc card) so `fp8-moe-tp-divisibility` verifies rather than WARNs

@@ -36,6 +36,7 @@ claude
 │   └── project-structure.md  # Layout and conventions
 ├── agents/                   # Sub-agents for specialized tasks
 │   ├── blueprint-reviewer.md # Coherence auditor
+│   ├── carryover-auditor.md  # Prior-lesson carryover auditor
 │   ├── spec-writer.md        # Spec authoring
 │   ├── benchmark-analyst.md  # Results analysis
 │   ├── infra-deployer.md     # GPU-serving deployment (8-stage)
@@ -317,6 +318,7 @@ Specialized agents in `.claude/agents/` handle distinct phases of the lifecycle.
 |-------|--------|-------------|
 | `spec-writer` | Any | Drafting a new spec from a brief description |
 | `blueprint-reviewer` | Any | Auditing a blueprint for broken references and consistency |
+| `carryover-auditor` | Any | Red-teaming a new spec for prior-blueprint lessons it forgot to carry over |
 | `infra-deployer` | GPU Serving | Running the full 8-stage GPU serving deployment |
 | `agentcore-deployer` | Agent Runtime | Running the full 8-stage AgentCore Runtime deployment |
 | `benchmark-analyst` | GPU Serving | Analyzing raw benchmark JSON and updating the benchmark report |
