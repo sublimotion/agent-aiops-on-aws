@@ -20,8 +20,9 @@ Then collect:
 1. `<blueprint-dir>/lessons.md` — the full file, with attention to entries added since the last compound run (most recent entries at the bottom).
 2. **All readiness audits** — glob `<blueprint-dir>/results/readiness-audit-*.md` and read every one. Audits accumulate over time; patterns only become visible across multiple sessions.
 3. **All deployment logs** — glob `<blueprint-dir>/results/deployment-log-*.md` and read every one. If a deployment log is embedded inside a readiness audit file (as is common), treat it as part of that audit.
-4. `<blueprint-dir>/results/benchmark-report.md` — if it exists, the executive summary and key findings sections.
-5. Current steering files — read all of `.claude/steering/*.md` so you don't duplicate rules that already exist.
+4. `<blueprint-dir>/results/benchmark-report.md` — if it exists, the executive summary and key findings sections, **including the Stage 6 Tier Stack Table** (measured Δ per optimization tier vs T0).
+5. The blueprint spec's **Stage 0b lever ledger** — the planned `applied`/`deferred` disposition per tier. You compare plan (0b) against result (Stage 6) in the optimization-coverage step below.
+6. Current steering files — read all of `.claude/steering/*.md` so you don't duplicate rules that already exist.
 
 ## Version refresh protocol
 
@@ -59,6 +60,43 @@ Add to the compound summary:
 ### Staleness without refresh
 
 If no refresh has been run and a steering rule is older than 90 days, flag it in the compound summary as "due for review" — do not silently rely on it during deployment.
+
+## Optimization coverage refresh
+
+This is the end-of-loop half of the optimization flywheel. The spec's Stage 0b ledger is the *plan* (which levers the deployer intended to apply); the Stage 6 Tier Stack Table is the *result* (measured Δ per tier). Your job is to reconcile them, feed measured evidence back into the lever catalog, and surface any high-leverage lever that was skipped without justification — so the *next* deployment of a similar model starts from sharper priorities.
+
+### Process
+
+1. **Refresh measured deltas in `docs/optimization-stack.md`.** For each tier the Stage 6 Tier Stack Table measured, update that tier's "typical delta range" / blueprint-evidence cells with the new dated datapoint (e.g., "Kimi K2.6 NVFP4 on B200: 1.7× decode vs FP8, 2026-06-17"). Append evidence; do not delete prior datapoints unless a value is superseded for the *same* model+hardware. This is the only doc whose delta cells you edit — treat it as the dated-evidence layer.
+2. **Reconcile plan vs result.** Compare the Stage 0b ledger to the Stage 6 table:
+   - A tier `applied` in 0b and measured in Stage 6 → confirm the Δ landed in the catalog's typical range. If it underperformed, that's a candidate lesson ("X hurts on Y hardware").
+   - A tier `deferred` in 0b with a sound reason and still absent → no action — **unless the reason is an engine blocker** ("BLOCKED by PR #X", "incompatible", "not supported in <engine> yet"). Blockers decay: re-verify against the live tracker (`gh pr view <N> --repo <repo>`, `gh issue list --repo <repo> --search "<feature> in:title" --state all`, `mdc prs <model>`). If the PR merged or a newer release lifted it, record a lesson ("<feature> unblocked as of <engine> <version>/PR #X merged YYYY-MM-DD — re-test next deployment") and, if it raises a high-priority lever for this regime, note it in the relevant tier of `optimization-stack.md`. A stale blocker that silently suppressed a lever is the same defect class as a carryover gap.
+   - **A high-priority tier (per `optimization-stack.md` for the predicted regime) that was skipped with no reason, or whose deferral reason the benchmark contradicts → flag it.** This is the optimization analog of a carryover gap. Record it under a new compound-summary section `### Optimization coverage gaps`, and if the gap is cross-cutting (would recur for other models in the same regime), elevate a one-line priority note into the relevant tier of `optimization-stack.md`.
+3. **Decide the abstraction level for each optimization lesson** (the routing ladder — apply the invariance test "would this still be true after a framework version bump / a model swap?"):
+
+   | If the lesson… | Lands in | Example |
+   |----------------|----------|---------|
+   | is rederivable from the roofline (physics; survives model + framework + hardware swap) | `.claude/steering/inference-first-principles.md` (rare — only if a new attention arch / precision changes the math) | "MoE weight term dominates decode bytes regardless of attention trick" |
+   | is a **technique-class** statement true across ≥2 models/frameworks (survives a version bump) | `docs/optimization-stack.md` (generalized lever catalog) | "speculative decode is net-negative past c≈256 with a stock draft"; "disagg loses unless forced cross-node" |
+   | names a specific model/engine/version/instance (dies on the next release) | blueprint `lessons.md` + `mdc learn` / `gpu-infra learn` (T2/T3 cards, version-stamped) | "`--tool-call-parser glm47` for GLM-5"; "vLLM 0.18 + GPTQ-Int4 = garbage" |
+
+   Most optimization lessons stay at the card level. Promote to the catalog only on the *second* occurrence across models — a single datapoint is a card fact, a recurrence is a generalized lever.
+
+### Output format
+
+Add to the compound summary:
+
+```
+### Optimization coverage
+| Tier | 0b plan | Stage 6 result | Δ vs T0 | Catalog action |
+|------|---------|----------------|---------|----------------|
+
+### Optimization coverage gaps
+| Tier skipped | Predicted regime | Why it likely paid | Elevated to catalog? |
+|--------------|------------------|--------------------|----------------------|
+```
+
+If the blueprint has no Stage 6 Tier Stack Table (older blueprint, or benchmark not yet run), note that and skip this step rather than inventing deltas.
 
 ## What to extract from readiness audits
 
@@ -158,6 +196,25 @@ If no hardware lessons were found, omit this section.
 - Write rules as **imperative statements**, not observations. "Always copy model to NVMe before serving" not "NVMe is faster than FSx."
 - Include the **why** in a parenthetical when it's non-obvious. "Always copy model to NVMe before serving (17x faster than FSx for model loading)."
 - **Dedup check**: Before appending a new rule, grep the target steering file for the key terms (component name, error message, flag name). If a similar rule already exists, update it in place rather than appending a duplicate. If the existing rule covers a narrower case, widen it.
+- **Phenomenon-keyed consolidation** (prevents drift): before adding a new `####` heading, ask whether an existing rule covers the same *phenomenon* (the underlying behavior — JIT compile cost, KV-offload sizing, FP8 TP-divisibility — not the specific model/hardware that triggered it). If one exists, **do not add a second heading**. Instead reshape (or extend) that rule into the consolidated form:
+  - The **heading + first line** carry the general, tier-stable directive ("First-run JIT/graph compilation can take 15+ min — size readiness probes accordingly").
+  - A **table** carries the per-stack/hardware/version specifics that perish, one row per occurrence, with a dated `Seen` column. A new occurrence is a **new row**, never a new heading.
+
+  ```markdown
+  #### First-run JIT/graph compilation can take 15+ min — size readiness probes accordingly
+  <!-- stack: vllm,sglang | validated: YYYY-MM-DD -->
+
+  Set readiness probe `initialDelaySeconds ≥ 900` and cache compile artifacts so restarts skip it.
+
+  | Stack / hardware       | First-start | Cache path          | Seen    |
+  |------------------------|-------------|---------------------|---------|
+  | SGLang DeepGEMM / B200 | ~15 min     | (DeepGEMM JIT)      | 2026-03 |
+  | vLLM DeepGEMM / B200   | ~16 min     | /root/.cache/vllm/  | 2026-05 |
+  ```
+
+  The table *is* the changelog: heading = catalog/steering tier, rows = version-stamped card tier — the routing ladder applied inside a single rule. Update the heading's `validated:` tag to the newest row's date.
+
+  **Respect the append-only guardrail.** You may freely apply this consolidation to rules *you wrote in this same run* (collapse your own new heading into an existing rule's table). For **cross-session** clusters that already exist in the file, do NOT rewrite them — surface them under `### Compaction candidates` in the compound summary for human approval. The contradiction case is the same: if a new row contradicts an existing one (newer measurement supersedes older), add the new row and flag the stale one; never silently delete.
 - **Version tag**: If the rule references specific versions or version-dependent behavior, add a `<!-- stack: component=version | validated: YYYY-MM-DD -->` comment immediately after the heading. See the "Version Tagging Convention" section at the top of `tech-stack.md`.
 - Append to the relevant section in the steering file. Do not rewrite or reorder existing content.
 - If no suitable section exists, add a new `##` heading at the bottom of the file.
@@ -168,6 +225,29 @@ If no hardware lessons were found, omit this section.
 - File paths derivable from `project-structure.md`.
 - Patterns already documented in an existing steering rule (dedup check above).
 - Operational details specific to one model or one instance type that wouldn't help other blueprints.
+
+## Compaction trigger (git-churn drift detection)
+
+After you finish elevating, decide whether any steering file you touched has accreted enough to warrant compaction. Use git history as the drift signal so this is mechanical, not eyeballed.
+
+For each steering file you appended to this run, run:
+
+```bash
+git log --numstat --pretty=format: -- <file> | awk 'NF==3{a+=$1;d+=$2} END{printf "added=%d deleted=%d net=%d\n",a,d,a-d}'
+wc -l < <file>
+```
+
+Interpret the two signatures (the discriminator is net-growth vs current size, NOT commit count — a frequently-revised control file is healthy; an append-only knowledge file that only ever grows is drifting):
+
+| Signature | Meaning | Action |
+|-----------|---------|--------|
+| `net ≈ current line count` and `deleted ≈ 0` | **monotonic accretion, never compacted** | strong compaction candidate — flag it |
+| `added ≫ current line count` (already churned) | being reshuffled; likely has stale forked clusters (the JIT/HiCache pattern) | scan for same-phenomenon `####` clusters; flag any found |
+| `net` small or `deleted` substantial relative to adds | revised in place / shimmed | healthy — no action |
+
+When a file trips either accretion signature, scan it for same-phenomenon clusters (two or more `####` headings describing one underlying behavior across different models/hardware/versions — see "Phenomenon-keyed consolidation"). List each cluster under `### Compaction candidates` in the compound summary with the proposed consolidated heading and the rows it would collapse into. **Do not rewrite cross-session clusters yourself** — this is the append-only guardrail; the candidate list is for human approval. Only auto-collapse rules you wrote in this same run.
+
+If no touched file trips a signature, omit the `### Compaction candidates` section.
 
 ## Output
 
@@ -195,6 +275,11 @@ After reviewing all inputs:
 ### Elevated to steering
 | Rule | Source (audit/log/lessons) | Target file | Section |
 |------|---------------------------|-------------|---------|
+
+### Compaction candidates
+(Omit if no touched steering file tripped an accretion signature. For each: the file, its churn signature, the same-phenomenon cluster to collapse, and the proposed consolidated heading. Human-approval only — not auto-applied.)
+| File | Signature (net/now/deleted) | Cluster (headings to collapse) | Proposed consolidated heading |
+|------|------------------------------|-------------------------------|-------------------------------|
 
 ### Kept local
 | Lesson (summary) | Source | Reason kept local |
