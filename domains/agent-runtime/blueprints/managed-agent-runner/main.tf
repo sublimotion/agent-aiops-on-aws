@@ -166,6 +166,12 @@ data "aws_iam_policy_document" "run_perms" {
     actions   = ["ecr:GetDownloadUrlForLayer", "ecr:BatchGetImage", "ecr:GetAuthorizationToken"]
     resources = ["*"]
   }
+  # Model auth via Bedrock (the harness calls Claude through Bedrock with IRSA).
+  statement {
+    effect    = "Allow"
+    actions   = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
+    resources = ["*"]
+  }
   # KMS for the SSE bucket.
   statement {
     effect    = "Allow"
