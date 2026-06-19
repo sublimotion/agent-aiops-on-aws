@@ -75,6 +75,28 @@ Concrete, mechanically checkable conditions for each stage. The deployer agent c
 - [ ] Every applicable prior lesson — especially `outcome: failure`/`partial` — is reflected here as a component requirement, required arg, or verification criterion, OR explicitly noted as not applicable. Each carried lesson cites its source (`<blueprint>/lessons.md` #N).
 - [ ] No P0 carryover gap remains (an applicable, non-codified prior failure-lesson absent from this spec).
 
+### Stage 0b — Optimization Coverage (lever ledger)
+
+Predict the bottleneck regime, then account for every optimization tier — so a high-leverage lever is never silently skipped (the failure mode that loses throughput with no error). Fill the ledger below; a tier left blank is treated as an unreviewed gap, a tier marked `deferred` with a reason is fine.
+
+1. **Regime prediction** (from `.claude/steering/inference-first-principles.md`): this deployment should be `____`-bound on `____` (hardware) at target concurrency. One line of reasoning: `____`.
+2. **Lever ledger** — for each tier in `docs/optimization-stack.md`, mark `applied` (name the config) or `deferred — <reason>`:
+
+| Tier | Lever | applied / deferred — reason |
+|------|-------|------------------------------|
+| T0 | Baseline (honest reference) | |
+| T1 | Quantization (weight + KV bytes) | |
+| T2 | KV / prefix cache | |
+| T3 | Speculative decode | |
+| T4 | Parallelism (TP/EP/DP shape) | |
+| T5 | Kernel / compile | |
+
+- [ ] Regime predicted with one-line reasoning
+- [ ] Every tier is either `applied` (with config) or `deferred` (with reason) — no blank rows
+- [ ] Any tier whose `docs/optimization-stack.md` priority is high for the predicted regime is `applied`, OR its deferral reason explicitly addresses why the high-priority lever doesn't pay here
+- [ ] **Any deferral that cites an engine blocker ("BLOCKED by PR #X", "incompatible with …", "not supported in <engine> yet") is re-verified against the live tracker** — `mdc prs <model>` plus `gh pr view <N> --repo <vllm-project/vllm|sgl-project/sglang>` / `gh issue list --repo <repo> --search "<feature> in:title" --state all`. A merged PR or newer release may have lifted the blocker. Record the blocker's `validated: YYYY-MM-DD` next to the deferral; a blocker carried from a card/lessons.md without re-check is not a valid deferral reason for a high-priority lever
+- [ ] The same tier list will be filled with measured deltas in the Stage 6 Tier Stack Table (this ledger is the *plan*; Stage 6 is the *result*)
+
 ### Stage 0c — Serving-Config Resolver (fail-closed)
 - [ ] `python3 standards/serving-commons/resolver/validate-serving-config.py --sidecar blueprints/<name>/benchmark.yaml --corpus-root .` exits 0 (no hard-rule FAILs)
 - [ ] If model is FP8 MoE: `model.moe_intermediate_size` is present in the sidecar (or mdc card) so `fp8-moe-tp-divisibility` verifies rather than WARNs
@@ -122,6 +144,11 @@ Concrete, mechanically checkable conditions for each stage. The deployer agent c
 - [ ] KV cache utilization (`vllm:gpu_cache_usage_perc` or equivalent)
 - [ ] Running requests (`vllm:num_requests_running`)
 - [ ] Speculative decode acceptance rate (if MTP/spec decode enabled)
+
+**Tier Stack Table** (required — closes the Stage 0b ledger): fill the table from `docs/optimization-stack.md` with the **measured** Δ each tier delivered vs T0, and mark any tier blocked. This is the *result* half of the Stage 0b *plan*; `compound-learner` reads it to refresh the catalog's delta cells.
+- [ ] One row per tier T0–T5: config landed, Δ tok/s vs T0, Δ TTFT p99 vs T0, blocked? (with reason)
+- [ ] Every tier marked `deferred` in Stage 0b is reconciled here (still deferred, or applied + measured)
+- [ ] Any tier that underperformed its `optimization-stack.md` typical-Δ range is noted in `lessons.md`
 
 **Enriched artifact output**: Store in `blueprints/<name>/results/` following the schema from `standards/benchmark-commons/PROPOSAL.md`. Each artifact includes: model metadata, engine config, infrastructure, workload, core metrics, SLO evaluation, and optional extensions.
 
