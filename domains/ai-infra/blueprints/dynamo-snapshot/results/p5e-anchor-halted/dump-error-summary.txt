@@ -1,0 +1,32 @@
+# CRIU dump error captured 2026-05-30 ~21:08 UTC on p5e.48xlarge i-075d128c2e99849c5
+# All 4 retries (orch-A, A2, A3, A4) failed at the same point:
+
+(31.481787) 56312 fdinfo 9: pos:    0 flags: 100002/0x1
+(31.481802) Error (criu/files-ext.c:98): Can't dump file 9 of that type [20666] (chr 195:255)
+(31.481906) Error (criu/cr-dump.c:1701): Dump files (pid: 56312) failed with -1
+(31.482360) net: Unlock network
+(31.631216) cuda_plugin: finished cuda_plugin stage 0 err -1
+(33.423068) cuda_plugin: resuming devices on pid 56011
+(38.972424) cuda_plugin: resuming devices on pid 56312
+(46.576655) Unfreezing tasks into 1
+(46.579039) Error (criu/cr-dump.c:2130): Dumping FAILED.
+
+# fd 9 in EngineCore (pid 56312) -> /dev/nvidiactl (chr 195:255), inode 2045, mnt_id 25.
+# A minimal `torch.cuda.init() + torch.randn(... 'cuda:0')` script with
+# CUDA_VISIBLE_DEVICES=0 opens 51 nvidia-related fds across all 8 GPUs on this host:
+#   24x /dev/nvidia2  (the GPU it scheduled "device 0" onto)
+#   6x each on nvidia0,1,3,4,5,6,7
+#   4x /dev/nvidia-uvm
+#   1x /dev/nvidia-caps/nvidia-cap2
+#   1x /dev/nvidiactl  <- the one CRIU fails on
+#
+# cuda_plugin.so registered hooks (per `strings cuda_plugin.so`):
+#   CR_PLUGIN_HOOK__PAUSE_DEVICES
+#   CR_PLUGIN_HOOK__CHECKPOINT_DEVICES
+#   CR_PLUGIN_HOOK__RESUME_DEVICES_LATE
+#   CR_PLUGIN_HOOK__HANDLE_DEVICE_VMA
+# NOT registered: HANDLE_DEVICE_FD. Bare-fd opens to /dev/nvidiaN fall through
+# to CRIU's generic dump_unsupp_fd → returns -ENOTSUP → dump fails.
+#
+# Tried `--external dev[195/255]:nvidiactl --external dev[195/0]:nvidia0 --external dev[195/254]:nvidia-uvm`:
+# no effect — `dev[major/minor]:NAME` syntax is for mountable block devices, not character-device fds.

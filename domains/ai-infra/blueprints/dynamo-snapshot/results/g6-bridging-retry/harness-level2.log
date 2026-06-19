@@ -1,0 +1,49 @@
+INFO 05-30 16:33:26 [__init__.py:216] Automatically detected platform cuda.
+[harness] constructing vLLM with enable_sleep_mode=True ...
+INFO 05-30 16:33:28 [utils.py:328] non-default args: {'dtype': 'float16', 'seed': 42, 'max_model_len': 2048, 'gpu_memory_utilization': 0.4, 'disable_log_stats': True, 'enforce_eager': True, 'enable_sleep_mode': True}
+INFO 05-30 16:33:34 [__init__.py:742] Resolved architecture: Qwen3ForCausalLM
+WARNING 05-30 16:33:34 [__init__.py:2767] Casting torch.bfloat16 to torch.float16.
+INFO 05-30 16:33:34 [__init__.py:1815] Using max model len 2048
+INFO 05-30 16:33:35 [scheduler.py:222] Chunked prefill is enabled with max_num_batched_tokens=8192.
+INFO 05-30 16:33:35 [__init__.py:3400] Cudagraph is disabled under eager mode
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:35 [core.py:654] Waiting for init message from front-end.
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:35 [core.py:76] Initializing a V1 LLM engine (v0.10.2) with config: model='Qwen/Qwen3-0.6B', speculative_config=None, tokenizer='Qwen/Qwen3-0.6B', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.float16, max_seq_len=2048, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=True, kv_cache_dtype=auto, device_config=cuda, decoding_config=DecodingConfig(backend='auto', disable_fallback=False, disable_any_whitespace=False, disable_additional_properties=False, reasoning_backend=''), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None), seed=42, served_model_name=Qwen/Qwen3-0.6B, enable_prefix_caching=True, chunked_prefill_enabled=True, use_async_output_proc=True, pooler_config=None, compilation_config={"level":0,"debug_dump_path":"","cache_dir":"","backend":"","custom_ops":[],"splitting_ops":null,"use_inductor":true,"compile_sizes":[],"inductor_compile_config":{"enable_auto_functionalized_v2":false},"inductor_passes":{},"cudagraph_mode":0,"use_cudagraph":true,"cudagraph_num_of_warmups":0,"cudagraph_capture_sizes":[],"cudagraph_copy_inputs":false,"full_cuda_graph":false,"pass_config":{},"max_capture_size":0,"local_cache_dir":null}
+[W530 16:33:38.860520599 ProcessGroupNCCL.cpp:981] Warning: TORCH_NCCL_AVOID_RECORD_STREAMS is the default now, this environment variable is thus deprecated. (function operator())
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:38 [parallel_state.py:1165] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, TP rank 0, EP rank 0
+[1;36m(EngineCore_DP0 pid=6165)[0;0m WARNING 05-30 16:33:38 [topk_topp_sampler.py:69] FlashInfer is not available. Falling back to the PyTorch-native implementation of top-p & top-k sampling. For the best performance, please install FlashInfer.
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:38 [gpu_model_runner.py:2338] Starting to load model Qwen/Qwen3-0.6B...
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:38 [gpu_model_runner.py:2370] Loading model from scratch...
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:38 [cuda.py:362] Using Flash Attention backend on V1 engine.
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:38 [weight_utils.py:348] Using model weights format ['*.safetensors']
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:38 [weight_utils.py:406] No model.safetensors.index.json found in remote.
+[1;36m(EngineCore_DP0 pid=6165)[0;0m Loading safetensors checkpoint shards:   0% Completed | 0/1 [00:00<?, ?it/s]
+[1;36m(EngineCore_DP0 pid=6165)[0;0m Loading safetensors checkpoint shards: 100% Completed | 1/1 [00:01<00:00,  1.93s/it]
+[1;36m(EngineCore_DP0 pid=6165)[0;0m Loading safetensors checkpoint shards: 100% Completed | 1/1 [00:01<00:00,  1.93s/it]
+[1;36m(EngineCore_DP0 pid=6165)[0;0m 
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:40 [default_loader.py:268] Loading weights took 1.94 seconds
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:41 [gpu_model_runner.py:2392] Model loading took 1.1201 GiB and 2.457605 seconds
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:42 [gpu_worker.py:298] Available KV cache memory: 6.28 GiB
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:42 [kv_cache_utils.py:864] GPU KV cache size: 58,752 tokens
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:42 [kv_cache_utils.py:868] Maximum concurrency for 2,048 tokens per request: 28.69x
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:42 [gpu_worker.py:391] Free memory on device (21.82/22.04 GiB) on startup. Desired GPU memory utilization is (0.4, 8.81 GiB). Actual usage is 1.12 GiB for weight, 1.4 GiB for peak activation, 0.02 GiB for non-torch memory, and 0.0 GiB for CUDAGraph memory. Replace gpu_memory_utilization config with `--kv-cache-memory=6582429900` to fit into requested memory, or `--kv-cache-memory=20544297984` to fully utilize gpu memory. Current kv cache memory in use is 6739716300 bytes.
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:42 [core.py:218] init engine (profile, create kv cache, warmup model) took 1.33 seconds
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:43 [__init__.py:3400] Cudagraph is disabled under eager mode
+INFO 05-30 16:33:43 [llm.py:295] Supported_tasks: ['generate']
+INFO 05-30 16:33:43 [__init__.py:36] No IOProcessor plugins requested by the model
+[1;36m(EngineCore_DP0 pid=6165)[0;0m WARNING 05-30 16:33:43 [cudagraph_dispatcher.py:102] cudagraph dispatching keys are not initialized. No cudagraph will be used.
+[harness] pre  hash=3e50d80e09be7f70b423a9c505a9064e77a41d825320699aa0990cd953996698 ntok=64
+[harness] llm.sleep(level=2) ...
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:44 [block_pool.py:292] Successfully reset prefix cache
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:44 [gpu_worker.py:116] Sleep mode freed 8.85 GiB memory, 0.27 GiB memory is still in use.
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:44 [executor_base.py:188] It took 0.086442 seconds to fall asleep.
+READY_FOR_CHECKPOINT pid=6074
+[harness] SIGUSR1 received, llm.wake_up() ...
+[1;36m(EngineCore_DP0 pid=6165)[0;0m INFO 05-30 16:33:52 [executor_base.py:204] It took 0.008190 seconds to wake up tags {'weights', 'kv_cache'}.
+[harness] post hash=5341e6b2646979a70e57653007a1f310169421ec9bdd9f1a5648f75ade005af1 ntok=64
+[harness] GATE_1_FAIL: token-ID hashes differ

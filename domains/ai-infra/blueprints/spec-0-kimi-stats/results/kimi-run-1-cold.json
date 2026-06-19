@@ -1,0 +1,25 @@
+{
+  "schema": "benchmark-commons/v1",
+  "experiment": "spec-0-kimi-stats",
+  "variant": "run-1-cold",
+  "fixture": "kimi-k2.6-fp8",
+  "image": "vllm/vllm-openai:v0.21.0",
+  "hardware": "p6-b300.48xlarge x1 (us-west-2b spot)",
+  "tp_size": 8,
+  "model_size_gb": 585,
+  "weights_source": "S3 (cold sync)",
+  "events_ms": {
+    "T0_pod_create": 0,
+    "T_init_started": 6000,
+    "T_init_finished": 1942000,
+    "T_main_started": 2115000,
+    "T_pod_ready": 2763000
+  },
+  "stages_ms": {
+    "init_s3_sync": 1936000,
+    "init_to_main_gap": 173000,
+    "main_to_ready": 648000,
+    "TOTAL_pod_create_to_ready": 2763000
+  },
+  "first_completion_ms_after_ready": 12181
+}

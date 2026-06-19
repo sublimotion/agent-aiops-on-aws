@@ -1,0 +1,30 @@
+{
+  "schema": "benchmark-commons/v1",
+  "experiment": "spec-0-kimi",
+  "variant": "prof-1",
+  "fixture": "kimi-k2.6-fp8",
+  "image": "vllm/vllm-openai:v0.21.0",
+  "hardware": "p6-b300.48xlarge x1",
+  "tp_size": 8,
+  "model_size_gb": 585,
+  "events_ms": {
+    "T0_pod_create": 0,
+    "T_init_started": 2000,
+    "T_init_finished_s3_sync_done": 1942000,
+    "T5_main_container_started": 1944000,
+    "T6_python_alive": 1948799,
+    "T_kimi_model_class_loaded": 1956065,
+    "T_cuda_graph_capture_start": 2567604,
+    "T12_pod_ready": 2599000
+  },
+  "stages_ms": {
+    "image_pull_T2_T3": "<300",
+    "init_s3_sync": 1940000,
+    "container_start_T4_T6": 4799,
+    "model_load_T7_T_cuda": 618805,
+    "cuda_graph_to_ready": 31395,
+    "TOTAL_pod_create_to_ready": 2599000
+  },
+  "first_token_ms_after_ready": 12182,
+  "started_at_wall": 1779473348
+}

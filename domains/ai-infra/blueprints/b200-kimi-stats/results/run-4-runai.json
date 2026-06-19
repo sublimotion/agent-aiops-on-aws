@@ -1,0 +1,35 @@
+{
+  "schema": "benchmark-commons/v1",
+  "experiment": "b200-spec-b",
+  "variant": "run-4-runai-streamer",
+  "fixture": "kimi-k2.6-fp8",
+  "image": "vllm/vllm-openai:v0.21.0",
+  "hardware": "p6-b200.48xlarge x1 (us-east-2b spot)",
+  "tp_size": 8,
+  "model_size_gb": 585,
+  "weights_source": "NVMe (warm)",
+  "load_format": "runai_streamer",
+  "runai_concurrency": 16,
+  "compile_cache": "hostPath /mnt/nvme/compile-cache mounted",
+  "events_ms": {
+    "T0": 0,
+    "T_main_started": 2000,
+    "T_pod_ready": 383000
+  },
+  "stages_ms": {
+    "main_to_ready": 381000
+  },
+  "comparison": {
+    "default_loader_main_to_ready_ms": 384000,
+    "runai_streamer_main_to_ready_ms": 381000,
+    "runai_savings_seconds": 3,
+    "runai_speedup_x": 1.01
+  },
+  "interpretation": [
+    "RunAI Streamer with --load-format=runai_streamer enabled.",
+    "Saves only 3s vs default loader on warm-NVMe path (statistically zero).",
+    "Reason: NVMe-to-HBM is already PCIe-bandwidth bound. Concurrent reads don't help when single reader saturates the link.",
+    "RunAI Streamer's value is conditional: wins on S3-backed sources (latency parallelism), neutral on local NVMe.",
+    "Steering implication: only enable runai_streamer when load source is S3 or other high-latency storage."
+  ]
+}

@@ -1,0 +1,471 @@
+# Snapshot orchestrator — drives the four phases of the E1 experiment:
+#
+#   Phase 1 (CHECKPOINT):
+#     - Read Deployment ministral-3b's pod template
+#     - Apply protocol/checkpoint.go transforms (label as source, target-containers
+#       annotation, seccomp profile, EnsureControlVolume, swap readinessProbe to
+#       sentinel exec, clear liveness/startup, wrap command with cuda-checkpoint
+#       --launch-job)
+#     - Submit as a Job: checkpoint-job-<id>-1
+#     - Watch the source pod until annotation
+#       nvidia.com/snapshot-checkpoint-status=completed (set by snapshot-agent)
+#       OR Job status=Failed
+#
+#   Phase 2 (EBS SNAPSHOT + FSR):
+#     - Discover the EBS volume backing the snapshot-checkpoints PVC
+#     - aws ec2 create-snapshot --volume-id <vid> --tags ...
+#     - Wait state=completed
+#     - aws ec2 enable-fast-snapshot-restores --availability-zones <az> --source-snapshot-ids <sid>
+#     - (Optional) create a snapshot.storage.k8s.io VolumeSnapshotContent
+#       referencing the AWS snapshot, so per-replica PVCs can hydrate from it.
+#
+#   Phase 3 (RESTORE FAN-OUT):
+#     - For i in 1..4:
+#       - Build a Pod from the Deployment template with
+#         protocol/restore.go transforms (label as restore-target, checkpoint-id,
+#         target-containers, seccomp, control volume, container.command=["sleep","infinity"],
+#         StartupProbe gating on /snapshot-control/restore-complete)
+#       - Inject per-replica PVC `snapshot-restore-<i>` populated from the
+#         VolumeSnapshot
+#       - kubectl create
+#     - Watch all 4 pods until each has annotation
+#       nvidia.com/snapshot-restore-status.ministral=completed
+#
+#   Phase 4 (RECORD):
+#     - Capture per-pod timestamps from event log + annotations
+#     - Emit JSON to /results/e1-result.json on the orchestrator's mounted PVC
+#
+# Per the iter-5 directive's "If 200 lines of bash+kubectl gets unwieldy,
+# write it as a small Go binary or Python script in a small image. Pick the
+# lower-friction option." — Python wins. We use the bitnami/kubectl image
+# plus pip install kubernetes boto3 at startup. Total wall ~30s before the
+# first phase fires; cheaper than building+pushing yet another image for
+# iter 5a authoring.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: snapshot-orchestrator-script
+  namespace: dynamo-snapshot
+  labels:
+    app.kubernetes.io/component: snapshot-orchestrator
+data:
+  orchestrate.py: |
+    #!/usr/bin/env python3
+    """
+    Snapshot orchestrator for Ministral-3B E1 (4-replica restore).
+    Drives the protocol described in protocol/checkpoint.go + protocol/restore.go.
+    """
+    import copy
+    import json
+    import logging
+    import os
+    import sys
+    import time
+    import uuid
+    from typing import Any, Dict, List, Optional
+
+    import boto3
+    from kubernetes import client, config, watch
+    from kubernetes.client.rest import ApiException
+
+    NAMESPACE = os.environ.get("WORKLOAD_NAMESPACE", "dynamo-snapshot")
+    DEPLOYMENT_NAME = os.environ.get("DEPLOYMENT_NAME", "ministral-3b")
+    TARGET_CONTAINER = os.environ.get("TARGET_CONTAINER", "ministral")
+    TARGET_REPLICAS = int(os.environ.get("TARGET_REPLICAS", "4"))
+    CHECKPOINT_PVC = os.environ.get("CHECKPOINT_PVC", "snapshot-checkpoints")
+    REGION = os.environ.get("AWS_REGION", "us-west-2")
+    SECCOMP_PROFILE = "profiles/block-iouring.json"
+    CHECKPOINT_LABEL = "nvidia.com/snapshot-is-checkpoint-source"
+    CHECKPOINT_ID_LABEL = "nvidia.com/snapshot-checkpoint-id"
+    RESTORE_TARGET_LABEL = "nvidia.com/snapshot-is-restore-target"
+    TARGET_CONTAINERS_ANN = "nvidia.com/snapshot-target-containers"
+    CHECKPOINT_STATUS_ANN = "nvidia.com/snapshot-checkpoint-status"
+    RESTORE_STATUS_ANN_PREFIX = "nvidia.com/snapshot-restore-status."
+    ARTIFACT_VERSION_ANN = "nvidia.com/snapshot-artifact-version"
+    SNAPSHOT_CONTROL_VOL = "snapshot-control"
+    SNAPSHOT_CONTROL_MOUNT = "/snapshot-control"
+    SNAPSHOT_CONTROL_DIR_ENV = "DYN_SNAPSHOT_CONTROL_DIR"
+    READY_FOR_CHECKPOINT_FILE = "ready-for-checkpoint"
+    RESTORE_COMPLETE_FILE = "restore-complete"
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+    log = logging.getLogger("orchestrator")
+
+    config.load_incluster_config()
+    apps = client.AppsV1Api()
+    core = client.CoreV1Api()
+    batch = client.BatchV1Api()
+    custom = client.CustomObjectsApi()
+
+    def stamp_meta(obj: dict, key: str, value: str, kind: str = "labels") -> None:
+        meta = obj.setdefault("metadata", {})
+        bag = meta.setdefault(kind, {}) or {}
+        bag[key] = value
+        meta[kind] = bag
+
+    def ensure_control_volume(pod_spec: dict, container: dict) -> None:
+        vols = pod_spec.setdefault("volumes", []) or []
+        if not any(v.get("name") == SNAPSHOT_CONTROL_VOL for v in vols):
+            vols.append({"name": SNAPSHOT_CONTROL_VOL, "emptyDir": {}})
+            pod_spec["volumes"] = vols
+        mounts = container.setdefault("volumeMounts", []) or []
+        if not any(m.get("name") == SNAPSHOT_CONTROL_VOL for m in mounts):
+            mounts.append({
+                "name": SNAPSHOT_CONTROL_VOL,
+                "mountPath": SNAPSHOT_CONTROL_MOUNT,
+                "subPath": container["name"],
+            })
+            container["volumeMounts"] = mounts
+        env = container.setdefault("env", []) or []
+        if not any(e.get("name") == SNAPSHOT_CONTROL_DIR_ENV for e in env):
+            env.append({"name": SNAPSHOT_CONTROL_DIR_ENV, "value": SNAPSHOT_CONTROL_MOUNT})
+            container["env"] = env
+
+    def wrap_cuda_checkpoint(container: dict) -> None:
+        cmd = container.get("command") or []
+        args = container.get("args") or []
+        if not cmd:
+            raise RuntimeError("container.command required for cuda-checkpoint --launch-job wrapping")
+        container["command"] = ["cuda-checkpoint"]
+        container["args"] = ["--launch-job"] + cmd + args
+
+    def build_checkpoint_job(dep: dict, checkpoint_id: str) -> dict:
+        tmpl = copy.deepcopy(dep["spec"]["template"])
+        # Pod-level metadata
+        stamp_meta(tmpl, CHECKPOINT_LABEL, "true", "labels")
+        stamp_meta(tmpl, CHECKPOINT_ID_LABEL, checkpoint_id, "labels")
+        stamp_meta(tmpl, ARTIFACT_VERSION_ANN, "1", "annotations")
+        # Required: target-containers annotation
+        ann = tmpl.setdefault("metadata", {}).setdefault("annotations", {}) or {}
+        ann[TARGET_CONTAINERS_ANN] = TARGET_CONTAINER
+        tmpl["metadata"]["annotations"] = ann
+        # Pod-level seccomp profile
+        spec = tmpl["spec"]
+        sec = spec.setdefault("securityContext", {}) or {}
+        sec["seccompProfile"] = {"type": "Localhost", "localhostProfile": SECCOMP_PROFILE}
+        spec["securityContext"] = sec
+        spec["restartPolicy"] = "Never"
+
+        # Find target container, apply checkpoint shaping
+        target = None
+        for c in spec.get("containers", []):
+            if c["name"] == TARGET_CONTAINER:
+                target = c
+                break
+        if target is None:
+            raise RuntimeError(f"container {TARGET_CONTAINER!r} not found in deployment template")
+        ensure_control_volume(spec, target)
+        # readinessProbe: cat the ready-for-checkpoint sentinel
+        target["readinessProbe"] = {
+            "exec": {"command": ["cat", f"{SNAPSHOT_CONTROL_MOUNT}/{READY_FOR_CHECKPOINT_FILE}"]},
+            "periodSeconds": 1,
+        }
+        target.pop("livenessProbe", None)
+        target.pop("startupProbe", None)
+        # Wrap entrypoint
+        wrap_cuda_checkpoint(target)
+
+        job_name = f"checkpoint-job-{checkpoint_id[:8]}-1"
+        return {
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "metadata": {
+                "name": job_name,
+                "namespace": NAMESPACE,
+                "labels": {CHECKPOINT_ID_LABEL: checkpoint_id},
+            },
+            "spec": {
+                "backoffLimit": 0,
+                "ttlSecondsAfterFinished": 300,
+                "activeDeadlineSeconds": 1800,
+                "template": tmpl,
+            },
+        }
+
+    def wait_checkpoint_completed(checkpoint_id: str, timeout_s: int = 1500) -> None:
+        log.info("waiting for checkpoint pod annotation %s=completed", CHECKPOINT_STATUS_ANN)
+        deadline = time.time() + timeout_s
+        sel = f"{CHECKPOINT_LABEL}=true,{CHECKPOINT_ID_LABEL}={checkpoint_id}"
+        while time.time() < deadline:
+            pods = core.list_namespaced_pod(NAMESPACE, label_selector=sel).items
+            for p in pods:
+                ann = (p.metadata.annotations or {})
+                status = ann.get(CHECKPOINT_STATUS_ANN, "")
+                phase = p.status.phase
+                log.info("pod %s phase=%s checkpoint_status=%s", p.metadata.name, phase, status)
+                if status == "completed":
+                    return
+                if status == "failed":
+                    raise RuntimeError(f"checkpoint failed on pod {p.metadata.name}")
+            time.sleep(5)
+        raise TimeoutError("checkpoint did not complete within timeout")
+
+    def find_pvc_volume_id(pvc_name: str) -> str:
+        pvc = core.read_namespaced_persistent_volume_claim(pvc_name, NAMESPACE)
+        pv_name = pvc.spec.volume_name
+        pv = core.read_persistent_volume(pv_name)
+        # AWS EBS CSI: spec.csi.volume_handle is the volume-id (vol-xxxx)
+        if pv.spec.csi and pv.spec.csi.volume_handle:
+            return pv.spec.csi.volume_handle
+        raise RuntimeError(f"could not resolve EBS volume id for PVC {pvc_name}")
+
+    def create_ebs_snapshot(volume_id: str, checkpoint_id: str) -> str:
+        ec2 = boto3.client("ec2", region_name=REGION)
+        log.info("creating EBS snapshot of %s", volume_id)
+        resp = ec2.create_snapshot(
+            VolumeId=volume_id,
+            Description=f"dynamo-snapshot-eks iter5 checkpoint {checkpoint_id}",
+            TagSpecifications=[{
+                "ResourceType": "snapshot",
+                "Tags": [
+                    {"Key": "Name", "Value": f"dynamo-snapshot-{checkpoint_id[:8]}"},
+                    {"Key": "blueprint", "Value": "dynamo-snapshot-eks"},
+                    {"Key": "iter", "Value": "5"},
+                    {"Key": "model", "Value": "ministral-3b"},
+                    {"Key": "checkpoint_id", "Value": checkpoint_id},
+                ],
+            }],
+        )
+        sid = resp["SnapshotId"]
+        log.info("snapshot id=%s — waiting for completed", sid)
+        waiter = ec2.get_waiter("snapshot_completed")
+        waiter.wait(SnapshotIds=[sid], WaiterConfig={"Delay": 5, "MaxAttempts": 240})
+        return sid
+
+    def enable_fsr(snapshot_id: str, az: str) -> None:
+        ec2 = boto3.client("ec2", region_name=REGION)
+        log.info("enabling FSR for %s in %s", snapshot_id, az)
+        ec2.enable_fast_snapshot_restores(
+            AvailabilityZones=[az],
+            SourceSnapshotIds=[snapshot_id],
+        )
+
+    def build_restore_pod(dep: dict, checkpoint_id: str, replica_idx: int, pvc_name: str) -> dict:
+        tmpl = copy.deepcopy(dep["spec"]["template"])
+        meta = tmpl.setdefault("metadata", {})
+        meta["name"] = f"ministral-3b-restore-{replica_idx}"
+        meta["namespace"] = NAMESPACE
+        labels = meta.setdefault("labels", {}) or {}
+        labels[RESTORE_TARGET_LABEL] = "true"
+        labels[CHECKPOINT_ID_LABEL] = checkpoint_id
+        labels.pop(CHECKPOINT_LABEL, None)
+        meta["labels"] = labels
+        ann = meta.setdefault("annotations", {}) or {}
+        ann[TARGET_CONTAINERS_ANN] = TARGET_CONTAINER
+        ann[ARTIFACT_VERSION_ANN] = "1"
+        meta["annotations"] = ann
+        spec = tmpl["spec"]
+        spec["restartPolicy"] = "Never"
+        sec = spec.setdefault("securityContext", {}) or {}
+        sec["seccompProfile"] = {"type": "Localhost", "localhostProfile": SECCOMP_PROFILE}
+        spec["securityContext"] = sec
+
+        # Inject the per-replica checkpoint PVC for restore-side reads.
+        # Volume name MUST be "checkpoint-storage" per protocol/common.go
+        # CheckpointVolumeName, mounted at the same basePath as the agent
+        # (/checkpoints) per the agent ConfigMap.
+        vols = spec.setdefault("volumes", []) or []
+        if not any(v.get("name") == "checkpoint-storage" for v in vols):
+            vols.append({
+                "name": "checkpoint-storage",
+                "persistentVolumeClaim": {"claimName": pvc_name},
+            })
+            spec["volumes"] = vols
+
+        target = None
+        for c in spec.get("containers", []):
+            if c["name"] == TARGET_CONTAINER:
+                target = c
+                break
+        if target is None:
+            raise RuntimeError(f"container {TARGET_CONTAINER!r} not found")
+        # checkpoint volume mount on target
+        mounts = target.setdefault("volumeMounts", []) or []
+        if not any(m.get("name") == "checkpoint-storage" for m in mounts):
+            mounts.append({"name": "checkpoint-storage", "mountPath": "/checkpoints"})
+            target["volumeMounts"] = mounts
+        ensure_control_volume(spec, target)
+        # Restore-shape: command=sleep infinity, gating startup probe
+        target["command"] = ["sleep", "infinity"]
+        target["args"] = []
+        target["startupProbe"] = {
+            "exec": {"command": ["cat", f"{SNAPSHOT_CONTROL_MOUNT}/{RESTORE_COMPLETE_FILE}"]},
+            "timeoutSeconds": 1,
+            "periodSeconds": 1,
+            "failureThreshold": 2147483647,
+            "successThreshold": 1,
+        }
+        target.pop("livenessProbe", None)
+        target.pop("readinessProbe", None)
+
+        return {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": meta,
+            "spec": spec,
+        }
+
+    def main() -> int:
+        log.info("orchestrator starting — namespace=%s deployment=%s replicas=%d",
+                 NAMESPACE, DEPLOYMENT_NAME, TARGET_REPLICAS)
+        dep = apps.read_namespaced_deployment(DEPLOYMENT_NAME, NAMESPACE).to_dict()
+        checkpoint_id = uuid.uuid4().hex
+        log.info("assigned checkpoint_id=%s", checkpoint_id)
+
+        # Phase 1
+        job_manifest = build_checkpoint_job(dep, checkpoint_id)
+        log.info("creating CheckpointJob %s", job_manifest["metadata"]["name"])
+        batch.create_namespaced_job(NAMESPACE, job_manifest)
+        wait_checkpoint_completed(checkpoint_id)
+        t_checkpoint_done = time.time()
+
+        # Phase 2
+        volume_id = find_pvc_volume_id(CHECKPOINT_PVC)
+        snapshot_id = create_ebs_snapshot(volume_id, checkpoint_id)
+        # Use the AZ of the source EBS volume.
+        ec2 = boto3.client("ec2", region_name=REGION)
+        vol = ec2.describe_volumes(VolumeIds=[volume_id])["Volumes"][0]
+        az = vol["AvailabilityZone"]
+        enable_fsr(snapshot_id, az)
+        t_snapshot_done = time.time()
+
+        # Phase 3 — fan out 4 restore pods. Each gets its own PVC hydrated from
+        # the same EBS snapshot via the EBS CSI driver's restore-from-snapshot.
+        restore_pods: List[str] = []
+        for i in range(1, TARGET_REPLICAS + 1):
+            pvc_name = f"snapshot-restore-{checkpoint_id[:8]}-{i}"
+            pvc_manifest = {
+                "apiVersion": "v1",
+                "kind": "PersistentVolumeClaim",
+                "metadata": {
+                    "name": pvc_name,
+                    "namespace": NAMESPACE,
+                    "labels": {CHECKPOINT_ID_LABEL: checkpoint_id},
+                },
+                "spec": {
+                    "accessModes": ["ReadWriteOnce"],
+                    "storageClassName": "gp3-snapshot",
+                    "resources": {"requests": {"storage": "50Gi"}},
+                    "dataSourceRef": {
+                        "apiGroup": "snapshot.storage.k8s.io",
+                        "kind": "VolumeSnapshot",
+                        "name": f"vs-{checkpoint_id[:8]}",
+                    },
+                },
+            }
+            try:
+                core.create_namespaced_persistent_volume_claim(NAMESPACE, pvc_manifest)
+            except ApiException as e:
+                if e.status != 409:
+                    raise
+            pod_manifest = build_restore_pod(dep, checkpoint_id, i, pvc_name)
+            core.create_namespaced_pod(NAMESPACE, pod_manifest)
+            restore_pods.append(pod_manifest["metadata"]["name"])
+
+        # Wait for all restore-status.<container>=completed
+        log.info("waiting for %d restore pods to reach completed", len(restore_pods))
+        deadline = time.time() + 900
+        completed: Dict[str, float] = {}
+        while time.time() < deadline and len(completed) < len(restore_pods):
+            for name in restore_pods:
+                if name in completed:
+                    continue
+                try:
+                    p = core.read_namespaced_pod(name, NAMESPACE)
+                except ApiException:
+                    continue
+                ann = p.metadata.annotations or {}
+                status = ann.get(f"{RESTORE_STATUS_ANN_PREFIX}{TARGET_CONTAINER}", "")
+                if status == "completed":
+                    completed[name] = time.time()
+                    log.info("pod %s restore completed (%d/%d)", name, len(completed), len(restore_pods))
+                elif status == "failed":
+                    raise RuntimeError(f"pod {name} restore failed")
+            time.sleep(2)
+        if len(completed) < len(restore_pods):
+            raise TimeoutError(f"only {len(completed)}/{len(restore_pods)} restored")
+        t_restore_done = max(completed.values())
+
+        result = {
+            "checkpoint_id": checkpoint_id,
+            "snapshot_id": snapshot_id,
+            "volume_id": volume_id,
+            "az": az,
+            "checkpoint_seconds": t_checkpoint_done,
+            "ebs_snapshot_seconds": t_snapshot_done - t_checkpoint_done,
+            "restore_seconds_to_all_ready": t_restore_done - t_snapshot_done,
+            "per_replica_completion_ts": completed,
+        }
+        os.makedirs("/results", exist_ok=True)
+        with open("/results/e1-result.json", "w") as f:
+            json.dump(result, f, indent=2, default=str)
+        log.info("E1 result: %s", json.dumps(result, indent=2, default=str))
+        return 0
+
+    if __name__ == "__main__":
+        sys.exit(main())
+---
+# The actual Job. Apply this AFTER:
+#   - 30-snapshot-agent-daemonset has rolled out and Pods are Ready
+#   - 50-ministral-3b-deployment has at least 1 ready replica with the
+#     ready-watcher sentinel touched (i.e. baseline B1 has run)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: snapshot-orchestrator
+  namespace: dynamo-snapshot
+  labels:
+    app.kubernetes.io/component: snapshot-orchestrator
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  activeDeadlineSeconds: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: snapshot-orchestrator
+    spec:
+      serviceAccountName: snapshot-orchestrator
+      restartPolicy: Never
+      containers:
+        - name: orchestrator
+          image: public.ecr.aws/docker/library/python:3.12-slim
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eux
+              pip install --no-cache-dir --quiet kubernetes==31.0.0 boto3==1.35.50
+              python /scripts/orchestrate.py
+          env:
+            - name: AWS_REGION
+              value: us-west-2
+            - name: WORKLOAD_NAMESPACE
+              value: dynamo-snapshot
+            - name: DEPLOYMENT_NAME
+              value: ministral-3b
+            - name: TARGET_CONTAINER
+              value: ministral
+            - name: TARGET_REPLICAS
+              value: "4"
+            - name: CHECKPOINT_PVC
+              value: snapshot-checkpoints
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+            - name: results
+              mountPath: /results
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+      volumes:
+        - name: scripts
+          configMap:
+            name: snapshot-orchestrator-script
+            defaultMode: 0755
+        - name: results
+          emptyDir: {}

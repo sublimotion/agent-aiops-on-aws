@@ -1,0 +1,202 @@
+# syntax=docker/dockerfile:1.7
+#
+# Slim SGLang serving image.
+#
+# Lineage:
+#   - sgl-project/sglang Issue #19160 (closed) -- forensic 76.5 GB ROCm
+#     breakdown showing single-stage build leaves ~13.5 GB of source/build
+#     artifacts, Rust+Go toolchains, embedded vLLM backend.
+#   - sgl-project/sglang Issue #22231 (open) -- redundant nvidia-* pip
+#     wheels stacked on cuda-cudnn base.
+#   - sgl-project/sglang Issue #10784 (closed/inactive) -- multi-stage refactor
+#     proposal.
+#
+# Goals:
+#   - Compressed size <= 8 GB (vs 11.3 GB upstream :latest-runtime,
+#     12.4 GB upstream :latest-cu130).
+#   - Multi-stage: -devel base in builder, -runtime base in final.
+#   - No bundled source repos, Rust toolchain, Go binaries, or build artifacts.
+#   - Drop redundant nvidia-* wheels that overlap with the cuda base layer.
+#   - Empty kernel caches at build (populated at runtime; Spec C territory).
+#
+# Build args:
+#   CUDA_TAG         -- nvidia/cuda image tag, e.g. 13.0.3 or 12.8.2
+#   PY_VERSION       -- 3.11 or 3.12
+#   SGLANG_VERSION   -- pinned SGLang release, e.g. 0.5.12
+#   TORCH_VERSION    -- pinned torch matching the CUDA tag (e.g. 2.5.1)
+#
+# Build:
+#   docker buildx build \
+#     --build-arg CUDA_TAG=13.0.3 \
+#     --build-arg PY_VERSION=3.12 \
+#     --build-arg SGLANG_VERSION=0.5.12 \
+#     --build-arg TORCH_VERSION=2.5.1 \
+#     -t ai-infra/sglang-slim:0.5.12-cu130 \
+#     -f Dockerfile.sglang-slim .
+
+ARG CUDA_TAG=13.0.3
+ARG PY_VERSION=3.12
+
+# -----------------------------------------------------------------------------
+# Stage 1: builder
+# -----------------------------------------------------------------------------
+FROM nvidia/cuda:${CUDA_TAG}-devel-ubuntu24.04 AS builder
+
+ARG CUDA_TAG
+ARG PY_VERSION
+ARG SGLANG_VERSION
+ARG TORCH_VERSION
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    UV_LINK_MODE=copy
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python${PY_VERSION} \
+        python${PY_VERSION}-dev \
+        python${PY_VERSION}-venv \
+        python3-pip \
+        git \
+        curl \
+        build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    cp /root/.local/bin/uv /usr/local/bin/uv
+
+ENV VENV=/opt/venv
+RUN uv venv --python python${PY_VERSION} ${VENV}
+ENV PATH="${VENV}/bin:${PATH}"
+
+# Install torch from the matching CUDA wheel index. Drop torchvision/torchaudio
+# (not used by SGLang serving path).
+RUN --mount=type=cache,target=/root/.cache/uv \
+    case "${CUDA_TAG}" in \
+        12.8.*) TORCH_INDEX=https://download.pytorch.org/whl/cu128 ;; \
+        13.0.*) TORCH_INDEX=https://download.pytorch.org/whl/cu130 ;; \
+        *)      echo "unsupported CUDA_TAG=${CUDA_TAG}" && exit 1 ;; \
+    esac && \
+    uv pip install --index-strategy unsafe-best-match \
+        --extra-index-url ${TORCH_INDEX} \
+        "torch==${TORCH_VERSION}"
+
+# SGLang core. The "all" extra pulls in everything; we install the runtime
+# extras explicitly to avoid datasets, training tooling, eval harness, etc.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --no-deps "sglang[srt]==${SGLANG_VERSION}" && \
+    uv pip install \
+        "transformers>=4.45" \
+        "tokenizers>=0.20" \
+        "huggingface_hub>=0.25" \
+        "fastapi" \
+        "uvicorn[standard]" \
+        "openai>=1.45" \
+        "prometheus-client" \
+        "psutil" \
+        "msgpack" \
+        "msgspec" \
+        "pyzmq" \
+        "tiktoken" \
+        "interegular" \
+        "lark" \
+        "partial-json-parser" \
+        "pyarrow" \
+        "scipy" \
+        "sentencepiece" \
+        "outlines==0.1.11" \
+        "anthropic" \
+        "litellm" \
+        "decord"
+
+# Kernels: flashinfer + flash-attn + triton.
+# flashinfer cubin bundle is large; rely on runtime fetch instead of bundling.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install \
+        "flashinfer-python" \
+        "triton>=3.0" || true
+
+# Per Issue #22231: SGLang's transitive deps drop a pile of nvidia-* wheels
+# (cuda-runtime, cuda-cudart, cuda-cupti, cublas, cufft, curand, cusolver,
+# cusparse, nccl, nvjitlink, nvtx) that duplicate libraries already in the
+# nvidia/cuda base image. Strip them.
+#
+# Keep nvjitlink (used by torch's lazy-load path) and nccl (multi-GPU comms).
+# Drop the rest -- the runtime base provides them.
+RUN ${VENV}/bin/pip uninstall -y \
+        nvidia-cuda-runtime-cu12 \
+        nvidia-cuda-runtime-cu13 \
+        nvidia-cuda-cupti-cu12 \
+        nvidia-cuda-cupti-cu13 \
+        nvidia-cufft-cu12 \
+        nvidia-cufft-cu13 \
+        nvidia-curand-cu12 \
+        nvidia-curand-cu13 \
+        nvidia-cusolver-cu12 \
+        nvidia-cusolver-cu13 \
+        nvidia-cusparse-cu12 \
+        nvidia-cusparse-cu13 \
+        nvidia-cublas-cu12 \
+        nvidia-cublas-cu13 \
+        nvidia-cuda-nvrtc-cu12 \
+        nvidia-cuda-nvrtc-cu13 \
+        nvidia-cuda-nvcc-cu12 \
+        nvidia-cuda-nvcc-cu13 \
+    2>/dev/null || true
+
+# Strip dev/test artifacts.
+RUN find ${VENV} -depth \( \
+        -name "tests" -o \
+        -name "test" -o \
+        -name "__pycache__" -o \
+        -name "*.pyc" -o \
+        -name "*.pyo" -o \
+        -name "examples" -o \
+        -name "docs" -o \
+        -name "*.cu" -o \
+        -name "*.cpp.o" -o \
+        -name "*.a" \
+    \) -exec rm -rf {} + 2>/dev/null || true
+
+RUN ${VENV}/bin/pip uninstall -y torchvision torchaudio datasets 2>/dev/null || true
+
+RUN find ${VENV} -name "*.so" -exec strip --strip-unneeded {} + 2>/dev/null || true
+
+# -----------------------------------------------------------------------------
+# Stage 2: runtime
+# -----------------------------------------------------------------------------
+FROM nvidia/cuda:${CUDA_TAG}-runtime-ubuntu24.04 AS runtime
+
+ARG PY_VERSION
+ARG SGLANG_VERSION
+ARG CUDA_TAG
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    VENV=/opt/venv \
+    PATH=/opt/venv/bin:/usr/local/cuda/bin:${PATH}
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python${PY_VERSION} \
+        python${PY_VERSION}-venv \
+        ca-certificates \
+        libnuma1 \
+        libgomp1 \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
+COPY --from=builder /opt/venv /opt/venv
+
+RUN mkdir -p /root/.triton/cache /root/.cache/torch_compile && \
+    chmod -R 1777 /root/.triton /root/.cache
+
+LABEL org.opencontainers.image.source="https://github.com/sgl-project/sglang" \
+      org.opencontainers.image.description="Slim SGLang ${SGLANG_VERSION} on CUDA ${CUDA_TAG}" \
+      io.ai-infra.lineage="sglang-issue-19160+22231" \
+      io.ai-infra.upstream-issues="sgl-project/sglang#22231"
+
+EXPOSE 30000
+
+ENTRYPOINT ["python", "-m", "sglang.launch_server"]
+CMD ["--host", "0.0.0.0", "--port", "30000"]

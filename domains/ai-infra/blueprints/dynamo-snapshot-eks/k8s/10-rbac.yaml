@@ -1,0 +1,140 @@
+# RBAC for the snapshot-agent DaemonSet and the snapshot orchestrator Job.
+#
+# The agent uses informers to watch pods cluster-wide (or restricted to a single
+# namespace via RESTRICTED_NAMESPACE env). It patches pod annotations
+# nvidia.com/snapshot-checkpoint-status,
+# nvidia.com/snapshot-restore-status.<container>,
+# nvidia.com/snapshot-restore-container-id.<container>.
+# It also reads its own DaemonSet for storage discovery (DiscoverStorageFromDaemonSets).
+#
+# The orchestrator Job creates a CheckpointJob (batchv1.Job), watches it,
+# creates EBS-backed VolumeSnapshots, then scales the Ministral-3B Deployment
+# and creates per-replica PVCs from the snapshot.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: snapshot-agent
+  namespace: dynamo-snapshot
+  labels:
+    app.kubernetes.io/component: snapshot-agent
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: snapshot-agent
+  labels:
+    app.kubernetes.io/component: snapshot-agent
+rules:
+  # Pods: list/watch all (informer), patch annotations on source/target pods.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["pods/status"]
+    verbs: ["get", "patch", "update"]
+  # Used by the agent for diagnostic exec into target pods (rarely; needed by
+  # some restore flows that re-trigger the workload).
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  # Storage discovery — list snapshot-agent DaemonSets in the workload namespace
+  # to resolve the shared checkpoint PVC (DiscoverStorageFromDaemonSets).
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["get", "list", "watch"]
+  # ConfigMaps: read its own /etc/snapshot/config.yaml mount (handled by kubelet,
+  # but RBAC needed if the agent ever falls back to the API).
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  # Jobs: read CheckpointJob status during reconcile.
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch"]
+  # Events for visibility.
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  - apiGroups: ["events.k8s.io"]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  # Node access — agent reads its own Node for taints/labels diagnostics.
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: snapshot-agent
+  labels:
+    app.kubernetes.io/component: snapshot-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: snapshot-agent
+subjects:
+  - kind: ServiceAccount
+    name: snapshot-agent
+    namespace: dynamo-snapshot
+---
+# Orchestrator service account — drives CheckpointJob -> EBS snapshot ->
+# VolumeSnapshot -> Deployment scale-up. Needs broader access.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: snapshot-orchestrator
+  namespace: dynamo-snapshot
+  labels:
+    app.kubernetes.io/component: snapshot-orchestrator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: snapshot-orchestrator
+  labels:
+    app.kubernetes.io/component: snapshot-orchestrator
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots", "volumesnapshotcontents", "volumesnapshotclasses"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: snapshot-orchestrator
+  labels:
+    app.kubernetes.io/component: snapshot-orchestrator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: snapshot-orchestrator
+subjects:
+  - kind: ServiceAccount
+    name: snapshot-orchestrator
+    namespace: dynamo-snapshot

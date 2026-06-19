@@ -1,0 +1,42 @@
+# gp3 StorageClass + VolumeSnapshotClass for the EBS+FSR pipeline.
+#
+# The EBS CSI driver in EKS provides ebs.csi.aws.com. We provision gp3 with
+# moderate IOPS/throughput — checkpoints are a few GiB each, written once,
+# read once on restore. Higher tiers buy nothing for this workload.
+#
+# Fast Snapshot Restore (FSR): enabled per-AZ via aws ec2 enable-fast-snapshot-restores
+# AFTER the snapshot is created (the orchestrator Job calls it). FSR is not a
+# StorageClass parameter — it's a runtime AWS API call that pre-warms the
+# snapshot blocks so first-byte reads on restored volumes are full-speed.
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3-snapshot
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  iops: "3000"
+  throughput: "125"
+  encrypted: "true"
+  fsType: ext4
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: ebs-snapshot
+  labels:
+    app.kubernetes.io/component: snapshot-agent
+driver: ebs.csi.aws.com
+deletionPolicy: Delete
+parameters:
+  # Tag the EBS snapshot for cost tracking + iter-5 cleanup.
+  # Per AWS EBS CSI docs: tagSpecification_<N> creates extra tags on the EBS snapshot.
+  tagSpecification_1: "blueprint=dynamo-snapshot-eks"
+  tagSpecification_2: "iter=5"
+  tagSpecification_3: "model=ministral-3b"

@@ -1,0 +1,49 @@
+# snapshot-agent /etc/snapshot/config.yaml — schema in
+# upstream-snapshot/internal/types/config.go.
+#
+# Required fields (Validate enforces):
+#   storage.basePath  — absolute path the agent mounts the checkpoint store at
+#                       (StorageAccessModeAgentMount → agent reads/writes here directly).
+#   restore.nsRestorePath — path to the nsrestore binary INSIDE the placeholder
+#                           image (the agent invokes it via nsenter joining the
+#                           placeholder's namespaces). Baked at /usr/local/bin/nsrestore
+#                           by the upstream Dockerfile placeholder stage.
+#   restore.restoreTimeoutSeconds — must be > 0.
+#
+# CRIU options reflect the predecessor blueprint's iter-1 dump-policy validation:
+#   tcpEstablished=true   — vLLM keeps an idle listener; CRIU dumps it.
+#   fileLocks=true        — vLLM holds advisory file locks on weight shards.
+#   linkRemap=true        — pid file rewrites across restore.
+#   manageCgroupsMode=full — cgroup v2 on AL2023; required for full restore.
+#   binaryPath/libDir     — agent image bakes criu at /usr/local/sbin/criu.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: snapshot-agent-config
+  namespace: dynamo-snapshot
+  labels:
+    app.kubernetes.io/component: snapshot-agent
+data:
+  config.yaml: |
+    storage:
+      type: pvc
+      basePath: /checkpoints
+      accessMode: agentMount
+    overlay:
+      exclusions: []
+    restore:
+      nsRestorePath: /usr/local/bin/nsrestore
+      restoreTimeoutSeconds: 600
+    criu:
+      ghostLimit: 1073741824
+      logLevel: 4
+      workDir: /var/criu-work
+      tcpEstablished: true
+      fileLocks: true
+      linkRemap: true
+      manageCgroupsMode: full
+      extUnixSk: true
+      shellJob: false
+      binaryPath: /usr/local/sbin/criu
+      libDir: /usr/local/lib/criu
+      skipInFlight: true

@@ -1,0 +1,112 @@
+# Kimi K2.6 FP8 fixture pod for Spec 0 large fixture and Specs B/C/D.
+#
+# Lands on the B300 spot nodegroup (us-west-2b). Init container syncs weights
+# from S3 to /mnt/nvme; main container serves vLLM.
+#
+# IMAGE_TAG and VARIANT_TAG are placeholders — the run-plan.sh script
+# substitutes them per experiment cell using `envsubst`.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kimi-k2-6-fixture-${VARIANT_TAG}
+  namespace: ai-infra
+  labels:
+    ai-infra/fixture: kimi-k2.6
+    ai-infra/variant: "${VARIANT_TAG}"
+    ai-infra/experiment: "${EXPERIMENT}"
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    ai-infra/role: b200-spot
+  tolerations:
+    - key: ai-infra/b200
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+  hostNetwork: true
+  hostIPC: true
+  initContainers:
+    - name: stage-weights
+      image: amazon/aws-cli:latest
+      command:
+        - sh
+        - -c
+        - |
+          set -eux
+          mkdir -p /mnt/nvme/Kimi-K2.6
+          if [ ! -f /mnt/nvme/Kimi-K2.6/.staged ]; then
+            aws s3 sync \
+              s3://${KIMI_BUCKET}/models/Kimi-K2.6/ \
+              /mnt/nvme/Kimi-K2.6/ \
+              --region us-west-2 \
+              --no-progress
+            touch /mnt/nvme/Kimi-K2.6/.staged
+          fi
+      volumeMounts:
+        - name: nvme
+          mountPath: /mnt/nvme
+  containers:
+    - name: vllm
+      image: ${IMAGE_TAG}
+      imagePullPolicy: Always
+      args:
+        - "--model=/mnt/nvme/Kimi-K2.6"
+        - "--tensor-parallel-size=8"
+        - "--max-model-len=131072"
+        - "--gpu-memory-utilization=0.90"
+        - "--enable-prefix-caching"
+        - "--tool-call-parser=kimi_k2"
+        - "--reasoning-parser=kimi_k2"
+        - "--trust-remote-code"
+        - "--host=0.0.0.0"
+        - "--port=8000"
+        # Variant-specific args appended via patch by run-plan.sh.
+      env:
+        - name: HF_HUB_OFFLINE
+          value: "1"
+        - name: VLLM_LOGGING_LEVEL
+          value: "DEBUG"
+      resources:
+        limits:
+          nvidia.com/gpu: 8
+        requests:
+          nvidia.com/gpu: 8
+      ports:
+        - containerPort: 8000
+          name: http
+      volumeMounts:
+        - name: nvme
+          mountPath: /mnt/nvme
+        - name: shm
+          mountPath: /dev/shm
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        initialDelaySeconds: 60
+        periodSeconds: 5
+        timeoutSeconds: 5
+        failureThreshold: 240   # ~20 min for cold start with JIT
+  volumes:
+    - name: nvme
+      hostPath:
+        path: /mnt/nvme
+        type: DirectoryOrCreate
+    - name: shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 64Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kimi-k2-6-fixture-${VARIANT_TAG}
+  namespace: ai-infra
+spec:
+  selector:
+    ai-infra/fixture: kimi-k2.6
+    ai-infra/variant: "${VARIANT_TAG}"
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: http

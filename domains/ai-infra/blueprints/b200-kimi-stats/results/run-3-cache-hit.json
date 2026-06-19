@@ -1,0 +1,43 @@
+{
+  "schema": "benchmark-commons/v1",
+  "experiment": "b200-spec-c-cache-hit",
+  "variant": "run-3-cache-hit",
+  "fixture": "kimi-k2.6-fp8",
+  "image": "vllm/vllm-openai:v0.21.0",
+  "hardware": "p6-b200.48xlarge x1 (us-east-2b spot $113.93/hr)",
+  "tp_size": 8,
+  "model_size_gb": 585,
+  "weights_source": "NVMe (warm)",
+  "compile_cache": "hostPath /mnt/nvme/compile-cache mounted at /root/.cache/vllm",
+  "cache_size_mb": 502,
+  "vllm_args_override": "cudagraph_capture_sizes=[1,2,4,8,16,32,64,128,256,512]",
+  "events_ms": {
+    "T0": 0,
+    "T_main_started": 2000,
+    "T_pod_ready": 386000
+  },
+  "stages_ms": {
+    "main_to_ready": 384000,
+    "weight_load": 245970
+  },
+  "log_evidence": [
+    "Loading weights took 245.97 seconds",
+    "Directly load AOT compilation from path /root/.cache/vllm/torch_compile_cache/torch_aot_compile/12def... (all 8 ranks)"
+  ],
+  "comparison": {
+    "b200_baseline_main_to_ready_ms": 573000,
+    "b200_trim_only_ms": 411000,
+    "b200_cache_hit_ms": 384000,
+    "trim_savings_seconds": 162,
+    "cache_savings_over_trim_seconds": 27,
+    "cache_savings_over_baseline_seconds": 189,
+    "cache_speedup_vs_baseline_x": 1.49
+  },
+  "interpretation": [
+    "AOT compile cache HIT confirmed \u2014 log shows 'Directly load AOT compilation' for all 8 TP ranks",
+    "Saves only 27s vs cudagraph-trim alone \u2014 most of the savings are from the trim, not the cache",
+    "Reason: with TP=8 on 585GB model, the dominant stage is weight load (246s), not compile",
+    "JIT/compile + warmup is now ~140s of 384s (37%) \u2014 much smaller than projected",
+    "Weight load is the new bottleneck \u2014 this is Spec B's domain (RunAI Streamer, ModelExpress)"
+  ]
+}

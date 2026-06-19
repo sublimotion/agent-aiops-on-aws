@@ -1,0 +1,45 @@
+{
+  "schema": "benchmark-commons/v1",
+  "experiment": "spec-a-image-pull",
+  "variant": "slim-vs-upstream-default-pull",
+  "host": "c7i.2xlarge on-demand, us-west-2",
+  "container_runtime": "Docker 29.5.2 / containerd default",
+  "fixtures": [
+    {
+      "image": "vllm/vllm-openai:v0.21.0 (upstream default)",
+      "uncompressed_size_gb": 32.9,
+      "compressed_size_gb": 11.0,
+      "registry": "docker.io",
+      "cold_pull_seconds": 143.8,
+      "warm_pull_seconds": 0.63
+    },
+    {
+      "image": "615299764834.dkr.ecr.us-west-2.amazonaws.com/ai-infra/vllm-slim:0.21.0-cu130 (our slim build)",
+      "uncompressed_size_gb": 15.3,
+      "compressed_size_gb": 5.27,
+      "registry": "ECR (in-region)",
+      "cold_pull_seconds": 77.0,
+      "warm_pull_seconds": null
+    }
+  ],
+  "headline": {
+    "slim_image_pull_speedup_x": 1.87,
+    "image_size_reduction_uncompressed_pct": 53,
+    "image_size_reduction_compressed_pct": 52,
+    "throughput_consistent_mb_per_sec": 200
+  },
+  "interpretation": [
+    "Slim image (built per Spec C blueprint) is ~half the size of upstream and pulls in 77 s vs 144 s.",
+    "1.87x speedup is bandwidth-bound — same MB/s throughput, less data to move.",
+    "This win is independent of any lazy-pull / SOCI work. It compounds with future caching.",
+    "Slim still includes flashinfer (~2.5 GB cubin pre-PR-41134 fix) and cuda runtime. There's still room to shrink further (~6-8 GB target with PR #41134 + image-baked compile cache trim)."
+  ],
+  "soci_lazy_pull_status": "NOT MEASURED. Setting up soci-snapshotter requires containerd-level config (separate from Docker's containerd shim), needs runtime restart on the host. Deferred to a follow-up that runs SOCI properly on a fresh node with a SOCI-indexed image in ECR.",
+  "next_steps": [
+    "Build SOCI index for the slim image: `soci create <image-ref>` then push.",
+    "Run a node with soci-snapshotter as the containerd snapshotter (per AWS Labs Karpenter EC2NodeClass userData recipe).",
+    "Time pod-create to pod-Running with --snapshotter soci.",
+    "Compare to the 77 s slim baseline. Target: <30 s with lazy pull (since Spec F shows 17% access ratio).",
+    "Apply Modal-style FUSE tuning (read_ahead=32M, max_pages=32M) to soci-snapshotter and re-time."
+  ]
+}

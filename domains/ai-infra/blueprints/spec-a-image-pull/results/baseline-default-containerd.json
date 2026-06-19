@@ -1,0 +1,44 @@
+{
+  "schema": "benchmark-commons/v1",
+  "experiment": "spec-a-image-pull",
+  "variant": "default-containerd",
+  "host": "c7i.2xlarge on-demand, us-west-2",
+  "container_runtime": "Docker 29.5.2 / containerd default",
+  "fixtures_tested": [
+    {
+      "image": "vllm/vllm-openai:v0.21.0",
+      "compressed_size_gb": 11.0,
+      "uncompressed_size_gb": 32.9,
+      "layers": 26,
+      "cold_pull_seconds": 143.8,
+      "warm_pull_seconds": 0.63,
+      "throughput_mb_per_sec_compressed": 78,
+      "throughput_mb_per_sec_uncompressed": 235
+    },
+    {
+      "image": "vllm/vllm-openai:latest-x86_64-ubuntu2404",
+      "compressed_size_gb": 11.5,
+      "uncompressed_size_gb": 33.1,
+      "cold_pull_seconds": 145.9,
+      "throughput_mb_per_sec_uncompressed": 232
+    }
+  ],
+  "headline": {
+    "default_containerd_pull_for_vllm_class_image_seconds": "144 seconds",
+    "warm_cache_pull_seconds": "<1 second",
+    "consistent_throughput_mb_per_sec": 230
+  },
+  "interpretation": [
+    "Default containerd pull of a vLLM image: ~144 s on c7i.2xlarge from us-west-2 ECR.",
+    "Cold-start time-to-pod-Running budget for image pull is bounded at ~150 s on this instance class.",
+    "Warm-pulled image (kubelet cache or ECR pull-through hit) costs <1 s — effectively free.",
+    "Combined with Spec F's 17.2% access ratio: lazy-pull mechanism could hypothetically pull only ~17% of bytes (~6 GB) instead of all 33 GB, theoretically reducing pull stage to ~25 s.",
+    "Two upstream variants (v0.21.0 vs latest-x86_64-ubuntu2404) differ <2% in pull time and size — picking 'smaller' upstream variant is not an optimization."
+  ],
+  "next_step_implications": [
+    "Lazy-pull (SOCI/Nydus) target: ~25-40 s pull stage (vs 144 s default).",
+    "EBS prebake target: ~5-15 s (snapshot attach + mount).",
+    "Need to actually run SOCI to verify the 25-40 s estimate isn't too optimistic.",
+    "ECR pull-through cache won't help here because we're already pulling from in-region ECR; only relevant for cross-region pull scenarios."
+  ]
+}

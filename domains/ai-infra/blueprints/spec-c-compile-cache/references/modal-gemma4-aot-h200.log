@@ -1,0 +1,106 @@
+(EngineCore pid=70)            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=70)   File "/usr/local/lib/python3.12/site-packages/vllm/v1/sample/ops/topk_topp_sampler.py", line 157, in forward_cuda
+(EngineCore pid=70)     return flashinfer_sample(logits.contiguous(), k, p, generators), None
+(EngineCore pid=70)            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=70)   File "/usr/local/lib/python3.12/site-packages/vllm/v1/sample/ops/topk_topp_sampler.py", line 447, in flashinfer_sample
+(EngineCore pid=70)     next_token_ids = flashinfer.sampling.top_k_top_p_sampling_from_logits(
+(EngineCore pid=70)                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=70)   File "/usr/local/lib/python3.12/site-packages/flashinfer/sampling.py", line 1400, in top_k_top_p_sampling_from_logits
+(EngineCore pid=70)     masked_logits = top_k_mask_logits(logits, top_k)
+(EngineCore pid=70)                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=70)   File "/usr/local/lib/python3.12/site-packages/flashinfer/sampling.py", line 1806, in top_k_mask_logits
+(EngineCore pid=70)     return get_sampling_module().top_k_mask_logits(
+(EngineCore pid=70)            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=70)   File "/usr/local/lib/python3.12/site-packages/flashinfer/sampling.py", line 54, in get_sampling_module
+(EngineCore pid=70)     module = gen_sampling_module().build_and_load()
+(EngineCore pid=70)              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=70)   File "/usr/local/lib/python3.12/site-packages/flashinfer/jit/core.py", line 318, in build_and_load
+(EngineCore pid=70)     self.build(verbose, need_lock=False)
+(EngineCore pid=70)   File "/usr/local/lib/python3.12/site-packages/flashinfer/jit/core.py", line 304, in build
+(EngineCore pid=70)     run_ninja(self.build_dir, self.ninja_path, verbose)
+(EngineCore pid=70)   File "/usr/local/lib/python3.12/site-packages/flashinfer/jit/cpp_ext.py", line 332, in run_ninja
+(EngineCore pid=70)     subprocess.run(
+(EngineCore pid=70)   File "/usr/local/lib/python3.12/subprocess.py", line 550, in run
+(EngineCore pid=70)     stdout, stderr = process.communicate(input, timeout=timeout)
+(EngineCore pid=70)                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=70)   File "/usr/local/lib/python3.12/subprocess.py", line 1196, in communicate
+(EngineCore pid=70)     stdout = self.stdout.read()
+(EngineCore pid=70)              ^^^^^^^^^^^^^^^^^^
+(EngineCore pid=70) KeyboardInterrupt
+[rank0]:[W523 12:26:06.732873402 ProcessGroupNCCL.cpp:1575] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+Runner failed with exception: Runner has been initializing for too long: 600 seconds. Consider increasing the `startup_timeout` of your Function. If you are using @web_server, use a non-blocking call such as `subprocess.Popen`.
+vllm serve google/gemma-4-26B-A4B-it --revision 47b6801b24d15ff9bcd8c96dfaea0be9ed3a0301 --served-model-name google/gemma-4-26B-A4B-it llm --host 0.0.0.0 --port 8000 --uvicorn-log-level=info --async-scheduling --no-enforce-eager --tensor-parallel-size 1 --limit-mm-per-prompt '{"image": 0, "video": 0, "audio": 0}' --enable-auto-tool-choice --reasoning-parser gemma4 --tool-call-parser gemma4 --speculative-config '{"model": "google/gemma-4-26B-A4B-it-assistant", "revision": "f188f476dc11dd5bb3014dc861529d316bce49d3", "num_speculative_tokens": 4}'
+(APIServer pid=5) INFO 05-23 12:26:51 [utils.py:306] 
+(APIServer pid=5) INFO 05-23 12:26:51 [utils.py:306]        █     █     █▄   ▄█
+(APIServer pid=5) INFO 05-23 12:26:51 [utils.py:306]  ▄▄ ▄█ █     █     █ ▀▄▀ █  version 0.21.0
+(APIServer pid=5) INFO 05-23 12:26:51 [utils.py:306]   █▄█▀ █     █     █     █  model   google/gemma-4-26B-A4B-it
+(APIServer pid=5) INFO 05-23 12:26:51 [utils.py:306]    ▀▀  ▀▀▀▀▀ ▀▀▀▀▀ ▀     ▀
+(APIServer pid=5) INFO 05-23 12:26:51 [utils.py:306] 
+(APIServer pid=5) INFO 05-23 12:26:51 [utils.py:240] non-default args: {'model_tag': 'google/gemma-4-26B-A4B-it', 'enable_auto_tool_choice': True, 'tool_call_parser': 'gemma4', 'host': '0.0.0.0', 'model': 'google/gemma-4-26B-A4B-it', 'revision': '47b6801b24d15ff9bcd8c96dfaea0be9ed3a0301', 'served_model_name': ['google/gemma-4-26B-A4B-it', 'llm'], 'reasoning_parser': 'gemma4', 'limit_mm_per_prompt': {'image': 0, 'video': 0, 'audio': 0}, 'async_scheduling': True, 'speculative_config': {'model': 'google/gemma-4-26B-A4B-it-assistant', 'revision': 'f188f476dc11dd5bb3014dc861529d316bce49d3', 'num_speculative_tokens': 4}}
+(APIServer pid=5) INFO 05-23 12:26:51 [model.py:568] Resolved architecture: Gemma4ForConditionalGeneration
+(APIServer pid=5) INFO 05-23 12:26:51 [model.py:1697] Using max model len 262144
+(APIServer pid=5) Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+(APIServer pid=5) INFO 05-23 12:26:52 [model.py:568] Resolved architecture: Gemma4MTPModel
+(APIServer pid=5) INFO 05-23 12:26:52 [model.py:1697] Using max model len 262144
+(APIServer pid=5) WARNING 05-23 12:26:52 [speculative.py:668] Enabling num_speculative_tokens > 1 will run multiple times of forward on same MTP layer,which may result in lower acceptance rate
+(APIServer pid=5) INFO 05-23 12:26:52 [scheduler.py:239] Chunked prefill is enabled with max_num_batched_tokens=8192.
+(APIServer pid=5) INFO 05-23 12:26:52 [config.py:101] Gemma4 model has heterogeneous head dimensions (head_dim=256, global_head_dim=512). Forcing TRITON_ATTN backend to prevent mixed-backend numerical divergence.
+(APIServer pid=5) INFO 05-23 12:26:52 [vllm.py:886] Asynchronous scheduling is enabled.
+(APIServer pid=5) INFO 05-23 12:26:52 [kernel.py:212] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'])
+(APIServer pid=5) WARNING 05-23 12:26:59 [cuda.py:237] Forcing --disable_chunked_mm_input for models with multimodal-bidirectional attention.
+(APIServer pid=5) INFO 05-23 12:27:03 [registry.py:134] All limits of multimodal modalities supported by the model are set to 0, running in text-only mode.
+(EngineCore pid=33) INFO 05-23 12:27:23 [core.py:109] Initializing a V1 LLM engine (v0.21.0) with config: model='google/gemma-4-26B-A4B-it', speculative_config=SpeculativeConfig(method='mtp', model='google/gemma-4-26B-A4B-it-assistant', num_spec_tokens=4), tokenizer='google/gemma-4-26B-A4B-it', skip_tokenizer_init=False, tokenizer_mode=auto, revision=47b6801b24d15ff9bcd8c96dfaea0be9ed3a0301, tokenizer_revision=47b6801b24d15ff9bcd8c96dfaea0be9ed3a0301, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=262144, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, decode_context_parallel_size=1, dcp_comm_backend=ag_rs, disable_custom_all_reduce=False, quantization=None, quantization_config=None, enforce_eager=False, enable_return_routed_experts=False, kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='gemma4', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, kv_cache_metrics=False, kv_cache_metrics_sample=0.01, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False), seed=0, served_model_name=google/gemma-4-26B-A4B-it, enable_prefix_caching=True, enable_chunked_prefill=True, pooler_config=None, compilation_config={'mode': <CompilationMode.VLLM_COMPILE: 3>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['none'], 'ir_enable_torch_wrap': True, 'splitting_ops': ['vllm::unified_attention_with_output', 'vllm::unified_mla_attention_with_output', 'vllm::mamba_mixer2', 'vllm::mamba_mixer', 'vllm::short_conv', 'vllm::linear_attention', 'vllm::plamo2_mamba_mixer', 'vllm::gdn_attention_core', 'vllm::gdn_attention_core_xpu', 'vllm::olmo_hybrid_gdn_full_forward', 'vllm::kda_attention', 'vllm::sparse_attn_indexer', 'vllm::rocm_aiter_sparse_attn_indexer', 'vllm::deepseek_v4_attention', 'vllm::unified_kv_cache_update', 'vllm::unified_mla_kv_cache_update'], 'compile_mm_encoder': False, 'cudagraph_mm_encoder': False, 'encoder_cudagraph_token_budgets': [], 'encoder_cudagraph_max_vision_items_per_batch': 0, 'encoder_cudagraph_max_frames_per_batch': None, 'compile_sizes': [], 'compile_ranges_endpoints': [8192], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'size_asserts': False, 'alignment_asserts': False, 'scalar_asserts': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>, 'cudagraph_num_of_warmups': 1, 'cudagraph_capture_sizes': [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': False, 'fuse_act_quant': False, 'fuse_attn_quant': False, 'enable_sp': False, 'fuse_gemm_comms': False, 'fuse_allreduce_rms': False, 'fuse_act_padding': False}, 'max_cudagraph_capture_size': 512, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': False, 'static_all_moe_layers': []}, kernel_config=KernelConfig(ir_op_priority=IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native']), enable_flashinfer_autotune=False, moe_backend='auto')
+(EngineCore pid=33) INFO 05-23 12:27:29 [registry.py:134] All limits of multimodal modalities supported by the model are set to 0, running in text-only mode.
+(EngineCore pid=33) INFO 05-23 12:27:29 [parallel_state.py:1410] world_size=1 rank=0 local_rank=0 distributed_init_method=tcp://172.20.0.48:62847 backend=nccl
+(EngineCore pid=33) INFO 05-23 12:27:29 [parallel_state.py:1723] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 0, EP rank 0, EPLB rank N/A
+(EngineCore pid=33) INFO 05-23 12:27:32 [topk_topp_sampler.py:45] Using FlashInfer for top-p & top-k sampling.
+(EngineCore pid=33) WARNING 05-23 12:27:32 [__init__.py:204] min_p and logit_bias parameters won't work with speculative decoding.
+(EngineCore pid=33) INFO 05-23 12:27:32 [gpu_model_runner.py:4857] Starting to load model google/gemma-4-26B-A4B-it...
+(EngineCore pid=33) INFO 05-23 12:27:33 [vllm.py:886] Asynchronous scheduling is enabled.
+(EngineCore pid=33) INFO 05-23 12:27:33 [kernel.py:212] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'])
+(EngineCore pid=33) INFO 05-23 12:27:33 [cuda.py:312] Using AttentionBackendEnum.TRITON_ATTN backend.
+(EngineCore pid=33) INFO 05-23 12:27:33 [unquantized.py:288] Using TRITON Unquantized MoE backend out of potential backends: ['FlashInfer TRTLLM', 'FlashInfer CUTLASS', 'TRITON', 'BATCHED_TRITON'].
+(EngineCore pid=33) INFO 05-23 12:27:33 [cuda.py:312] Using AttentionBackendEnum.TRITON_ATTN backend.
+(EngineCore pid=33) INFO 05-23 12:27:34 [weight_utils.py:938] Filesystem type for checkpoints: 9P. Checkpoint size: 48.07 GiB. Available RAM: 1016.43 GiB.
+(EngineCore pid=33) INFO 05-23 12:27:34 [weight_utils.py:961] Auto-prefetch is disabled because the filesystem (9P) is not a recognized network FS (NFS/Lustre). If you want to force prefetching, start vLLM with --safetensors-load-strategy=prefetch.
+(EngineCore pid=33) Loading safetensors checkpoint shards:   0% Completed | 0/2 [00:00<?, ?it/s]
+(EngineCore pid=33) Loading safetensors checkpoint shards:  50% Completed | 1/2 [00:23<00:23, 23.62s/it]
+(EngineCore pid=33) Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:25<00:00, 10.72s/it]
+(EngineCore pid=33) Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:25<00:00, 12.66s/it]
+(EngineCore pid=33) 
+(EngineCore pid=33) INFO 05-23 12:27:59 [default_loader.py:397] Loading weights took 25.36 seconds
+(EngineCore pid=33) INFO 05-23 12:27:59 [unquantized.py:345] Using MoEPrepareAndFinalizeNoDPEPModular
+(EngineCore pid=33) INFO 05-23 12:27:59 [gpu_model_runner.py:4881] Loading drafter model...
+(EngineCore pid=33) INFO 05-23 12:27:59 [kernel.py:212] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'])
+(EngineCore pid=33) INFO 05-23 12:27:59 [kernel.py:212] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'])
+(EngineCore pid=33) Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+(EngineCore pid=33) INFO 05-23 12:27:59 [weight_utils.py:663] No model.safetensors.index.json found in remote.
+(EngineCore pid=33) INFO 05-23 12:27:59 [weight_utils.py:938] Filesystem type for checkpoints: 9P. Checkpoint size: 0.78 GiB. Available RAM: 1016.40 GiB.
+(EngineCore pid=33) Loading safetensors checkpoint shards:   0% Completed | 0/1 [00:00<?, ?it/s]
+(EngineCore pid=33) Loading safetensors checkpoint shards: 100% Completed | 1/1 [00:00<00:00,  1.42it/s]
+(EngineCore pid=33) Loading safetensors checkpoint shards: 100% Completed | 1/1 [00:00<00:00,  1.42it/s]
+(EngineCore pid=33) 
+(EngineCore pid=33) INFO 05-23 12:28:00 [default_loader.py:397] Loading weights took 0.73 seconds
+(EngineCore pid=33) INFO 05-23 12:28:00 [llm_base_proposer.py:1274] Detected MTP model. Sharing target model embedding weights with the draft model.
+(EngineCore pid=33) INFO 05-23 12:28:00 [gemma4.py:171] Gemma4 MTP: keeping draft model's own lm_head (draft_dim != backbone_dim).
+(EngineCore pid=33) INFO 05-23 12:28:00 [gemma4.py:330] Gemma4 MTP: draft layer 0 (sliding_attention) -> language_model.model.layers.28.self_attn.attn
+(EngineCore pid=33) INFO 05-23 12:28:00 [gemma4.py:330] Gemma4 MTP: draft layer 1 (sliding_attention) -> language_model.model.layers.28.self_attn.attn
+(EngineCore pid=33) INFO 05-23 12:28:00 [gemma4.py:330] Gemma4 MTP: draft layer 2 (sliding_attention) -> language_model.model.layers.28.self_attn.attn
+(EngineCore pid=33) INFO 05-23 12:28:00 [gemma4.py:330] Gemma4 MTP: draft layer 3 (full_attention) -> language_model.model.layers.29.self_attn.attn
+(EngineCore pid=33) INFO 05-23 12:28:00 [gpu_model_runner.py:4959] Model loading took 48.25 GiB memory and 27.447869 seconds
+(EngineCore pid=33) INFO 05-23 12:28:06 [backends.py:1089] Using cache directory: /root/.cache/vllm/torch_compile_cache/a6f06ab438/rank_0_0/backbone for vLLM's torch.compile
+(EngineCore pid=33) INFO 05-23 12:28:06 [backends.py:1148] Dynamo bytecode transform time: 5.02 s
+(EngineCore pid=33) INFO 05-23 12:28:15 [backends.py:292] Directly load the compiled graph(s) for compile range (1, 8192) from the cache, took 8.520 s
+(EngineCore pid=33) INFO 05-23 12:28:15 [decorators.py:311] Directly load AOT compilation from path /root/.cache/vllm/torch_compile_cache/torch_aot_compile/39e7378ed502eca6caf75d7ea0e86bbac7ed017f786813f4293c9ff6534baa59/rank_0_0/model
+(EngineCore pid=33) INFO 05-23 12:28:15 [monitor.py:53] torch.compile took 13.96 s in total
+(EngineCore pid=33) WARNING 05-23 12:28:18 [fused_moe.py:1073] Using default MoE config. Performance might be sub-optimal! Config file not found at /usr/local/lib/python3.12/site-packages/vllm/model_executor/layers/fused_moe/configs/E=128,N=704,device_name=NVIDIA_H200.json
+(EngineCore pid=33) INFO 05-23 12:28:20 [monitor.py:81] Initial profiling/warmup run took 5.34 s
+(EngineCore pid=33) INFO 05-23 12:28:21 [backends.py:1089] Using cache directory: /root/.cache/vllm/torch_compile_cache/a6f06ab438/rank_0_0/eagle_head for vLLM's torch.compile
+(EngineCore pid=33) INFO 05-23 12:28:21 [backends.py:1148] Dynamo bytecode transform time: 0.58 s
+(EngineCore pid=33) INFO 05-23 12:28:23 [backends.py:292] Directly load the compiled graph(s) for compile range (1, 8192) from the cache, took 2.201 s
+(EngineCore pid=33) INFO 05-23 12:28:23 [decorators.py:311] Directly load AOT compilation from path /root/.cache/vllm/torch_compile_cache/torch_aot_compile/a5fe6da851901b54b777a6dc3c5826a34f6c75bd6f3bec85b2d6b95e0ab5194c/rank_0_0/model
+(EngineCore pid=33) INFO 05-23 12:28:23 [monitor.py:53] torch.compile took 2.82 s in total
+(EngineCore pid=33) INFO 05-23 12:28:23 [monitor.py:81] Initial profiling/warmup run took 0.01 s
+Stopping app - uncaught exception raised locally: TimeoutError().
+(EngineCore pid=33) INFO 05-23 12:30:04 [gpu_model_runner.py:6063] Profiling CUDA graph memory: PIECEWISE=48 (largest=500), FULL=48 (largest=500)
+Runner terminated.

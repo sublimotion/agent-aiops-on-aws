@@ -1,0 +1,18 @@
+{
+  "criu_dump_seconds": 21.3808,
+  "criu_restore_seconds": 3.96813,
+  "artifact_bytes": 4446528199,
+  "artifact_gib": 4.141,
+  "weights_bytes": 1519218163,
+  "weights_gib": 1.415,
+  "artifact_to_weights_ratio": 2.927,
+  "harness_rc": "0",
+  "gate_1_token_equality": "PASS",
+  "gate_2_artifact_size": "FAIL",
+  "gate_3_restore_latency": "PASS",
+  "sleep_level": 1,
+  "gpu_mem_after_sleep_mib": 282,
+  "vllm_sleep_freed_gib": 8.85,
+  "vllm_sleep_residual_gib": 0.28,
+  "comments": "Sleep level=1 keeps weights resident; artifact = weights (1.41 GiB) + ~3 GiB Python/torch/CUDA process state. Ratio dominated by fixed overhead since model is tiny. Extrapolation: (size + 3 GiB) / size = 1.5x at 6 GiB, 1.12x at 26 GiB."
+}

@@ -1,0 +1,73 @@
+# Small fixture for Spec 0 — Qwen3 1.7B, runs TP=1 on a single GPU.
+# Lands on the B300 nodegroup (uses 1 of 8 GPUs) since the cluster
+# currently has no smaller GPU pool. Negligible cost.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: qwen3-next-fixture-${VARIANT_TAG}
+  namespace: ai-infra
+  labels:
+    ai-infra/fixture: qwen3-next
+    ai-infra/variant: "${VARIANT_TAG}"
+    ai-infra/experiment: "${EXPERIMENT}"
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    ai-infra/role: b300-spot
+  tolerations:
+    - key: ai-infra/b300
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+  containers:
+    - name: vllm
+      image: ${IMAGE_TAG}
+      imagePullPolicy: Always
+      args:
+        - "--model=Qwen/Qwen3-1.7B"
+        - "--tensor-parallel-size=1"
+        - "--max-model-len=32768"
+        - "--gpu-memory-utilization=0.30"
+        - "--enforce-eager"
+        - "--trust-remote-code"
+        - "--host=0.0.0.0"
+        - "--port=8000"
+      env:
+        - name: VLLM_LOGGING_LEVEL
+          value: "DEBUG"
+      resources:
+        limits:
+          nvidia.com/gpu: 1
+        requests:
+          nvidia.com/gpu: 1
+      ports:
+        - containerPort: 8000
+      volumeMounts:
+        - name: shm
+          mountPath: /dev/shm
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        initialDelaySeconds: 30
+        periodSeconds: 5
+        timeoutSeconds: 5
+        failureThreshold: 60
+  volumes:
+    - name: shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 16Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qwen3-next-fixture-${VARIANT_TAG}
+  namespace: ai-infra
+spec:
+  selector:
+    ai-infra/fixture: qwen3-next
+    ai-infra/variant: "${VARIANT_TAG}"
+  ports:
+    - port: 8000
+      targetPort: 8000

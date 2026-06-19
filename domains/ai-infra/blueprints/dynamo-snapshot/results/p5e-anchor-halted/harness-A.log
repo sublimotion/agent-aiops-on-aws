@@ -1,0 +1,64 @@
+[harness] PATH_MODE=A use_eager=True
+[harness] constructing vLLM LLM(Gemma-4-26B-A4B-it) ...
+INFO 05-30 21:09:58 [utils.py:240] non-default args: {'dtype': 'bfloat16', 'seed': 42, 'max_model_len': 8192, 'gpu_memory_utilization': 0.85, 'disable_log_stats': True, 'enforce_eager': True, 'enable_sleep_mode': True, 'model': 'google/gemma-4-26B-A4B-it'}
+WARNING 05-30 21:09:58 [envs.py:1866] Unknown vLLM environment variable detected: VLLM_ATTENTION_BACKEND
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+INFO 05-30 21:09:59 [model.py:568] Resolved architecture: Gemma4ForConditionalGeneration
+INFO 05-30 21:09:59 [model.py:1697] Using max model len 8192
+INFO 05-30 21:09:59 [scheduler.py:239] Chunked prefill is enabled with max_num_batched_tokens=16384.
+INFO 05-30 21:09:59 [config.py:101] Gemma4 model has heterogeneous head dimensions (head_dim=256, global_head_dim=512). Forcing TRITON_ATTN backend to prevent mixed-backend numerical divergence.
+INFO 05-30 21:09:59 [vllm.py:886] Asynchronous scheduling is enabled.
+WARNING 05-30 21:09:59 [vllm.py:942] Enforce eager set, disabling torch.compile and CUDAGraphs. This is equivalent to setting -cc.mode=none -cc.cudagraph_mode=none
+WARNING 05-30 21:09:59 [vllm.py:960] Inductor compilation was disabled by user settings, optimizations settings that are only active during inductor compilation will be ignored.
+INFO 05-30 21:09:59 [kernel.py:212] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['vllm_c', 'native'], fused_add_rms_norm=['vllm_c', 'native'])
+INFO 05-30 21:09:59 [vllm.py:1135] Cudagraph is disabled under eager mode
+WARNING 05-30 21:09:59 [cuda.py:237] Forcing --disable_chunked_mm_input for models with multimodal-bidirectional attention.
+INFO 05-30 21:09:59 [compilation.py:303] Enabled custom fusions: norm_quant, act_quant
+(EngineCore pid=60723) INFO 05-30 21:10:07 [core.py:109] Initializing a V1 LLM engine (v0.21.0) with config: model='google/gemma-4-26B-A4B-it', speculative_config=None, tokenizer='google/gemma-4-26B-A4B-it', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=8192, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, decode_context_parallel_size=1, dcp_comm_backend=ag_rs, disable_custom_all_reduce=False, quantization=None, quantization_config=None, enforce_eager=True, enable_return_routed_experts=False, kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, kv_cache_metrics=False, kv_cache_metrics_sample=0.01, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False), seed=42, served_model_name=google/gemma-4-26B-A4B-it, enable_prefix_caching=True, enable_chunked_prefill=True, pooler_config=None, compilation_config={'mode': <CompilationMode.NONE: 0>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['all'], 'ir_enable_torch_wrap': False, 'splitting_ops': [], 'compile_mm_encoder': False, 'cudagraph_mm_encoder': False, 'encoder_cudagraph_token_budgets': [], 'encoder_cudagraph_max_vision_items_per_batch': 0, 'encoder_cudagraph_max_frames_per_batch': None, 'compile_sizes': [], 'compile_ranges_endpoints': [16384], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'size_asserts': False, 'alignment_asserts': False, 'scalar_asserts': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.NONE: 0>, 'cudagraph_num_of_warmups': 0, 'cudagraph_capture_sizes': [], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': True, 'fuse_act_quant': True, 'fuse_attn_quant': False, 'enable_sp': False, 'fuse_gemm_comms': False, 'fuse_allreduce_rms': False, 'fuse_act_padding': False}, 'max_cudagraph_capture_size': 0, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': False, 'static_all_moe_layers': []}, kernel_config=KernelConfig(ir_op_priority=IrOpPriorityConfig(rms_norm=['vllm_c', 'native'], fused_add_rms_norm=['vllm_c', 'native']), enable_flashinfer_autotune=False, moe_backend='auto')
+(EngineCore pid=60723) INFO 05-30 21:10:08 [parallel_state.py:1410] world_size=1 rank=0 local_rank=0 distributed_init_method=tcp://172.31.12.153:34467 backend=nccl
+(EngineCore pid=60723) INFO 05-30 21:10:08 [parallel_state.py:1723] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 0, EP rank 0, EPLB rank N/A
+(EngineCore pid=60723) INFO 05-30 21:10:09 [topk_topp_sampler.py:45] Using FlashInfer for top-p & top-k sampling.
+(EngineCore pid=60723) INFO 05-30 21:10:09 [gpu_model_runner.py:4857] Starting to load model google/gemma-4-26B-A4B-it...
+(EngineCore pid=60723) WARNING 05-30 21:10:09 [vllm.py:942] Enforce eager set, disabling torch.compile and CUDAGraphs. This is equivalent to setting -cc.mode=none -cc.cudagraph_mode=none
+(EngineCore pid=60723) WARNING 05-30 21:10:09 [vllm.py:960] Inductor compilation was disabled by user settings, optimizations settings that are only active during inductor compilation will be ignored.
+(EngineCore pid=60723) INFO 05-30 21:10:09 [kernel.py:212] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['vllm_c', 'native'], fused_add_rms_norm=['vllm_c', 'native'])
+(EngineCore pid=60723) INFO 05-30 21:10:09 [vllm.py:1135] Cudagraph is disabled under eager mode
+(EngineCore pid=60723) INFO 05-30 21:10:10 [cuda.py:312] Using AttentionBackendEnum.TRITON_ATTN backend.
+(EngineCore pid=60723) INFO 05-30 21:10:10 [unquantized.py:288] Using TRITON Unquantized MoE backend out of potential backends: ['FlashInfer TRTLLM', 'FlashInfer CUTLASS', 'TRITON', 'BATCHED_TRITON'].
+(EngineCore pid=60723) INFO 05-30 21:10:10 [cuda.py:312] Using AttentionBackendEnum.TRITON_ATTN backend.
+(EngineCore pid=60723) INFO 05-30 21:10:10 [weight_utils.py:938] Filesystem type for checkpoints: XFS. Checkpoint size: 48.07 GiB. Available RAM: 1845.81 GiB.
+(EngineCore pid=60723) INFO 05-30 21:10:10 [weight_utils.py:961] Auto-prefetch is disabled because the filesystem (XFS) is not a recognized network FS (NFS/Lustre). If you want to force prefetching, start vLLM with --safetensors-load-strategy=prefetch.
+(EngineCore pid=60723) Loading safetensors checkpoint shards:   0% Completed | 0/2 [00:00<?, ?it/s]
+(EngineCore pid=60723) Loading safetensors checkpoint shards:  50% Completed | 1/2 [00:05<00:05,  5.41s/it]
+(EngineCore pid=60723) Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:05<00:00,  2.35s/it]
+(EngineCore pid=60723) Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:05<00:00,  2.81s/it]
+(EngineCore pid=60723) 
+(EngineCore pid=60723) INFO 05-30 21:10:16 [default_loader.py:397] Loading weights took 5.62 seconds
+(EngineCore pid=60723) INFO 05-30 21:10:16 [unquantized.py:345] Using MoEPrepareAndFinalizeNoDPEPModular
+(EngineCore pid=60723) INFO 05-30 21:10:17 [gpu_model_runner.py:4959] Model loading took 48.54 GiB memory and 6.827580 seconds
+(EngineCore pid=60723) INFO 05-30 21:10:17 [gpu_model_runner.py:5920] Encoder cache will be initialized with a budget of 16384 tokens, and profiled with 6 video items of the maximum feature size.
+(EngineCore pid=60723) WARNING 05-30 21:10:33 [op.py:290] Priority not set for op rms_norm, using native implementation.
+(EngineCore pid=60723) WARNING 05-30 21:10:42 [fused_moe.py:1073] Using default MoE config. Performance might be sub-optimal! Config file not found at /mnt/nvme/venv/lib/python3.12/site-packages/vllm/model_executor/layers/fused_moe/configs/E=128,N=704,device_name=NVIDIA_H200.json
+(EngineCore pid=60723) INFO 05-30 21:10:43 [gpu_worker.py:462] Available KV cache memory: 67.31 GiB
+(EngineCore pid=60723) INFO 05-30 21:10:43 [kv_cache_utils.py:1710] GPU KV cache size: 320,266 tokens
+(EngineCore pid=60723) INFO 05-30 21:10:43 [kv_cache_utils.py:1711] Maximum concurrency for 8,192 tokens per request: 39.10x
+(EngineCore pid=60723) INFO 05-30 21:10:43 [kernel_warmup.py:44] Skipping FlashInfer autotune because it is disabled.
+(EngineCore pid=60723) INFO 05-30 21:10:43 [jit_monitor.py:54] Kernel JIT monitor activated — Triton JIT compilations during inference will be logged as warnings.
+(EngineCore pid=60723) INFO 05-30 21:10:43 [core.py:306] init engine (profile, create kv cache, warmup model) took 26.58 s
+(EngineCore pid=60723) WARNING 05-30 21:10:44 [vllm.py:942] Enforce eager set, disabling torch.compile and CUDAGraphs. This is equivalent to setting -cc.mode=none -cc.cudagraph_mode=none
+(EngineCore pid=60723) WARNING 05-30 21:10:44 [vllm.py:960] Inductor compilation was disabled by user settings, optimizations settings that are only active during inductor compilation will be ignored.
+(EngineCore pid=60723) INFO 05-30 21:10:44 [kernel.py:212] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['vllm_c', 'native'], fused_add_rms_norm=['vllm_c', 'native'])
+(EngineCore pid=60723) INFO 05-30 21:10:44 [vllm.py:1135] Cudagraph is disabled under eager mode
+[harness] LLM constructed in 45.14s
+(EngineCore pid=60723) WARNING 05-30 21:10:44 [jit_monitor.py:103] Triton kernel JIT compilation during inference: _compute_slot_mapping_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+(EngineCore pid=60723) WARNING 05-30 21:10:44 [jit_monitor.py:103] Triton kernel JIT compilation during inference: kernel_unified_attention. This causes a latency spike; consider extending warmup to cover this shape/config.
+(EngineCore pid=60723) WARNING 05-30 21:10:44 [jit_monitor.py:103] Triton kernel JIT compilation during inference: fused_moe_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+(EngineCore pid=60723) WARNING 05-30 21:10:44 [jit_monitor.py:103] Triton kernel JIT compilation during inference: reduce_segments. This causes a latency spike; consider extending warmup to cover this shape/config.
+[harness] pre  hash=9ada62e7dc2b695ed012a9b8f115563e06fd2f8b15ba4f65bbcdabf0b170e750 warm=0.36s ntok=4
+[harness] llm.sleep(level=1) ...
+(EngineCore pid=60723) INFO 05-30 21:10:44 [block_pool.py:471] Successfully reset prefix cache
+(EngineCore pid=60723) INFO 05-30 21:11:29 [cumem.py:209] CuMemAllocator: sleep freed 115.97 GiB memory in total, of which 48.59 GiB is backed up in CPU and the rest 67.38 GiB is discarded directly.
+(EngineCore pid=60723) INFO 05-30 21:11:29 [gpu_worker.py:178] Sleep mode freed 119.88 GiB memory, 7.77 GiB memory is still in use.
+(EngineCore pid=60723) INFO 05-30 21:11:29 [abstract.py:331] It took 45.198828 seconds to fall asleep.
+[harness] sleep done in 45.52s
+READY_FOR_CHECKPOINT pid=60426

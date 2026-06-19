@@ -1,0 +1,33 @@
+{
+  "schema": "benchmark-commons/v1",
+  "experiment": "b200-kimi-stats",
+  "variant": "run-1-cold-baseline",
+  "fixture": "kimi-k2.6-fp8",
+  "image": "vllm/vllm-openai:v0.21.0",
+  "hardware": "p6-b200.48xlarge x1 (us-east-2b spot, $113.93/hr)",
+  "tp_size": 8,
+  "model_size_gb": 585,
+  "weights_source": "S3 us-east-2 (in-region cold sync)",
+  "events_ms": {
+    "T0_pod_create": 0,
+    "T_init_started": 4000,
+    "T_init_finished": 1101000,
+    "T_main_started": 1262000,
+    "T_pod_ready": 1835000
+  },
+  "stages_ms": {
+    "init_s3_sync": 1097000,
+    "init_to_main_gap": 161000,
+    "main_to_ready": 573000,
+    "TOTAL_pod_create_to_ready": 1835000
+  },
+  "first_token_ms_after_ready": 6469,
+  "comparison_to_b300_uswest2": {
+    "b300_init_s3_sync_ms": 1936000,
+    "b200_use2_init_s3_sync_ms": 1097000,
+    "in_region_speedup_x": 1.76,
+    "b300_main_to_ready_ms": 506000,
+    "b200_main_to_ready_ms": 573000,
+    "main_to_ready_speedup_x": 0.88
+  }
+}

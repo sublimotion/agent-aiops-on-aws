@@ -1,0 +1,48 @@
+{
+  "schema": "benchmark-commons/v1",
+  "experiment": "spec-f-access-profiling",
+  "variant": "vllm-import-only",
+  "image": "vllm/vllm-openai:v0.21.0",
+  "image_total_bytes": 22850079576,
+  "image_total_files": 116713,
+  "image_total_size_gb": 22.85,
+  "trace_command": "python3 -c \"import vllm.entrypoints.openai.api_server\"",
+  "trace_method": "strace -f -e trace=openat",
+  "trace_environment": "non-GPU c7i.2xlarge, vllm fails after import on missing CUDA but trace is complete",
+  "results": {
+    "total_openat_calls": 21011,
+    "successful_opens": 15426,
+    "negative_lookups_enoent": 5585,
+    "negative_lookup_ratio_pct": 26.6,
+    "unique_paths_opened": 11147,
+    "unique_paths_real_filesystem": 11129,
+    "unique_enoent_paths": 4527,
+    "touched_bytes": 3934125247,
+    "touched_bytes_gb": 3.93,
+    "missing_at_post_check": 4416
+  },
+  "headline_metrics": {
+    "files_touched_pct_of_total": 9.5,
+    "bytes_touched_pct_of_total": 17.2,
+    "lazy_load_theoretical_speedup_x": 5.8
+  },
+  "top_extensions_by_count": {
+    ".py": 4715,
+    "(none)": 1476,
+    ".pyc": 1235,
+    ".txt": 223,
+    ".so": 98
+  },
+  "interpretation": [
+    "For vLLM serving cold-start (import + serve readiness, no weights), only ~17% of container bytes are actually read.",
+    "26.6% of openat calls are negative lookups (Python import path-walk via sys.path). FUSE backends should fast-path negative results.",
+    "Modal's claim that lazy-load wins are bounded by access ratio is confirmed: theoretical max speedup of ~6x via lazy-pull + targeted prefetch.",
+    "Image-bake / EBS prebake transfer ALL 22.85 GB. Lazy-pull + access-set-prefetch could transfer ~3.93 GB. The opportunity is real."
+  ],
+  "next_step_implications": [
+    "Spec A: prioritize lazy-load variants (SOCI/Nydus) over EBS prebake. Access set is small enough for lazy to win.",
+    "Spec A: include FUSE-tuning variant (Spec E config) since FUSE tunables are the inner-loop.",
+    "Bake a `prefetch.txt` per image: ship the touched-file list as image metadata so a snapshotter can prefetch it eagerly.",
+    "EBS prebake is still useful for warm-pool prepull (one-time cost amortized across replicas), but for autoscale events lazy wins."
+  ]
+}

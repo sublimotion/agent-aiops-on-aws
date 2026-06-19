@@ -1,0 +1,148 @@
+# syntax=docker/dockerfile:1.7
+#
+# Slim vLLM serving image.
+#
+# Lineage:
+#   - vllm-project/vllm PR #22377 (closed, never merged) -- multi-stage layout,
+#     python-slim base, COPY --from=builder for wheels.
+#   - vllm-project/vllm PR #41134 (merged May 2026) -- defer flashinfer cubin
+#     download to remove ~2.5 GB of cross-layer duplication.
+#   - vllm-project/vllm Issue #28656 (open) -- image size > 30 GB tracking.
+#
+# Goals:
+#   - Compressed size <= 7 GB (vs 8.3 GB upstream slim, 9.4 GB upstream default).
+#   - No torchvision, torchaudio, datasets, pytest, examples, docs, CUDA samples.
+#   - Empty Triton + Inductor caches at build (populated at runtime; Spec C
+#     studies how to pre-populate).
+#   - Multi-stage: -devel base in builder, -runtime base in final.
+#
+# Build args:
+#   CUDA_TAG       -- nvidia/cuda image tag, e.g. 12.8.2 or 13.0.3
+#   PY_VERSION     -- 3.11 or 3.12
+#   VLLM_VERSION   -- pinned vLLM release, e.g. 0.21.0
+#   TORCH_VERSION  -- pinned torch matching the CUDA tag (e.g. 2.5.1+cu128)
+#
+# Build:
+#   docker buildx build \
+#     --build-arg CUDA_TAG=12.8.2 \
+#     --build-arg PY_VERSION=3.12 \
+#     --build-arg VLLM_VERSION=0.21.0 \
+#     --build-arg TORCH_VERSION=2.5.1 \
+#     -t ai-infra/vllm-slim:0.21.0-cu128 \
+#     -f Dockerfile.vllm-slim .
+
+ARG CUDA_TAG=12.8.2
+ARG PY_VERSION=3.12
+
+# -----------------------------------------------------------------------------
+# Stage 1: builder -- has full -devel toolchain, builds/installs wheels.
+# -----------------------------------------------------------------------------
+FROM nvidia/cuda:${CUDA_TAG}-devel-ubuntu24.04 AS builder
+
+ARG CUDA_TAG
+ARG PY_VERSION
+ARG VLLM_VERSION
+ARG TORCH_VERSION
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    UV_LINK_MODE=copy
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python${PY_VERSION} \
+        python${PY_VERSION}-dev \
+        python${PY_VERSION}-venv \
+        python3-pip \
+        git \
+        curl \
+        build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    cp /root/.local/bin/uv /usr/local/bin/uv
+
+# Build into a virtualenv we can copy whole into the runtime stage.
+ENV VENV=/opt/venv
+RUN uv venv --python python${PY_VERSION} ${VENV}
+ENV PATH="${VENV}/bin:${PATH}"
+
+# Install vLLM with full deps from the right CUDA wheel index.
+# vLLM's own resolver picks consistent torch + flashinfer + flash-attn.
+# We strip torchvision/torchaudio after install (vLLM serving doesn't need them).
+RUN --mount=type=cache,target=/root/.cache/uv \
+    case "${CUDA_TAG}" in \
+        12.8.*) TORCH_INDEX=https://download.pytorch.org/whl/cu128 ;; \
+        13.0.*) TORCH_INDEX=https://download.pytorch.org/whl/cu130 ;; \
+        12.4.*) TORCH_INDEX=https://download.pytorch.org/whl/cu124 ;; \
+        *)      echo "unsupported CUDA_TAG=${CUDA_TAG}" && exit 1 ;; \
+    esac && \
+    uv pip install --index-strategy unsafe-best-match \
+        --extra-index-url ${TORCH_INDEX} \
+        "vllm==${VLLM_VERSION}"
+
+# Strip dev/test artifacts that ride along inside site-packages.
+RUN find ${VENV} -depth \( \
+        -name "tests" -o \
+        -name "test" -o \
+        -name "__pycache__" -o \
+        -name "*.pyc" -o \
+        -name "*.pyo" -o \
+        -name "*.dist-info/RECORD" -o \
+        -name "*.dist-info/WHEEL" -o \
+        -name "examples" -o \
+        -name "docs" -o \
+        -name "*.cu" -o \
+        -name "*.cpp.o" -o \
+        -name "*.a" \
+    \) -exec rm -rf {} + 2>/dev/null || true
+
+# Drop torchvision and torchaudio if they came in via transitive deps.
+RUN ${VENV}/bin/pip uninstall -y torchvision torchaudio datasets 2>/dev/null || true
+
+# Strip debug symbols from CUDA libs that snuck into the venv.
+RUN find ${VENV} -name "*.so" -exec strip --strip-unneeded {} + 2>/dev/null || true
+
+# -----------------------------------------------------------------------------
+# Stage 2: runtime -- -runtime base, just enough Python + venv from builder.
+# -----------------------------------------------------------------------------
+FROM nvidia/cuda:${CUDA_TAG}-runtime-ubuntu24.04 AS runtime
+
+ARG PY_VERSION
+ARG VLLM_VERSION
+ARG CUDA_TAG
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    VENV=/opt/venv \
+    PATH=/opt/venv/bin:/usr/local/cuda/bin:${PATH} \
+    LD_LIBRARY_PATH=/opt/venv/lib/python${PY_VERSION}/site-packages/nvidia/nvjitlink/lib:${LD_LIBRARY_PATH}
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python${PY_VERSION} \
+        python${PY_VERSION}-venv \
+        ca-certificates \
+        libnuma1 \
+        libgomp1 \
+        gcc \
+        g++ \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
+COPY --from=builder /opt/venv /opt/venv
+
+# Empty caches at build; populated at runtime. Spec C controls cache strategy.
+RUN mkdir -p /root/.triton/cache /root/.cache/torch_compile && \
+    chmod -R 1777 /root/.triton /root/.cache
+
+# Image labels for traceability.
+LABEL org.opencontainers.image.source="https://github.com/vllm-project/vllm" \
+      org.opencontainers.image.description="Slim vLLM ${VLLM_VERSION} on CUDA ${CUDA_TAG}" \
+      io.ai-infra.lineage="vllm-PR-22377+PR-41134" \
+      io.ai-infra.upstream-issues="vllm/vllm#28656"
+
+EXPOSE 8000
+
+ENTRYPOINT ["python", "-m", "vllm.entrypoints.openai.api_server"]
+CMD ["--host", "0.0.0.0", "--port", "8000"]

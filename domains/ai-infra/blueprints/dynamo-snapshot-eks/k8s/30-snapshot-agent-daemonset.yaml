@@ -1,0 +1,151 @@
+# Shared checkpoint-store PVC used by the snapshot-agent DaemonSet.
+# DiscoverStorageFromDaemonSets (protocol/restore.go) discovers this by
+# scanning the agent DaemonSet's volume named "checkpoints"
+# (SnapshotAgentVolumeName) and mapping it to the basePath set in the
+# agent ConfigMap.
+#
+# Iter 5b note: this PVC is provisioned via a gp3 ReadWriteMany-equivalent.
+# AWS EBS gp3 is RWO only; for E1 (single-node, 1 source pod + 4 restore pods
+# all on the same g7e), we use gp3 with accessMode RWO and rely on the fact
+# that all 5 pods are on one node — the EBS volume is mounted by the agent
+# DaemonSet pod on that node, and other pods on the same node access checkpoints
+# via /host/proc/<pid>/root/<basePath>. Multi-node E2 will require EFS or FSx
+# Lustre and is out of scope for iter 5.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: snapshot-checkpoints
+  namespace: dynamo-snapshot
+  labels:
+    app.kubernetes.io/component: snapshot-agent
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp3-snapshot
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: snapshot-agent
+  namespace: dynamo-snapshot
+  labels:
+    app.kubernetes.io/component: snapshot-agent
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: snapshot-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: snapshot-agent
+    spec:
+      serviceAccountName: snapshot-agent
+      # Schedule only on labeled snapshot-eligible GPU nodes. The label is
+      # applied by the iter-5b nodegroup definition.
+      nodeSelector:
+        agent-aiops/snapshot-eligible: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: node.kubernetes.io/unschedulable
+          operator: Exists
+          effect: NoSchedule
+      hostPID: true
+      hostNetwork: false
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      containers:
+        # Container name MUST be "agent" — protocol/restore.go
+        # SnapshotAgentContainerName is hard-coded for the storage-discovery walk.
+        - name: agent
+          image: 615299764834.dkr.ecr.us-west-2.amazonaws.com/dynamo-snapshot-agent:iter5
+          imagePullPolicy: IfNotPresent
+          args:
+            - --runtime=containerd
+            - --runtime-socket=/run/containerd/containerd.sock
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            # Empty RESTRICTED_NAMESPACE → watch cluster-wide. Set this to
+            # "dynamo-snapshot" if you want to scope the agent to its own
+            # namespace.
+            - name: RESTRICTED_NAMESPACE
+              value: ""
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN", "SYS_PTRACE", "SYS_RESOURCE", "NET_ADMIN", "CHECKPOINT_RESTORE"]
+          volumeMounts:
+            - name: agent-config
+              mountPath: /etc/snapshot
+              readOnly: true
+            # Container runtime socket (for containerd CRI) — agent uses this
+            # to resolve container PIDs and OCI specs.
+            - name: containerd-sock
+              mountPath: /run/containerd/containerd.sock
+            # Host /proc — required for ReadMountInfo via /host/proc/<pid>.
+            - name: host-proc
+              mountPath: /host/proc
+              readOnly: true
+            # Kubelet pods dir — checkpoint storage discovery needs to walk
+            # the workload pod's mounts. EmptyDirs and PVC mounts are under
+            # /var/lib/kubelet/pods/<podUID>/...
+            - name: kubelet-pods
+              mountPath: /var/lib/kubelet/pods
+              mountPropagation: HostToContainer
+            # cgroupfs — CRIU manageCgroupsMode=full needs to read the
+            # workload's cgroup tree.
+            - name: host-sys-fs-cgroup
+              mountPath: /sys/fs/cgroup
+            # The shared checkpoint store. Volume name MUST be "checkpoints"
+            # (SnapshotAgentVolumeName) for DiscoverStorageFromDaemonSets to
+            # find it. mountPath MUST equal storage.basePath in the agent
+            # ConfigMap (/checkpoints).
+            - name: checkpoints
+              mountPath: /checkpoints
+            # CRIU work dir
+            - name: criu-work
+              mountPath: /var/criu-work
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+      volumes:
+        - name: agent-config
+          configMap:
+            name: snapshot-agent-config
+        - name: containerd-sock
+          hostPath:
+            path: /run/containerd/containerd.sock
+            type: Socket
+        - name: host-proc
+          hostPath:
+            path: /proc
+            type: Directory
+        - name: kubelet-pods
+          hostPath:
+            path: /var/lib/kubelet/pods
+            type: Directory
+        - name: host-sys-fs-cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+            type: Directory
+        - name: checkpoints
+          persistentVolumeClaim:
+            claimName: snapshot-checkpoints
+        - name: criu-work
+          emptyDir:
+            sizeLimit: 16Gi

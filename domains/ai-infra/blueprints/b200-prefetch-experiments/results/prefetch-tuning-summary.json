@@ -1,0 +1,50 @@
+{
+  "schema": "benchmark-commons/v1",
+  "experiment": "b200-prefetch-tuning",
+  "fixture": "kimi-k2.6-fp8",
+  "image": "vllm/vllm-openai:v0.21.0",
+  "hardware": "p6-b200.48xlarge x1 (us-east-2b spot $113.93/hr)",
+  "tp_size": 8,
+  "model_size_gb": 585,
+  "weights_source": "NVMe (warm cache, all 3 runs same instance)",
+  "results": [
+    {
+      "variant": "baseline-v2-no-prefetch",
+      "main_to_ready_s": 569,
+      "weight_load_s": 396.8,
+      "weight_load_pct_of_warmpath": 69.7
+    },
+    {
+      "variant": "prefetch-default-8thread-16MB",
+      "main_to_ready_s": 428,
+      "weight_load_s": 262.85,
+      "weight_load_pct_of_warmpath": 61.4,
+      "prefetch_thread_finish_s": null,
+      "saves_vs_baseline_s": 141,
+      "saves_pct": 24.8
+    },
+    {
+      "variant": "prefetch-aggressive-32thread-64MB",
+      "main_to_ready_s": 418,
+      "weight_load_s": 243.51,
+      "weight_load_pct_of_warmpath": 58.3,
+      "prefetch_thread_finish_s": 8.66,
+      "saves_vs_baseline_s": 151,
+      "saves_pct": 26.5
+    }
+  ],
+  "headline_findings": [
+    "Prefetch ON beats prefetch OFF on local NVMe by ~25% \u2014 defeats vLLM v0.21.0's auto-disable heuristic",
+    "Aggressive tuning (32 threads, 64MB blocks) marginally beats default (8/16MB) by 10s \u2014 1.7% additional gain",
+    "Page cache fills in 8.66 s for 585 GB on instance NVMe \u2014 implies ~67 GB/s read throughput",
+    "Remaining weight load time (243 s) is purely cudaMemcpy/torch overhead, NOT disk-bound",
+    "Steering rule: always force --safetensors-load-strategy=prefetch on local NVMe",
+    "Steering rule: default tuning (8 threads, 16MB) captures ~95% of available win; no need to over-tune"
+  ],
+  "implications_for_specs": [
+    "Spec B's RunAI Streamer no-win finding now makes sense \u2014 page cache prefetch already does the parallelism RunAI Streamer would add",
+    "Weight-load bottleneck is post-page-cache (cudaMemcpy + torch loader overhead)",
+    "Without vLLM internals work, weight-load floor on local NVMe at TP=8 for 585 GB is ~243 s",
+    "ModelExpress P2P (replica-N\u22652) is the only path below this floor \u2014 peer's HBM bypasses both disk and cudaMemcpy"
+  ]
+}

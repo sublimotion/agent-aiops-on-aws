@@ -1,0 +1,91 @@
+# Log patterns for the canonical 14-event timeline.
+#
+# Each entry maps a canonical event id (T6..T11) to one or more regexes
+# that match the event in stdout/stderr of the workload pod, plus optional
+# log lines from containerd or kubelet.
+#
+# Ranges of vLLM versions can have different log formats; pick the entry
+# whose `applies_to` matches the running version. The validator script
+# will print which range was used.
+#
+# Source attribution:
+#   - workload_log     : kubectl logs -f <pod>
+#   - containerd       : nerdctl/journalctl on the node
+#   - k8s_event        : pod event stream (handled in profiler.py, not here)
+
+schema_version: 1
+
+ranges:
+  - applies_to: "vllm>=0.7,<0.20"
+    events:
+      T6_python_alive:
+        source: workload_log
+        # First line of stdout from PID 1. Use a permissive regex; any byte counts.
+        any_line: true
+      T7_weights_load_start:
+        source: workload_log
+        regex:
+          - 'Loading model weights'
+          - 'Starting to load model'
+          - 'Loading safetensors checkpoint'
+      T8_weights_loaded:
+        source: workload_log
+        regex:
+          - 'Model weights loaded\.\s*Memory usage:'
+          - 'Loading model weights took ([\d.]+) seconds'
+          - 'Model loaded in ([\d.]+) s'
+      T9_jit_compile_start:
+        source: workload_log
+        regex:
+          - 'Starting torch\.compile'
+          - 'Compiling .*with torch\.compile'
+          - 'Running DeepGEMM autotuning'
+          - 'JIT compiling'
+          - 'Triton autotune'
+      T10_jit_compile_done:
+        source: workload_log
+        regex:
+          - 'Compilation finished'
+          - 'torch\.compile finished'
+          - 'DeepGEMM autotuning complete'
+      T11_cuda_graphs_done:
+        source: workload_log
+        regex:
+          - 'Capturing CUDA graphs.*\bdone\b'
+          - 'CUDA graphs captured in ([\d.]+) s'
+          - 'Engine ready to serve requests'
+          - 'Application startup complete'
+          - 'Started server process'
+
+# Containerd / kubelet event patterns (used to corroborate T2-T5 if k8s
+# event stream is incomplete).
+runtime_events:
+  T2_image_pull_start:
+    source: k8s_event
+    reason: Pulling
+  T3_image_pull_complete:
+    source: k8s_event
+    reason: Pulled
+  T4_container_created:
+    source: k8s_event
+    reason: Created
+  T5_container_started:
+    source: k8s_event
+    reason: Started
+
+# Stages built from event pairs. Profiler validates each interval >= 0.
+stages:
+  node_provision:    [T0_pod_create, T1_node_assigned]
+  image_pull:        [T2_image_pull_start, T3_image_pull_complete]
+  container_start:   [T4_container_created, T6_python_alive]
+  model_load:        [T7_weights_load_start, T8_weights_loaded]
+  jit_compile:       [T9_jit_compile_start, T11_cuda_graphs_done]
+  first_token_warmup: [T12_health_200, T13_first_token]
+
+# Gap buckets - time between stages, always reported separately.
+gaps:
+  - [T1_node_assigned,        T2_image_pull_start]
+  - [T3_image_pull_complete,  T4_container_created]
+  - [T6_python_alive,         T7_weights_load_start]
+  - [T8_weights_loaded,       T9_jit_compile_start]
+  - [T11_cuda_graphs_done,    T12_health_200]

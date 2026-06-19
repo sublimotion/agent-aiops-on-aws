@@ -1,0 +1,82 @@
+{
+  "schema": "benchmark-commons/v1",
+  "experiment": "spec-c-ebs-snapshot",
+  "fixture": "kimi-k2.6-fp8",
+  "image": "vllm/vllm-openai:v0.21.0",
+  "hardware": "p6-b200.48xlarge x1 (us-east-2b spot $113.93/hr)",
+  "tp_size": 8,
+  "model_size_gb": 585,
+  "ebs_volume": "vol-0ff3a81d73d512390 (created from snapshot)",
+  "ebs_snapshot": "snap-035013a5b031c6e9f",
+  "cache_size_mb": 498,
+  "operations": {
+    "ebs_volume_create_from_snapshot_seconds": 8.84,
+    "ebs_volume_attach_seconds": 9.7,
+    "ebs_volume_mount_seconds": "<1",
+    "ebs_snapshot_create_seconds": 60,
+    "cache_dir_size_after_bake_mb": 498
+  },
+  "runs": [
+    {
+      "variant": "bake-cache-miss-no-prefetch",
+      "main_to_ready_s": 586,
+      "weight_load_s": 415.67,
+      "hit": false,
+      "note": "populated EBS during this run"
+    },
+    {
+      "variant": "restore-cache-hit-no-prefetch-fresh-node",
+      "main_to_ready_s": 557,
+      "weight_load_s": 414.67,
+      "hit": true,
+      "note": "weight load slow because no prefetch flag"
+    },
+    {
+      "variant": "restore-cache-hit-prefetch-trim-fresh-node",
+      "main_to_ready_s": 386,
+      "weight_load_s": 250.95,
+      "compile_seconds": 8.21,
+      "hit": true,
+      "note": "the headline result \u2014 full stack on fresh node"
+    }
+  ],
+  "headline": {
+    "ebs_cache_hit_on_fresh_node_main_to_ready_s": 386,
+    "matches_same_node_hostpath_cache_hit_s": 384,
+    "delta_seconds": 2,
+    "delta_pct": 0.5
+  },
+  "key_findings": [
+    "EBS snapshot of compile cache restores cleanly to a brand-new node \u2014 full AOT HIT delivered (8 ranks confirmed in logs)",
+    "Snapshot restore + attach + mount overhead: ~25 s total (volume create 9s + attach 10s + mount <1s)",
+    "AOT HIT delivers identical compile speedup on fresh node as on same-node (hostPath): 386 s vs 384 s",
+    "Cache survives node termination, instance store loss, AZ reboot \u2014 anything except snapshot deletion",
+    "Multi-variant capability validated: vLLM auto-picks correct hash dir; cache key is portable across nodes",
+    "Fast Snapshot Restore not needed for 500 MB cache \u2014 lazy load is fast enough",
+    "Operational implication: bake compile cache to EBS snapshot once per (vLLM_version \u00d7 model \u00d7 config), reuse forever until any of those change"
+  ],
+  "production_recipe": {
+    "step_1": "Run a baker pod once per variant: cold start, write to EBS-mounted /root/.cache/vllm",
+    "step_2": "After ready, snapshot the volume: aws ec2 create-snapshot --volume-id $V",
+    "step_3": "Tag snapshot with (model, vllm_version, tp_size, cudagraph_config) for retrieval",
+    "step_4": "Production pods: PVC restored from snapshot, mounted at /root/.cache/vllm, AOT HIT every cold start",
+    "step_5": "On vLLM upgrade or model swap: rebuild snapshot once, all replicas inherit"
+  },
+  "comparison_to_alternatives": {
+    "image_baked_cache": {
+      "win": "single artifact, atomic deploy",
+      "loss": "image rebuild per variant; +500 MB image bloat",
+      "verdict": "OK for fixed-config production, painful for experimentation"
+    },
+    "hostpath_cache_same_node": {
+      "win": "zero-overhead restore",
+      "loss": "lost on node termination, doesn't help fresh node",
+      "verdict": "good for development, not production"
+    },
+    "ebs_snapshot_cache": {
+      "win": "persistent across nodes, cheap (~$30/mo idle), multi-variant on one volume",
+      "loss": "~25 s attach/mount overhead, snapshot management",
+      "verdict": "BEST for production multi-replica scenarios"
+    }
+  }
+}

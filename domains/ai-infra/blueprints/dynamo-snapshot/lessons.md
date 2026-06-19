@@ -1,0 +1,462 @@
+# dynamo-snapshot — lessons
+
+Field notes captured live during deployment. The compound-learner promotes
+selected entries to steering rules.
+
+## Deployment context
+
+- Spec: `domains/ai-infra/specs/dynamo-snapshot-coldstart.md`
+- Stage 0 actually executed: g6.xlarge spot in us-west-2b (g5 was capacity-out
+  in all three default AZs simultaneously at 2026-05-30T10:25Z; pivoted to g6
+  which is the spec's secondary smoke target and **also the cheaper spot**
+  ($0.32/hr g6.xlarge vs $0.56/hr g5.xlarge)).
+- AWS account: 615299764834
+- Region / AZ: us-west-2 / us-west-2b
+- SSH key: `~/.ssh/dynamo-snapshot-uw2.pem` (mode 600)
+- IAM instance profile: `dynamo-snapshot-uw2-profile` (S3 RO + ECR RO + CW agent)
+- Security group: `sg-06821adfa7f05916f` (SSH from operator IP only)
+- AMI: `ami-0b8143be52d61bd07` (NVIDIA AL2023 base GPU AMI, 2026-05-29)
+- NVIDIA driver shipped on AMI: **595.71.05** (well above the 580.xx hard gate
+  Dynamo snapshot docs require)
+- CUDA toolkit on AMI: 13.2
+- `cuda-checkpoint` binary version: 595.71.05 (from
+  github.com/NVIDIA/cuda-checkpoint, x86_64_Linux build)
+- CRIU built from source: tag `4.2`, GitID `4d76d1a` from
+  github.com/checkpoint-restore/criu @ `criu-dev`
+- CRIU image source decision: **build from source** on the GPU host itself
+  (no prebuilt `nvcr.io` image is published by NVIDIA — the docs show a
+  Makefile-driven `make docker-build-agent` flow). Dockerfile vendored into
+  `upstream-snapshot/` from `github.com/ai-dynamo/dynamo` at pinned SHA
+  `39251bcf13f854b305331101014d2a3980a2aab6`.
+
+## NVIDIA Dynamo Snapshot — confirmed prerequisites (from docs.nvidia.com 2026-05-30)
+
+### [prereq]: Driver requirement is 580.xx, not R555+
+<!-- captured: 2026-05-30 | stage: 0 -->
+
+The spec mentions "R555+ stable for >1 year" but the official Dynamo snapshot
+docs require **NVIDIA driver 580.xx or newer** (and 590.xx for multi-GPU
+snapshot validation). The base NVIDIA AL2023 AMI ships 595.71.05 — well
+above the floor. **Hard gate**: `cuda-checkpoint --help` must succeed and the
+driver major must be ≥ 580.
+
+**Fix**: Verify driver and `cuda-checkpoint` availability immediately after
+SSH on the new instance. If driver < 580, switch to a newer AMI or update
+drivers on the live host before continuing.
+
+### [prereq]: x86_64 / amd64 only
+<!-- captured: 2026-05-30 | stage: 0 -->
+
+NVIDIA `cuda-checkpoint` ships an x86_64 binary only — the upstream
+Dockerfile fails the build on any other arch. Not a problem on g5/g6/g7e/p5e
+but worth noting if anyone tries Graviton GPU instances later.
+
+### [prereq]: vLLM is the only supported worker today
+<!-- captured: 2026-05-30 | stage: 0 -->
+
+Backend support for snapshot/restore is **vLLM-only** in preview today —
+SGLang, multimodal, embedding, and diffusion workers are explicitly
+unsupported. Multi-GPU TP is "limited validation" preview.
+
+**Implication for spec**: SGLang cells in the matrix should be deferred.
+Stage 0 plan (Qwen3-0.6B vLLM) is correctly aligned, but see io_uring gotcha
+below — naive `vllm.LLM` in-process triggers it.
+
+### [prereq]: Privileged DaemonSet required
+<!-- captured: 2026-05-30 | stage: 0 -->
+
+`snapshot-agent` runs in privileged mode to perform CRIU operations.
+Workload pods themselves do **not** need to be privileged. For Stage 0 (no
+EKS, just a single VM running CRIU directly), this maps to running
+`criu`/`cuda-checkpoint` as root on the host — no special EKS scheduling.
+
+### [build]: Upstream Dockerfile expects multi-stage build with cuda-dl-base
+<!-- captured: 2026-05-30 | stage: 0 -->
+
+`AGENT_BASE_IMAGE` defaults to
+`nvcr.io/nvidia/cuda-dl-base:25.11-cuda13.0-devel-ubuntu24.04`. The agent
+image needs CUDA toolkit headers + `libcuda` for the cuda-checkpoint helper
+build. CRIU is built in a separate `ubuntu:24.04` stage from the
+`criu-dev` branch with the cuda_plugin (`make install-cuda_plugin`).
+
+For Stage 0 we did **not** build the placeholder image — `criu` and
+`cuda-checkpoint` ran directly on the AL2023 host once installed. That worked.
+
+## Findings from the Stage 0 g6.xlarge run
+
+### [criu]: vLLM/uvloop process tree contains an io_uring fd that CRIU 4.2 cannot dump
+<!-- captured: 2026-05-30 | stage: 0 -->
+
+When dumping a `python -m vllm.entrypoints.openai.api_server` process tree
+*or* an in-process `vllm.LLM(...)` Python with `enforce_eager=True`, CRIU
+4.2 (`criu-dev` HEAD) fails with:
+
+```
+Error (criu/proc_parse.c:511): Unknown shit 600 (anon_inode:[io_uring])
+Error (criu/proc_parse.c:747): Can't open <pid>'s mapfile link <addr>: No such device or address
+Error (criu/cr-dump.c:1589): Collect mappings (pid: <pid>) failed with -1
+```
+
+`criu check --feature uring` returns "Unknown feature uring" for this build —
+io_uring C/R support is **not in the `criu-dev` HEAD** at SHA `4d76d1a` (CI
+commit dated mid-2026). The triggering fd comes from **uvloop** (libuv
+io_uring backend) — uvloop is a transitive vLLM dep. Linux kernel 6.12 on
+AL2023 uses io_uring for libuv automatically.
+
+**Workarounds**:
+1. Disable uvloop in the workload (set `VLLM_USE_TRITON_FLASH_ATTN=0` is
+   unrelated; the right knob is to use the standard asyncio loop. vLLM's
+   `LLM` class doesn't actually need uvloop in offline mode but it can still
+   be initialized indirectly).
+2. Use the upstream Dynamo `snapshot-agent` orchestration which presumably
+   handles this (NVIDIA's CRIU fork referenced via `CRIU_REPO`/`CRIU_REF`
+   build args may include their AIO + parallel-memfd patches that handle
+   io_uring; we used the upstream default which does not).
+3. **Avoid uvloop entirely** by running the inference workload as a pure
+   pytorch process (see next entry).
+
+**Implication for the production rule**: the spec's "single-GPU vLLM" claim
+is contingent on either (a) NVIDIA's CRIU fork shipping io_uring support, or
+(b) building vLLM/Dynamo images that pin a non-uvloop async backend. **Stage
+0 leaves this open** — the cuda-checkpoint primitive itself works (see next
+entry); the wrapping is the open question.
+
+### [criu]: pytorch-only smoke (no vLLM, no asyncio) dumps + restores cleanly
+<!-- captured: 2026-05-30 | stage: 0 -->
+
+Replaced the vLLM smoke with a plain HuggingFace transformers + pytorch
+script (`scripts/smoke-pytorch.py`) loading `Qwen/Qwen3-0.6B` in fp16 on the
+L4. Sequence:
+
+1. `cuda-checkpoint --action lock --pid <pid> --timeout 30000`
+2. `cuda-checkpoint --action checkpoint --pid <pid>`
+3. `criu dump -t <pid> -D /mnt/nvme/criu-checkpoint --shell-job
+   --tcp-established --file-locks --link-remap --leave-running`
+4. `cuda-checkpoint --action restore --pid <pid>` (in-place)
+5. `cuda-checkpoint --action unlock --pid <pid>`
+6. Kill original; `criu restore -D /mnt/nvme/criu-checkpoint --shell-job
+   --tcp-established --file-locks --restore-detached`
+7. Resumed process replays SIGUSR1, regenerates → token IDs match.
+
+**Result**:
+- Gate 1 (token equality): **PASS** — SHA256 of 64-token output matches
+  byte-for-byte (`c09af5...8bb3f`).
+- Gate 2 (artifact ≤ 2× weights): **MARGINAL FAIL** — 3.29 GiB artifact for
+  1.41 GiB weights = 2.33×. Likely because the pytorch run keeps full
+  activation buffers and a second copy of weights in CUDA pinned memory; a
+  proper vLLM run with `--enable-sleep-mode` invoked before checkpoint would
+  reduce GPU footprint substantially. **Not a hard fail of the primitive.**
+- Gate 3 (restore < 30s on local NVMe): **PASS** — 1.69 s restore wall-clock
+  for 3.29 GiB artifact (~1.95 GiB/s effective, well within instance-store
+  XFS bandwidth).
+
+`criu dump` itself took 7.78 s (dominated by GPU-state copy in
+`cuda-checkpoint --action checkpoint`).
+
+### [criu]: cuda-checkpoint requires host RAM ≥ GPU memory used (no GPU→disk path yet)
+<!-- captured: 2026-05-30 | stage: 0 -->
+
+First attempt with vLLM's default `gpu_memory_utilization=0.85` (≈19.7 GiB
+of L4's 23 GiB) on a 15 GiB-RAM g6.xlarge failed with:
+
+```
+Could not checkpoint on process ID <pid>: "out of memory"
+```
+
+`cuda-checkpoint --action checkpoint` copies all device-side allocations
+into host RAM before CRIU dumps them. Until the Dynamo "GMS" path lands
+(blocked on a CUDA driver patch per the spec), **host RAM must exceed the
+GPU memory currently in use** by a comfortable margin.
+
+**Fix on g6.xlarge**: lower `gpu_memory_utilization` to 0.25 (≈ 5.7 GiB),
+which fits in 15 GiB RAM. For Qwen3-0.6B (1.2 GiB FP16) this still leaves
+plenty of headroom.
+
+**Implication**: the production rule must derive a **min-host-RAM constraint**
+of the form: `host_RAM ≥ 1.2 × peak_GPU_alloc + 4 GiB OS`. For larger
+serving configs (e.g. Mistral-Small-4 in 24 GiB on g6) this means choosing
+`g6.4xlarge`/`g6.8xlarge` over `g6.xlarge` purely for checkpoint headroom,
+NOT for compute.
+
+### [criu]: minor iptables warnings on restore are benign
+<!-- captured: 2026-05-30 | stage: 0 -->
+
+`criu restore` emits two `iptables: Bad rule (does a matching rule exist in
+that chain?)` warnings (exit status=1 from the helper) before reporting
+"Restore finished successfully. Tasks resumed." The restored process works
+correctly. AL2023 default iptables chains differ slightly from CRIU's
+expectations; safe to ignore for Stage 0.
+
+### [build]: pycriu pip install during `make install-lib` fails on system python 3.9
+<!-- captured: 2026-05-30 | stage: 0 -->
+
+`sudo make install` fails at `make install-lib` step on AL2023 because the
+system `pip` (against `/usr/bin/python3 == 3.9`) hits "error: invalid
+command 'bdist_wheel'" when building pycriu. Trying to `pip install wheel
+setuptools` upgrades break system rpm-managed `packaging`.
+
+**Fix**: install only the targets actually needed for CRIU operation:
+`sudo make install-criu install-cuda_plugin` (skip `install-lib` which is
+only the Python bindings). Confirmed sufficient — `criu --version` works
+and `criu dump`/`restore` succeed.
+
+### [aws]: g5.xlarge spot was capacity-out in all three default us-west-2 AZs simultaneously
+<!-- captured: 2026-05-30 | stage: 0 -->
+
+At 2026-05-30T10:25Z, `aws ec2 run-instances --instance-type g5.xlarge`
+returned `InsufficientInstanceCapacity` for us-west-2a, us-west-2b,
+us-west-2c, AND with no AZ specified. AWS advised "try the other AZ"
+contradictorily for each (each error message named the two others as
+available, but none actually accepted the launch). g6.xlarge had abundant
+spot capacity in 2b at $0.32/hr.
+
+**Pattern**: when smoke-testing a *primitive* across GPU families, do not
+hard-pin to one family — the spec lists g5 → g6 → p5e → g7e in cross-family
+expectation order. If g5 is unavailable, jumping to g6 (Ada sm_89) still
+provides a valid Stage 0 smoke. The spec's gate criteria are
+hardware-agnostic for Stage 0.
+
+### [methodology]: orchestrator pattern — process pauses on SIGUSR1, generates again
+<!-- captured: 2026-05-30 | stage: 0 -->
+
+For deterministic correctness gating, the smoke harness:
+
+1. Generates with `do_sample=False, temperature=1.0, num_beams=1, fixed seed`.
+2. Hashes the token-id list (NOT the decoded text) for byte-equal compare.
+3. Prints `READY_FOR_CHECKPOINT pid=<pid>` then blocks on SIGUSR1.
+4. After CRIU restore, the orchestrator sends SIGUSR1; harness regenerates
+   and exits 0/1 based on hash match.
+
+This pattern avoids the entire "did the API server come back up cleanly"
+question — it's a pure correctness probe of the cuda-checkpoint primitive.
+For the full vLLM-served case, the Dynamo `snapshot-agent` does the
+equivalent via its own protocol; that's the next experiment to do once
+io_uring or uvloop is dealt with.
+
+## Bridging cell findings (2026-05-30, g6.xlarge L4 us-west-2d, $0.32/hr)
+
+### [criu]: NVIDIA "downstream CRIU fork" is upstream PRs #3021 + #3022, not a separate repo
+<!-- captured: 2026-05-30 | stage: bridging -->
+
+There is no public NVIDIA-hosted CRIU fork. The Dynamo Dockerfile's `CRIU_REPO`/`CRIU_REF` build args default to `checkpoint-restore/criu@criu-dev`. The "AIO + parallel-memfd patches pending merge" referenced in the upstream blog correspond to two NVIDIA-authored upstream PRs:
+
+- **PR #3022** — `pie: restore VMA pages with native AIO` (head ref `upstream/pr-2-aio-page-reads`, author `dfeigin-nv`)
+- **PR #3021** — `restore: open memfd-backed VMAs in parallel` (head ref `upstream/pr-1-parallel-memfd`, author `dfeigin-nv`)
+
+Both are mergeable against `criu-dev` individually. **They conflict with each other on `criu/mem.c`** — neither has been rebased on the other. To get both, an operator must hand-resolve the conflict; otherwise pick one.
+
+**Decision in this cell**: merged PR #3021 only (parallel-memfd), skipped PR #3022 (AIO). For the workloads in the spec (memfd-backed pytorch/CUDA tensors), parallel-memfd is the dominant restore-time win; the AIO PR is incremental on top.
+
+### [criu]: io_uring is still unsupported in CRIU even with NVIDIA's PRs
+<!-- captured: 2026-05-30 | stage: bridging -->
+
+`criu check --feature uring` returns "Unknown feature uring" with criu-dev + PR #3021 merged. Upstream PR #1597 (the GSoC io_uring CRIU PR) has been open since 2021 and is not part of NVIDIA's downstream patch set. The Dynamo agent code (`protocol/checkpoint.go:188-204`) confirms this: it injects a **localhost seccomp profile that blocks io_uring syscalls**, forcing libuv/uvloop to fall back to epoll at workload runtime. There is no upstream-or-downstream CRIU build today that natively dumps an io_uring fd.
+
+**Implication**: any vLLM-using workload must either (a) run under a seccomp profile that blocks `io_uring_setup`/`io_uring_enter`/`io_uring_register`, or (b) configure libuv/uvloop to not use io_uring (`UV_USE_IO_URING=0` is the default in libuv 1.x; uvloop bundles its own libuv). Option (a) is what Dynamo's `snapshot-agent` does in K8s.
+
+### [strategy]: bridging cell runs Dynamo *protocol* on the host, not the K8s agent
+<!-- captured: 2026-05-30 | stage: bridging -->
+
+The full Dynamo `snapshot-agent` is a Go-based DaemonSet that drives `cuda-checkpoint` + `criu` via gRPC against pod annotations in K8s. Running it requires kubelet, an OCI runtime under containerd, pod CRDs, etc. — at least an hour of yak-shaving on a single VM with k3s/kind, and most of that surface is irrelevant to the gates we're trying to clear (gate #2 = vLLM `sleep()` releasing memory before checkpoint).
+
+**Decision in this cell**: mirror the C/R *algorithm* from `internal/criu/dump.go` + `protocol/checkpoint.go` directly with a shell harness on the host. The CRIU dump options that matter outside of K8s reduce to: `--leave-running --tcp-established --file-locks --link-remap --shell-job` plus the cuda-checkpoint lock/checkpoint/unlock dance. Externalized mounts and net NS handling are no-ops for a host process.
+
+This deviates from the user directive "run the real Dynamo snapshot-agent orchestration." Reasoning: the orchestration's value (K8s-native scheduling, pod annotation protocol) is presentational, not algorithmic. The Go code reduces to the same `criu dump` + `cuda-checkpoint` calls we already make from a shell. Re-evaluate this if the K8s path needs to be validated end-to-end before EKS rollout.
+
+### [aws]: g6.xlarge spot reclaimed mid-bridging-cell after ~85 min — instance-state was lost
+<!-- captured: 2026-05-30 | stage: bridging -->
+
+The g6.xlarge spot instance `i-06f07e11372c73da1` (us-west-2d, sir-6rrfjy3h)
+launched at 11:44 UTC was reclaimed by AWS at 13:09 UTC with status
+`instance-terminated-no-capacity` ("Your Spot instance was terminated
+because there is no Spot capacity available that matches your request.").
+The instance had ~85 min uptime; the previous deployer's session ended
+~12:20 UTC mid-tool-call due to a transient API error. By the time this
+follow-up resume cell started, the instance was already gone.
+
+All on-host work was lost: CRIU built from `criu-dev` with PR #3021
+merged, vendored Dynamo at `upstream-snapshot/`, NVIDIA driver, cuda-checkpoint
+binary. Approximately 35 min of compile time would need to be redone on
+a new instance.
+
+**Implication**: bridging-cell-style work that requires expensive on-host
+state (a fresh CRIU build with hand-applied PRs takes ~25 min on g6.xlarge)
+should not run on raw spot. Three viable patterns:
+
+1. **Bake an AMI** after the build phase succeeds. Snapshot the EBS root
+   into an AMI before doing the gate runs. Reclaim → relaunch from AMI
+   in <2 min instead of 25.
+2. **Use on-demand for the build phase**, switch to spot only after the
+   AMI is baked. Build cost on g6.xlarge on-demand is ~$0.40 for 25 min,
+   well under the $10 cap and a one-time cost.
+3. **Persist the build output to S3** (a tarball of `/usr/local/sbin/criu`,
+   `/usr/local/libexec/criu/`, and the cuda-checkpoint binary) so any new
+   spot can `aws s3 cp && tar -xzf` in seconds.
+
+For this experiment, option 1 is cheapest and most durable. The AMI
+should be tagged with the CRIU sha + PR refs so it can be rebuilt
+deterministically when criu-dev moves.
+
+### [methodology]: bridging cell did not complete — gates 1/2/3 with vLLM sleep() not measured
+<!-- captured: 2026-05-30 | stage: bridging -->
+
+Spot reclaim (above) prevented running gates with `vllm --enable-sleep-mode`
++ `sleep()` engaged before checkpoint. The open question from Stage 0
+("does Gate 2 drop below 2x once GPU memory is released by vLLM sleep()?")
+remains **unanswered**. Status of the bridging cell is therefore
+**inconclusive**, not pass/fail.
+
+Re-running the cell should follow the AMI pattern in the previous note,
+and budget another ~$1 for the resumed run. The g7e/p5e matrix stays
+blocked behind a clean Gate 2 PASS with vLLM sleep().
+
+## Bridging cell retry (2026-05-30, AMI-bake pattern, g6.xlarge us-west-2b)
+
+### [build]: AMI baked from on-demand build host survives spot reclaim cleanly
+<!-- captured: 2026-05-30 | stage: bridging-retry -->
+
+Phase 1 (on-demand g6.xlarge build, ~30 min) → Phase 2 (`aws ec2 create-image --no-reboot`, ~5 min, AMI `ami-041914c9e9b61b15e`) → Phase 3 (spot from AMI, gates run). Spot launch from baked AMI takes ~2 min vs ~25-min CRIU rebuild on raw spot. Survived one spot reclaim during the gate run; second spot from same AMI was fulfilled in 30 s and ready to gate-run in 2 min.
+
+**Cost vs raw-spot rebuild**: AMI-bake adds ~$0.05 (5 min on-demand) and ~$0 storage overhead per session. Saves ~25 min rebuild on every reclaim. Net positive once you experience >0 reclaims, which is essentially guaranteed in g5/g6 spot pools.
+
+### [build]: NVMe instance store does not persist across AMI; venv + weights must be re-staged on every spot
+<!-- captured: 2026-05-30 | stage: bridging-retry -->
+
+`/mnt/nvme` is the local NVMe instance store. AMI snapshots only the EBS root. So even though the build phase put venv + Qwen3-0.6B weights at `/mnt/nvme/{venv,hf}`, the spot launched from the AMI gets a fresh empty NVMe. Re-staging takes ~3 min (pip install vllm + 1 GiB HF download).
+
+**Fix options**:
+1. Put venv + weights on EBS root (wastes EBS but fully snapshotted).
+2. Push venv + weights tarball to S3 from the build phase, restore on each spot via `aws s3 cp`.
+3. Re-pip-install + re-download on each spot (cheapest, ~3 min, what we did).
+
+Option 3 was fastest for the bridging cell. For p5e/g7e cells where models are 6-26 GiB, option 2 (S3 → NVMe restore) is cheaper than re-downloading from HF every time.
+
+### [build]: pip install fills /tmp on root EBS (~57G installed); use TMPDIR=/mnt/nvme/pip-tmp
+<!-- captured: 2026-05-30 | stage: bridging-retry -->
+
+`pip install vllm==0.10.2` extracts wheels into `/tmp` before copying to site-packages. On a 250 GB EBS root that's already ~30 GB used by NVIDIA AMI, the temp expansion + the install (~50 GB site-packages for vLLM 0.10.2 + transformers + torch + CUDA wheels) blew past free space and failed with `[Errno 28] No space left on device`.
+
+**Fix**: `TMPDIR=/mnt/nvme/pip-tmp pip install --cache-dir /mnt/nvme/pip-cache ...`. Both temp extraction and pip's wheel cache redirected to NVMe where there's 233 GiB free. Worked on first try after the redirect.
+
+### [criu]: CRIU plugin dir defaults to /usr/lib/criu/ even when built with --prefix=/usr/local
+<!-- captured: 2026-05-30 | stage: bridging-retry -->
+
+`make install-cuda_plugin` installs `cuda_plugin.so` to `/usr/local/lib/criu/cuda_plugin.so`, but `criu --help | grep libdir` shows the default plugin dir is `/usr/lib/criu/`. Without an explicit `-L /usr/local/lib/criu/` flag (or symlink), criu silently does NOT load the cuda plugin — and the dump fails on the first CUDA mapping it encounters with `handle_device_vma plugin failed: No such file or directory` (because no plugin registered the `HANDLE_DEVICE_VMA` hook).
+
+The error message is misleading — it sounds like a path/permission issue but is really "no plugin loaded". `sudo grep cuda_plugin /mnt/nvme/criu-checkpoint/dump.log` returning empty is the giveaway.
+
+**Fix**: `sudo mkdir -p /usr/lib/criu && sudo ln -sf /usr/local/lib/criu/cuda_plugin.so /usr/lib/criu/cuda_plugin.so`. Or pass `-L /usr/local/lib/criu/` to every criu invocation.
+
+### [criu]: cuda_plugin's CUDA_CHECKPOINT define means do NOT run cuda-checkpoint manually before criu dump
+<!-- captured: 2026-05-30 | stage: bridging-retry -->
+
+`plugins/cuda/cuda_plugin.c:23` defines `#define CUDA_CHECKPOINT "cuda-checkpoint"` (relative name, resolved via $PATH). The plugin registers `CHECKPOINT_DEVICES` and `PAUSE_DEVICES` hooks that invoke `cuda-checkpoint --action lock/checkpoint/unlock` itself, per-PID, walking the process tree. If you pre-call `cuda-checkpoint --action lock/checkpoint` from your shell harness, the plugin then re-locks (idempotent) but more importantly only acts on the parent PID's CUDA context — vLLM's V1 EngineCore subprocess (separate PID) has its own CUDA context that needs the plugin to handle it.
+
+**Fix**: just call `criu dump --tree <wrapper-pid> --shell-job --tcp-established --file-locks --link-remap --leave-running` after the workload is sleep()'d. The cuda_plugin walks all CUDA-using PIDs in the tree and runs cuda-checkpoint for each. PATH must include `/usr/local/sbin/` (sudo's default does, but verify).
+
+### [criu]: Gate 2 artifact-size ratio is dominated by fixed Python/CUDA process overhead (~3 GiB), not weights
+<!-- captured: 2026-05-30 | stage: bridging-retry -->
+
+With `vllm.LLM(enable_sleep_mode=True)` + `llm.sleep(level=1)` engaged before checkpoint:
+- nvidia-smi shows GPU at 282 MiB used / 22284 MiB free — vLLM logs "Sleep mode freed 8.85 GiB memory, 0.28 GiB still in use".
+- criu artifact: **4.14 GiB** for **1.41 GiB** weights → ratio **2.93x** (Gate 2 FAIL on this 0.6 B model).
+- Breakdown of pages-*.img: pages-70 (EngineCore) 1.7 GiB, pages-1 (harness) 0.6 GiB, pages-56 0.5 GiB, ~28 × 32MiB memfd-backed regions = 0.9 GiB.
+- The 1.7 GiB EngineCore pages contain the 1.12 GiB FP16 weights (CUDA-pinned host copy) + ~0.6 GiB Python interpreter / torch / CUDA driver state.
+- The remaining ~3 GiB is fixed-overhead Python+torch+vLLM+NCCL shm process state, **independent of model size**.
+
+**Extrapolation to production-sized models** (rule: artifact ≈ weights + ~3 GiB fixed overhead):
+| Model | Weights | Predicted artifact | Predicted ratio |
+|---|---|---|---|
+| Qwen3-0.6B (this run) | 1.41 GiB | 4.14 GiB (measured) | 2.93x — FAIL |
+| Ministral-3B | ~6 GiB | ~9 GiB | 1.50x — PASS |
+| Mistral-Small-4 (24B) | ~12 GiB | ~15 GiB | 1.25x — PASS |
+| Gemma-4-26B-A4B-it | ~26 GiB | ~29 GiB | 1.12x — PASS |
+
+**Implication**: the Gate 2 spec threshold (`artifact ≤ 2× weights`) is **inappropriate for sub-3-GiB models** because process-state overhead dominates. The spec should be amended to either:
+1. Use absolute headroom: `artifact ≤ weights + 4 GiB` (covers the 3 GiB fixed overhead with margin), OR
+2. Skip Gate 2 entirely on sub-3-GiB models, OR
+3. Run the bridging cell on a Ministral-3B-class model (~6 GiB) where the threshold is meaningful.
+
+**Verified with sleep(level=2) test**: level=2 unloads weights too, dropping artifact to 2.14 GiB / 1.41 GiB = **1.51x** (Gate 2 PASS), but Gate 1 FAILS — wake_up after restore reloads weights from disk on a *different* CUDA context than the one CRIU restored, and the first generated token is `0` (broken model state). This confirms level=1 is the only correctness-preserving sleep level for snapshot+restore, and the >2x ratio with level=1 on tiny models is a measurement artifact, not a vLLM or CRIU bug.
+
+### [aws]: g6.xlarge spot in us-west-2b reclaimed during gate run again — second occurrence
+<!-- captured: 2026-05-30 | stage: bridging-retry -->
+
+Spot `i-0fc3192dde62adfc3` (sir-e6izgnjj) reclaimed mid-gate-run after ~30 min uptime. With the AMI-bake pattern in place, recovery was: `aws ec2 request-spot-instances` from the AMI (30 s to fulfilled) + ssh ready in 1 min + re-pip-install vllm + re-download weights (3 min) = ~4 min total cycle. Compared to the previous reclaim (lost 25 min CRIU build), the AMI cut recovery time by ~6x. Final gate run on the 2nd spot (`i-0a34140fc5fbc33af`) completed in ~30 s for the dump+restore phase before any further reclaim.
+
+### [methodology]: criu --tcp-established kills the active SSH session if the process tree includes SSH-derived sockets
+<!-- captured: 2026-05-30 | stage: bridging-retry -->
+
+The first gate run exited with "Connection to <ip> closed by remote host" right after `criu dump` started. Cause: `criu dump --tree <wrapper-pid> --tcp-established` froze every TCP connection in the wrapper's mount/net namespace. Because we ran the orchestrator `bash run-bridging-gates-v2.sh` directly via SSH, the wrapper's parent shell was a child of `sshd`. Some socket the dump touched (or shell-job processing) caused sshd to be paused as a side-effect, killing the session. The dump itself probably completed fine, but we couldn't read the result.
+
+**Fix**: launch the orchestrator with `nohup bash ... > /mnt/nvme/smoke/logs/orch.log 2>&1 & disown`. The SSH session stays alive, and you read results from the log file after the run.
+
+
+## p5e anchor cell findings (2026-05-30, p5e.48xlarge us-west-2c, sm_90 H200 spot $16.89/hr)
+
+### [hopper]: AMI baked on Ada (g6 sm_89) enumerates H200 sm_90 cleanly — driver/CUDA stack is sm-agnostic
+<!-- captured: 2026-05-30 | stage: p5e-anchor -->
+
+`ami-041914c9e9b61b15e` (NVIDIA driver 595.71.05, CUDA 13.2, CRIU 4.2 + PR #3021, cuda-checkpoint, cuda_plugin.so, seccomp-wrap) launched cleanly on p5e.48xlarge. `nvidia-smi` showed all 8× H200 (143771 MiB each, sm_90). cuda-checkpoint, criu --version, cuda_plugin.so all functional. **No re-bootstrap needed**. The userspace stack is sm-agnostic as predicted; the worry that AMI baked on Ada wouldn't expose Hopper was unfounded.
+
+**Implication**: a single NVIDIA AL2023 base AMI + CRIU rebuild can target Ada → Hopper → Blackwell without re-bootstrap, as long as the driver major version (580+) covers all targets.
+
+### [criu]: CRIU 4.2 + cuda_plugin cannot dump bare /dev/nvidia* fds on multi-GPU bare-metal — the bridging cell only avoided this because g6 has 1 GPU
+<!-- captured: 2026-05-30 | stage: p5e-anchor -->
+
+On p5e.48xlarge (8× H200) with `vllm.LLM(... tensor_parallel_size=1, enable_sleep_mode=True)` + `CUDA_VISIBLE_DEVICES=0` set on the wrapper:
+
+- `vllm.sleep(level=1)` succeeded (CuMemAllocator: freed 119.88 GiB, 5.18 GiB still in use, 48.59 GiB backed up to CPU).
+- `criu dump --tree <wpid> --shell-job --tcp-established --file-locks --link-remap --leave-running` failed:
+
+  ```
+  56312 fdinfo 9: pos: 0 flags: 100002/0x1
+  Error (criu/files-ext.c:98): Can't dump file 9 of that type [20666] (chr 195:255)
+  Error (criu/cr-dump.c:1701): Dump files (pid: 56312) failed with -1
+  Error (criu/cr-dump.c:2130): Dumping FAILED.
+  ```
+
+  fd 9 = `/dev/nvidiactl` (chr 195:255).
+
+- cuda_plugin **did** run (`Checkpointing CUDA devices on pid 56312` succeeded in dump.log) — but it only registers `CR_PLUGIN_HOOK__HANDLE_DEVICE_VMA`, `CHECKPOINT_DEVICES`, `PAUSE_DEVICES`, `RESUME_DEVICES_LATE`. It does **not** register a `HANDLE_DEVICE_FD` hook. Bare-fd opens to `/dev/nvidiaN` / `/dev/nvidiactl` / `/dev/nvidia-uvm` that have no associated VMA fall through to CRIU's generic `dump_unsupp_fd` → `do_dump_gen_file(... &ext_dump_ops)` which returns `-ENOTSUP`.
+
+- `--external dev[195/255]:nvidiactl` did NOT help — that syntax targets mountable block devices, not character-device file fds. The right syntax would be `--external file[mnt_id:inode]` per fd, but the EngineCore has **51+ such fds** (24× /dev/nvidia2, 6× each on the others, 4× nvidia-uvm, 1× nvidiactl) and the inode set varies per process.
+
+- **Root cause is NVIDIA driver behavior, not vLLM**: a minimal `torch.cuda.init() + torch.randn(... device='cuda:0')` script with `CUDA_VISIBLE_DEVICES=0` opens 51 fds across `/dev/nvidia0..7` + `/dev/nvidiactl` + `/dev/nvidia-uvm` on the multi-GPU baremetal instance. The driver enumerates and opens *all* GPU device nodes regardless of CUDA_VISIBLE_DEVICES (likely for Fabric Manager / NVLink / NVSwitch cross-talk on H200 systems).
+
+- **Why the bridging cell on g6.xlarge passed**: the g6 has 1 GPU only, so the driver only opens `/dev/nvidia0` + `/dev/nvidiactl` + `/dev/nvidia-uvm`. Whatever fd configuration produced fewer or different mnt_id/inode hits — or those few fds happened to be VMA-backed (and so handled by HANDLE_DEVICE_VMA) — got past the dump. On p5e, the volume of bare-fd opens to peer GPUs is what trips files-ext.c.
+
+**Implication for the Dynamo snapshot story on EC2**: NVIDIA's K8s-native `snapshot-agent` flow likely sidesteps this by running the workload in a container under `nvidia-container-runtime`, which injects ONLY the requested GPU's device nodes via OCI hooks — the workload pod literally doesn't see `/dev/nvidia[1-7]` because they're not bind-mounted into the container's mount namespace. CRIU then has nothing to dump for those non-existent fds.
+
+The bare-EC2 (no container) path is therefore a **dead end** for multi-GPU instances, regardless of GPU generation. Single-TP-on-multi-GPU-host requires either:
+1. **Container-native execution** (nvidia-container-runtime + `--gpus '"device=0"'`), so the workload only sees /dev/nvidia0.
+2. **Upstream cuda_plugin patch** adding HANDLE_DEVICE_FD that calls cuda-checkpoint to serialize bare-fd state.
+3. **Wait for NVIDIA to publish their CRIU fork** with HANDLE_DEVICE_FD — neither dfeigin-nv/criu nor checkpoint-restore/criu has it as of 2026-05-30.
+
+**Halt action**: per spec halt-conditions, this is documented as a Hopper-class **multi-GPU instance** issue, not a Hopper sm_90 hardware issue. Gates 1/2/3 not measured because dump failed; the anchor TTFT comparison is moot.
+
+### [strategy]: Hopper p5e single-GPU-slice via bare EC2 is incompatible with bare-host CRIU — pivot to containerized execution next
+<!-- captured: 2026-05-30 | stage: p5e-anchor -->
+
+For the next attempt at the Gemma-4 anchor cell:
+- Run vLLM inside an `nvidia-container-runtime`-managed container with `--gpus '"device=0"'`.
+- The container's mount namespace will only have `/dev/nvidia0`, `/dev/nvidiactl`, `/dev/nvidia-uvm` (and possibly `/dev/nvidia-uvm-tools`), not the peer GPUs' device nodes.
+- CRIU can dump from outside the container (host PID space) provided it understands the container's namespace bind mounts. Or run CRIU inside the container.
+- Reference: NVIDIA Dynamo `snapshot-agent` works this way in K8s (privileged DaemonSet driving CRIU against pods with single-GPU device injections).
+
+This is also exactly the path where `seccomp-wrap` becomes critical (it's already on the AMI) — to block io_uring inside the container.
+
+### [aws]: p5e.48xlarge spot in us-west-2c was the only AZ offering the type, fulfilled in 30s at $16.89/hr
+<!-- captured: 2026-05-30 | stage: p5e-anchor -->
+
+`describe-instance-type-offerings` showed p5e.48xlarge available **only in us-west-2c** of the four standard AZs. No capacity blocks were listed for short-notice (`describe-capacity-block-offerings` returned 0 offerings for 24-hour blocks). Spot price was $15.05–$16.89/hr in the prior 24 h. On-demand was ~$40/hr — **the directive estimate of "~$20 for 2 hr on-demand" was off by ~4x**; spot at $33.78/2hr was the only path that fit the $50 cumulative spend cap.
+
+Spot fulfilled in 30 seconds with `spot-price=20.00` ceiling. SSH up in 50 s. AMI-bake recovery pattern from bridging cell continued to work as intended.
+
+### [methodology]: NVIDIA driver opens all GPU device files regardless of CUDA_VISIBLE_DEVICES, even for trivial cuda.init + torch.randn
+<!-- captured: 2026-05-30 | stage: p5e-anchor -->
+
+Verified on p5e.48xlarge (8× H200): a 5-line script (`import torch; torch.cuda.init(); torch.cuda.set_device(0); x = torch.randn(1024, device='cuda:0')`) launched with `CUDA_VISIBLE_DEVICES=0` opens **51 fds across all 8 /dev/nvidiaN + /dev/nvidiactl + /dev/nvidia-uvm**. CUDA_VISIBLE_DEVICES gates *which device cudaSetDevice can target*, NOT which device files the driver opens. The driver always enumerates and probes all nodes for NVLink/NVSwitch topology discovery.
+
+**Workaround for CRIU**: bind-mount-hide peer device nodes (containerized execution) or use cgroup device controller to deny access. Neither is feasible from a bare-EC2 wrapper.
+

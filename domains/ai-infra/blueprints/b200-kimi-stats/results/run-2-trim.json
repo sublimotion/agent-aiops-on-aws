@@ -1,0 +1,29 @@
+{
+  "schema": "benchmark-commons/v1",
+  "experiment": "b200-kimi-stats",
+  "variant": "run-2-cudagraph-trim",
+  "fixture": "kimi-k2.6-fp8",
+  "image": "vllm/vllm-openai:v0.21.0",
+  "hardware": "p6-b200.48xlarge x1 (us-east-2b spot)",
+  "tp_size": 8,
+  "model_size_gb": 585,
+  "weights_source": "NVMe (warm cache)",
+  "vllm_args_override": "--compilation-config={\"cudagraph_capture_sizes\":[1,2,4,8,16,32,64,128,256,512]}",
+  "events_ms": {
+    "T0_pod_create": 0,
+    "T_main_started": 2000,
+    "T_pod_ready": 413000
+  },
+  "stages_ms": {
+    "main_to_ready": 411000,
+    "TOTAL_pod_create_to_ready": 413000
+  },
+  "first_token_ms_after_ready": 6559,
+  "comparison": {
+    "b200_baseline_main_to_ready_ms": 573000,
+    "b200_trim_main_to_ready_ms": 411000,
+    "trim_speedup_x": 1.39,
+    "stage_savings_seconds": 162,
+    "stage_savings_pct": 28
+  }
+}

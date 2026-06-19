@@ -1,0 +1,80 @@
+[orch] launching workload via seccomp-wrap
+[orch] READY pid=6074
+[orch] process tree:
+python(6074)-+-VLLM::EngineCor(6165)-+-{VLLM::EngineCor}(6168)
+             |                       |-{VLLM::EngineCor}(6172)
+             |                       |-{VLLM::EngineCor}(6173)
+             |                       |-{VLLM::EngineCor}(6174)
+             |                       |-{VLLM::EngineCor}(6181)
+             |                       |-{VLLM::EngineCor}(6182)
+             |                       |-{VLLM::EngineCor}(6183)
+             |                       |-{VLLM::EngineCor}(6184)
+             |                       |-{VLLM::EngineCor}(6185)
+             |                       |-{VLLM::EngineCor}(6186)
+             |                       |-{VLLM::EngineCor}(6187)
+             |                       |-{VLLM::EngineCor}(6188)
+             |                       |-{VLLM::EngineCor}(6189)
+             |                       |-{VLLM::EngineCor}(6190)
+             |                       |-{VLLM::EngineCor}(6191)
+             |                       |-{VLLM::EngineCor}(6192)
+             |                       |-{VLLM::EngineCor}(6193)
+             |                       |-{VLLM::EngineCor}(6194)
+             |                       |-{VLLM::EngineCor}(6195)
+             |                       |-{VLLM::EngineCor}(6196)
+             |                       |-{VLLM::EngineCor}(6197)
+             |                       |-{VLLM::EngineCor}(6198)
+             |                       |-{VLLM::EngineCor}(6199)
+             |                       |-{VLLM::EngineCor}(6200)
+             |                       |-{VLLM::EngineCor}(6201)
+             |                       |-{VLLM::EngineCor}(6202)
+             |                       |-{VLLM::EngineCor}(6203)
+             |                       |-{VLLM::EngineCor}(6204)
+             |                       |-{VLLM::EngineCor}(6205)
+             |                       |-{VLLM::EngineCor}(6206)
+             |                       |-{VLLM::EngineCor}(6207)
+             |                       |-{VLLM::EngineCor}(6208)
+             |                       |-{VLLM::EngineCor}(6209)
+             |                       |-{VLLM::EngineCor}(6210)
+             |                       |-{VLLM::EngineCor}(6211)
+             |                       |-{VLLM::EngineCor}(6212)
+             |                       |-{VLLM::EngineCor}(6213)
+             |                       |-{VLLM::EngineCor}(6214)
+             |                       |-{VLLM::EngineCor}(6215)
+             |                       |-{VLLM::EngineCor}(6216)
+             |                       |-{VLLM::EngineCor}(6217)
+             |                       |-{VLLM::EngineCor}(6231)
+             |                       |-{VLLM::EngineCor}(6232)
+             |                       |-{VLLM::EngineCor}(6246)
+             |                       |-{VLLM::EngineCor}(6247)
+             |                       |-{VLLM::EngineCor}(6248)
+             |                       |-{VLLM::EngineCor}(6249)
+             |                       |-{VLLM::EngineCor}(6250)
+             |                       `-{VLLM::EngineCor}(6251)
+             |-{python}(6119)
+             |-{python}(6252)
+             |-{python}(6253)
+             |-{python}(6254)
+             |-{python}(6255)
+             |-{python}(6256)
+             |-{python}(6257)
+             |-{python}(6258)
+             |-{python}(6259)
+             `-{python}(6260)
+[orch] GPU mem after sleep():
+278 MiB, 22288 MiB
+[orch] harness RSS: 943300 kB
+[orch] criu dump dur=2.20002 s
+[orch] artifact=2294136716 bytes (2.137 GiB)
+[orch] killing original tree
+[orch] criu restore dur=2.1162 s
+[orch] restored pid=6074
+
+=== BRIDGING GATE RESULTS ===
+criu_dump_seconds=2.20002
+criu_restore_seconds=2.1162
+artifact=2.137 GiB / weights=1.415 GiB ratio=1.510
+harness_rc=1
+GATE 1 token-id equality: FAIL
+GATE 2 artifact <= 2x weights: PASS (ratio=1.510)
+GATE 3 restore < 30s: PASS (2.1162 s)
+result -> /mnt/nvme/smoke/bridging-result.json
