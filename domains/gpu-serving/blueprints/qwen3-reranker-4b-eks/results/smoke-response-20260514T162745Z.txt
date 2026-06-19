@@ -1,0 +1,14 @@
+# Qwen3-Reranker-4B smoke test on EKS g6e.2xlarge (L40S 48GB) — 20260514T162745Z
+
+## Launch flags (see k8s/vllm-reranker-g6e-2xlarge.yaml)
+vLLM 0.19.1, --runner pooling --convert classify
+--hf-overrides '{architectures:[Qwen3ForSequenceClassification],classifier_from_token:[no,yes],is_original_qwen3_reranker:true}'
+
+## /v1/models
+{"object":"list","data":[{"id":"Qwen/Qwen3-Reranker-4B","object":"model","created":1778776065,"owned_by":"vllm","root":"Qwen/Qwen3-Reranker-4B","parent":null,"max_model_len":4096,"permission":[{"id":"modelperm-9fbcfed51d34f6f5","object":"model_permission","created":1778776065,"allow_create_engine":false,"allow_sampling":true,"allow_logprobs":true,"allow_search_indices":false,"allow_view":true,"allow_fine_tuning":false,"organization":"*","group":null,"is_blocking":false}]}]}
+
+## /v1/score — query + 3 candidates
+{"id":"score-9444ad7670a5f910","object":"list","created":1778776065,"model":"Qwen/Qwen3-Reranker-4B","data":[{"index":0,"object":"score","score":0.9860658645629883},{"index":1,"object":"score","score":0.4693620800971985},{"index":2,"object":"score","score":0.9868148565292358}],"usage":{"prompt_tokens":41,"total_tokens":41,"completion_tokens":0,"prompt_tokens_details":null}}
+
+## /v1/rerank — same query, returns sorted
+{"id":"rerank-babb3f2c4f568d08","model":"Qwen/Qwen3-Reranker-4B","usage":{"prompt_tokens":41,"total_tokens":41},"results":[{"index":2,"document":{"text":"Paris is a beautiful city.","multi_modal":null},"relevance_score":0.9868148565292358},{"index":0,"document":{"text":"The capital of France is Paris.","multi_modal":null},"relevance_score":0.9860658645629883},{"index":1,"document":{"text":"Berlin is the capital of Germany.","multi_modal":null},"relevance_score":0.4693620800971985}]}

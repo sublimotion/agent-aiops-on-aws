@@ -1,0 +1,186 @@
+---
+# Benchmark runner — CPU pod on inference-eks-v132, drives aiperf/custbench against the p6-b300 GPU node.
+# Reads target endpoint via GPU_NODE_IP env (patched from results/.gpu-node.env before apply).
+# Auto-syncs each produced artifact to S3 for spot-reclaim safety.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kimi-bench-runner-scripts
+  namespace: default
+data:
+  common.sh: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+    : "${TAG:?}" ; : "${GPU_NODE_IP:?}" ; : "${ENGINE_PORT:?}"
+    ENDPOINT="${ENDPOINT:-http://${GPU_NODE_IP}:${ENGINE_PORT}}"
+    RESULTS_BUCKET="${RESULTS_BUCKET:-s3://kimi-k2-bench-results-20260216163240701700000007}"
+    S3_PREFIX="${S3_PREFIX:-kimi-k2.6-speculative}"
+    STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+    OUT_DIR=/results/${TAG}
+    mkdir -p "$OUT_DIR"
+    export ENDPOINT RESULTS_BUCKET S3_PREFIX STAMP OUT_DIR
+
+  sync.sh: |
+    #!/usr/bin/env bash
+    # Upload all new artifacts under /results/ to S3 then checkpoint a manifest.
+    set -euo pipefail
+    source /scripts/common.sh
+    aws s3 sync /results/ "${RESULTS_BUCKET}/${S3_PREFIX}/" --only-show-errors --region us-east-1
+    (find /results -type f -newer /results/.last-sync 2>/dev/null || find /results -type f) \
+      | sed "s|^/results/||" > /results/.last-manifest.txt
+    touch /results/.last-sync
+    echo "[$(date -u +%FT%TZ)] synced $(wc -l </results/.last-manifest.txt) files to ${RESULTS_BUCKET}/${S3_PREFIX}/"
+
+  run-w1-multi-turn-chat.sh: |
+    #!/usr/bin/env bash
+    source /scripts/common.sh
+    aiperf profile --url "$ENDPOINT" --model kimi-k2.6 \
+      --workload multi-turn-chat \
+      --input-tokens 1024 --output-tokens 128 \
+      --concurrency 1,4,8,16,32,64 \
+      --rounds 1,5,10 \
+      --output-json "$OUT_DIR/kimi-k2.6_${TAG}_w1-multi-turn-chat_${STAMP}.json"
+    /scripts/sync.sh
+
+  run-w2-rag.sh: |
+    #!/usr/bin/env bash
+    source /scripts/common.sh
+    for CTX in 2000 5000 10000; do
+      aiperf profile --url "$ENDPOINT" --model kimi-k2.6 \
+        --workload rag-long-context \
+        --input-tokens "$CTX" --output-tokens 100 \
+        --concurrency 1,8,32,64 \
+        --output-json "$OUT_DIR/kimi-k2.6_${TAG}_w2-rag-${CTX}_${STAMP}.json"
+      /scripts/sync.sh
+    done
+
+  run-w3-agent-tool.sh: |
+    #!/usr/bin/env bash
+    source /scripts/common.sh
+    aiperf profile --url "$ENDPOINT" --model kimi-k2.6 \
+      --workload coding-agent \
+      --input-tokens 512 --output-tokens 128 \
+      --turns-per-session 10 \
+      --concurrency 1,4,8,16,32 \
+      --output-json "$OUT_DIR/kimi-k2.6_${TAG}_w3-agent-tool_${STAMP}.json"
+    /scripts/sync.sh
+
+  run-w4-shared-prompt.sh: |
+    #!/usr/bin/env bash
+    source /scripts/common.sh
+    for SYS in 2000 4000; do
+      aiperf profile --url "$ENDPOINT" --model kimi-k2.6 \
+        --workload chatbot-short \
+        --system-prompt-tokens "$SYS" --input-tokens 128 --output-tokens 128 \
+        --concurrency 4,8,16 \
+        --shared-system-prompt \
+        --output-json "$OUT_DIR/kimi-k2.6_${TAG}_w4-shared-sys${SYS}_${STAMP}.json"
+      /scripts/sync.sh
+    done
+
+  run-w5-prod-mix.sh: |
+    #!/usr/bin/env bash
+    source /scripts/common.sh
+    aiperf profile --url "$ENDPOINT" --model kimi-k2.6 \
+      --workload qps-sweep \
+      --dataset sharegpt \
+      --input-tokens 512 --output-tokens 256 \
+      --qps 0.5,1,2,3,5,8 --duration 120 \
+      --output-json "$OUT_DIR/kimi-k2.6_${TAG}_w5-prod-mix_${STAMP}.json"
+    /scripts/sync.sh
+
+  run-w6-long-context.sh: |
+    #!/usr/bin/env bash
+    source /scripts/common.sh
+    for CTX in 1024 4096 8192 16384 32768 65536; do
+      aiperf profile --url "$ENDPOINT" --model kimi-k2.6 \
+        --workload chatbot-long \
+        --input-tokens "$CTX" --output-tokens 256 \
+        --concurrency 1,4,8,16 \
+        --output-json "$OUT_DIR/kimi-k2.6_${TAG}_w6-long-ctx-${CTX}_${STAMP}.json"
+      /scripts/sync.sh
+    done
+
+  run-concurrency-sweep.sh: |
+    #!/usr/bin/env bash
+    # Always-on sweep for find-the-crossover analysis across phases.
+    source /scripts/common.sh
+    aiperf profile --url "$ENDPOINT" --model kimi-k2.6 \
+      --workload concurrency-sweep \
+      --input-tokens 512 --output-tokens 256 \
+      --concurrency 1,8,32,64,128,256,512 \
+      --output-json "$OUT_DIR/kimi-k2.6_${TAG}_concurrency-sweep_${STAMP}.json"
+    /scripts/sync.sh
+
+  run-phase-suite.sh: |
+    #!/usr/bin/env bash
+    # Drive the full workload matrix for one phase tag.
+    # Usage: TAG=phase-1-sglang-eagle3 ENGINE_PORT=30000 /scripts/run-phase-suite.sh
+    source /scripts/common.sh
+    for script in run-concurrency-sweep run-w1-multi-turn-chat run-w2-rag run-w3-agent-tool run-w4-shared-prompt run-w5-prod-mix run-w6-long-context; do
+      echo "=== $script ==="
+      /scripts/${script}.sh || echo "FAILED: $script (continuing)"
+    done
+    /scripts/sync.sh
+    echo "PHASE SUITE COMPLETE for TAG=${TAG}"
+
+  sync-loop.sh: |
+    #!/usr/bin/env bash
+    # Background sync every 60s — picks up any in-flight artifacts for spot-reclaim safety.
+    while true; do
+      /scripts/sync.sh || true
+      sleep 60
+    done
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kimi-bench-runner
+  namespace: default
+  labels:
+    app: kimi-bench-runner
+    project: kimi-k2.6-speculative
+spec:
+  restartPolicy: Never
+  serviceAccountName: kimi-bench-runner
+  containers:
+    - name: runner
+      image: 615299764834.dkr.ecr.us-east-1.amazonaws.com/bench-runner:aiperf-latest
+      command: ["/bin/bash", "-c"]
+      args: ["nohup /scripts/sync-loop.sh >/tmp/sync-loop.log 2>&1 & sleep infinity"]
+      env:
+        - name: GPU_NODE_IP
+          value: "REPLACE_WITH_PRIVATE_IP"
+        - name: ENGINE_PORT
+          value: "8000"
+        - name: RESULTS_BUCKET
+          value: "s3://kimi-k2-bench-results-20260216163240701700000007"
+        - name: S3_PREFIX
+          value: "kimi-k2.6-speculative"
+        - name: AWS_REGION
+          value: "us-east-1"
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+        - name: results
+          mountPath: /results
+      resources:
+        requests: {cpu: "4", memory: "8Gi"}
+        limits:   {cpu: "8", memory: "16Gi"}
+  volumes:
+    - name: scripts
+      configMap:
+        name: kimi-bench-runner-scripts
+        defaultMode: 0755
+    - name: results
+      emptyDir:
+        sizeLimit: 30Gi
+---
+# ServiceAccount + IRSA binding for S3 writes (apply after cluster OIDC is configured)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kimi-bench-runner
+  namespace: default
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::615299764834:role/kimi-bench-runner-s3

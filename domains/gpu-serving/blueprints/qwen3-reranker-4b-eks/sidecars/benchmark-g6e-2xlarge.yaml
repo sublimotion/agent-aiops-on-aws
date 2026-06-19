@@ -1,0 +1,133 @@
+# Qwen3-Reranker-4B Benchmark Sidecar (g6e.2xlarge — spec-alt substrate, see note)
+# Spec target is g6.xlarge (L4 24GB); we're running on L40S 48GB for session reuse.
+# Performance numbers = upper bound; cost-efficiency row must note substrate mismatch.
+
+model:
+  name: Qwen3-Reranker-4B
+  id: Qwen/Qwen3-Reranker-4B
+  modality: text-cross-encoder
+  architecture: transformer
+  parameters_total: "4B"
+  quantization: bf16
+  max_model_len: 4096
+
+engine:
+  name: vllm
+  version: "0.19.1"
+  container_image: vllm/vllm-openai:v0.19.1
+  tensor_parallel: 1
+  pipeline_parallel: 1
+  replicas: 1
+  reasoning: false
+  kv_cache_dtype: auto
+  attention_backend: flash-attn
+  task: classify
+  extra_args:
+    trust-remote-code: true
+    max-num-seqs: 64
+    gpu-memory-utilization: 0.90
+
+infrastructure:
+  substrate: eks
+  instance_type: g6e.2xlarge      # spec prefers g6.xlarge (L4); using L40S for reuse
+  substrate_note: "spec-alt: L40S 48GB, not the spec-preferred L4 24GB"
+  region: us-east-2
+  gpu:
+    name: L40S
+    arch: sm_89
+    count: 1
+    vram_gb: 48
+    interconnect: none
+  eks:
+    cluster_name: qwen3-next-bench-eks-cluster
+    cluster_version: "1.32"
+    nodegroup: g6e-ocr
+    node_count: 1
+    ami: AL2_x86_64_GPU
+
+# Reranker API is /v1/classify (not /v1/chat/completions)
+# Body: {"model": ..., "text_1": "<query>", "text_2": ["<candidate1>", ...]}
+# Response: per-pair relevance scores (single float per pair)
+
+workloads:
+  # Latency
+  - catalog_id: chatbot-short       # adapted: short pair, single query
+    mode: latency
+    override:
+      workload_overrides:
+        candidate_count: 1
+        pair_length: 512
+
+  # Concurrency sweep — primary O1 cell, pair-length axis
+  - catalog_id: concurrency-sweep
+    mode: mixed
+    o_code: O1
+    override:
+      load:
+        levels: [1, 4, 16, 64, 256]   # reranker pairs scale much higher than LLM chat
+      pair_length_axis: [512, 1024, 2048, 4096]
+
+  # Batch throughput at k=50 (standard retrieval setup)
+  - catalog_id: batch-throughput
+    mode: batch
+    override:
+      workload_overrides:
+        candidate_count: 50      # rerank k=50 is the enterprise-retrieval shape
+        pair_length: 1024
+
+  # RAG-QA as the practitioner workload
+  - catalog_id: rag-qa
+    mode: latency
+    override:
+      workload_overrides:
+        candidate_count: 50
+
+  # Engagement O-codes
+  - catalog_id: quantization-pareto
+    o_code: O3
+    override:
+      precisions: [bf16]       # FP8 row deferred (needs g6e; INT8/INT4 need spec gaps filled)
+      quality:
+        eval: fiqa
+        harness: mteb           # MTEB reranking task
+        tolerance: 0.015
+  - catalog_id: cold-start
+    o_code: O9
+    override:
+      source: [hub]             # weights staged from HF Hub on first pod boot
+      break_out: [weights_load, allocator, kernel_compile, cuda_graph]
+  - catalog_id: burn-in
+    o_code: O5
+    override:
+      duration_hours: 1
+      rate_fraction_of_ceiling: 0.85
+  # MIG (O4) and power (O11) deferred — MIG requires p5en; O11 requires DCGM scrape
+
+slo:
+  # Latency-critical: reranker sits on the user query path
+  e2e_p99_ms: 50              # per-pair score latency target at k=50
+  error_rate_max: 0.001
+  queries_per_s_min: null     # populated from run
+
+quality_baselines:
+  fiqa:
+    bf16: null                # MTEB reranking main_score; seeded from first O3 run
+    tolerance: 0.015
+    harness: mteb
+    task: FiQA2018             # MTEB reranking task id
+
+cost:
+  instance_type: g6e.2xlarge
+  on_demand_price_per_hr: 2.24
+  spec_preferred_instance: g6.xlarge
+  spec_preferred_price_per_hr: 0.80
+  utilization_target: 0.70
+  note: "cost column in report must carry a 'substrate-alt' caveat"
+
+version_pins:
+  vllm_image_sha: null
+  driver_version: null
+  cuda_version: null
+  mteb: "1.38.22"
+
+artifacts: {}

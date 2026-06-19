@@ -1,0 +1,128 @@
+# DeepSeek-OCR-2 Benchmark Sidecar (g6e.2xlarge, BF16 baseline)
+# Referenced by the adapter to produce Common Benchmark Artifacts v1.0.0.
+# Spec: ../../../specs/deepseek-ocr-2-eks.md
+
+model:
+  name: DeepSeek-OCR-2
+  id: deepseek-ai/DeepSeek-OCR-2
+  modality: vision-language
+  architecture: vlm
+  parameters_total: "8B"
+  quantization: bf16
+  max_model_len: 8192
+
+engine:
+  name: vllm
+  version: "0.19.1"
+  container_image: vllm/vllm-openai:v0.19.1
+  tensor_parallel: 1
+  pipeline_parallel: 1
+  replicas: 1
+  reasoning: false
+  kv_cache_dtype: auto
+  attention_backend: flash-attn
+  extra_args:
+    trust-remote-code: true
+    max-num-seqs: 32
+    gpu-memory-utilization: 0.90
+
+infrastructure:
+  substrate: eks
+  instance_type: g6e.2xlarge
+  region: us-east-2
+  gpu:
+    name: L40S
+    arch: sm_89
+    count: 1
+    vram_gb: 48
+    interconnect: none
+  eks:
+    cluster_name: qwen3-next-bench-eks-cluster
+    cluster_version: "1.32"
+    nodegroup: g6e-ocr
+    node_count: 1
+    ami: AL2_x86_64_GPU
+
+# Prompt shapes (injected client-side as user-message text content alongside image_url).
+# HF repo ships no chat_template; do NOT rely on vLLM fallback template.
+prompt_templates:
+  plain_ocr: "<image>\nFree OCR. "
+  grounding: "<image>\n<|grounding|>Convert the document to markdown. "
+  default_for_quality_evals: grounding
+
+workloads:
+  # Latency workloads
+  - catalog_id: chatbot-short
+    mode: latency
+  - catalog_id: concurrency-sweep
+    mode: latency
+    override:
+      load:
+        levels: [1, 4, 16, 32]
+      workload_overrides:
+        image_tokens: 4096
+  - catalog_id: rag-qa
+    mode: latency
+
+  # Batch workloads
+  - catalog_id: batch-throughput
+    mode: batch
+  - catalog_id: qps-sweep
+    mode: mixed
+  - catalog_id: production-mix
+    mode: mixed
+
+  # Engagement O-codes
+  - catalog_id: quantization-pareto
+    o_code: O3
+    override:
+      precisions: [bf16, fp8, int8]
+      quality:
+        eval: olmocr_bench           # primary gate (was: docvqa)
+        tolerance: 0.02
+        periodic_deeper_eval: omnidocbench   # run on BF16 + winning FP8 row
+  - catalog_id: cold-start
+    o_code: O9
+    override:
+      break_out: [image_encoder, llm_decoder]
+  - catalog_id: burn-in
+    o_code: O5
+    override:
+      duration_hours: 1
+      rate_fraction_of_ceiling: 0.85
+  - catalog_id: power-efficiency
+    o_code: O11
+    override:
+      load_fractions: [0.25, 0.50, 0.75, 1.00]
+
+slo:
+  ttft_p99_ms: 500        # latency mode @ 4K image-tokens
+  e2e_p99_ms: 5000        # latency mode per page
+  error_rate_max: 0.001
+  pages_per_s_min: null   # populated from batch run
+
+quality_baselines:
+  olmocr_bench:
+    bf16: null            # seeded at first O3 run; DeepSeek reports 76.3
+    tolerance: 0.02
+    subscores: [arxiv_math, old_scans, tables, headers_footers, multi_column, long_tiny_text, base]
+  omnidocbench:
+    bf16: null            # seeded at first O3 run; DeepSeek-OCR-2 community score 90.25
+    tolerance: 0.02
+    components: [text_edit, formula_cdm, table_teds, layout, reading_order]
+
+cost:
+  instance_type: g6e.2xlarge
+  on_demand_price_per_hr: 2.24
+  utilization_target: 0.70
+
+version_pins:
+  vllm_image_sha: null       # pinned at first successful run
+  driver_version: null
+  cuda_version: null
+  dcgm_exporter: "3.3.7-3.5.0-ubuntu22.04"
+  loadgen: v4.1
+  mteb: "1.38.22"
+  lm_eval_harness: v0.4.7
+
+artifacts: {}

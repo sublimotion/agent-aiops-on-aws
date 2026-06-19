@@ -1,0 +1,111 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dcgm-metrics-prof
+  namespace: default
+data:
+  # Custom DCGM field list INCLUDING profiling counters (the default dcp-metrics-included.csv
+  # omits DCGM_FI_PROF_*, which is why the first session got only power/temp — L8b). These are
+  # what prove the bottleneck (HBM-BW-bound vs compute-bound) instead of inferring it.
+  metrics.csv: |
+    DCGM_FI_PROF_GR_ENGINE_ACTIVE,  gauge, gpu graphics/compute engine active ratio
+    DCGM_FI_PROF_SM_ACTIVE,         gauge, SM active ratio
+    DCGM_FI_PROF_SM_OCCUPANCY,      gauge, SM occupancy ratio
+    DCGM_FI_PROF_PIPE_TENSOR_ACTIVE,gauge, tensor pipe active ratio (compute-bound signal)
+    DCGM_FI_PROF_DRAM_ACTIVE,       gauge, HBM memory active ratio (BW-bound signal)
+    DCGM_FI_PROF_PCIE_TX_BYTES,     gauge, PCIe tx bytes
+    DCGM_FI_PROF_PCIE_RX_BYTES,     gauge, PCIe rx bytes
+    DCGM_FI_PROF_NVLINK_TX_BYTES,   gauge, NVLink tx bytes
+    DCGM_FI_PROF_NVLINK_RX_BYTES,   gauge, NVLink rx bytes
+    DCGM_FI_DEV_POWER_USAGE,        gauge, power draw W
+    DCGM_FI_DEV_GPU_TEMP,           gauge, gpu temp C
+    DCGM_FI_DEV_GPU_UTIL,           gauge, gpu utilization
+    DCGM_FI_DEV_FB_USED,            gauge, framebuffer used MiB
+    DCGM_FI_DEV_XID_ERRORS,         gauge, xid errors
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-bench-config
+  namespace: default
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s
+      scrape_timeout: 4s
+      evaluation_interval: 15s
+      external_labels:
+        blueprint: kimi-k2.6-nvfp4
+        session: session-2026-06-16
+    scrape_configs:
+      - job_name: sglang
+        static_configs:
+          - targets: ["localhost:30000"]
+            labels: {engine: sglang, role: serving}
+        metrics_path: /metrics
+      - job_name: vllm
+        static_configs:
+          - targets: ["localhost:8000"]
+            labels: {engine: vllm, role: serving}
+        metrics_path: /metrics
+      - job_name: dcgm
+        static_configs:
+          - targets: ["localhost:9400"]
+            labels: {role: gpu}
+      - job_name: node
+        static_configs:
+          - targets: ["localhost:9100"]
+            labels: {role: host}
+      - job_name: prometheus
+        static_configs:
+          - targets: ["localhost:9090"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: observability-bench
+  namespace: default
+  labels: {app: observability-bench}
+spec:
+  restartPolicy: Always
+  nodeSelector: {blueprint: kimi-k2.6-nvfp4}
+  tolerations:
+    - {key: ai-infra/b300, operator: Exists, effect: NoSchedule}   # the ACTUAL node taint (L2)
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+  hostNetwork: true
+  hostPID: true
+  containers:
+    - name: dcgm-exporter
+      image: nvcr.io/nvidia/k8s/dcgm-exporter:3.3.9-3.6.1-ubuntu22.04  # session-1 known-good; default CSV gives power/temp. PROF unavailable on this driver (L11).
+      args: ["-f", "/etc/dcgm-exporter/dcp-metrics-included.csv", "--address", ":9400"]
+      env:
+        - {name: DCGM_EXPORTER_KUBERNETES, value: "false"}
+      securityContext:
+        privileged: true            # PROF profiling counters need privileged, not just SYS_ADMIN
+      resources:
+        requests: {cpu: "500m", memory: 512Mi}
+      volumeMounts:
+        - {name: dcgm-prof, mountPath: /etc/dcgm-prof}
+    # node-exporter omitted — cluster already runs prometheus-prometheus-node-exporter on :9100
+    # (monitoring ns, hostPort) on this node; we scrape that instead (L: avoid :9100 bind conflict).
+    - name: prometheus
+      image: prom/prometheus:v2.54.1
+      args:
+        - --config.file=/etc/prometheus/prometheus.yml
+        - --storage.tsdb.path=/prometheus
+        - --storage.tsdb.retention.time=7d
+        - --web.enable-admin-api
+        - --web.enable-lifecycle
+        - --web.listen-address=:9090
+      volumeMounts:
+        - {name: prom-config, mountPath: /etc/prometheus}
+        - {name: prom-data, mountPath: /prometheus}
+      resources:
+        requests: {cpu: "500m", memory: 1Gi}
+        limits: {memory: 4Gi}
+      securityContext: {runAsUser: 65534, runAsGroup: 65534}
+  volumes:
+    - {name: dcgm-prof, configMap: {name: dcgm-metrics-prof}}
+    - {name: prom-config, configMap: {name: prometheus-bench-config}}
+    - {name: prom-data, hostPath: {path: /mnt/nvme/prom-data, type: DirectoryOrCreate}}

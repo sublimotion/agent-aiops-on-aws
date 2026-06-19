@@ -1,0 +1,197 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "2c88827d-73da-4ce7-a314-6559a567bb16",
+  "created_at": "2026-06-11T14:13:55Z",
+  "source_tool": {
+    "name": "custbench-async",
+    "version": "0.1.0",
+    "enrichment_version": "1.0.0"
+  },
+  "model": {
+    "name": "Nemotron-3-Super-120B-A12B",
+    "id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
+    "architecture": "hybrid-mamba-moe",
+    "parameters_total": "120B",
+    "parameters_active": "12B",
+    "quantization": "fp8",
+    "max_model_len": 16384
+  },
+  "engine": {
+    "name": "vllm",
+    "container_image": "vllm/vllm-openai:v0.18.1",
+    "base_image": null,
+    "dockerfile": null,
+    "tensor_parallel": 2,
+    "pipeline_parallel": 1,
+    "data_parallel": null,
+    "expert_parallel": null,
+    "replicas": 4,
+    "reasoning": false,
+    "kv_cache_dtype": "fp8",
+    "attention_backend": "auto",
+    "speculative_decode": null,
+    "engine_config_tag": "bf16-agg-tp2x4",
+    "extra_args": {
+      "enable-prefix-caching": true,
+      "mamba-cache-mode": "all"
+    }
+  },
+  "infrastructure": {
+    "substrate": "eks",
+    "instance_type": "p6-b200.48xlarge",
+    "region": "us-east-2",
+    "gpu": {
+      "name": "B200",
+      "arch": "sm_100",
+      "count": 8,
+      "vram_gb": 183,
+      "interconnect": "nvswitch-nvl5"
+    }
+  },
+  "workload": {
+    "use_case": "fin-support",
+    "catalog_id": "fin-support",
+    "modality": "text",
+    "dataset": {
+      "type": "rag-augmented",
+      "input_tokens": {
+        "mean": 9053.4,
+        "p50": 8809,
+        "p90": 12058
+      },
+      "output_tokens": {
+        "mean": 74,
+        "p90": 107
+      }
+    },
+    "load": {
+      "type": "concurrency",
+      "concurrency": 130,
+      "num_prompts": 520,
+      "warmup_requests": 0
+    },
+    "api": {
+      "type": "chat",
+      "streaming": true,
+      "endpoint": "/v1/chat/completions"
+    }
+  },
+  "metrics": {
+    "duration_s": 27.27,
+    "completed": 520,
+    "failed": 0,
+    "error_rate": 0.0,
+    "ttft_ms": {
+      "mean": 495.3,
+      "p50": 495.3,
+      "p90": 3925.9,
+      "p95": 5025.65,
+      "p99": 6125.4
+    },
+    "tpot_ms": {
+      "mean": 72.5,
+      "p50": 72.5,
+      "p90": null,
+      "p95": null,
+      "p99": 119.0
+    },
+    "itl_ms": {
+      "mean": 72.5,
+      "p50": 72.5,
+      "p90": null,
+      "p95": null,
+      "p99": 119.0
+    },
+    "e2e_ms": {
+      "mean": 6545.1,
+      "p50": 6128.5,
+      "p90": 10496.5,
+      "p95": 12284.95,
+      "p99": 14073.4
+    },
+    "output_toks_per_s": 1411.1,
+    "request_throughput": 19.069,
+    "total_toks_per_s": 174046.5,
+    "total_input_tokens": 4707768,
+    "total_output_tokens": 38480,
+    "max_concurrent_requests": 130
+  },
+  "slo": {
+    "targets": {
+      "e2e_p50_ms": 6500,
+      "e2e_p90_ms": 9500,
+      "ttft_p99_ms": 6000,
+      "tpot_p99_ms": 50,
+      "error_rate_max": 0.001
+    },
+    "results": {
+      "e2e_p50_ms": {
+        "target": 6500,
+        "actual": 6128.5,
+        "pass": true
+      },
+      "e2e_p90_ms": {
+        "target": 9500,
+        "actual": 10496.5,
+        "pass": false
+      },
+      "ttft_p99_ms": {
+        "target": 6000,
+        "actual": 6125.4,
+        "pass": false
+      },
+      "tpot_p99_ms": {
+        "target": 50,
+        "actual": 119.0,
+        "pass": false
+      },
+      "error_rate_max": {
+        "target": 0.001,
+        "actual": 0.0,
+        "pass": true
+      }
+    },
+    "overall_pass": false
+  },
+  "extensions": {
+    "cost": {
+      "instance_cost_per_hr": 32.0,
+      "cost_basis": "spot",
+      "dollars_per_1m_total_tokens": 0.0511,
+      "dollars_per_1m_output_tokens": 6.2993,
+      "formula": "(32.0 / 174046.5 tot_tok/s) * (1e6 / 3600)"
+    },
+    "prefix_cache": {
+      "hit_rate_measured": 0.0,
+      "corpus_ceiling": 0.3,
+      "pre": {
+        "hits": 3562374072.7028484,
+        "queries": 3562425845.702811,
+        "hit_rate": 0.9999854669255713
+      },
+      "post": {
+        "hits": 3562374072.7028484,
+        "queries": 3563215279.702811,
+        "hit_rate": 0.9997639191196911
+      }
+    },
+    "augmentation_audit": {
+      "real_vs_synthetic_split": {
+        "synthetic": 0,
+        "real": 520
+      },
+      "distinct_prompt_fraction": 1.0
+    },
+    "reliability_flags": {
+      "prefix_hit_rate_gt_corpus_ceiling": false
+    },
+    "session_metadata": {
+      "platform": "b200",
+      "engine_config_tag": "bf16-agg-tp2x4",
+      "source_filename": "fin-support_bf16-agg-tp2x4_c130_20260611-141355.json",
+      "blueprint": "domains/gpu-serving/blueprints/fin-rag-answer",
+      "run_date": "20260611",
+      "enrichment_note": "Generated from custbench fin-support flat format. Cost is $/1M TOTAL tokens (prefill+decode) \u2014 this is a prefill-dominated RAG workload; output-only $/1M also emitted. TPOT has p50/p99 only (no p90 captured by driver)."
+    }
+  }
+}

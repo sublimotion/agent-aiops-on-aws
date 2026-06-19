@@ -1,0 +1,15 @@
+# nemotron-3-ultra | single-stream (c=1) | vLLM v0.22.0 | B200 p6-b200.48xlarge TP4 | us-east-2 az2
+# nemotron_h_mtp k=5 (native MTP) | NVIDIA min-latency recipe | 12 diverse real prompts | temp=1.0 top_p=0.95 | 512 out
+# captured 2026-06-06. decode_tps = post-TTFT steady-state; wall_tps = end-to-end (what Artificial Analysis measures).
+# accept_len from Prometheus /metrics (vllm:spec_decode_num_{draft,accepted}_tokens_total), K=5.
+metric	median	mean	min	max	vs_deepinfra_300
+decode_tok_s	297.7	294.2	197.6	398.9	0.99x
+wall_tok_s	267.6	276.8	193.8	360.0	0.89x
+# accept: draft_delta=7900 accept_delta=4012 accept_rate=0.508 accept_len=3.54 (k=5)
+# decode>=300: 6/12 prompts | wall>=300: 5/12 prompts | TTFT median 0.057s max 0.478s
+#
+# VERDICT vs DeepInfra 300 tok/s single-stream: ESSENTIALLY MATCHED on decode (median 297.7, 0.99x; 6/12 clear 300),
+# 0.89x on end-to-end wall (median 267.6). HUGE jump vs first-run SGLang (decode 177 / wall 130).
+# Root cause of first-run miss CONFIRMED: SGLang NemotronH MTP bug #21138 (~0% real acceptance, accept_len 2.4 = base only).
+# vLLM native nemotron_h_mtp reaches accept_len 3.54 @ temp=1.0. NVIDIA publishes 4.9-5.5 (likely lower temp / specific workloads)
+# -> further headroom likely exists. accept_len is still the gate, not decode-hops or TP.

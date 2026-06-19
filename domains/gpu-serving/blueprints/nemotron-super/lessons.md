@@ -88,5 +88,16 @@ Dynamo PR #7369 demonstrates disaggregated prefill/decode on g7e using vLLM's `N
 
 **Still blocked for Nemotron-Super**: This Dynamo path uses vLLM's `NixlConnector` which requires standard transformer KV cache. Nemotron-Super's Mamba-2 hybrid recurrent state is incompatible with all KV transfer connectors (HMA disabled → can't unify hybrid KV cache specs). The EFA/LIBFABRIC discovery doesn't change the Mamba blocker — it's a KV format issue, not a transport issue.
 
+### #22 — Spec-Decode NOT Deployable on vLLM 0.18.1 TP2 (fin-rag P1)
+Both speculative-decode paths are blocked at TP2 for Nemotron-3-Super on vLLM 0.18.1:
+- **MTP**: blocked at TP2 (not deployable on this stack).
+- **n-gram**: graph-captured n-gram (`--speculative-config '{"method":"ngram","num_speculative_tokens":4,"prompt_lookup_max":4,"prompt_lookup_min":2}'`) crashes during Mamba-2 CUDA-graph capture at TP2. The only way to get it to start was to add `--enforce-eager`, which disables CUDA-graph capture entirely.
+
+**Verdict: spec-decode is NOT deployable for Nemotron-3-Super on vLLM 0.18.1 at TP2.** This is the customer answer and is consistent with the prefill-dominated fin-rag workload, where spec-decode was always the secondary lever.
+
+**Decision (operator):** did NOT pursue the enforce-eager acceptance measurement; eager latency is non-representative and the crashed path (Mamba2 graph capture) is required in production, so an eager acceptance number is not actionable. Spec-decode verdict stands as not-deployable on 0.18.1 TP2. Spec-decode axis CLOSED.
+
+Serving reverted to the graph-captured FP8 winner: agg-tp2-x4, `--max-num-batched-tokens 16384`, `--kv-cache-dtype fp8`, `--attention-backend TRITON_ATTN`, NO spec-decode, NO enforce-eager. Deployment `fin-rag-vllm-fp8` in namespace `ml-inference`.
+
 ### #14 — Spot B200 Available in us-east-2
 p6-b200.48xlarge spot instances available at ~$17.90-18.90/hr (us-east-2b/2c). Created via EKS managed node group with `--capacity-type SPOT`. Must use `--ami-type AL2023_x86_64_NVIDIA` (default `AL2023_x86_64_STANDARD` has no GPU drivers).

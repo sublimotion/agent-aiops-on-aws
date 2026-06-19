@@ -1,0 +1,130 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-bench-config
+  namespace: default
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s
+      scrape_timeout: 4s
+      evaluation_interval: 15s
+      external_labels:
+        blueprint: qwen3-235b-speculative
+        session: session-2026-05-14
+    scrape_configs:
+      - job_name: sglang
+        static_configs:
+          - targets: ["localhost:30000"]
+            labels: {engine: sglang, role: serving}
+        metrics_path: /metrics
+      - job_name: dcgm
+        static_configs:
+          - targets: ["localhost:9400"]
+            labels: {role: gpu}
+      - job_name: node
+        static_configs:
+          - targets: ["localhost:9100"]
+            labels: {role: host}
+      - job_name: prometheus
+        static_configs:
+          - targets: ["localhost:9090"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: observability-bench
+  namespace: default
+  labels:
+    app: observability-bench
+spec:
+  restartPolicy: Always
+  nodeSelector:
+    blueprint: qwen3-235b-speculative
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  hostNetwork: true
+  hostPID: true
+  containers:
+    # DCGM exporter — profiling metrics enabled (HBM BW, tensor core, SM active)
+    - name: dcgm-exporter
+      image: nvcr.io/nvidia/k8s/dcgm-exporter:3.3.9-3.6.1-ubuntu22.04
+      args:
+        - -f
+        - /etc/dcgm-exporter/dcp-metrics-included.csv
+        - --address
+        - ":9400"
+      env:
+        - name: DCGM_EXPORTER_KUBERNETES
+          value: "false"
+      securityContext:
+        capabilities:
+          add: ["SYS_ADMIN"]
+      resources:
+        requests:
+          cpu: "500m"
+          memory: 512Mi
+    # node-exporter
+    - name: node-exporter
+      image: prom/node-exporter:v1.8.2
+      args:
+        - --path.procfs=/host/proc
+        - --path.sysfs=/host/sys
+        - --path.rootfs=/rootfs
+        - --web.listen-address=:9100
+        - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($|/)
+      volumeMounts:
+        - name: proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: sys
+          mountPath: /host/sys
+          readOnly: true
+        - name: rootfs
+          mountPath: /rootfs
+          readOnly: true
+      resources:
+        requests:
+          cpu: "200m"
+          memory: 128Mi
+    # Prometheus — 7d retention, admin API enabled for snapshots
+    - name: prometheus
+      image: prom/prometheus:v2.54.1
+      args:
+        - --config.file=/etc/prometheus/prometheus.yml
+        - --storage.tsdb.path=/prometheus
+        - --storage.tsdb.retention.time=7d
+        - --web.enable-admin-api
+        - --web.enable-lifecycle
+        - --web.listen-address=:9090
+      volumeMounts:
+        - name: prom-config
+          mountPath: /etc/prometheus
+        - name: prom-data
+          mountPath: /prometheus
+      resources:
+        requests:
+          cpu: "500m"
+          memory: 1Gi
+        limits:
+          memory: 4Gi
+      securityContext:
+        runAsUser: 65534
+        runAsGroup: 65534
+  volumes:
+    - name: proc
+      hostPath: {path: /proc}
+    - name: sys
+      hostPath: {path: /sys}
+    - name: rootfs
+      hostPath: {path: /}
+    - name: prom-config
+      configMap:
+        name: prometheus-bench-config
+    - name: prom-data
+      hostPath:
+        path: /mnt/nvme/prom-data
+        type: DirectoryOrCreate

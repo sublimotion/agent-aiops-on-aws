@@ -1,0 +1,250 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "08ebb7e0-4232-4c56-893b-55bece83967f",
+  "created_at": "2026-05-14T17:16:59Z",
+  "source_tool": {
+    "name": "custom",
+    "version": "0.1.0-qwen3-reranker",
+    "enrichment_version": "1.0.0"
+  },
+  "model": {
+    "name": "Qwen3-Reranker-4B",
+    "id": "Qwen/Qwen3-Reranker-4B",
+    "architecture": "cross-encoder",
+    "parameters_total": "4B",
+    "quantization": "bf16",
+    "max_model_len": 4096
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.19.1",
+    "container_image": "vllm/vllm-openai:v0.19.1",
+    "base_image": null,
+    "dockerfile": null,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "data_parallel": null,
+    "expert_parallel": null,
+    "replicas": 1,
+    "reasoning": false,
+    "kv_cache_dtype": "auto",
+    "attention_backend": "flash-attn",
+    "speculative_decode": null,
+    "extra_args": {
+      "runner": "pooling",
+      "convert": "classify",
+      "trust-remote-code": true,
+      "max-num-seqs": 64,
+      "gpu-memory-utilization": 0.9,
+      "hf_overrides": {
+        "architectures": [
+          "Qwen3ForSequenceClassification"
+        ],
+        "classifier_from_token": [
+          "no",
+          "yes"
+        ],
+        "is_original_qwen3_reranker": true
+      }
+    }
+  },
+  "infrastructure": {
+    "substrate": "eks",
+    "instance_type": "g6e.2xlarge",
+    "region": "us-east-2",
+    "gpu": {
+      "name": "L40S",
+      "arch": "sm_89",
+      "count": 1,
+      "vram_gb": 48,
+      "interconnect": "none"
+    },
+    "substrate_deviation": {
+      "spec_preferred_instance": "g6.xlarge",
+      "spec_preferred_gpu": "L4 24GB",
+      "reason": "Session reuse \u2014 g6e.2xlarge already provisioned for deepseek-ocr. Cost-efficiency row is NOT valid for L4; per-stream latency is an upper bound (L40S has ~33% more TFLOPS and 2x VRAM headroom)."
+    }
+  },
+  "workload": {
+    "use_case": "reranker",
+    "catalog_id": "concurrency-sweep",
+    "modality": "text",
+    "dataset": {
+      "type": "synthetic-lorem-corpus",
+      "source": "scripts/_common.py::build_corpus",
+      "input_tokens": {
+        "mean": 84665.0
+      },
+      "output_tokens": {
+        "mean": 0
+      }
+    },
+    "load": {
+      "type": "concurrency-sweep",
+      "levels": [
+        1,
+        4,
+        16,
+        64,
+        256
+      ],
+      "num_prompts_per_level": 50,
+      "warmup_requests": 10,
+      "current_level": 256
+    },
+    "api": {
+      "type": "score",
+      "streaming": false,
+      "endpoint": "/v1/score",
+      "prompt_template": "query + k=50 candidates"
+    }
+  },
+  "metrics": {
+    "duration_s": 6.423212916997727,
+    "completed": 50,
+    "failed": 0,
+    "error_rate": 0.0,
+    "e2e_ms": {
+      "mean": 3316.1109716596548,
+      "p50": 3248.327082983451,
+      "p90": 5655.597500008298,
+      "p95": 6050.601374998223,
+      "p99": 6355.218499986222
+    },
+    "output_toks_per_s": 0.0,
+    "request_throughput": 7.7842663237404395,
+    "total_input_tokens": 4233250,
+    "total_output_tokens": 0,
+    "max_concurrent_requests": 256,
+    "ttft_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "tpot_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "itl_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    }
+  },
+  "extensions": {
+    "reranker": {
+      "k_candidates": 50,
+      "pair_length_target": 1024,
+      "pairs_per_s": 389.213316187022,
+      "total_pairs_scored": 2500
+    },
+    "substrate_caveat": "Measured on g6e.2xlarge (L40S 48GB) \u2014 spec-preferred is g6.xlarge (L4 24GB). Per-stream latency is an upper bound for L40S; cost claims should NOT be projected to the L4 row from this artifact.",
+    "notes": "Iteration 2 extended concurrency sweep for Qwen3-Reranker-4B on vLLM 0.19.1. Levels [1,4,16,64,256]; k=50 candidates/req; pair_length=1024. c=256 added to probe saturation / failure modes. Headline is peak pairs/s level; per-level aggregates in extensions.sweep_levels; failure breakdown in extensions.saturation_notes.",
+    "saturation_notes": [],
+    "sweep_levels": [
+      {
+        "concurrency": 1,
+        "completed": 50,
+        "failed": 0,
+        "duration_s": 15.019113374990411,
+        "request_throughput": 3.329091321945755,
+        "pairs_per_s": 166.45456609728777,
+        "e2e_ms": {
+          "mean": 300.30866676184814,
+          "p50": 292.23945902776904,
+          "p90": 312.53016702248715,
+          "p95": 390.9644590166863,
+          "p99": 452.13516597868875
+        },
+        "total_input_tokens": 4233250,
+        "total_pairs_scored": 2500,
+        "error_breakdown": {},
+        "error_samples": []
+      },
+      {
+        "concurrency": 4,
+        "completed": 50,
+        "failed": 0,
+        "duration_s": 6.430596249992959,
+        "request_throughput": 7.775328765206608,
+        "pairs_per_s": 388.7664382603304,
+        "e2e_ms": {
+          "mean": 498.6508957610931,
+          "p50": 496.76341700251214,
+          "p90": 524.0863329963759,
+          "p95": 532.8727090090979,
+          "p99": 668.6593329941388
+        },
+        "total_input_tokens": 4233250,
+        "total_pairs_scored": 2500,
+        "error_breakdown": {},
+        "error_samples": []
+      },
+      {
+        "concurrency": 16,
+        "completed": 50,
+        "failed": 0,
+        "duration_s": 6.582269999984419,
+        "request_throughput": 7.596163633536509,
+        "pairs_per_s": 379.8081816768254,
+        "e2e_ms": {
+          "mean": 1804.5605699979933,
+          "p50": 1977.5025409762748,
+          "p90": 2017.9935839842074,
+          "p95": 2228.276540990919,
+          "p99": 2464.692624984309
+        },
+        "total_input_tokens": 4233250,
+        "total_pairs_scored": 2500,
+        "error_breakdown": {},
+        "error_samples": []
+      },
+      {
+        "concurrency": 64,
+        "completed": 50,
+        "failed": 0,
+        "duration_s": 6.83691316601471,
+        "request_throughput": 7.313241924519773,
+        "pairs_per_s": 365.6620962259887,
+        "e2e_ms": {
+          "mean": 3733.0339000798995,
+          "p50": 3660.1292089908384,
+          "p90": 6120.757374999812,
+          "p95": 6482.761917024618,
+          "p99": 6772.077999979956
+        },
+        "total_input_tokens": 4233250,
+        "total_pairs_scored": 2500,
+        "error_breakdown": {},
+        "error_samples": []
+      },
+      {
+        "concurrency": 256,
+        "completed": 50,
+        "failed": 0,
+        "duration_s": 6.423212916997727,
+        "request_throughput": 7.7842663237404395,
+        "pairs_per_s": 389.213316187022,
+        "e2e_ms": {
+          "mean": 3316.1109716596548,
+          "p50": 3248.327082983451,
+          "p90": 5655.597500008298,
+          "p95": 6050.601374998223,
+          "p99": 6355.218499986222
+        },
+        "total_input_tokens": 4233250,
+        "total_pairs_scored": 2500,
+        "error_breakdown": {},
+        "error_samples": []
+      }
+    ],
+    "catalog_id_remapped_from": "concurrency-sweep-extended"
+  }
+}

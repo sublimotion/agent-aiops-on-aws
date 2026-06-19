@@ -1,0 +1,48 @@
+# Copy FP8 weights FSx -> local NVMe RAID (/mnt/nvme/models) on the B200 node.
+# NVMe is ~17x faster than FSx for model load (operational lesson).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: copy-fp8-to-nvme
+  namespace: ml-inference
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 1800
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+      volumes:
+        - name: fsx
+          persistentVolumeClaim:
+            claimName: vllm-qwen3-fsx-pvc
+        - name: nvme
+          hostPath:
+            path: /mnt/nvme
+            type: Directory
+      containers:
+        - name: copy
+          image: alpine:3.20
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              SRC=/fsx/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+              DST=/mnt/nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+              mkdir -p "$DST"
+              echo "Copying FP8 FSx -> NVMe ..."
+              cp -a "$SRC"/. "$DST"/
+              echo "COPY_DONE"
+              du -sh "$DST"
+              ls "$DST" | head
+          volumeMounts:
+            - {name: fsx, mountPath: /fsx}
+            - {name: nvme, mountPath: /mnt/nvme}
+          resources:
+            requests: {cpu: "2", memory: 4Gi}
+            limits: {cpu: "4", memory: 8Gi}

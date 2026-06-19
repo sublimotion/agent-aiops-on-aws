@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cto-embedding-g5-2xlarge
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qwen3-embedding-g5-2xlarge
+  namespace: cto-embedding-g5-2xlarge
+  labels:
+    app: qwen3-embedding-g5-2xlarge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qwen3-embedding-g5-2xlarge
+  template:
+    metadata:
+      labels:
+        app: qwen3-embedding-g5-2xlarge
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: ml.g5.2xlarge
+      tolerations:
+      - key: sagemaker.amazonaws.com/NodeHealthStatus
+        operator: Exists
+        effect: NoSchedule
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: vllm
+        image: vllm/vllm-openai:v0.19.1
+        # vLLM 0.19.1 uses `vllm serve <model>` subcommand; --task was removed.
+        # Qwen/Qwen3-Embedding-8B's HF config has pooling config so vLLM auto-
+        # detects it as a pooling (embedding) model without explicit flag.
+        command: ["vllm"]
+        args:
+        - serve
+        - Qwen/Qwen3-Embedding-8B
+        - --dtype
+        - bfloat16
+        - --max-model-len
+        - "8192"
+        - --gpu-memory-utilization
+        - "0.90"
+        - --host
+        - 0.0.0.0
+        - --port
+        - "8000"
+        - --trust-remote-code
+        env:
+        - name: HF_HUB_ENABLE_HF_TRANSFER
+          value: "1"
+        - name: VLLM_USAGE_SOURCE
+          value: production-cto
+        ports:
+        - containerPort: 8000
+          name: http
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+            memory: 16Gi
+            cpu: "3"
+          requests:
+            nvidia.com/gpu: 1
+            memory: 12Gi
+            cpu: "2"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 120
+          periodSeconds: 15
+          failureThreshold: 40
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 300
+          periodSeconds: 30
+          failureThreshold: 6
+        volumeMounts:
+        - name: hf-cache
+          mountPath: /root/.cache/huggingface
+        - name: shm
+          mountPath: /dev/shm
+      volumes:
+      - name: hf-cache
+        emptyDir:
+          sizeLimit: 40Gi
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 4Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qwen3-embedding-g5-2xlarge-svc
+  namespace: cto-embedding-g5-2xlarge
+spec:
+  selector:
+    app: qwen3-embedding-g5-2xlarge
+  ports:
+  - port: 8000
+    targetPort: 8000
+    name: http
+  type: ClusterIP

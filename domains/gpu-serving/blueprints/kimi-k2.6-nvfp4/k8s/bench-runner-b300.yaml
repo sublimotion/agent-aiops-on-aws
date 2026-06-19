@@ -1,0 +1,98 @@
+# Bench-runner for kimi-k2.6-nvfp4. hostNetwork + dnsPolicy Default (L4b) so it reaches
+# the serving pod on localhost (hostNetwork) and can pip-install. Drives concurrency at
+# the customer operating point; latency/TTFT come from Prometheus, cache hit from per-request usage.
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: kimi-bench-scripts, namespace: default}
+data:
+  bench.py: |
+    #!/usr/bin/env python3
+    # Concurrency driver. Cache-hit headline = Σ cached_input_tokens / Σ prompt_tokens (engine-agnostic).
+    # Builds a BYTE-IDENTICAL shared prefix (L: RadixAttention exact-match) + unique suffix per request.
+    import asyncio, aiohttp, time, sys, json, statistics, argparse, random, string
+
+    p = argparse.ArgumentParser()
+    p.add_argument("--engine", required=True, choices=["sglang","vllm"])
+    p.add_argument("--port", type=int, required=True)
+    p.add_argument("--conc", type=int, required=True)
+    p.add_argument("--total", type=int, default=200)
+    p.add_argument("--prefix-tokens", type=int, default=23250)   # ~74% of 31404 → target cache hit
+    p.add_argument("--suffix-tokens", type=int, default=8154)
+    p.add_argument("--out-tokens", type=int, default=1024)
+    p.add_argument("--out", required=True)
+    a = p.parse_args()
+
+    # Shared prefix is the SAME string for every request (byte-identical → radix/prefix cache hits).
+    SHARED_PREFIX = ("You are a coding agent. " + ("context " * a.prefix_tokens))
+    def unique_suffix():
+        rid = "".join(random.choices(string.ascii_lowercase, k=8))
+        return f"\nRequest {rid}: " + " ".join(random.choices(["fix","refactor","explain","test","trace"], k=a.suffix_tokens))
+
+    async def one(session):
+        prompt = SHARED_PREFIX + unique_suffix()
+        if a.engine == "sglang":
+            url=f"http://localhost:{a.port}/generate"
+            body={"text":prompt,"sampling_params":{"max_new_tokens":a.out_tokens,"temperature":0.0}}
+        else:
+            url=f"http://localhost:{a.port}/v1/completions"
+            body={"model":"Kimi-K2.6-NVFP4","prompt":prompt,"max_tokens":a.out_tokens,"temperature":0.0}
+        t0=time.time()
+        async with session.post(url,json=body,timeout=aiohttp.ClientTimeout(total=900)) as r:
+            d=await r.json()
+        dt=time.time()-t0
+        meta=d.get("meta_info") or {}
+        usage=d.get("usage") or {}
+        # cached tokens: sglang meta_info.cached_tokens ; vllm usage.prompt_tokens_details.cached_tokens
+        cached=meta.get("cached_tokens")
+        if cached is None: cached=(usage.get("prompt_tokens_details") or {}).get("cached_tokens")
+        prompt_toks=meta.get("prompt_tokens") or usage.get("prompt_tokens") or 0
+        comp=meta.get("completion_tokens") or usage.get("completion_tokens") or a.out_tokens
+        return {"dt":dt,"comp":comp,"cached":cached or 0,"prompt":prompt_toks,
+                "accept":meta.get("spec_accept_length")}
+
+    async def main():
+        conn=aiohttp.TCPConnector(limit=a.conc*2)
+        async with aiohttp.ClientSession(connector=conn) as s:
+            sem=asyncio.Semaphore(a.conc)
+            async def g():
+                async with sem:
+                    try: return await one(s)
+                    except Exception as e: return {"err":str(e)}
+            t0=time.time(); res=await asyncio.gather(*[g() for _ in range(a.total)]); t1=time.time()
+        ok=[r for r in res if "err" not in r]
+        comp=sum(r["comp"] for r in ok); cached=sum(r["cached"] for r in ok); pt=sum(r["prompt"] for r in ok)
+        lats=sorted(r["dt"] for r in ok)
+        out={"engine":a.engine,"concurrency":a.conc,"requests_ok":len(ok),"requests_err":len(res)-len(ok),
+             "duration_s":round(t1-t0,3),"agg_decode_tok_s":round(comp/(t1-t0),1) if t1>t0 else 0,
+             "cache_hit_token_fraction":round(cached/pt,4) if pt else None,
+             "prompt_tokens_total":pt,"cached_tokens_total":cached,
+             "p50_latency_s":round(lats[len(lats)//2],3) if lats else None,
+             "p99_latency_s":round(lats[int(len(lats)*0.99)],3) if len(lats)>10 else (lats[-1] if lats else None),
+             "t_start":t0,"t_end":t1}
+        accs=[r["accept"] for r in ok if r.get("accept")]
+        if accs: out["spec_accept_length_mean"]=round(sum(accs)/len(accs),3)
+        json.dump(out,open(a.out,"w"),indent=2); print(json.dumps(out,indent=2))
+    asyncio.run(main())
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: bench-runner, namespace: default, labels: {app: bench-runner}}
+spec:
+  restartPolicy: Always
+  hostNetwork: true
+  dnsPolicy: Default          # L4b — external DNS for pip
+  nodeSelector: {blueprint: kimi-k2.6-nvfp4}
+  tolerations:
+    - {key: ai-infra/b300, operator: Exists, effect: NoSchedule}
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+  containers:
+    - name: runner
+      image: python:3.12-slim
+      command: ["bash","-c","pip install -q aiohttp && while true; do sleep 3600; done"]
+      volumeMounts:
+        - {name: scripts, mountPath: /scripts}
+        - {name: nvme, mountPath: /mnt/nvme, mountPropagation: HostToContainer}   # L12: see weights + results
+      resources: {requests: {cpu: "4", memory: 4Gi}}
+  volumes:
+    - {name: scripts, configMap: {name: kimi-bench-scripts}}
+    - {name: nvme, hostPath: {path: /mnt/nvme, type: Directory}}

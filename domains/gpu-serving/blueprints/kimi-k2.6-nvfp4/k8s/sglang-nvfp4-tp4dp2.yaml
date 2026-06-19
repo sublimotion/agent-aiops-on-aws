@@ -1,0 +1,50 @@
+# SGLang Kimi-K2.6-NVFP4 — TP8 baseline (NO spec decode, NO HiCache).
+# Baseline first; EAGLE3 + HiCache are added as sweep levers (separate manifests / patches).
+# Node: ai-infra-use2-b200-spot, labeled blueprint=kimi-k2.6-nvfp4 after scale-up.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sglang-kimi-nvfp4-tp4dp2
+  namespace: default
+  labels: {app: sglang-kimi-nvfp4, phase: tp4dp2}
+spec:
+  restartPolicy: Never
+  nodeSelector: {blueprint: kimi-k2.6-nvfp4}
+  tolerations:
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}   # the ACTUAL node taint (L2)
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+  hostNetwork: true
+  containers:
+    - name: sglang
+      image: lmsysorg/sglang:v0.5.13.post1-cu130   # cu130 bundles cutlass (NVFP4 path); cu129 does NOT (L7). Runs on sm_100.
+      command:
+        - bash
+        - -c
+        - |
+          # FlashInfer cubin symlink race fires on EVERY cold start (kimi-k2.6-spec L16)
+          find /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins -name trtllmGen_bmm_export -exec rm -rf {} + 2>/dev/null || true
+          exec python3 -m sglang.launch_server \
+            --model-path /mnt/nvme/models/kimi-k26-nvfp4 \
+            --served-model-name Kimi-K2.6-NVFP4 \
+            --quantization modelopt_fp4 \
+            --tp 4 \
+            --dp 2 \
+            --tool-call-parser kimi_k2 \
+            --reasoning-parser kimi_k2 \
+            --context-length 65536 \
+            --mem-fraction-static 0.90 \
+            --enable-metrics \
+            --trust-remote-code \
+            --host 0.0.0.0 --port 30000
+      env:
+        - {name: HF_HOME, value: /mnt/nvme/hf-cache}
+      resources:
+        requests: {nvidia.com/gpu: "8", cpu: "48", memory: 512Gi}
+        limits:   {nvidia.com/gpu: "8", cpu: "96", memory: 1024Gi}  # baseline has no HiCache tier
+      securityContext: {capabilities: {add: ["IPC_LOCK"]}}
+      volumeMounts:
+        - {name: nvme, mountPath: /mnt/nvme, mountPropagation: HostToContainer}
+        - {name: shm, mountPath: /dev/shm}
+  volumes:
+    - {name: nvme, hostPath: {path: /mnt/nvme, type: Directory}}
+    - {name: shm, emptyDir: {medium: Memory, sizeLimit: 64Gi}}

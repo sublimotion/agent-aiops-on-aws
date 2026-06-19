@@ -1,0 +1,68 @@
+apiVersion: inference.sagemaker.aws.amazon.com/v1alpha1
+kind: InferenceEndpointConfig
+metadata:
+  name: qwen3-embedding-g5-2xlarge
+  namespace: default
+spec:
+  modelName: qwen3-embedding-8b
+  endpointName: qwen3-embedding-g5-2xlarge
+  invocationEndpoint: /v1/embeddings
+  modelSourceConfig:
+    modelSourceType: huggingfaceHub
+    huggingfaceHubModel:
+      modelId: Qwen/Qwen3-Embedding-8B
+      # No token needed — Qwen3-Embedding-8B is a public model
+  instanceType: ml.g5.2xlarge
+  worker:
+    resources:
+      limits:
+        nvidia.com/gpu: 1
+        memory: 16Gi
+        cpu: "3"
+      requests:
+        nvidia.com/gpu: 1
+        memory: 12Gi
+        cpu: "2"
+    # vLLM runtime config
+    image: vllm/vllm-openai:v0.19.1
+    modelInvocationPort:
+      containerPort: 8000
+      name: http
+    environmentVariables:
+    - name: HF_HUB_ENABLE_HF_TRANSFER
+      value: "1"
+    # vLLM CLI args
+    args:
+    - --model
+    - Qwen/Qwen3-Embedding-8B
+    - --task
+    - embed
+    - --dtype
+    - bfloat16
+    - --max-model-len
+    - "8192"
+    - --gpu-memory-utilization
+    - "0.90"
+    - --host
+    - 0.0.0.0
+    - --port
+    - "8000"
+    - --trust-remote-code
+    # Request limits (v3.1 feature)
+    requestLimits:
+      maxConcurrentRequests: 64
+      maxQueueSize: 16
+      overflowStatusCode: 429
+  metrics:
+    enabled: true
+  kubernetes:
+    # Node affinity — bind to our known-good A10G node
+    nodeSelector:
+      node.kubernetes.io/instance-type: ml.g5.2xlarge
+    tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: sagemaker.amazonaws.com/NodeHealthStatus
+      operator: Exists
+      effect: NoSchedule

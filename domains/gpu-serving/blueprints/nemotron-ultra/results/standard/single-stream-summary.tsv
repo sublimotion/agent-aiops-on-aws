@@ -1,0 +1,15 @@
+# nemotron-3-ultra | single-stream (c=1) | B300 | real prompts | temp=1.0 | 512 out | DeepInfra target = 300 tok/s
+# captured 2026-06-05. decode_tps = SGLang meta_info.decode_throughput (steady-state engine decode rate).
+config	decode_median_tok_s	wall_median_tok_s	accept_len_med	vs_deepinfra_300
+sglang-tp4-eagle	117.5	93.9	1.90	0.39x
+sglang-tp8-eagle	151.8	103.2	2.01	0.51x
+# TP8 (10 diverse prompts): median 152 / mean 165 / range 104-338 tok/s decode. 1/10 prompts >=300 (accept_len 3.07).
+# accept_len median 2.01. TP8 ~+30% over TP4 single-stream but acceptance (not decode hops) is the gate.
+sglang-tp8-eagle-widetree	176.8	130.1	2.43	0.59x
+# Wide-tree (topk=4, draft=16, falls to spec-v1): BEST config. decode median 177 / max 584 tok/s engine.
+# End-to-end (compl/e2e, what Artificial Analysis measures): median 130 / max 184 tok/s. 2/12 decode>=300, 0/12 e2e>=300.
+# accept_len median 2.43 (best of all configs). Wider tree raised acceptance but spec-v1 overhead caps e2e gain.
+#
+# VERDICT vs DeepInfra 300 tok/s single-stream: NOT BEATEN. Best engine-decode median 177 (0.59x),
+# best end-to-end median 130 (0.43x). Peaks hit 300+ only on high-acceptance prompts, not at median.
+# Root cause: EAGLE/MTP acceptance on diverse real prompts (accept_len ~2.0-2.4) is the ceiling, not TP/decode-hops.

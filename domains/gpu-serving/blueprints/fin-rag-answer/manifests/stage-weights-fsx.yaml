@@ -1,0 +1,64 @@
+# Stage Nemotron-3-Super weights to FSx Lustre.
+# FP8 (~124GB) downloaded first so serving can start ASAP; BF16 (~240GB) after.
+# Runs on a CPU system node (download is network/IO bound). Mounts FSx PVC.
+# CPU nodes are 4-vCPU (3920m allocatable) -> request 2 CPU to fit.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: stage-weights-fsx
+  namespace: ml-inference
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 14400
+  template:
+    spec:
+      restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: nvidia.com/gpu.present
+                    operator: DoesNotExist
+      volumes:
+        - name: fsx
+          persistentVolumeClaim:
+            claimName: vllm-qwen3-fsx-pvc
+      containers:
+        - name: downloader
+          image: python:3.11-slim
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              pip install --no-cache-dir -q "huggingface_hub[hf_transfer]>=1.11"
+              export HF_HUB_ENABLE_HF_TRANSFER=1
+              export HF_TOKEN="${HF_TOKEN}"
+              mkdir -p /fsx/models
+              echo "=== Downloading FP8 (~124GB) ==="
+              hf download nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8 \
+                --local-dir /fsx/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+              echo "FP8_DONE"
+              echo "=== Downloading BF16 (~240GB) ==="
+              hf download nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16 \
+                --local-dir /fsx/models/NVIDIA-Nemotron-3-Super-120B-A12B-BF16
+              echo "BF16_DONE"
+              echo "ALL_DONE"
+              ls -la /fsx/models/
+          env:
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token
+                  key: token
+          volumeMounts:
+            - name: fsx
+              mountPath: /fsx
+          resources:
+            requests:
+              cpu: "2"
+              memory: 4Gi
+            limits:
+              cpu: "3500m"
+              memory: 12Gi

@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voxtral-Mini-3B on EKS L40S — Visual Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:#0f1117; --surface:#1a1d2e; --surface-2:#242740; --border:#2e3151;
+    --text:#e2e8f0; --text-muted:#8892a4;
+    --accent:#6366f1; --accent-2:#a78bfa; --accent-soft:rgba(99,102,241,0.15);
+    --green:#22c55e; --green-soft:rgba(34,197,94,0.14);
+    --red:#ef4444; --red-soft:rgba(239,68,68,0.14);
+    --yellow:#f59e0b; --yellow-soft:rgba(245,158,11,0.14);
+    --cyan:#06b6d4; --pink:#ec4899;
+  }
+  [data-theme="light"]{--bg:#f8fafc;--surface:#fff;--surface-2:#f1f5f9;--border:#e2e8f0;--text:#0f172a;--text-muted:#64748b;--accent-soft:rgba(99,102,241,.08);--green-soft:rgba(34,197,94,.08);--red-soft:rgba(239,68,68,.08);--yellow-soft:rgba(245,158,11,.08);}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.6}
+  header{background:linear-gradient(135deg,var(--surface) 0%,var(--surface-2) 100%);border-bottom:1px solid var(--border);padding:2rem;position:relative;overflow:hidden}
+  header::before{content:'';position:absolute;top:-50%;right:-10%;width:400px;height:400px;background:radial-gradient(circle,var(--accent-soft) 0%,transparent 70%);pointer-events:none}
+  header .wrap{max-width:1200px;margin:0 auto;position:relative}
+  header .row{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+  header h1{font-size:1.6rem;font-weight:700;letter-spacing:-.02em}
+  header .meta{font-size:.85rem;color:var(--text-muted);margin-top:.35rem}
+  .hero-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1rem;margin-top:1.5rem}
+  .hero-stat{background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem}
+  [data-theme="light"] .hero-stat{background:rgba(255,255,255,.7)}
+  .hero-stat .label{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:.25rem}
+  .hero-stat .value{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:1.45rem;font-weight:700;color:var(--accent)}
+  .hero-stat.lead .value{color:var(--green);font-size:1.7rem}
+  .hero-stat .sub{font-size:.75rem;color:var(--text-muted);margin-top:.2rem}
+  .theme-toggle{background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:.4rem .9rem;border-radius:6px;cursor:pointer;font-size:.8rem;font-family:inherit}
+  .theme-toggle:hover{background:var(--border)}
+  main{max-width:1200px;margin:0 auto;padding:2rem}
+  nav.toc{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.75rem 1.25rem;margin-bottom:2rem;display:flex;flex-wrap:wrap;gap:1rem;font-size:.8rem}
+  nav.toc a{color:var(--text-muted);text-decoration:none}
+  nav.toc a:hover{color:var(--accent)}
+  h2{font-size:1.25rem;font-weight:700;margin-bottom:1rem;letter-spacing:-.01em}
+  h3{font-size:.95rem;font-weight:600;margin:0 0 .75rem 0;color:var(--text-muted)}
+  .section{margin-bottom:2.75rem}
+  .hw-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin-bottom:1rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1rem}
+  .hw-item .label{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:.25rem}
+  .hw-item .value{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem}
+  .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.5rem;margin-bottom:1rem}
+  .chart-wrap{position:relative;height:340px}
+  .chart-wrap.tall{height:420px}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+  @media (max-width:850px){.two-col{grid-template-columns:1fr}}
+  table{width:100%;border-collapse:collapse;font-size:.85rem}
+  .table-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border);background:var(--surface)}
+  thead{background:var(--surface-2)}
+  th{padding:.75rem 1rem;text-align:left;font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);white-space:nowrap}
+  td{padding:.65rem 1rem;border-top:1px solid var(--border);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.82rem}
+  td.name{font-family:inherit;font-weight:500}
+  tr:hover td{background:var(--accent-soft)}
+  td.best{color:var(--green);font-weight:600}
+  td.worst{color:var(--red)}
+  td.warn{color:var(--yellow)}
+  .badge{display:inline-block;padding:.15rem .55rem;border-radius:999px;font-size:.7rem;font-weight:600}
+  .badge-pass{background:var(--green-soft);color:var(--green)}
+  .badge-fail{background:var(--red-soft);color:var(--red)}
+  .badge-skip{background:var(--yellow-soft);color:var(--yellow)}
+  .badge-na{background:var(--surface-2);color:var(--text-muted)}
+  .callout{background:var(--accent-soft);border-left:3px solid var(--accent);padding:1rem 1.25rem;border-radius:0 8px 8px 0;margin:1rem 0;font-size:.9rem}
+  .callout strong{color:var(--accent)}
+  .callout.green{background:var(--green-soft);border-left-color:var(--green)} .callout.green strong{color:var(--green)}
+  .callout.yellow{background:var(--yellow-soft);border-left-color:var(--yellow)} .callout.yellow strong{color:var(--yellow)}
+  .callout.red{background:var(--red-soft);border-left-color:var(--red)} .callout.red strong{color:var(--red)}
+  .heatmap{display:grid;gap:2px;background:var(--border);border-radius:10px;overflow:hidden;border:1px solid var(--border);font-size:.8rem}
+  .heatmap .cell{padding:.65rem .75rem;background:var(--surface);font-family:ui-monospace,SFMono-Regular,monospace;text-align:right}
+  .heatmap .cell.head{background:var(--surface-2);color:var(--text-muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;font-family:inherit;text-align:left}
+  .heatmap .cell.row-label{background:var(--surface-2);color:var(--text);font-family:inherit;font-weight:500;text-align:left}
+  .heatmap .cell.sweet{background:var(--green-soft);color:var(--green);font-weight:700}
+  .heatmap .cell.fail-cell{background:var(--red-soft);color:var(--red)}
+  .tier-grid{display:grid;gap:.5rem}
+  .tier-row-v{display:grid;grid-template-columns:70px 1fr 140px 100px;align-items:center;gap:1rem;padding:1rem 1.25rem;border:1px solid var(--border);border-radius:10px;background:var(--surface);font-size:.85rem}
+  .tier-row-v.landed{border-left:4px solid var(--green)}
+  .tier-row-v.blocked{opacity:.65;border-left:4px solid var(--yellow)}
+  .tier-row-v.na{opacity:.5;border-left:4px solid var(--text-muted)}
+  .tier-row-v .tier-name{font-weight:700;font-size:1.1rem}
+  .tier-row-v.landed .tier-name{color:var(--green)}
+  .tier-row-v.blocked .tier-name{color:var(--yellow)}
+  .tier-row-v.na .tier-name{color:var(--text-muted)}
+  .tier-row-v .metric{font-family:ui-monospace,SFMono-Regular,monospace;text-align:right;font-weight:600}
+  .slo-grid{display:grid;gap:2px;background:var(--border);border-radius:10px;overflow:hidden;border:1px solid var(--border);grid-template-columns:160px repeat(3,1fr);font-size:.82rem}
+  .slo-grid .cell{padding:.7rem .85rem;background:var(--surface);font-family:ui-monospace,monospace;text-align:center}
+  .slo-grid .cell.head{background:var(--surface-2);color:var(--text-muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;font-family:inherit}
+  .slo-grid .cell.row-label{background:var(--surface-2);color:var(--text);font-family:inherit;font-weight:500;text-align:left}
+  .slo-grid .pass{background:var(--green-soft);color:var(--green);font-weight:600}
+  .slo-grid .fail{background:var(--red-soft);color:var(--red);font-weight:600}
+  .slo-grid .skip{background:var(--yellow-soft);color:var(--yellow);font-weight:600}
+  .slo-grid .na{color:var(--text-muted)}
+  footer{text-align:center;padding:2rem;color:var(--text-muted);font-size:.75rem;border-top:1px solid var(--border);margin-top:3rem}
+  footer code{font-size:.72rem;background:var(--surface-2);padding:.1rem .4rem;border-radius:4px}
+  .artifact-list{list-style:none;display:flex;flex-direction:column;gap:.35rem;align-items:center;margin-top:.75rem}
+  .caveat-banner{background:var(--yellow-soft);border:1px solid var(--yellow);border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.25rem;font-size:.88rem;display:flex;align-items:flex-start;gap:.9rem}
+  .caveat-banner .chip{background:var(--yellow);color:#1a1300;padding:.15rem .55rem;border-radius:6px;font-weight:700;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+  .caveat-banner strong{color:var(--yellow)}
+  code.inline{background:var(--surface-2);padding:.08rem .35rem;border-radius:4px;font-size:.78rem}
+  .api-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+  @media (max-width:850px){.api-grid{grid-template-columns:1fr}}
+  .api-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem}
+  .api-card h4{font-size:.85rem;margin-bottom:.5rem;color:var(--accent)}
+  .api-card pre{background:var(--surface-2);border-radius:6px;padding:.6rem .75rem;font-size:.72rem;overflow-x:auto;margin-top:.5rem;color:var(--text)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="row">
+      <div>
+        <h1>Voxtral-Mini-3B-2507 on EKS · L40S 48GB</h1>
+        <div class="meta">Stage 6 transcription sweep · g6e.2xlarge · us-east-2 · vLLM 0.19.1 BF16 · 2026-05-15</div>
+      </div>
+      <button class="theme-toggle" onclick="toggleTheme()">Toggle theme</button>
+    </div>
+
+    <div class="caveat-banner" style="margin-top:1.25rem;">
+      <span class="chip">Substrate-alt</span>
+      <div><strong>Running on L40S 48GB, not the spec-preferred L4 24GB.</strong> g6e.2xlarge ($2.24/hr) was used instead of the spec-preferred g6.xlarge (L4, ~$0.80/hr). Per-stream RTFx here is an <em>upper bound</em>; the cost-efficiency numbers below do <strong>not</strong> translate to L4. Spec projects ~75% of L40S throughput at ~57% lower $/hr on L4 — net ~2.1× cheaper per audio-minute if validated.</div>
+    </div>
+
+    <div class="hero-stats">
+      <div class="hero-stat lead">
+        <div class="label">Aggregate RTFx (peak)</div>
+        <div class="value">482×</div>
+        <div class="sub">c=16 · 430 audio-s in 0.89 wall-s</div>
+      </div>
+      <div class="hero-stat">
+        <div class="label">Audio-min per dollar</div>
+        <div class="value">12,910</div>
+        <div class="sub">L40S @ $2.24/hr · peak aggregate</div>
+      </div>
+      <div class="hero-stat">
+        <div class="label">Per-stream sweet spot</div>
+        <div class="value">c=4</div>
+        <div class="sub">RTFx p50 87× · wall p50 127 ms</div>
+      </div>
+      <div class="hero-stat">
+        <div class="label">Error rate</div>
+        <div class="value">0 / 90</div>
+        <div class="sub">3 levels × 30 prompts · all OK</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <nav class="toc">
+    <a href="#config">Config</a>
+    <a href="#caveat">Substrate caveat</a>
+    <a href="#concurrency">Concurrency</a>
+    <a href="#buckets">Duration buckets</a>
+    <a href="#mistral">vs Mistral baseline</a>
+    <a href="#api">API surfaces</a>
+    <a href="#tier">Tier stack</a>
+    <a href="#slo">SLO</a>
+    <a href="#cost">Cost</a>
+    <a href="#deferred">Deferred</a>
+  </nav>
+
+  <!-- Config -->
+  <section id="config" class="section">
+    <h2>Configuration tiles</h2>
+    <div class="hw-card">
+      <div class="hw-item"><div class="label">Substrate</div><div class="value">Amazon EKS · managed NG</div></div>
+      <div class="hw-item"><div class="label">Node</div><div class="value">g6e.2xlarge · 1× L40S 48 GB · sm_89</div></div>
+      <div class="hw-item"><div class="label">Region</div><div class="value">us-east-2</div></div>
+      <div class="hw-item"><div class="label">Engine</div><div class="value">vLLM 0.19.1 · BF16</div></div>
+      <div class="hw-item"><div class="label">Mistral flags</div><div class="value">--tokenizer_mode mistral --config_format mistral --load_format mistral</div></div>
+      <div class="hw-item"><div class="label">Runtime extras</div><div class="value">mistral-common[audio]</div></div>
+      <div class="hw-item"><div class="label">max_num_seqs</div><div class="value">16</div></div>
+      <div class="hw-item"><div class="label">max_model_len</div><div class="value">32,768</div></div>
+      <div class="hw-item"><div class="label">GPU mem util</div><div class="value">0.85</div></div>
+      <div class="hw-item"><div class="label">Attention</div><div class="value">flash-attn</div></div>
+      <div class="hw-item"><div class="label">API surfaces</div><div class="value">/v1/audio/transcriptions + /v1/chat/completions</div></div>
+      <div class="hw-item"><div class="label">TP / PP / replicas</div><div class="value">1 / 1 / 1</div></div>
+    </div>
+  </section>
+
+  <!-- Caveat detail -->
+  <section id="caveat" class="section">
+    <div class="callout yellow">
+      <strong>Why the L4 numbers aren't here.</strong> The spec prefers g6.xlarge (L4 24GB, ~$0.80/hr). Voxtral-Mini-3B BF16 (~9.5 GB) fits comfortably in L4's 24 GB. L40S has ~3× FP16 TFLOPs and 2× VRAM, so per-stream RTFx is an upper bound; cost-efficiency projects ~2.1× better on L4 (per spec: ~75% throughput × ~57% $/hr). Run the same transcription sweep on g6.xlarge before quoting an L4 cost externally.
+    </div>
+  </section>
+
+  <!-- Concurrency -->
+  <section id="concurrency" class="section">
+    <h2>Concurrency scaling · aggregate vs per-stream RTFx</h2>
+    <p style="color:var(--text-muted);font-size:.88rem;margin-bottom:1rem;">
+      Sweep levels c = [1, 4, 16] · 5 warmup + 30 steady per level · round-robin 3s / 10s / 30s WAV chirps.
+      Aggregate RTFx (audio-s processed / wall-s) climbs with concurrency; <strong style="color:var(--text);">per-stream RTFx p50 peaks at c=4</strong> then degrades as queueing kicks in.
+    </p>
+    <div class="chart-card">
+      <h3>Aggregate RTFx (line, left) and per-stream RTFx p50 (line, right) vs concurrency</h3>
+      <div class="chart-wrap tall"><canvas id="concChart"></canvas></div>
+    </div>
+    <div class="callout">
+      <strong>Trade-off shape.</strong> For batch transcription, c=16 maxes throughput at <strong>482× aggregate RTFx</strong>. For interactive/real-time use cases where per-stream latency matters, <strong>c=4 is the sweet spot</strong> — RTFx p50 87× (wall p50 127 ms) vs RTFx p50 41× at c=16 (wall p50 346 ms). At c=1 the GPU is under-utilized: aggregate RTFx is only 85× even though per-stream is 95×.
+    </div>
+  </section>
+
+  <!-- Duration buckets -->
+  <section id="buckets" class="section">
+    <h2>Per-duration bucket matrix (c=16, peak level)</h2>
+    <div class="chart-card">
+      <h3>Wall p50 (ms) · RTFx p50 · audio-min/$ p50 · by audio duration</h3>
+      <div class="heatmap" style="grid-template-columns: 200px repeat(3, 1fr);">
+        <div class="cell head">bucket</div>
+        <div class="cell head">wall p50 (ms)</div>
+        <div class="cell head">RTFx p50</div>
+        <div class="cell head">audio-min / $ p50</div>
+
+        <div class="cell row-label">short — 3 s</div>
+        <div class="cell">202.4</div>
+        <div class="cell fail-cell">8.66</div>
+        <div class="cell fail-cell">232</div>
+
+        <div class="cell row-label">medium — 10 s</div>
+        <div class="cell">160.9</div>
+        <div class="cell">53.11</div>
+        <div class="cell">1,423</div>
+
+        <div class="cell row-label">long — 30 s</div>
+        <div class="cell">522.9</div>
+        <div class="cell sweet">55.27</div>
+        <div class="cell sweet">1,481</div>
+      </div>
+    </div>
+    <div class="callout yellow">
+      <strong>Short utterances are cost-poor.</strong> The 30 s bucket delivers <strong>1,481 audio-min/$</strong>, which is <strong>6.4× more cost-efficient than the 3 s bucket</strong> (232 audio-min/$). Even though 3 s clips finish faster in absolute terms (wall p50 202 ms vs 523 ms), each request pays the same fixed per-request overhead (HTTP + Mel encoder warm-up + scheduler admit). Amortising that overhead over 30 s of audio is roughly an order of magnitude better. <strong>Actionable</strong>: for contact-centre or voice-mail workloads where utterances are naturally short, batch consecutive turns into a single transcription call where the API allows, or accept 6× higher unit cost.
+    </div>
+    <div class="chart-card">
+      <h3>Audio-minutes per dollar by bucket (log scale)</h3>
+      <div class="chart-wrap"><canvas id="bucketChart"></canvas></div>
+    </div>
+  </section>
+
+  <!-- Mistral baseline -->
+  <section id="mistral" class="section">
+    <h2>Comparison vs Mistral self-reported baseline</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>source</th><th>RTFx</th><th>concurrency</th><th>hardware</th><th>notes</th></tr></thead>
+        <tbody>
+          <tr><td class="name">Mistral paper (arXiv:2507.13264)</td><td>109.86×</td><td>unspecified (single-stream implied)</td><td>not stated</td><td>self-reported baseline</td></tr>
+          <tr><td class="name">This run · c=1</td><td>85.15× agg / 94.64× p50</td><td>1</td><td>L40S 48GB</td><td><span class="badge badge-skip">below baseline</span> single-stream not the saturation point</td></tr>
+          <tr><td class="name">This run · c=4</td><td>271.03× agg / 86.82× p50</td><td>4</td><td>L40S 48GB</td><td><span class="badge badge-pass">2.5× baseline (aggregate)</span></td></tr>
+          <tr><td class="name">This run · c=16</td><td class="best">482.02× agg</td><td>16</td><td>L40S 48GB</td><td><span class="badge badge-pass">4.4× baseline (aggregate)</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout">
+      <strong>Apples-to-apples caveat.</strong> Mistral's 109.86× number is for an <em>unspecified</em> batch — most likely single-stream. At our matched c=1 we land at 85× aggregate / 95× per-stream (within 13% of Mistral, slight regression likely from BF16 vs unstated baseline precision). The 4.4× headline at c=16 is a <em>different operating point</em>, not a like-for-like comparison.
+    </div>
+  </section>
+
+  <!-- API surfaces -->
+  <section id="api" class="section">
+    <h2>API surfaces · both registered and verified</h2>
+    <div class="api-grid">
+      <div class="api-card">
+        <h4>POST /v1/audio/transcriptions</h4>
+        <p style="font-size:.85rem;">OpenAI Whisper-compat. Multipart upload of an audio file. Returns a single JSON with <code class="inline">{"text": "..."}</code>. Used for the perf sweep.</p>
+        <pre>curl -F "file=@audio.wav" -F "model=voxtral" \
+  http://svc/v1/audio/transcriptions</pre>
+        <p style="font-size:.78rem;color:var(--text-muted);margin-top:.5rem;"><strong>Streaming:</strong> waits for full audio before emitting tokens. <em>Not</em> frame-streaming.</p>
+      </div>
+      <div class="api-card">
+        <h4>POST /v1/chat/completions (audio_url)</h4>
+        <p style="font-size:.85rem;">Mirror of the image_url shape — <strong>not</strong> the older <code class="inline">{"type":"audio","path":...}</code> form in the Mistral docs / spec narrative. SSE token streaming works as standard.</p>
+        <pre>{"role":"user","content":[
+  {"type":"text","text":"Summarize the audio."},
+  {"type":"audio_url","audio_url":{
+     "url":"data:audio/wav;base64,..."}}
+]}</pre>
+        <p style="font-size:.78rem;color:var(--text-muted);margin-top:.5rem;"><strong>Streaming:</strong> token-level SSE works.</p>
+      </div>
+    </div>
+    <div class="callout yellow">
+      <strong>True frame-streaming requires the Realtime variant.</strong> Both endpoints above consume the full audio before token generation begins. For sub-second time-to-first-word on long-form audio, deploy <code class="inline">Voxtral-Mini-4B-Realtime-2602</code> behind <code class="inline">/v1/realtime</code> WebSocket — out of scope for this artifact.
+    </div>
+  </section>
+
+  <!-- Tier stack -->
+  <section id="tier" class="section">
+    <h2>Tier stack · T0 landed · T1 deferred · T2/T3 N/A · T4/T5 default</h2>
+    <div class="tier-grid">
+      <div class="tier-row-v landed">
+        <div class="tier-name">T0</div>
+        <div>
+          <strong>BF16 baseline landed.</strong> vLLM 0.19.1 · Mistral tokenizer/config/load formats · max_num_seqs=16 · max_model_len=32768 · flash-attn · /v1/audio/transcriptions sweep.
+        </div>
+        <div class="metric" style="color:var(--green)">482× RTFx</div>
+        <div class="metric">1.0×</div>
+      </div>
+      <div class="tier-row-v blocked">
+        <div class="tier-name">T1</div>
+        <div>
+          <strong>FP8 (E4M3) weight-only</strong> — L40S sm_89 has FP8 tensor cores. Deferred this iteration; doable with <code class="inline">--quantization fp8</code>. Expected throughput uplift but quality risk on WER (gate not yet active).
+          <span class="badge badge-skip" style="margin-left:.5rem;">deferred</span>
+        </div>
+        <div class="metric">—</div>
+        <div class="metric">—</div>
+      </div>
+      <div class="tier-row-v na">
+        <div class="tier-name">T2</div>
+        <div>
+          <strong>KV / prefix cache</strong> — transcription has no shared system prompt; HiCache/LMCache offer nothing on this axis. May matter for understanding (Q&A) workload with shared persona prompt.
+          <span class="badge badge-na" style="margin-left:.5rem;">workload mismatch</span>
+        </div>
+        <div class="metric">—</div>
+        <div class="metric">—</div>
+      </div>
+      <div class="tier-row-v na">
+        <div class="tier-name">T3</div>
+        <div>
+          <strong>Speculative decode</strong> — transcription emits short responses (mean 5.5 word-tokens on chirp corpus). Decode is not the bottleneck; Mel encode + prefill dominates.
+          <span class="badge badge-na" style="margin-left:.5rem;">not applicable</span>
+        </div>
+        <div class="metric">—</div>
+        <div class="metric">—</div>
+      </div>
+      <div class="tier-row-v landed">
+        <div class="tier-name">T4</div>
+        <div>
+          <strong>Parallelism</strong> — single GPU cell. 3B + audio encoder fits comfortably on 1× L40S (and 1× L4). TP/PP not relevant at this scale.
+        </div>
+        <div class="metric" style="color:var(--text-muted)">TP=1</div>
+        <div class="metric">—</div>
+      </div>
+      <div class="tier-row-v landed">
+        <div class="tier-name">T5</div>
+        <div>
+          <strong>Kernels — vLLM default flash-attn is active.</strong> No explicit <code class="inline">torch.compile</code>; default CUDA graphs in place. Not benchmarked.
+        </div>
+        <div class="metric" style="color:var(--text-muted)">default</div>
+        <div class="metric">—</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLO -->
+  <section id="slo" class="section">
+    <h2>SLO panel · spec targets</h2>
+    <div class="slo-grid">
+      <div class="cell head">SLO</div>
+      <div class="cell head">target</div>
+      <div class="cell head">measured</div>
+      <div class="cell head">verdict</div>
+
+      <div class="cell row-label">TTFW p99</div>
+      <div class="cell">≤ 1,000 ms</div>
+      <div class="cell">— (non-streaming)</div>
+      <div class="cell skip">DEFERRED · streaming run</div>
+
+      <div class="cell row-label">RTFx</div>
+      <div class="cell">≥ 1.0×</div>
+      <div class="cell">8.66× (worst per-stream p50, 3s @ c=16)</div>
+      <div class="cell pass">PASS · ≥ 8.7× headroom at every level</div>
+
+      <div class="cell row-label">error_rate</div>
+      <div class="cell">≤ 0.001</div>
+      <div class="cell">0.000 (0 / 90)</div>
+      <div class="cell pass">PASS · zero failures</div>
+    </div>
+    <div class="callout green" style="margin-top:1rem;">
+      <strong>Net: every measured SLO clears with wide margins.</strong> The only deferred metric is TTFW — Path 1 (transcription) returns the full transcript in a single response, so TTFW requires a streaming-mode follow-up. Path 2 (chat-completions) does stream tokens but was not benchmarked beyond smoke this iteration.
+    </div>
+  </section>
+
+  <!-- Cost -->
+  <section id="cost" class="section">
+    <h2>Cost panel · $/audio-minute and audio-min/$ by duration bucket</h2>
+    <div class="chart-card">
+      <h3>On-demand pricing (us-east-2) · L4 row is projected, not measured</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>instance · bucket</th><th>GPU</th><th>$/hr</th><th>audio-min / $</th><th>$ / audio-min</th><th>basis</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="name">g6e.2xlarge · 30 s</td><td>1× L40S 48GB</td><td>$2.24</td><td class="best">1,481</td><td class="best">$0.000675</td><td><span class="badge badge-pass">measured · c=16</span></td></tr>
+            <tr><td class="name">g6e.2xlarge · 10 s</td><td>1× L40S 48GB</td><td>$2.24</td><td>1,423</td><td>$0.000703</td><td><span class="badge badge-pass">measured · c=16</span></td></tr>
+            <tr><td class="name">g6e.2xlarge · 3 s</td><td>1× L40S 48GB</td><td>$2.24</td><td class="worst">232</td><td class="worst">$0.004311</td><td><span class="badge badge-pass">measured · c=16 · 6.4× more expensive than 30s</span></td></tr>
+            <tr><td class="name">g6e.2xlarge · aggregate peak</td><td>1× L40S 48GB</td><td>$2.24</td><td>12,910</td><td>$0.0000775</td><td><span class="badge badge-pass">measured · all buckets blended @ c=16</span></td></tr>
+            <tr><td class="name">g6.xlarge · 30 s (proj)</td><td>1× L4 24GB</td><td>$0.80</td><td class="warn">~3,110</td><td class="warn">~$0.000322</td><td><span class="badge badge-skip">projected · 75% throughput × 36% $/hr · ~2.1× cheaper</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="callout yellow">
+      <strong>Substrate-alt caveat (repeat).</strong> The L4 row is projected from the spec's 75% throughput × 36% $/hr ratio (g6.xlarge $0.80 / g6e.2xlarge $2.24 = 0.357). Net projected: ~2.1× cheaper $/audio-min on L4. Validate with a g6.xlarge run before quoting externally.
+    </div>
+  </section>
+
+  <!-- Deferred -->
+  <section id="deferred" class="section">
+    <h2>Deferred work</h2>
+    <div class="two-col">
+      <div class="chart-card">
+        <h3 style="color:var(--accent)">Quality + streaming follow-ups</h3>
+        <p style="font-size:.88rem;margin-bottom:.6rem;"><strong>LibriSpeech WER quality gate</strong> — dataset not mirrored this session. Spec target: 1.88% WER on test-clean (Mistral self-report) ± 0.5pp.</p>
+        <p style="font-size:.88rem;margin-bottom:.6rem;"><strong>Streaming TTFW measurement</strong> — needed to validate the ≤ 1,000 ms p99 SLO. Either via <code class="inline">?stream=true</code> on transcriptions or via the chat-completions SSE path.</p>
+        <p style="font-size:.88rem;"><strong>Realtime variant</strong> — <code class="inline">Voxtral-Mini-4B-Realtime-2602</code> for true frame-streaming via <code class="inline">/v1/realtime</code> WebSocket. Out of scope for the OpenAI-compat sweep.</p>
+      </div>
+      <div class="chart-card">
+        <h3 style="color:var(--yellow)">Cells / substrates not yet run</h3>
+        <p style="font-size:.88rem;margin-bottom:.6rem;"><strong>FP8 row (T1)</strong> — L40S has FP8 tensor cores; throughput/quality trade-off untested.</p>
+        <p style="font-size:.88rem;margin-bottom:.6rem;"><strong>L4 substrate-canonical run</strong> — the spec-preferred g6.xlarge cell; needed to validate the ~2.1× cost-efficiency projection.</p>
+        <p style="font-size:.88rem;margin-bottom:.6rem;"><strong>Audio understanding workload at scale</strong> — Path 2 (/v1/chat/completions) was smoke-only. Real public-domain speech samples required (chirp corpus elicits hallucination).</p>
+        <p style="font-size:.88rem;"><strong>c=32+ saturation probe</strong> — at c=16 the GPU may still be under-utilized given a 3B model on 48 GB. Lessons.md flags max_num_seqs &gt; 16 as a follow-up.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div>Generated from 1 Common Benchmark Artifact v1.0.0 + <code>lessons.md</code> + <code>sidecars/benchmark-g6e-2xlarge.yaml</code> · agent-aiops-on-aws</div>
+  <div style="margin-top:.75rem;font-weight:600;color:var(--text);">Source artifact</div>
+  <ul class="artifact-list">
+    <li><code>voxtral-mini-3b_eks_g6e-2xl_vllm_transcription-sweep_20260515T132713Z.json</code> · iter 1 · c∈[1,4,16] · buckets {3s, 10s, 30s}</li>
+  </ul>
+</footer>
+
+<script>
+  function toggleTheme(){
+    const html=document.documentElement;
+    const next=html.getAttribute('data-theme')==='dark'?'light':'dark';
+    html.setAttribute('data-theme',next);
+    Object.values(window._charts||{}).forEach(c=>{if(c&&c.update)c.update()});
+  }
+  const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const palette=()=>({text:css('--text'),textMuted:css('--text-muted'),border:css('--border'),accent:css('--accent'),accent2:css('--accent-2'),green:css('--green'),red:css('--red'),yellow:css('--yellow'),cyan:css('--cyan'),pink:css('--pink')});
+  Chart.defaults.font.family='-apple-system, BlinkMacSystemFont, Segoe UI, Inter, sans-serif';
+  Chart.defaults.color=css('--text-muted');
+  window._charts={};
+
+  // Concurrency chart — dual axis (aggregate vs per-stream RTFx)
+  (()=>{
+    const p=palette();
+    const ctx=document.getElementById('concChart').getContext('2d');
+    const labels=['c=1','c=4 ★','c=16'];
+    const aggRtfx=[85.15, 271.03, 482.02];
+    const perStreamRtfx=[94.64, 86.82, 40.79];
+    window._charts.conc=new Chart(ctx,{
+      type:'line',
+      data:{labels,datasets:[
+        {label:'aggregate RTFx (audio-s/wall-s)',data:aggRtfx,borderColor:p.green,backgroundColor:p.green+'33',yAxisID:'y1',tension:.3,pointRadius:6,borderWidth:3,fill:false},
+        {label:'per-stream RTFx p50',data:perStreamRtfx,borderColor:p.accent2,backgroundColor:p.accent2+'33',yAxisID:'y2',tension:.3,pointRadius:6,borderWidth:3,fill:false,borderDash:[6,4]},
+      ]},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        scales:{
+          y1:{type:'linear',position:'left',grid:{color:p.border},ticks:{color:p.green},title:{display:true,text:'aggregate RTFx',color:p.green},beginAtZero:true},
+          y2:{type:'linear',position:'right',grid:{display:false},ticks:{color:p.accent2},title:{display:true,text:'per-stream RTFx p50',color:p.accent2},beginAtZero:true},
+          x:{grid:{display:false},ticks:{color:p.text}}
+        },
+        plugins:{legend:{position:'top',labels:{color:p.text}}}
+      }
+    });
+  })();
+
+  // Bucket cost chart (audio-min / $)
+  (()=>{
+    const p=palette();
+    const ctx=document.getElementById('bucketChart').getContext('2d');
+    const labels=['3 s','10 s','30 s'];
+    const vals=[231.93, 1422.50, 1480.52];
+    const colors=[p.red, p.accent, p.green];
+    window._charts.bucket=new Chart(ctx,{
+      type:'bar',
+      data:{labels,datasets:[{label:'audio-min / $ (p50)',data:vals,backgroundColor:colors,borderRadius:6}]},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        scales:{
+          y:{type:'logarithmic',grid:{color:p.border},ticks:{color:p.textMuted},title:{display:true,text:'audio-min / $ (log)',color:p.textMuted}},
+          x:{grid:{display:false},ticks:{color:p.text},title:{display:true,text:'audio duration bucket',color:p.textMuted}}
+        },
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{label:(c)=>`${c.parsed.y.toLocaleString()} audio-min / $`}}
+        }
+      },
+      plugins:[{
+        id:'ratioLabel',
+        afterDraw(chart){
+          const {ctx,chartArea,scales}=chart;
+          const x=scales.x.getPixelForValue(2);
+          const y=scales.y.getPixelForValue(1480.52)-12;
+          ctx.save();
+          ctx.fillStyle=p.green;ctx.font='bold 12px ui-monospace, monospace';ctx.textAlign='center';
+          ctx.fillText('6.4× vs 3s',x,y);
+          ctx.restore();
+        }
+      }]
+    });
+  })();
+</script>
+</body>
+</html>

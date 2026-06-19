@@ -1,0 +1,50 @@
+# Download FP8 weights DIRECTLY from HF to the B200's local NVMe RAID.
+# FSx cannot be mounted on the B200 node (Lustre NID parse failure). Also, the
+# B200 pod network cannot reach kube-dns (172.20.0.10) -> use hostNetwork +
+# dnsPolicy Default so the pod uses the NODE's working VPC resolver.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: download-fp8-to-nvme
+  namespace: ml-inference
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      hostNetwork: true
+      dnsPolicy: Default
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+      volumes:
+        - name: nvme
+          hostPath: {path: /mnt/nvme, type: Directory}
+      containers:
+        - name: downloader
+          image: python:3.11-slim
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              pip install --no-cache-dir -q "huggingface_hub[hf_transfer]>=1.11"
+              export HF_HUB_ENABLE_HF_TRANSFER=1
+              export HF_TOKEN="${HF_TOKEN}"
+              DST=/mnt/nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+              mkdir -p "$DST"
+              echo "=== Downloading FP8 -> NVMe ==="
+              hf download nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8 --local-dir "$DST"
+              echo "FP8_DONE"
+              du -sh "$DST"; ls "$DST" | head
+          env:
+            - name: HF_TOKEN
+              valueFrom: {secretKeyRef: {name: hf-token, key: token}}
+          volumeMounts:
+            - {name: nvme, mountPath: /mnt/nvme}
+          resources:
+            requests: {cpu: "8", memory: 16Gi}
+            limits: {cpu: "16", memory: 32Gi}

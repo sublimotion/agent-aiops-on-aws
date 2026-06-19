@@ -1,0 +1,32 @@
+# DCGM exporter pinned to the B200 node — captures SM occupancy + HBM-BW utilization
+# during the knee sweep, to settle compute-vs-bandwidth bound (=> B200 vs B300 verdict).
+# Exposes :9400/metrics; we scrape it directly (no Prometheus dependency).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dcgm-exporter
+  namespace: ml-inference
+  labels: {app: dcgm-exporter}
+spec:
+  restartPolicy: Never
+  nodeName: ip-10-0-30-22.us-east-2.compute.internal
+  hostNetwork: true
+  hostPID: true
+  tolerations:
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+  volumes:
+    - name: pod-gpu-resources
+      hostPath: {path: /var/lib/kubelet/pod-resources}
+  containers:
+    - name: dcgm-exporter
+      image: nvcr.io/nvidia/k8s/dcgm-exporter:4.4.2-4.7.1-ubuntu22.04
+      securityContext:
+        privileged: true
+      env:
+        - {name: DCGM_EXPORTER_LISTEN, value: ":9400"}
+        - {name: DCGM_EXPORTER_KUBERNETES, value: "false"}
+      ports:
+        - {containerPort: 9400, name: metrics, hostPort: 9400}
+      volumeMounts:
+        - {name: pod-gpu-resources, mountPath: /var/lib/kubelet/pod-resources, readOnly: true}

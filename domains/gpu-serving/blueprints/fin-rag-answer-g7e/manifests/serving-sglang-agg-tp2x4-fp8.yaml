@@ -1,0 +1,115 @@
+# SGLang serving on g7e (sm_120, PCIe): Nemotron-3-Super FP8, agg-tp2-x4.
+# This REPRODUCES the known-good sm_120 backend config from upstream SGLang issue #20541
+# (Nemotron-3-Super-120B-A12B-FP8 on 8x RTX PRO 6000, the "most SM120-friendly model tested").
+# It is the SGLang comparison point against the B200/vLLM run — NOT an apples-to-apples mirror.
+#
+# #20541 known-good sm_120 backend matrix (do NOT change without re-verifying on sm_120):
+#   - DeepGEMM FP8 GEMM: FAILS on sm_120 -> SGLANG_DISABLE_DEEP_GEMM=1
+#   - CUTLASS FP8 GEMM:  FAILS on sm_120 -> force --fp8-gemm-backend triton
+#   - MoE runner:        Triton WORKS    -> --moe-runner-backend triton
+#   - Attention:         FlashInfer WORKS at defaults (GQA) -> no triton-attn workaround
+#   - trtllm_mha:        FAILS (not ported) -> avoid
+#   - CUDA graphs:       WORK (GQA, no SMEM overflow) -> NO --enforce-eager
+#   - KV cache fp8_e4m3: WORKS
+#   - Mamba scheduler:   extra_buffer asserts -> --mamba-scheduler-strategy no_buffer
+#   - reasoning parser:  nemotron_3 (NOT nano_v3/super_v3)
+#   - DeepEP/HiCache:    FAIL (PCIe P2P) -> out of scope on g7e
+#   - First FP8 ModelOpt load ~45 min (one-time quant processing), ~14s thereafter -> generous probe.
+#
+# CRITICAL PRE-CHECK (blocks this manifest): SGLang TP uses NCCL collectives. NCCL 2.25.1 is
+# BROKEN on Blackwell sm_120 + PCIe (all collectives fail at enqueue.cc:1500). The image's NCCL
+# MUST be >= 2.26.2. Verify in-image before applying (vLLM is unaffected via custom allreduce,
+# but SGLang's TP=2 path is NOT). If the image ships 2.25.1, TP2 SGLang will fail to init.
+#
+# IMAGE: lmsysorg/sglang:v0.5.12.post1-cu130 (latest STABLE, cu130 build) -> copied to ECR by
+#   manifests/skopeo-sglang-copy.yaml. cu130 (CUDA 13.0) ships NCCL >> 2.26.2, clearing the
+#   sm_120+PCIe NCCL-2.25.1 collective bug for the TP=2 path. Well past the v0.5.9 ModelOptFp8
+#   fix (#18447) that #20541's config needs.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fin-rag-g7e-sglang-fp8
+  namespace: ml-inference
+  labels: {app: fin-rag-g7e-sglang, precision: fp8, config: agg-tp2-x4, hw: g7e-sm120}
+spec:
+  replicas: 4
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {app: fin-rag-g7e-sglang, precision: fp8}
+  template:
+    metadata:
+      labels: {app: fin-rag-g7e-sglang, precision: fp8, config: agg-tp2-x4, hw: g7e-sm120}
+    spec:
+      nodeSelector:
+        fin-rag/hardware: g7e-sm120
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        - {key: ai-infra/g7e, operator: Exists, effect: NoSchedule}
+      volumes:
+        - name: nvme
+          hostPath: {path: /mnt/nvme, type: Directory}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 32Gi}
+      containers:
+        - name: sglang
+          image: 615299764834.dkr.ecr.us-east-2.amazonaws.com/sglang:v0.5.12.post1-cu130
+          imagePullPolicy: IfNotPresent
+          command: ["python3", "-m", "sglang.launch_server"]
+          args:
+            - --model-path
+            - /mnt/nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+            - --served-model-name
+            - nemotron-3-super
+            - --tp
+            - "2"
+            - --trust-remote-code
+            - --fp8-gemm-backend
+            - triton
+            - --moe-runner-backend
+            - triton
+            - --mamba-scheduler-strategy
+            - no_buffer
+            - --reasoning-parser
+            - nemotron_3
+            - --kv-cache-dtype
+            - fp8_e4m3
+            - --mem-fraction-static
+            - "0.90"
+            - --context-length
+            - "16384"
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+          env:
+            - {name: SGLANG_DISABLE_DEEP_GEMM, value: "1"}
+            - {name: HF_HUB_OFFLINE, value: "1"}
+            - {name: TRANSFORMERS_OFFLINE, value: "1"}
+          ports:
+            - {containerPort: 8000, name: http}
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 120
+            periodSeconds: 20
+            failureThreshold: 160      # ~45 min first-load FP8 ModelOpt quant processing (#20541)
+          resources:
+            requests: {cpu: "16", memory: 96Gi, nvidia.com/gpu: "2"}
+            limits: {nvidia.com/gpu: "2"}
+          securityContext:
+            capabilities: {add: ["IPC_LOCK"]}
+          volumeMounts:
+            - {name: nvme, mountPath: /mnt/nvme}
+            - {name: shm, mountPath: /dev/shm}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fin-rag-g7e-sglang-fp8
+  namespace: ml-inference
+  labels: {app: fin-rag-g7e-sglang, precision: fp8}
+spec:
+  type: ClusterIP
+  selector: {app: fin-rag-g7e-sglang, precision: fp8}
+  ports:
+    - {name: http, port: 8000, targetPort: 8000, protocol: TCP}

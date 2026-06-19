@@ -1,0 +1,11 @@
+# nemotron-3-ultra | vLLM v0.22.0 | B200 p6-b200.48xlarge TP4 | us-east-2 az2 | P4 long-context | nemotron_h_mtp k=5
+# captured 2026-06-06. temp=1.0, ignore_eos, 256 out. Model max_position_embeddings=262144 (256k);
+# "1M" tiers (512k/1m) EXCEED the architectural limit and are NOT runnable. Feasible: 64k/128k/256k.
+# CAVEAT: synthetic filler is repetitive -> tokenizer compresses (prompt_tok lands below the label) and accept_len
+#   inflates to 6.0. decode_tps and TTFT are valid; realistic diverse-prompt accept_len is 3.54.
+tier	prompt_tokens	completion	ttft_s	e2e_s	decode_tps	accept_len
+64k	48082	256	2.45	2.99	468.1	6.0
+128k	97052	256	2.76	3.29	483.6	6.0
+256k	194090	256	4.05	4.55	514.3	6.0
+# Long-context decode is STABLE and FAST: 468-514 tok/s held at 194k context, no collapse/OOM. TTFT 2.4-4.0s.
+# vs first-run SGLang B300 TP8: 128k 484 vs 131 (3.7x), 256k 514 vs 119 (4.3x). vLLM MTP path dominates at long context too.

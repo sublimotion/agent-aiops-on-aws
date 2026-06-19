@@ -1,0 +1,82 @@
+
+=============
+== PyTorch ==
+=============
+
+NVIDIA Release 25.03 (build 148941828)
+PyTorch Version 2.7.0a0+7c8ec84
+Container image Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2014-2024 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+GOVERNING TERMS: The software and materials are governed by the NVIDIA Software License Agreement
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/)
+and the Product-Specific Terms for NVIDIA AI Products
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
+
+Cloning into 'nccl-tests'...
+=== all_reduce_perf 8 GPU ===
+#  Rank  2 Group  0 Pid   1496 on ip-10-192-13-9 device  2 [0000:76:00] NVIDIA B300 SXM6 AC
+#  Rank  3 Group  0 Pid   1496 on ip-10-192-13-9 device  3 [0000:85:00] NVIDIA B300 SXM6 AC
+#  Rank  4 Group  0 Pid   1496 on ip-10-192-13-9 device  4 [0000:94:00] NVIDIA B300 SXM6 AC
+#  Rank  5 Group  0 Pid   1496 on ip-10-192-13-9 device  5 [0000:a3:00] NVIDIA B300 SXM6 AC
+#  Rank  6 Group  0 Pid   1496 on ip-10-192-13-9 device  6 [0000:b2:00] NVIDIA B300 SXM6 AC
+#  Rank  7 Group  0 Pid   1496 on ip-10-192-13-9 device  7 [0000:c1:00] NVIDIA B300 SXM6 AC
+#
+#                                                              out-of-place                       in-place          
+#       size         count      type   redop    root     time   algbw   busbw  #wrong     time   algbw   busbw  #wrong 
+#        (B)    (elements)                               (us)  (GB/s)  (GB/s)             (us)  (GB/s)  (GB/s)         
+     1048576        262144     float     sum      -1    54.90   19.10   33.43       0    49.05   21.38   37.41       0
+     2097152        524288     float     sum      -1    52.71   39.78   69.62       0    52.52   39.93   69.87       0
+     4194304       1048576     float     sum      -1    54.96   76.32  133.56       0    53.65   78.18  136.81       0
+     8388608       2097152     float     sum      -1    70.49  119.01  208.26       0    70.01  119.82  209.69       0
+    16777216       4194304     float     sum      -1   104.82  160.06  280.10       0   103.68  161.82  283.18       0
+    33554432       8388608     float     sum      -1   162.00  207.12  362.46       0   159.96  209.76  367.09       0
+    67108864      16777216     float     sum      -1   265.31  252.94  442.65       0   265.93  252.36  441.62       0
+   134217728      33554432     float     sum      -1   388.21  345.73  605.03       0   388.18  345.76  605.08       0
+   268435456      67108864     float     sum      -1   699.52  383.74  671.55       0   698.95  384.06  672.10       0
+   536870912     134217728     float     sum      -1  1322.43  405.97  710.45       0  1313.93  408.60  715.05       0
+  1073741824     268435456     float     sum      -1  2540.55  422.64  739.62       0  2551.00  420.91  736.59       0
+  2147483648     536870912     float     sum      -1  4978.48  431.35  754.87       0  4954.54  433.44  758.52       0
+  4294967296    1073741824     float     sum      -1  9785.86  438.90  768.07       0  9786.09  438.88  768.05       0
+  8589934592    2147483648     float     sum      -1  17965.0  478.15  836.76       0  17952.3  478.49  837.35       0
+# Out of bounds values : 0 OK
+# Avg bus bandwidth    : 473.388 
+#
+# Collective test concluded: all_reduce_perf
+#
+
+
+=== all_gather_perf 8 GPU ===
+#       size         count      type   redop    root     time   algbw   busbw  #wrong     time   algbw   busbw  #wrong 
+#        (B)    (elements)                               (us)  (GB/s)  (GB/s)             (us)  (GB/s)  (GB/s)         
+     1048576         32768     float    none      -1    43.76   23.96   20.96       0    43.68   24.00   21.00       0
+     2097152         65536     float    none      -1    43.76   47.93   41.94       0    43.77   47.91   41.92       0
+     4194304        131072     float    none      -1    44.98   93.25   81.59       0    44.62   94.00   82.25       0
+     8388608        262144     float    none      -1    48.61  172.55  150.98       0    48.20  174.02  152.27       0
+    16777216        524288     float    none      -1    58.36  287.46  251.53       0    58.50  286.77  250.92       0
+    33554432       1048576     float    none      -1   118.20  283.88  248.39       0   115.62  290.21  253.93       0
+    67108864       2097152     float    none      -1   141.67  473.70  414.49       0   140.99  475.98  416.48       0
+   134217728       4194304     float    none      -1   211.32  635.13  555.74       0   209.87  639.53  559.59       0
+   268435456       8388608     float    none      -1   403.41  665.42  582.24       0   400.46  670.32  586.53       0
+   536870912      16777216     float    none      -1   788.77  680.64  595.56       0   786.62  682.51  597.19       0
+  1073741824      33554432     float    none      -1  1513.81  709.30  620.64       0  1513.16  709.60  620.90       0
+  2147483648      67108864     float    none      -1  2917.77  736.00  644.00       0  2920.80  735.24  643.33       0
+# Out of bounds values : 0 OK
+# Avg bus bandwidth    : 351.433 
+#
+# Collective test concluded: all_gather_perf
+#
+

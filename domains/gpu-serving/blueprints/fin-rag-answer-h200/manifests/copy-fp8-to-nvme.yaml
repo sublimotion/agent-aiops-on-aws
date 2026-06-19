@@ -1,0 +1,50 @@
+# Copy FP8 weights FSx -> local NVMe RAID (/mnt/nvme/models) on the H200 node.
+# Reuses the SAME FSx PVC the B200 run staged (vllm-qwen3-fsx-pvc); no HF re-download.
+# FSx is in us-east-2c; H200 node is in us-east-2a -> CROSS-AZ mount (one-time bulk copy).
+# Works within the VPC (FSx SG opened to the cluster SG on Lustre ports 988/1018-1023).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: copy-fp8-to-nvme-h200
+  namespace: ml-inference
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 2400   # cross-AZ FSx->NVMe of ~124GB; generous ceiling
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        fin-rag/hardware: h200-sm90
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        - {key: ai-infra/h200, operator: Exists, effect: NoSchedule}
+      volumes:
+        - name: fsx
+          persistentVolumeClaim:
+            claimName: vllm-qwen3-fsx-pvc
+        - name: nvme
+          hostPath:
+            path: /mnt/nvme
+            type: Directory
+      containers:
+        - name: copy
+          image: alpine:3.20
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              SRC=/fsx/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+              DST=/mnt/nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+              mkdir -p "$DST"
+              echo "Copying FP8 FSx(2c) -> NVMe(2a H200) ..."
+              time cp -a "$SRC"/. "$DST"/
+              echo "COPY_DONE"
+              du -sh "$DST"
+              ls "$DST" | head
+          volumeMounts:
+            - {name: fsx, mountPath: /fsx}
+            - {name: nvme, mountPath: /mnt/nvme}
+          resources:
+            requests: {cpu: "2", memory: 4Gi}
+            limits: {cpu: "4", memory: 8Gi}

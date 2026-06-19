@@ -1,0 +1,249 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "5a1820d8-1fb7-454c-a11e-e7d05694a3cd",
+  "created_at": "2026-05-13T00:00:00Z",
+  "source_tool": {
+    "name": "custom",
+    "version": "0.1.0-embedding-bench",
+    "enrichment_version": "1.0.0"
+  },
+  "model": {
+    "name": "Qwen3-Embedding-8B",
+    "id": "Qwen/Qwen3-Embedding-8B",
+    "architecture": "embedding",
+    "parameters_total": "8B",
+    "quantization": "bf16",
+    "max_model_len": 8192
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.19.1",
+    "container_image": "vllm/vllm-openai:v0.19.1",
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "data_parallel": null,
+    "expert_parallel": null,
+    "replicas": 1,
+    "reasoning": false,
+    "kv_cache_dtype": "auto",
+    "attention_backend": "default",
+    "speculative_decoding": null,
+    "extra_args": {
+      "task": "embed",
+      "trust-remote-code": true
+    }
+  },
+  "infrastructure": {
+    "substrate": "hyperpod-eks",
+    "instance_type": "ml.g5.4xlarge",
+    "region": "us-east-1",
+    "gpu": {
+      "name": "A10G",
+      "arch": "sm_86",
+      "count": 1,
+      "vram_gb": 24,
+      "interconnect": "none"
+    },
+    "eks": {
+      "cluster_version": "1.32",
+      "node_count": 1
+    },
+    "hyperpod": {
+      "cluster_name": "finetune-g5-cluster",
+      "instance_group": "llmd-validation",
+      "deep_health_checks": true,
+      "auto_recovery": true
+    }
+  },
+  "workload": {
+    "use_case": "stress",
+    "catalog_id": "burn-in",
+    "modality": "text",
+    "dataset": {
+      "type": "synthetic",
+      "input_tokens": {
+        "mean": 512,
+        "std_dev": 256
+      },
+      "output_tokens": {
+        "mean": 0,
+        "std_dev": 0
+      }
+    },
+    "load": {
+      "type": "constant",
+      "request_rate": null,
+      "duration_s": 3600,
+      "num_prompts": 449697,
+      "warmup_requests": null,
+      "warmup_s": 600,
+      "max_concurrency": 28,
+      "slice_duration_s": 300
+    },
+    "api": {
+      "type": "embeddings",
+      "streaming": false,
+      "endpoint": "/v1/embeddings"
+    }
+  },
+  "metrics": {
+    "duration_s": 3600,
+    "completed": 449697,
+    "failed": 0,
+    "error_rate": 0.0,
+    "e2e_ms": {
+      "mean": 221.31749987602234,
+      "p50": 221.05693817138672,
+      "p90": 314.4848346710205,
+      "p95": null,
+      "p99": 379.1489601135254
+    },
+    "output_toks_per_s": 0.0,
+    "request_throughput": 124.91583333333334,
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+    "max_concurrent_requests": 28
+  },
+  "slo": {
+    "targets": {
+      "drift_pct_max": 2.0,
+      "error_rate_max": 0.001
+    },
+    "results": {
+      "drift_pct_max": {
+        "target": 2.0,
+        "actual": 2.491748282019377,
+        "pass": false
+      },
+      "error_rate_max": {
+        "target": 0.001,
+        "actual": 0.0,
+        "pass": true
+      }
+    },
+    "overall_pass": false
+  },
+  "extensions": {
+    "burn_in_stability": {
+      "hour_1_throughput": 123.20666666666666,
+      "final_throughput": 126.27666666666667,
+      "throughput_drift_pct": 2.491748282019377,
+      "unrecoverable_errors": 0,
+      "slice_count": 12,
+      "slices": [
+        {
+          "slice_idx": 0,
+          "start_ts": 1778681404,
+          "completed": 37594,
+          "failed": 0,
+          "output_throughput": 125.31333333333333,
+          "latency_p50": 220.49498558044434,
+          "latency_p99": 300.78125
+        },
+        {
+          "slice_idx": 1,
+          "start_ts": 1778681704,
+          "completed": 37357,
+          "failed": 0,
+          "output_throughput": 124.52333333333333,
+          "latency_p50": 223.42777252197266,
+          "latency_p99": 291.91136360168457
+        },
+        {
+          "slice_idx": 2,
+          "start_ts": 1778682004,
+          "completed": 36723,
+          "failed": 0,
+          "output_throughput": 122.41,
+          "latency_p50": 226.8049716949463,
+          "latency_p99": 310.9140396118164
+        },
+        {
+          "slice_idx": 3,
+          "start_ts": 1778682304,
+          "completed": 37116,
+          "failed": 0,
+          "output_throughput": 123.72,
+          "latency_p50": 224.462628364563,
+          "latency_p99": 314.4848346710205
+        },
+        {
+          "slice_idx": 4,
+          "start_ts": 1778682604,
+          "completed": 37748,
+          "failed": 0,
+          "output_throughput": 125.82666666666667,
+          "latency_p50": 220.02744674682617,
+          "latency_p99": 289.65306282043457
+        },
+        {
+          "slice_idx": 5,
+          "start_ts": 1778682905,
+          "completed": 36261,
+          "failed": 0,
+          "output_throughput": 120.87,
+          "latency_p50": 223.5729694366455,
+          "latency_p99": 379.1489601135254
+        },
+        {
+          "slice_idx": 6,
+          "start_ts": 1778683205,
+          "completed": 38113,
+          "failed": 0,
+          "output_throughput": 127.04333333333334,
+          "latency_p50": 218.16277503967285,
+          "latency_p99": 288.2249355316162
+        },
+        {
+          "slice_idx": 7,
+          "start_ts": 1778683505,
+          "completed": 37781,
+          "failed": 0,
+          "output_throughput": 125.93666666666667,
+          "latency_p50": 221.05693817138672,
+          "latency_p99": 290.463924407959
+        },
+        {
+          "slice_idx": 8,
+          "start_ts": 1778683805,
+          "completed": 37221,
+          "failed": 0,
+          "output_throughput": 124.07,
+          "latency_p50": 222.32604026794434,
+          "latency_p99": 325.90675354003906
+        },
+        {
+          "slice_idx": 9,
+          "start_ts": 1778684106,
+          "completed": 37962,
+          "failed": 0,
+          "output_throughput": 126.54,
+          "latency_p50": 218.6204195022583,
+          "latency_p99": 294.3747043609619
+        },
+        {
+          "slice_idx": 10,
+          "start_ts": 1778684406,
+          "completed": 37938,
+          "failed": 0,
+          "output_throughput": 126.46,
+          "latency_p50": 218.15311908721924,
+          "latency_p99": 300.6939888000488
+        },
+        {
+          "slice_idx": 11,
+          "start_ts": 1778684706,
+          "completed": 37883,
+          "failed": 0,
+          "output_throughput": 126.27666666666667,
+          "latency_p50": 218.69993209838867,
+          "latency_p99": 313.3502006530762
+        }
+      ]
+    },
+    "raw_tool_output": {
+      "uri": "results/burn-in/burn-in-final.json",
+      "format": "json"
+    }
+  }
+}

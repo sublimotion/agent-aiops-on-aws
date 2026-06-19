@@ -1,0 +1,1131 @@
+
+==========
+== CUDA ==
+==========
+
+CUDA Version 13.0.1
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+/sgl-workspace/sglang/python/sglang/launch_server.py:51: UserWarning: 'python -m sglang.launch_server' is still supported, but 'sglang serve' is the recommended entrypoint.
+  Example: sglang serve --model-path <model> [options]
+  warnings.warn(
+DeepGemm is enabled but the scale_fmt of checkpoint is not ue8m0. This might cause accuracy degradation on Blackwell.
+TensorRT-LLM MLA only supports page_size of 32 or 64, changing page_size from None to 64.
+FlashInfer TRTLLM MoE is enabled. --disable-shared-experts-fusion is automatically set.
+Max running requests is reset to 48 for speculative decoding. You can override this by explicitly setting --max-running-requests.
+Spec v2 is enabled for eagle/eagle3 speculative decoding and overlap schedule is turned on.
+speculative_num_draft_tokens is adjusted to speculative_num_steps + 1 when speculative_eagle_topk == 1
+/sgl-workspace/sglang/python/sglang/srt/entrypoints/http_server.py:172: FastAPIDeprecationWarning: ORJSONResponse is deprecated, FastAPI now serializes data directly to JSON bytes via Pydantic when a return type or response model is set, which is faster and doesn't need a custom response class. Read more in the FastAPI docs: https://fastapi.tiangolo.com/advanced/custom-response/#orjson-or-response-model and https://fastapi.tiangolo.com/tutorial/response-model/
+  from sglang.srt.utils.json_response import (
+[2026-05-13 21:13:52] server_args=ServerArgs(model_path='/mnt/nvme/models/kimi-k26-fp8', tokenizer_path='/mnt/nvme/models/kimi-k26-fp8', tokenizer_mode='auto', tokenizer_worker_num=1, skip_tokenizer_init=False, load_format='auto', model_loader_extra_config='{}', trust_remote_code=True, context_length=None, is_embedding=False, enable_multimodal=None, revision=None, model_impl='auto', host='0.0.0.0', port=30000, fastapi_root_path='', grpc_mode=False, skip_server_warmup=False, warmups=None, nccl_port=None, checkpoint_engine_wait_weights_before_ready=False, ssl_keyfile=None, ssl_certfile=None, ssl_ca_certs=None, ssl_keyfile_password=None, enable_ssl_refresh=False, dtype='auto', quantization='compressed-tensors', quantization_param_path=None, kv_cache_dtype='auto', enable_fp32_lm_head=False, modelopt_quant=None, modelopt_checkpoint_restore_path=None, modelopt_checkpoint_save_path=None, modelopt_export_path=None, quantize_and_serve=False, rl_quant_profile=None, mem_fraction_static=0.8060263867187499, max_running_requests=48, max_queued_requests=None, max_total_tokens=None, chunked_prefill_size=16384, enable_dynamic_chunking=False, max_prefill_tokens=16384, prefill_max_requests=None, schedule_policy='fcfs', enable_priority_scheduling=False, disable_priority_preemption=False, default_priority_value=None, abort_on_priority_when_disabled=False, schedule_low_priority_values_first=False, priority_scheduling_preemption_threshold=10, schedule_conservativeness=1.0, page_size=64, swa_full_tokens_ratio=0.8, disable_hybrid_swa_memory=False, radix_eviction_policy='lru', enable_prefill_delayer=False, prefill_delayer_max_delay_passes=30, prefill_delayer_token_usage_low_watermark=None, prefill_delayer_forward_passes_buckets=None, prefill_delayer_wait_seconds_buckets=None, device='cuda', tp_size=8, pp_size=1, pp_max_micro_batch_size=None, pp_async_batch_depth=0, stream_interval=1, stream_response_default_include_usage=False, incremental_streaming_output=False, enable_streaming_session=False, random_seed=453520087, constrained_json_whitespace_pattern=None, constrained_json_disable_any_whitespace=False, watchdog_timeout=300, soft_watchdog_timeout=None, dist_timeout=None, download_dir=None, model_checksum=None, base_gpu_id=0, gpu_id_step=1, sleep_on_idle=False, use_ray=False, custom_sigquit_handler=None, log_level='info', log_level_http=None, log_requests=False, log_requests_level=2, log_requests_format='text', log_requests_target=None, uvicorn_access_log_exclude_prefixes=[], crash_dump_folder=None, show_time_cost=False, enable_metrics=False, enable_mfu_metrics=False, enable_metrics_for_all_schedulers=False, tokenizer_metrics_custom_labels_header='x-custom-labels', tokenizer_metrics_allowed_custom_labels=None, extra_metric_labels=None, bucket_time_to_first_token=None, bucket_inter_token_latency=None, bucket_e2e_request_latency=None, collect_tokens_histogram=False, prompt_tokens_buckets=None, generation_tokens_buckets=None, gc_warning_threshold_secs=0.0, decode_log_interval=40, enable_request_time_stats_logging=False, kv_events_config=None, enable_trace=False, otlp_traces_endpoint='localhost:4317', export_metrics_to_file=False, export_metrics_to_file_dir=None, api_key=None, admin_api_key=None, served_model_name='/mnt/nvme/models/kimi-k26-fp8', weight_version='default', chat_template=None, hf_chat_template_name=None, completion_template=None, file_storage_path='sglang_storage', enable_cache_report=False, reasoning_parser='kimi_k2', tool_call_parser='kimi_k2', tool_server=None, sampling_defaults='model', dp_size=1, load_balance_method='round_robin', attn_cp_size=1, moe_dp_size=1, dist_init_addr=None, nnodes=1, node_rank=0, json_model_override_args='{}', preferred_sampling_params=None, enable_lora=None, enable_lora_overlap_loading=None, max_lora_rank=None, lora_target_modules=None, lora_paths=None, max_loaded_loras=None, max_loras_per_batch=8, lora_eviction_policy='lru', lora_backend='csgmv', max_lora_chunk_size=16, experts_shared_outer_loras=None, attention_backend='trtllm_mla', decode_attention_backend=None, prefill_attention_backend=None, sampling_backend='flashinfer', grammar_backend='xgrammar', mm_attention_backend=None, fp8_gemm_runner_backend='auto', fp4_gemm_runner_backend='auto', nsa_prefill_backend=None, nsa_decode_backend=None, disable_flashinfer_autotune=False, mamba_backend='triton', speculative_algorithm='EAGLE3', speculative_draft_model_path='/mnt/nvme/models/kimi-k26-eagle3', speculative_draft_model_revision='main', speculative_draft_load_format=None, speculative_num_steps=4, speculative_eagle_topk=1, speculative_num_draft_tokens=5, speculative_accept_threshold_single=1.0, speculative_accept_threshold_acc=1.0, speculative_token_map=None, speculative_attention_mode='prefill', speculative_draft_attention_backend='trtllm_mha', speculative_moe_runner_backend='auto', speculative_moe_a2a_backend=None, speculative_draft_model_quantization=None, speculative_ngram_min_bfs_breadth=1, speculative_ngram_max_bfs_breadth=10, speculative_ngram_match_type='BFS', speculative_ngram_max_trie_depth=18, speculative_ngram_capacity=10000000, enable_multi_layer_eagle=False, ep_size=1, moe_a2a_backend='none', moe_runner_backend='flashinfer_trtllm', flashinfer_mxfp4_moe_precision='default', enable_flashinfer_allreduce_fusion=True, enforce_disable_flashinfer_allreduce_fusion=False, enable_aiter_allreduce_fusion=False, deepep_mode='auto', ep_num_redundant_experts=0, ep_dispatch_algorithm=None, init_expert_location='trivial', enable_eplb=False, eplb_algorithm='auto', eplb_rebalance_num_iterations=1000, eplb_rebalance_layers_per_chunk=None, eplb_min_rebalancing_utilization_threshold=1.0, expert_distribution_recorder_mode=None, expert_distribution_recorder_buffer_size=1000, enable_expert_distribution_metrics=False, deepep_config=None, moe_dense_tp_size=None, elastic_ep_backend=None, enable_elastic_expert_backup=False, mooncake_ib_device=None, max_mamba_cache_size=None, mamba_ssm_dtype=None, mamba_full_memory_ratio=0.9, mamba_scheduler_strategy='no_buffer', mamba_track_interval=256, linear_attn_backend='triton', linear_attn_decode_backend=None, linear_attn_prefill_backend=None, enable_hierarchical_cache=False, hicache_ratio=2.0, hicache_size=0, hicache_write_policy='write_through', hicache_io_backend='kernel', hicache_mem_layout='layer_first', hicache_storage_backend=None, hicache_storage_prefetch_policy='best_effort', hicache_storage_backend_extra_config=None, enable_hisparse=False, hisparse_config=None, enable_lmcache=False, kt_weight_path=None, kt_method='AMXINT4', kt_cpuinfer=None, kt_threadpool_count=2, kt_num_gpu_experts=None, kt_max_deferred_experts_per_token=None, dllm_algorithm=None, dllm_algorithm_config=None, enable_double_sparsity=False, ds_channel_config_path=None, ds_heavy_channel_num=32, ds_heavy_token_num=256, ds_heavy_channel_type='qk', ds_sparse_decode_threshold=4096, cpu_offload_gb=0, offload_group_size=-1, offload_num_in_group=1, offload_prefetch_step=1, offload_mode='cpu', multi_item_scoring_delimiter=None, disable_radix_cache=False, cuda_graph_max_bs=512, cuda_graph_bs=[1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 40, 44, 48, 52, 56, 60, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512], disable_cuda_graph=False, disable_cuda_graph_padding=False, enable_profile_cuda_graph=False, enable_cudagraph_gc=False, enable_layerwise_nvtx_marker=False, enable_nccl_nvls=False, enable_symm_mem=False, disable_flashinfer_cutlass_moe_fp4_allgather=False, enable_tokenizer_batch_encode=False, disable_tokenizer_batch_decode=False, disable_outlines_disk_cache=False, disable_custom_all_reduce=False, enable_mscclpp=False, enable_torch_symm_mem=False, pre_warm_nccl=False, disable_overlap_schedule=False, enable_mixed_chunk=False, enable_dp_attention=False, enable_dp_lm_head=False, enable_two_batch_overlap=False, enable_single_batch_overlap=False, tbo_token_distribution_threshold=0.48, enable_torch_compile=False, disable_piecewise_cuda_graph=True, enforce_piecewise_cuda_graph=False, enable_torch_compile_debug_mode=False, torch_compile_max_bs=32, piecewise_cuda_graph_max_tokens=2048, piecewise_cuda_graph_tokens=[4, 8, 12, 16, 20, 24, 28, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 256, 288, 320, 352, 384, 416, 448, 480, 512, 576, 640, 704, 768, 832, 896, 960, 1024, 1280, 1536, 1792, 2048], piecewise_cuda_graph_compiler='eager', torchao_config='', enable_nan_detection=False, enable_p2p_check=False, triton_attention_reduce_in_fp32=False, triton_attention_num_kv_splits=8, triton_attention_split_tile_size=None, num_continuous_decode_steps=1, delete_ckpt_after_loading=False, enable_memory_saver=False, enable_weights_cpu_backup=False, enable_draft_weights_cpu_backup=False, allow_auto_truncate=False, enable_custom_logit_processor=False, flashinfer_mla_disable_ragged=False, disable_shared_experts_fusion=True, disable_chunked_prefix_cache=False, disable_fast_image_processor=False, keep_mm_feature_on_device=False, enable_return_hidden_states=False, enable_return_routed_experts=False, scheduler_recv_interval=1, numa_node=None, enable_deterministic_inference=False, rl_on_policy_target=None, enable_attn_tp_input_scattered=False, gc_threshold=None, enable_nsa_prefill_context_parallel=False, nsa_prefill_cp_mode='round-robin-split', enable_fused_qk_norm_rope=False, enable_precise_embedding_interpolation=False, enable_fused_moe_sum_all_reduce=False, enable_prefill_context_parallel=False, prefill_cp_mode='in-seq-split', enable_dynamic_batch_tokenizer=False, dynamic_batch_tokenizer_batch_size=32, dynamic_batch_tokenizer_batch_timeout=0.002, debug_tensor_dump_output_folder=None, debug_tensor_dump_layers=None, debug_tensor_dump_input_file=None, debug_tensor_dump_inject=False, disaggregation_mode='null', disaggregation_transfer_backend='mooncake', disaggregation_bootstrap_port=8998, disaggregation_ib_device=None, disaggregation_decode_enable_offload_kvcache=False, num_reserved_decode_tokens=512, disaggregation_decode_polling_interval=1, encoder_only=False, language_only=False, encoder_transfer_backend='zmq_to_scheduler', encoder_urls=[], enable_adaptive_dispatch_to_encoder=False, custom_weight_loader=[], weight_loader_disable_mmap=False, remote_instance_weight_loader_seed_instance_ip=None, remote_instance_weight_loader_seed_instance_service_port=None, remote_instance_weight_loader_send_weights_group_ports=None, remote_instance_weight_loader_backend='nccl', remote_instance_weight_loader_start_seed_via_transfer_engine=False, engine_info_bootstrap_port=6789, modelexpress_config=None, enable_pdmux=False, pdmux_config_path=None, sm_group_num=8, enable_broadcast_mm_inputs_process=False, enable_prefix_mm_cache=False, mm_enable_dp_encoder=False, mm_process_config={}, limit_mm_data_per_request=None, enable_mm_global_cache=False, decrypted_config_file=None, decrypted_draft_config_file=None, forward_hooks=None)
+[2026-05-13 21:13:52] User lacks permission to set NUMA affinity, skipping NUMA node configuration for GPU. If using docker, try adding --cap-add SYS_NICE to your docker run command.
+[2026-05-13 21:13:52] User lacks permission to set NUMA affinity, skipping NUMA node configuration for GPU. If using docker, try adding --cap-add SYS_NICE to your docker run command.
+[2026-05-13 21:13:52] User lacks permission to set NUMA affinity, skipping NUMA node configuration for GPU. If using docker, try adding --cap-add SYS_NICE to your docker run command.
+[2026-05-13 21:13:52] User lacks permission to set NUMA affinity, skipping NUMA node configuration for GPU. If using docker, try adding --cap-add SYS_NICE to your docker run command.
+[2026-05-13 21:13:52] User lacks permission to set NUMA affinity, skipping NUMA node configuration for GPU. If using docker, try adding --cap-add SYS_NICE to your docker run command.
+[2026-05-13 21:13:52] User lacks permission to set NUMA affinity, skipping NUMA node configuration for GPU. If using docker, try adding --cap-add SYS_NICE to your docker run command.
+[2026-05-13 21:13:52] User lacks permission to set NUMA affinity, skipping NUMA node configuration for GPU. If using docker, try adding --cap-add SYS_NICE to your docker run command.
+[2026-05-13 21:13:52] User lacks permission to set NUMA affinity, skipping NUMA node configuration for GPU. If using docker, try adding --cap-add SYS_NICE to your docker run command.
+[2026-05-13 21:13:52] DeepGemm is enabled but the scale_fmt of checkpoint is not ue8m0. This might cause accuracy degradation on Blackwell.
+[2026-05-13 21:13:53] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:13:53] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:13:53] Using default HuggingFace chat template with detected content format: openai
+[2026-05-13 21:14:01 TP6] User lacks permission to set NUMA affinity, skipping NUMA node configuration for GPU. If using docker, try adding --cap-add SYS_NICE to your docker run command.
+[2026-05-13 21:14:01 TP6] DeepGemm is enabled but the scale_fmt of checkpoint is not ue8m0. This might cause accuracy degradation on Blackwell.
+[2026-05-13 21:14:01 TP4] User lacks permission to set NUMA affinity, skipping NUMA node configuration for GPU. If using docker, try adding --cap-add SYS_NICE to your docker run command.
+[2026-05-13 21:14:01 TP4] DeepGemm is enabled but the scale_fmt of checkpoint is not ue8m0. This might cause accuracy degradation on Blackwell.
+[2026-05-13 21:14:01 TP6] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:14:01 TP6] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:14:01 TP4] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:14:01 TP4] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:14:02 TP2] User lacks permission to set NUMA affinity, skipping NUMA node configuration for GPU. If using docker, try adding --cap-add SYS_NICE to your docker run command.
+[2026-05-13 21:14:02 TP2] DeepGemm is enabled but the scale_fmt of checkpoint is not ue8m0. This might cause accuracy degradation on Blackwell.
+[2026-05-13 21:14:02 TP1] User lacks permission to set NUMA affinity, skipping NUMA node configuration for GPU. If using docker, try adding --cap-add SYS_NICE to your docker run command.
+[2026-05-13 21:14:02 TP1] DeepGemm is enabled but the scale_fmt of checkpoint is not ue8m0. This might cause accuracy degradation on Blackwell.
+[2026-05-13 21:14:02 TP7] User lacks permission to set NUMA affinity, skipping NUMA node configuration for GPU. If using docker, try adding --cap-add SYS_NICE to your docker run command.
+[2026-05-13 21:14:02 TP3] User lacks permission to set NUMA affinity, skipping NUMA node configuration for GPU. If using docker, try adding --cap-add SYS_NICE to your docker run command.
+[2026-05-13 21:14:02 TP7] DeepGemm is enabled but the scale_fmt of checkpoint is not ue8m0. This might cause accuracy degradation on Blackwell.
+[2026-05-13 21:14:02 TP3] DeepGemm is enabled but the scale_fmt of checkpoint is not ue8m0. This might cause accuracy degradation on Blackwell.
+[2026-05-13 21:14:02 TP5] User lacks permission to set NUMA affinity, skipping NUMA node configuration for GPU. If using docker, try adding --cap-add SYS_NICE to your docker run command.
+[2026-05-13 21:14:02] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:14:02] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:14:02 TP5] DeepGemm is enabled but the scale_fmt of checkpoint is not ue8m0. This might cause accuracy degradation on Blackwell.
+[2026-05-13 21:14:02 TP0] User lacks permission to set NUMA affinity, skipping NUMA node configuration for GPU. If using docker, try adding --cap-add SYS_NICE to your docker run command.
+[2026-05-13 21:14:02 TP2] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:14:02 TP2] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:14:02 TP0] DeepGemm is enabled but the scale_fmt of checkpoint is not ue8m0. This might cause accuracy degradation on Blackwell.
+[2026-05-13 21:14:02 TP1] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:14:02 TP1] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:14:02 TP7] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:14:02 TP7] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:14:02 TP3] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:14:02 TP3] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+/sgl-workspace/sglang/python/sglang/srt/utils/hf_transformers_utils.py:873: UserWarning: Using a slow tokenizer. This might cause a significant slowdown. Consider using a fast tokenizer instead.
+  warnings.warn(
+[2026-05-13 21:14:02 TP5] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:14:02 TP5] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:14:02 TP0] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:14:02 TP0] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:14:02 TP6] Calling super().encode with {'add_special_tokens': False}
+[2026-05-13 21:14:02 TP6] DeepGemm is enabled but the scale_fmt of checkpoint is not ue8m0. This might cause accuracy degradation on Blackwell.
+[2026-05-13 21:14:02 TP6] Init torch distributed begin.
+[2026-05-13 21:14:03 TP4] Calling super().encode with {'add_special_tokens': False}
+[2026-05-13 21:14:03 TP4] DeepGemm is enabled but the scale_fmt of checkpoint is not ue8m0. This might cause accuracy degradation on Blackwell.
+[2026-05-13 21:14:03 TP4] Init torch distributed begin.
+[2026-05-13 21:14:03 TP2] Calling super().encode with {'add_special_tokens': False}
+[2026-05-13 21:14:03 TP2] DeepGemm is enabled but the scale_fmt of checkpoint is not ue8m0. This might cause accuracy degradation on Blackwell.
+[2026-05-13 21:14:03 TP2] Init torch distributed begin.
+[2026-05-13 21:14:03 TP1] Calling super().encode with {'add_special_tokens': False}
+[2026-05-13 21:14:03 TP1] DeepGemm is enabled but the scale_fmt of checkpoint is not ue8m0. This might cause accuracy degradation on Blackwell.
+[2026-05-13 21:14:03 TP1] Init torch distributed begin.
+[2026-05-13 21:14:03 TP7] Calling super().encode with {'add_special_tokens': False}
+[2026-05-13 21:14:03 TP7] DeepGemm is enabled but the scale_fmt of checkpoint is not ue8m0. This might cause accuracy degradation on Blackwell.
+[2026-05-13 21:14:03 TP7] Init torch distributed begin.
+[2026-05-13 21:14:03 TP3] Calling super().encode with {'add_special_tokens': False}
+[2026-05-13 21:14:03 TP3] DeepGemm is enabled but the scale_fmt of checkpoint is not ue8m0. This might cause accuracy degradation on Blackwell.
+[2026-05-13 21:14:03 TP3] Init torch distributed begin.
+[2026-05-13 21:14:03 TP0] Calling super().encode with {'add_special_tokens': False}
+[2026-05-13 21:14:03 TP0] DeepGemm is enabled but the scale_fmt of checkpoint is not ue8m0. This might cause accuracy degradation on Blackwell.
+[2026-05-13 21:14:03 TP0] Init torch distributed begin.
+[2026-05-13 21:14:03 TP5] Calling super().encode with {'add_special_tokens': False}
+[2026-05-13 21:14:03 TP5] DeepGemm is enabled but the scale_fmt of checkpoint is not ue8m0. This might cause accuracy degradation on Blackwell.
+[2026-05-13 21:14:03 TP5] Init torch distributed begin.
+[Gloo] Rank 0 is connected to 7 peer ranks. Expected number of connected peer ranks is : 7
+[Gloo] Rank 2 is connected to 7 peer ranks. Expected number of connected peer ranks is : 7
+[Gloo] Rank 1 is connected to 7 peer ranks. Expected number of connected peer ranks is : 7
+[Gloo] Rank 4 is connected to 7 peer ranks. Expected number of connected peer ranks is : 7
+[Gloo] Rank 3 is connected to 7 peer ranks. Expected number of connected peer ranks is : 7
+[Gloo] Rank 5 is connected to 7 peer ranks. Expected number of connected peer ranks is : 7
+[Gloo] Rank 6 is connected to 7 peer ranks. Expected number of connected peer ranks is : 7
+[Gloo] Rank 7 is connected to 7 peer ranks. Expected number of connected peer ranks is : 7
+[Gloo] Rank 0 is connected to 7 peer ranks. Expected number of connected peer ranks is : 7
+[Gloo] Rank 1 is connected to 7 peer ranks. Expected number of connected peer ranks is : 7
+[Gloo] Rank 2 is connected to 7 peer ranks. Expected number of connected peer ranks is : 7
+[Gloo] Rank 3 is connected to 7 peer ranks. Expected number of connected peer ranks is : 7
+[Gloo] Rank 4 is connected to 7 peer ranks. Expected number of connected peer ranks is : 7
+[Gloo] Rank 5 is connected to 7 peer ranks. Expected number of connected peer ranks is : 7
+[Gloo] Rank 7 is connected to 7 peer ranks. Expected number of connected peer ranks is : 7
+[Gloo] Rank 6 is connected to 7 peer ranks. Expected number of connected peer ranks is : 7
+[2026-05-13 21:14:05 TP0] sglang is using nccl==2.28.3
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[2026-05-13 21:14:33 TP6] Init torch distributed ends. elapsed=30.38 s, mem usage=1.54 GB
+[2026-05-13 21:14:33 TP5] Init torch distributed ends. elapsed=29.44 s, mem usage=1.54 GB
+[2026-05-13 21:14:33 TP3] Init torch distributed ends. elapsed=29.50 s, mem usage=1.54 GB
+[2026-05-13 21:14:33 TP1] Init torch distributed ends. elapsed=29.68 s, mem usage=1.54 GB
+[2026-05-13 21:14:33 TP7] Init torch distributed ends. elapsed=29.62 s, mem usage=1.23 GB
+[2026-05-13 21:14:33 TP0] Init torch distributed ends. elapsed=29.48 s, mem usage=1.48 GB
+[2026-05-13 21:14:33 TP2] Init torch distributed ends. elapsed=29.77 s, mem usage=1.54 GB
+[2026-05-13 21:14:33 TP4] Init torch distributed ends. elapsed=30.20 s, mem usage=1.54 GB
+[2026-05-13 21:14:37 TP2] Load weight begin. avail mem=265.45 GB
+[2026-05-13 21:14:37 TP0] Load weight begin. avail mem=265.52 GB
+[2026-05-13 21:14:38 TP7] Load weight begin. avail mem=265.77 GB
+[2026-05-13 21:14:38 TP5] Load weight begin. avail mem=265.45 GB
+[2026-05-13 21:14:38 TP3] Load weight begin. avail mem=265.45 GB
+[2026-05-13 21:14:38 TP4] Load weight begin. avail mem=265.45 GB
+[2026-05-13 21:14:38 TP6] Load weight begin. avail mem=265.45 GB
+[2026-05-13 21:14:38 TP1] Load weight begin. avail mem=265.45 GB
+[2026-05-13 21:14:41 TP0] Multimodal attention backend not set. Use fa4.
+[2026-05-13 21:14:41 TP0] Using fa4 as multimodal attention backend.
+[2026-05-13 21:14:41 TP0] Acceleration for non-quantized schemes is not supported by Compressed Tensors. Falling back to UnquantizedLinearMethod
+[2026-05-13 21:14:41 TP7] Multimodal attention backend not set. Use fa4.
+[2026-05-13 21:14:41 TP7] Using fa4 as multimodal attention backend.
+[2026-05-13 21:14:41 TP7] Acceleration for non-quantized schemes is not supported by Compressed Tensors. Falling back to UnquantizedLinearMethod
+[2026-05-13 21:14:41 TP6] Multimodal attention backend not set. Use fa4.
+[2026-05-13 21:14:41 TP6] Using fa4 as multimodal attention backend.
+[2026-05-13 21:14:41 TP6] Acceleration for non-quantized schemes is not supported by Compressed Tensors. Falling back to UnquantizedLinearMethod
+[2026-05-13 21:14:41 TP5] Multimodal attention backend not set. Use fa4.
+[2026-05-13 21:14:41 TP5] Using fa4 as multimodal attention backend.
+[2026-05-13 21:14:41 TP5] Acceleration for non-quantized schemes is not supported by Compressed Tensors. Falling back to UnquantizedLinearMethod
+[2026-05-13 21:14:42 TP3] Multimodal attention backend not set. Use fa4.
+[2026-05-13 21:14:42 TP3] Using fa4 as multimodal attention backend.
+[2026-05-13 21:14:42 TP3] Acceleration for non-quantized schemes is not supported by Compressed Tensors. Falling back to UnquantizedLinearMethod
+[2026-05-13 21:14:42 TP4] Multimodal attention backend not set. Use fa4.
+[2026-05-13 21:14:42 TP4] Using fa4 as multimodal attention backend.
+[2026-05-13 21:14:42 TP4] Acceleration for non-quantized schemes is not supported by Compressed Tensors. Falling back to UnquantizedLinearMethod
+[2026-05-13 21:14:42 TP2] Multimodal attention backend not set. Use fa4.
+[2026-05-13 21:14:42 TP2] Using fa4 as multimodal attention backend.
+[2026-05-13 21:14:42 TP2] Acceleration for non-quantized schemes is not supported by Compressed Tensors. Falling back to UnquantizedLinearMethod
+[2026-05-13 21:14:42 TP1] Multimodal attention backend not set. Use fa4.
+[2026-05-13 21:14:42 TP1] Using fa4 as multimodal attention backend.
+[2026-05-13 21:14:42 TP1] Acceleration for non-quantized schemes is not supported by Compressed Tensors. Falling back to UnquantizedLinearMethod
+[2026-05-13 21:14:49 TP4] Using CompressedTensorsMxInt4MoE with flashinfer_trtllm backend
+[2026-05-13 21:14:49 TP2] Using CompressedTensorsMxInt4MoE with flashinfer_trtllm backend
+[2026-05-13 21:14:49 TP5] Using CompressedTensorsMxInt4MoE with flashinfer_trtllm backend
+[2026-05-13 21:14:49 TP6] Using CompressedTensorsMxInt4MoE with flashinfer_trtllm backend
+[2026-05-13 21:14:49 TP1] Using CompressedTensorsMxInt4MoE with flashinfer_trtllm backend
+[2026-05-13 21:14:49 TP3] Using CompressedTensorsMxInt4MoE with flashinfer_trtllm backend
+[2026-05-13 21:14:49 TP0] Using CompressedTensorsMxInt4MoE with flashinfer_trtllm backend
+[2026-05-13 21:14:49 TP7] Using CompressedTensorsMxInt4MoE with flashinfer_trtllm backend
+Multi-thread loading shards:   0% Completed | 0/64 [00:00<?, ?it/s]Multi-thread loading shards:   2% Completed | 1/64 [00:01<01:12,  1.15s/it]Multi-thread loading shards:  12% Completed | 8/64 [00:01<00:06,  8.48it/s]Multi-thread loading shards:  20% Completed | 13/64 [00:02<00:06,  7.50it/s]Multi-thread loading shards:  27% Completed | 17/64 [00:02<00:04, 10.48it/s]Multi-thread loading shards:  33% Completed | 21/64 [00:03<00:06,  6.19it/s]Multi-thread loading shards:  41% Completed | 26/64 [00:03<00:05,  6.66it/s]Multi-thread loading shards:  44% Completed | 28/64 [00:04<00:04,  7.41it/s]Multi-thread loading shards:  52% Completed | 33/64 [00:04<00:02, 10.69it/s]Multi-thread loading shards:  56% Completed | 36/64 [00:04<00:03,  7.51it/s]Multi-thread loading shards:  66% Completed | 42/64 [00:06<00:03,  6.26it/s]Multi-thread loading shards:  70% Completed | 45/64 [00:06<00:02,  7.13it/s]Multi-thread loading shards:  78% Completed | 50/64 [00:06<00:01,  7.63it/s]Multi-thread loading shards:  83% Completed | 53/64 [00:07<00:01,  8.96it/s]Multi-thread loading shards:  86% Completed | 55/64 [00:07<00:00,  9.63it/s]Multi-thread loading shards:  94% Completed | 60/64 [00:07<00:00, 12.45it/s]Multi-thread loading shards: 100% Completed | 64/64 [00:07<00:00,  8.52it/s]
+[2026-05-13 21:15:43 TP2] Load weight end. elapsed=66.00 s, type=KimiK25ForConditionalGeneration, quant=compressed-tensors, avail mem=193.35 GB, mem usage=72.10 GB.
+[2026-05-13 21:15:44 TP4] Load weight end. elapsed=65.87 s, type=KimiK25ForConditionalGeneration, quant=compressed-tensors, avail mem=193.35 GB, mem usage=72.10 GB.
+[2026-05-13 21:15:44 TP5] Load weight end. elapsed=66.15 s, type=KimiK25ForConditionalGeneration, quant=compressed-tensors, avail mem=193.35 GB, mem usage=72.10 GB.
+[2026-05-13 21:15:44 TP6] Load weight end. elapsed=66.52 s, type=KimiK25ForConditionalGeneration, quant=compressed-tensors, avail mem=193.35 GB, mem usage=72.10 GB.
+[2026-05-13 21:15:44 TP1] Load weight end. elapsed=66.64 s, type=KimiK25ForConditionalGeneration, quant=compressed-tensors, avail mem=193.35 GB, mem usage=72.10 GB.
+[2026-05-13 21:15:45 TP3] Load weight end. elapsed=66.98 s, type=KimiK25ForConditionalGeneration, quant=compressed-tensors, avail mem=193.35 GB, mem usage=72.10 GB.
+[2026-05-13 21:15:45 TP0] Load weight end. elapsed=67.77 s, type=KimiK25ForConditionalGeneration, quant=compressed-tensors, avail mem=193.41 GB, mem usage=72.10 GB.
+[2026-05-13 21:15:46 TP7] Load weight end. elapsed=68.79 s, type=KimiK25ForConditionalGeneration, quant=compressed-tensors, avail mem=193.66 GB, mem usage=72.10 GB.
+[2026-05-13 21:15:46 TP0] Using KV cache dtype: torch.bfloat16
+[2026-05-13 21:15:46 TP7] KV Cache is allocated. #tokens: 2167296, KV size: 141.84 GB
+[2026-05-13 21:15:46 TP7] Memory pool end. avail mem=51.71 GB
+[2026-05-13 21:15:46 TP2] KV Cache is allocated. #tokens: 2167296, KV size: 141.84 GB
+[2026-05-13 21:15:46 TP2] Memory pool end. avail mem=51.40 GB
+[2026-05-13 21:15:46 TP5] KV Cache is allocated. #tokens: 2167296, KV size: 141.84 GB
+[2026-05-13 21:15:46 TP5] Memory pool end. avail mem=51.40 GB
+[2026-05-13 21:15:46 TP6] KV Cache is allocated. #tokens: 2167296, KV size: 141.84 GB
+[2026-05-13 21:15:46 TP6] Memory pool end. avail mem=51.40 GB
+[2026-05-13 21:15:46 TP0] KV Cache is allocated. #tokens: 2167296, KV size: 141.84 GB
+[2026-05-13 21:15:46 TP3] KV Cache is allocated. #tokens: 2167296, KV size: 141.84 GB
+[2026-05-13 21:15:46 TP0] Memory pool end. avail mem=51.46 GB
+[2026-05-13 21:15:46 TP3] Memory pool end. avail mem=51.40 GB
+[2026-05-13 21:15:46 TP1] KV Cache is allocated. #tokens: 2167296, KV size: 141.84 GB
+[2026-05-13 21:15:46 TP1] Memory pool end. avail mem=51.40 GB
+[2026-05-13 21:15:46 TP4] KV Cache is allocated. #tokens: 2167296, KV size: 141.84 GB
+[2026-05-13 21:15:46 TP4] Memory pool end. avail mem=51.40 GB
+[2026-05-13 21:15:58 TP2] Running FlashInfer autotune...
+2026-05-13 21:15:58,904 - INFO - autotuner.py:446 - flashinfer.jit: [Autotuner]: Autotuning process starts ...
+[2026-05-13 21:15:59 TP1] Running FlashInfer autotune...
+2026-05-13 21:15:59,029 - INFO - autotuner.py:446 - flashinfer.jit: [Autotuner]: Autotuning process starts ...
+[2026-05-13 21:15:59 TP4] Running FlashInfer autotune...
+2026-05-13 21:15:59,035 - INFO - autotuner.py:446 - flashinfer.jit: [Autotuner]: Autotuning process starts ...
+[2026-05-13 21:15:59 TP7] Running FlashInfer autotune...
+2026-05-13 21:15:59,083 - INFO - autotuner.py:446 - flashinfer.jit: [Autotuner]: Autotuning process starts ...
+[2026-05-13 21:15:59 TP5] Running FlashInfer autotune...
+2026-05-13 21:15:59,187 - INFO - autotuner.py:446 - flashinfer.jit: [Autotuner]: Autotuning process starts ...
+[2026-05-13 21:15:59 TP6] Running FlashInfer autotune...
+2026-05-13 21:15:59,187 - INFO - autotuner.py:446 - flashinfer.jit: [Autotuner]: Autotuning process starts ...
+[2026-05-13 21:15:59 TP3] Running FlashInfer autotune...
+2026-05-13 21:15:59,267 - INFO - autotuner.py:446 - flashinfer.jit: [Autotuner]: Autotuning process starts ...
+[2026-05-13 21:15:59 TP0] Running FlashInfer autotune...
+2026-05-13 21:15:59,309 - INFO - autotuner.py:446 - flashinfer.jit: [Autotuner]: Autotuning process starts ...
+2026-05-13 21:16:06,188 - CUTE_DSL - WARNING - [handle_import_error] - Unexpected error during package walk: cutlass.cute.experimental
+[2026-05-13 21:16:06 TP5] Unexpected error during package walk: cutlass.cute.experimental
+2026-05-13 21:16:06,337 - CUTE_DSL - WARNING - [handle_import_error] - Unexpected error during package walk: cutlass.cute.experimental
+[2026-05-13 21:16:06 TP1] Unexpected error during package walk: cutlass.cute.experimental
+2026-05-13 21:16:06,525 - CUTE_DSL - WARNING - [handle_import_error] - Unexpected error during package walk: cutlass.cute.experimental
+[2026-05-13 21:16:06 TP6] Unexpected error during package walk: cutlass.cute.experimental
+2026-05-13 21:16:06,679 - CUTE_DSL - WARNING - [handle_import_error] - Unexpected error during package walk: cutlass.cute.experimental
+[2026-05-13 21:16:06 TP2] Unexpected error during package walk: cutlass.cute.experimental
+2026-05-13 21:16:06,695 - CUTE_DSL - WARNING - [handle_import_error] - Unexpected error during package walk: cutlass.cute.experimental
+[2026-05-13 21:16:06 TP4] Unexpected error during package walk: cutlass.cute.experimental
+2026-05-13 21:16:06,757 - CUTE_DSL - WARNING - [handle_import_error] - Unexpected error during package walk: cutlass.cute.experimental
+[2026-05-13 21:16:06 TP0] Unexpected error during package walk: cutlass.cute.experimental
+2026-05-13 21:16:06,774 - CUTE_DSL - WARNING - [handle_import_error] - Unexpected error during package walk: cutlass.cute.experimental
+[2026-05-13 21:16:06 TP3] Unexpected error during package walk: cutlass.cute.experimental
+2026-05-13 21:16:06,832 - CUTE_DSL - WARNING - [handle_import_error] - Unexpected error during package walk: cutlass.cute.experimental
+[2026-05-13 21:16:06 TP7] Unexpected error during package walk: cutlass.cute.experimental
+[2026-05-13 21:16:23 TP3] [SymmDeviceMemory] Rank: 3, Group size: 8, device_idx: 3, Signal pad offset: 234881024
+[2026-05-13 21:16:23 TP5] [SymmDeviceMemory] Rank: 5, Group size: 8, device_idx: 5, Signal pad offset: 234881024
+[2026-05-13 21:16:23 TP0] [SymmDeviceMemory] Rank: 0, Group size: 8, device_idx: 0, Signal pad offset: 234881024
+[2026-05-13 21:16:23 TP1] [SymmDeviceMemory] Rank: 1, Group size: 8, device_idx: 1, Signal pad offset: 234881024
+[2026-05-13 21:16:23 TP6] [SymmDeviceMemory] Rank: 6, Group size: 8, device_idx: 6, Signal pad offset: 234881024
+[2026-05-13 21:16:23 TP2] [SymmDeviceMemory] Rank: 2, Group size: 8, device_idx: 2, Signal pad offset: 234881024
+[2026-05-13 21:16:23 TP7] [SymmDeviceMemory] Rank: 7, Group size: 8, device_idx: 7, Signal pad offset: 234881024
+[2026-05-13 21:16:23 TP4] [SymmDeviceMemory] Rank: 4, Group size: 8, device_idx: 4, Signal pad offset: 234881024
+/usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py:4876: UserWarning: barrier(): using the device under current context. You can specify `device_id` in `init_process_group` to mute this warning.
+  warnings.warn(  # warn only once
+[2026-05-13 21:16:24 TP2] [SymmDeviceMemory] Rank: 2, Group size: 8, device_idx: 2, Signal pad offset: 2097152
+[2026-05-13 21:16:24 TP4] [SymmDeviceMemory] Rank: 4, Group size: 8, device_idx: 4, Signal pad offset: 2097152
+[2026-05-13 21:16:24 TP3] [SymmDeviceMemory] Rank: 3, Group size: 8, device_idx: 3, Signal pad offset: 2097152
+[2026-05-13 21:16:24 TP6] [SymmDeviceMemory] Rank: 6, Group size: 8, device_idx: 6, Signal pad offset: 2097152
+[2026-05-13 21:16:24 TP1] [SymmDeviceMemory] Rank: 1, Group size: 8, device_idx: 1, Signal pad offset: 2097152
+[2026-05-13 21:16:24 TP0] [SymmDeviceMemory] Rank: 0, Group size: 8, device_idx: 0, Signal pad offset: 2097152
+[2026-05-13 21:16:24 TP5] [SymmDeviceMemory] Rank: 5, Group size: 8, device_idx: 5, Signal pad offset: 2097152
+[2026-05-13 21:16:24 TP7] [SymmDeviceMemory] Rank: 7, Group size: 8, device_idx: 7, Signal pad offset: 2097152
+[2026-05-13 21:16:24 TP7] [SymmDeviceMemory] Rank: 7, Group size: 8, device_idx: 7, Signal pad offset: 704643072
+[2026-05-13 21:16:24 TP6] [SymmDeviceMemory] Rank: 6, Group size: 8, device_idx: 6, Signal pad offset: 704643072
+[2026-05-13 21:16:24 TP3] [SymmDeviceMemory] Rank: 3, Group size: 8, device_idx: 3, Signal pad offset: 704643072
+[2026-05-13 21:16:24 TP2] [SymmDeviceMemory] Rank: 2, Group size: 8, device_idx: 2, Signal pad offset: 704643072
+[2026-05-13 21:16:24 TP5] [SymmDeviceMemory] Rank: 5, Group size: 8, device_idx: 5, Signal pad offset: 704643072
+[2026-05-13 21:16:24 TP1] [SymmDeviceMemory] Rank: 1, Group size: 8, device_idx: 1, Signal pad offset: 704643072
+[2026-05-13 21:16:24 TP0] [SymmDeviceMemory] Rank: 0, Group size: 8, device_idx: 0, Signal pad offset: 704643072
+[2026-05-13 21:16:24 TP4] [SymmDeviceMemory] Rank: 4, Group size: 8, device_idx: 4, Signal pad offset: 704643072
+[2026-05-13 21:16:24 TP4] FlashInfer workspace initialized for rank 4, world_size 8, backend trtllm
+[2026-05-13 21:16:24 TP3] FlashInfer workspace initialized for rank 3, world_size 8, backend trtllm
+[2026-05-13 21:16:24 TP7] FlashInfer workspace initialized for rank 7, world_size 8, backend trtllm
+[2026-05-13 21:16:24 TP5] FlashInfer workspace initialized for rank 5, world_size 8, backend trtllm
+[2026-05-13 21:16:24 TP2] FlashInfer workspace initialized for rank 2, world_size 8, backend trtllm
+[2026-05-13 21:16:24 TP0] FlashInfer workspace initialized for rank 0, world_size 8, backend trtllm
+[2026-05-13 21:16:24 TP1] FlashInfer workspace initialized for rank 1, world_size 8, backend trtllm
+[2026-05-13 21:16:24 TP6] FlashInfer workspace initialized for rank 6, world_size 8, backend trtllm
+2026-05-13 21:16:25,935 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/BatchedGemmEnums.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmEnums.h
+2026-05-13 21:16:25,936 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmEnums.h
+2026-05-13 21:16:25,963 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/BatchedGemmEnums.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmEnums.h
+2026-05-13 21:16:25,993 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/BatchedGemmEnums.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmEnums.h
+2026-05-13 21:16:26,059 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/BatchedGemmEnums.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmEnums.h
+2026-05-13 21:16:26,066 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmEnums.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmEnums.h
+2026-05-13 21:16:26,068 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/BatchedGemmInterface.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h
+2026-05-13 21:16:26,068 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h
+2026-05-13 21:16:26,088 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/BatchedGemmInterface.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h
+2026-05-13 21:16:26,094 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmEnums.h
+2026-05-13 21:16:26,112 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/BatchedGemmInterface.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h
+2026-05-13 21:16:26,118 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/BatchedGemmInterface.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h
+2026-05-13 21:16:26,146 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/BatchedGemmInterface.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h
+2026-05-13 21:16:26,301 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h
+2026-05-13 21:16:26,303 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/BatchedGemmOptions.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmOptions.h
+2026-05-13 21:16:26,303 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmOptions.h
+2026-05-13 21:16:26,313 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h
+2026-05-13 21:16:26,432 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmOptions.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmOptions.h
+2026-05-13 21:16:26,433 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmEnums.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmEnums.h
+2026-05-13 21:16:26,434 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/Enums.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/Enums.h
+2026-05-13 21:16:26,434 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/Enums.h
+2026-05-13 21:16:26,437 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/Enums.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/Enums.h
+2026-05-13 21:16:26,460 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmEnums.h
+2026-05-13 21:16:26,573 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h
+2026-05-13 21:16:26,576 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/Enums.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/Enums.h
+2026-05-13 21:16:26,590 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h
+2026-05-13 21:16:26,619 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmEnums.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmEnums.h
+2026-05-13 21:16:26,624 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/Enums.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/Enums.h
+2026-05-13 21:16:26,665 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmEnums.h
+2026-05-13 21:16:26,681 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/Enums.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/Enums.h
+2026-05-13 21:16:26,683 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/GemmGatedActOptions.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/GemmGatedActOptions.h
+2026-05-13 21:16:26,683 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/GemmGatedActOptions.h
+2026-05-13 21:16:26,688 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/Enums.h
+2026-05-13 21:16:26,805 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/GemmGatedActOptions.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/GemmGatedActOptions.h
+2026-05-13 21:16:26,806 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/GemmOptions.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/GemmOptions.h
+2026-05-13 21:16:26,807 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/GemmOptions.h
+2026-05-13 21:16:26,849 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h
+2026-05-13 21:16:26,854 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/GemmOptions.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/GemmOptions.h
+2026-05-13 21:16:26,870 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h
+2026-05-13 21:16:26,971 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/Enums.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/Enums.h
+2026-05-13 21:16:26,974 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/GemmOptions.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/GemmOptions.h
+2026-05-13 21:16:26,975 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/Enums.h
+2026-05-13 21:16:26,980 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/GemmOptions.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/GemmOptions.h
+2026-05-13 21:16:26,982 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/KernelParams.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParams.h
+2026-05-13 21:16:26,983 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParams.h
+2026-05-13 21:16:27,004 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/GemmOptions.h
+2026-05-13 21:16:27,074 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmEnums.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmEnums.h
+2026-05-13 21:16:27,081 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/KernelParams.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParams.h
+2026-05-13 21:16:27,131 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParams.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParams.h
+2026-05-13 21:16:27,132 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParams.h
+2026-05-13 21:16:27,133 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/KernelParamsDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParamsDecl.h
+2026-05-13 21:16:27,133 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParamsDecl.h
+2026-05-13 21:16:27,172 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h
+2026-05-13 21:16:27,180 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/KernelParamsDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParamsDecl.h
+2026-05-13 21:16:27,199 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h
+2026-05-13 21:16:27,211 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/GemmOptions.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/GemmOptions.h
+2026-05-13 21:16:27,214 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/KernelParamsDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParamsDecl.h
+2026-05-13 21:16:27,225 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/GemmOptions.h
+2026-05-13 21:16:27,225 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/Enums.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/Enums.h
+2026-05-13 21:16:27,228 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/Enums.h
+2026-05-13 21:16:27,231 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/KernelParamsDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParamsDecl.h
+2026-05-13 21:16:27,246 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParamsDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParamsDecl.h
+2026-05-13 21:16:27,248 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/KernelTraits.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelTraits.h
+2026-05-13 21:16:27,248 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelTraits.h
+2026-05-13 21:16:27,265 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParamsDecl.h
+2026-05-13 21:16:27,362 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/GemmOptions.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/GemmOptions.h
+2026-05-13 21:16:27,365 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/KernelTraits.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelTraits.h
+2026-05-13 21:16:27,493 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelTraits.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelTraits.h
+2026-05-13 21:16:27,495 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/TmaDescriptor.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h
+2026-05-13 21:16:27,495 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h
+2026-05-13 21:16:27,516 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelTraits.h
+2026-05-13 21:16:27,581 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParams.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParams.h
+2026-05-13 21:16:27,585 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/TmaDescriptor.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h
+2026-05-13 21:16:27,619 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/Enums.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/Enums.h
+2026-05-13 21:16:27,626 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/TmaDescriptor.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h
+2026-05-13 21:16:27,635 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelTraits.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelTraits.h
+2026-05-13 21:16:27,637 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/TmaDescriptor.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h
+2026-05-13 21:16:27,644 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/BatchedGemmInterface.h
+2026-05-13 21:16:27,653 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/TmaDescriptor.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h
+2026-05-13 21:16:27,730 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParamsDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParamsDecl.h
+2026-05-13 21:16:27,731 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParamsDecl.h
+2026-05-13 21:16:27,733 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/TmaDescriptor.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h
+2026-05-13 21:16:27,752 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h
+2026-05-13 21:16:27,754 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h
+2026-05-13 21:16:27,754 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/CommonUtils.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CommonUtils.h
+2026-05-13 21:16:27,755 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CommonUtils.h
+2026-05-13 21:16:27,867 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParamsDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParamsDecl.h
+2026-05-13 21:16:27,871 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/CommonUtils.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CommonUtils.h
+2026-05-13 21:16:27,882 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParamsDecl.h
+2026-05-13 21:16:28,006 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CommonUtils.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CommonUtils.h
+2026-05-13 21:16:28,008 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h
+2026-05-13 21:16:28,008 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h
+2026-05-13 21:16:28,020 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h
+2026-05-13 21:16:28,021 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CommonUtils.h
+2026-05-13 21:16:28,023 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h
+2026-05-13 21:16:28,027 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h
+2026-05-13 21:16:28,064 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParamsDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/KernelParamsDecl.h
+2026-05-13 21:16:28,069 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h
+2026-05-13 21:16:28,154 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h
+2026-05-13 21:16:28,157 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h
+2026-05-13 21:16:28,174 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h
+2026-05-13 21:16:28,176 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/CudaKernelLauncher.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaKernelLauncher.h
+2026-05-13 21:16:28,176 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaKernelLauncher.h
+2026-05-13 21:16:28,184 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h
+2026-05-13 21:16:28,207 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h
+2026-05-13 21:16:28,223 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CommonUtils.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CommonUtils.h
+2026-05-13 21:16:28,226 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/CudaKernelLauncher.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaKernelLauncher.h
+2026-05-13 21:16:28,318 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaKernelLauncher.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaKernelLauncher.h
+2026-05-13 21:16:28,320 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/DtypeDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/DtypeDecl.h
+2026-05-13 21:16:28,320 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/DtypeDecl.h
+2026-05-13 21:16:28,327 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaKernelLauncher.h
+2026-05-13 21:16:28,376 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h
+2026-05-13 21:16:28,379 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/DtypeDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/DtypeDecl.h
+2026-05-13 21:16:28,420 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h
+2026-05-13 21:16:28,441 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/DtypeDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/DtypeDecl.h
+2026-05-13 21:16:28,443 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h
+2026-05-13 21:16:28,443 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h
+2026-05-13 21:16:28,444 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h
+2026-05-13 21:16:28,450 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h
+2026-05-13 21:16:28,479 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/DtypeDecl.h
+2026-05-13 21:16:28,487 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h
+2026-05-13 21:16:28,580 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaKernelLauncher.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaKernelLauncher.h
+2026-05-13 21:16:28,583 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h
+2026-05-13 21:16:28,605 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h
+2026-05-13 21:16:28,611 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h
+2026-05-13 21:16:28,616 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/DtypeDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/DtypeDecl.h
+2026-05-13 21:16:28,618 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h
+2026-05-13 21:16:28,621 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h
+2026-05-13 21:16:28,623 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h
+2026-05-13 21:16:28,623 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h
+2026-05-13 21:16:28,627 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h
+2026-05-13 21:16:28,632 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h
+2026-05-13 21:16:28,633 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h
+2026-05-13 21:16:28,639 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h
+2026-05-13 21:16:28,675 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h
+2026-05-13 21:16:28,778 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/TmaDescriptor.h
+2026-05-13 21:16:28,785 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h
+2026-05-13 21:16:28,817 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h
+2026-05-13 21:16:28,819 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/CudaArchDecl.h
+2026-05-13 21:16:28,819 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h
+2026-05-13 21:16:28,819 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h
+2026-05-13 21:16:28,824 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h
+2026-05-13 21:16:28,846 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h
+2026-05-13 21:16:28,848 - INFO - cubin_loader.py:224 - flashinfer.jit: Fetching b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c//include/trtllmGen_bmm_export/trtllm/gen/SparsityDecl.h from https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SparsityDecl.h
+2026-05-13 21:16:28,848 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SparsityDecl.h
+2026-05-13 21:16:28,869 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h
+2026-05-13 21:16:28,972 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SparsityDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SparsityDecl.h
+2026-05-13 21:16:29,070 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h
+2026-05-13 21:16:29,074 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h
+2026-05-13 21:16:29,094 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h
+2026-05-13 21:16:29,101 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h
+2026-05-13 21:16:29,268 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h
+2026-05-13 21:16:29,311 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h
+2026-05-13 21:16:29,313 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h
+2026-05-13 21:16:29,333 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h
+2026-05-13 21:16:29,498 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/MmaDecl.h
+2026-05-13 21:16:29,714 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h
+2026-05-13 21:16:29,737 - INFO - cubin_loader.py:83 - flashinfer.jit: Acquired lock for /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h
+2026-05-13 21:16:29,939 - INFO - cubin_loader.py:113 - flashinfer.jit: File downloaded successfully: https://edge.urm.nvidia.com/artifactory/sw-kernelinferencelibrary-public-generic-local/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h -> /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins/b55211623be7f5697c5262ffd8361fc06c147bc9/batched_gemm-b3c1646-c111d7c/include/trtllmGen_bmm_export/trtllm/gen/SfLayoutDecl.h
+2026-05-13 21:16:33,382 - INFO - autotuner.py:455 - flashinfer.jit: [Autotuner]: Autotuning process ends
+2026-05-13 21:16:33,382 - INFO - autotuner.py:455 - flashinfer.jit: [Autotuner]: Autotuning process ends
+2026-05-13 21:16:33,382 - INFO - autotuner.py:455 - flashinfer.jit: [Autotuner]: Autotuning process ends
+2026-05-13 21:16:33,382 - INFO - autotuner.py:455 - flashinfer.jit: [Autotuner]: Autotuning process ends
+2026-05-13 21:16:33,382 - INFO - autotuner.py:455 - flashinfer.jit: [Autotuner]: Autotuning process ends
+[2026-05-13 21:16:33 TP2] FlashInfer autotune completed.
+[2026-05-13 21:16:33 TP7] FlashInfer autotune completed.
+[2026-05-13 21:16:33 TP5] FlashInfer autotune completed.
+[2026-05-13 21:16:33 TP3] FlashInfer autotune completed.
+[2026-05-13 21:16:33 TP4] FlashInfer autotune completed.
+2026-05-13 21:16:33,382 - INFO - autotuner.py:455 - flashinfer.jit: [Autotuner]: Autotuning process ends
+[2026-05-13 21:16:33 TP6] FlashInfer autotune completed.
+2026-05-13 21:16:33,383 - INFO - autotuner.py:455 - flashinfer.jit: [Autotuner]: Autotuning process ends
+[2026-05-13 21:16:33 TP0] FlashInfer autotune completed.
+2026-05-13 21:16:33,383 - INFO - autotuner.py:455 - flashinfer.jit: [Autotuner]: Autotuning process ends
+[2026-05-13 21:16:33 TP1] FlashInfer autotune completed.
+[2026-05-13 21:16:33 TP3] Capture cuda graph begin. This can take up to several minutes. avail mem=46.73 GB
+[2026-05-13 21:16:33 TP4] Capture cuda graph begin. This can take up to several minutes. avail mem=46.73 GB
+[2026-05-13 21:16:33 TP5] Capture cuda graph begin. This can take up to several minutes. avail mem=46.73 GB
+[2026-05-13 21:16:33 TP2] Capture cuda graph begin. This can take up to several minutes. avail mem=46.73 GB
+[2026-05-13 21:16:33 TP6] Capture cuda graph begin. This can take up to several minutes. avail mem=46.73 GB
+[2026-05-13 21:16:33 TP7] Capture cuda graph begin. This can take up to several minutes. avail mem=47.67 GB
+[2026-05-13 21:16:33 TP0] Capture cuda graph begin. This can take up to several minutes. avail mem=46.92 GB
+[2026-05-13 21:16:33 TP0] Capture cuda graph bs [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 40, 44, 48]
+[2026-05-13 21:16:33 TP1] Capture cuda graph begin. This can take up to several minutes. avail mem=46.73 GB
+  0%|          | 0/23 [00:00<?, ?it/s]Capturing batches (bs=48 avail_mem=46.72 GB):   0%|          | 0/23 [00:00<?, ?it/s]Capturing batches (bs=48 avail_mem=46.72 GB):   4%|▍         | 1/23 [00:00<00:21,  1.05it/s]Capturing batches (bs=44 avail_mem=46.25 GB):   4%|▍         | 1/23 [00:00<00:21,  1.05it/s]Capturing batches (bs=44 avail_mem=46.25 GB):   9%|▊         | 2/23 [00:01<00:13,  1.55it/s]Capturing batches (bs=40 avail_mem=46.24 GB):   9%|▊         | 2/23 [00:01<00:13,  1.55it/s]Capturing batches (bs=40 avail_mem=46.24 GB):  13%|█▎        | 3/23 [00:01<00:09,  2.08it/s]Capturing batches (bs=32 avail_mem=46.23 GB):  13%|█▎        | 3/23 [00:01<00:09,  2.08it/s]Capturing batches (bs=32 avail_mem=46.23 GB):  17%|█▋        | 4/23 [00:01<00:07,  2.44it/s]Capturing batches (bs=30 avail_mem=46.22 GB):  17%|█▋        | 4/23 [00:01<00:07,  2.44it/s]Capturing batches (bs=30 avail_mem=46.22 GB):  22%|██▏       | 5/23 [00:02<00:06,  2.74it/s]Capturing batches (bs=28 avail_mem=46.21 GB):  22%|██▏       | 5/23 [00:02<00:06,  2.74it/s]Capturing batches (bs=28 avail_mem=46.21 GB):  26%|██▌       | 6/23 [00:02<00:05,  2.92it/s]Capturing batches (bs=26 avail_mem=46.19 GB):  26%|██▌       | 6/23 [00:02<00:05,  2.92it/s]Capturing batches (bs=26 avail_mem=46.19 GB):  30%|███       | 7/23 [00:02<00:05,  3.08it/s]Capturing batches (bs=24 avail_mem=46.18 GB):  30%|███       | 7/23 [00:02<00:05,  3.08it/s]Capturing batches (bs=24 avail_mem=46.18 GB):  35%|███▍      | 8/23 [00:03<00:04,  3.18it/s]Capturing batches (bs=22 avail_mem=46.17 GB):  35%|███▍      | 8/23 [00:03<00:04,  3.18it/s]Capturing batches (bs=22 avail_mem=46.17 GB):  39%|███▉      | 9/23 [00:03<00:04,  3.27it/s]Capturing batches (bs=20 avail_mem=46.16 GB):  39%|███▉      | 9/23 [00:03<00:04,  3.27it/s]Capturing batches (bs=20 avail_mem=46.16 GB):  43%|████▎     | 10/23 [00:03<00:03,  3.34it/s]Capturing batches (bs=18 avail_mem=46.15 GB):  43%|████▎     | 10/23 [00:03<00:03,  3.34it/s]Capturing batches (bs=18 avail_mem=46.15 GB):  48%|████▊     | 11/23 [00:03<00:03,  3.38it/s]Capturing batches (bs=16 avail_mem=46.13 GB):  48%|████▊     | 11/23 [00:03<00:03,  3.38it/s]Capturing batches (bs=16 avail_mem=46.13 GB):  52%|█████▏    | 12/23 [00:04<00:03,  3.43it/s]Capturing batches (bs=14 avail_mem=46.12 GB):  52%|█████▏    | 12/23 [00:04<00:03,  3.43it/s]Capturing batches (bs=14 avail_mem=46.12 GB):  57%|█████▋    | 13/23 [00:04<00:03,  3.21it/s]Capturing batches (bs=12 avail_mem=46.10 GB):  57%|█████▋    | 13/23 [00:04<00:03,  3.21it/s]Capturing batches (bs=12 avail_mem=46.10 GB):  61%|██████    | 14/23 [00:04<00:02,  3.28it/s]Capturing batches (bs=10 avail_mem=46.09 GB):  61%|██████    | 14/23 [00:04<00:02,  3.28it/s]Capturing batches (bs=10 avail_mem=46.09 GB):  65%|██████▌   | 15/23 [00:05<00:02,  3.33it/s]Capturing batches (bs=8 avail_mem=46.07 GB):  65%|██████▌   | 15/23 [00:05<00:02,  3.33it/s] Capturing batches (bs=8 avail_mem=46.07 GB):  70%|██████▉   | 16/23 [00:05<00:02,  3.36it/s]Capturing batches (bs=7 avail_mem=46.06 GB):  70%|██████▉   | 16/23 [00:05<00:02,  3.36it/s]Capturing batches (bs=7 avail_mem=46.06 GB):  74%|███████▍  | 17/23 [00:05<00:01,  3.39it/s]Capturing batches (bs=6 avail_mem=46.05 GB):  74%|███████▍  | 17/23 [00:05<00:01,  3.39it/s]Capturing batches (bs=6 avail_mem=46.05 GB):  78%|███████▊  | 18/23 [00:06<00:01,  3.42it/s]Capturing batches (bs=5 avail_mem=46.04 GB):  78%|███████▊  | 18/23 [00:06<00:01,  3.42it/s]Capturing batches (bs=5 avail_mem=46.04 GB):  83%|████████▎ | 19/23 [00:06<00:01,  3.48it/s]Capturing batches (bs=4 avail_mem=46.02 GB):  83%|████████▎ | 19/23 [00:06<00:01,  3.48it/s]Capturing batches (bs=4 avail_mem=46.02 GB):  87%|████████▋ | 20/23 [00:06<00:00,  3.49it/s]Capturing batches (bs=3 avail_mem=46.01 GB):  87%|████████▋ | 20/23 [00:06<00:00,  3.49it/s]Capturing batches (bs=3 avail_mem=46.01 GB):  91%|█████████▏| 21/23 [00:06<00:00,  3.52it/s]Capturing batches (bs=2 avail_mem=46.00 GB):  91%|█████████▏| 21/23 [00:06<00:00,  3.52it/s]Capturing batches (bs=2 avail_mem=46.00 GB):  96%|█████████▌| 22/23 [00:07<00:00,  3.57it/s]Capturing batches (bs=1 avail_mem=45.99 GB):  96%|█████████▌| 22/23 [00:07<00:00,  3.57it/s]Capturing batches (bs=1 avail_mem=45.99 GB): 100%|██████████| 23/23 [00:07<00:00,  3.34it/s]Capturing batches (bs=1 avail_mem=45.99 GB): 100%|██████████| 23/23 [00:07<00:00,  3.05it/s]
+[2026-05-13 21:16:41 TP0] Registering 46 cuda graph addresses
+[2026-05-13 21:16:41 TP7] Capture cuda graph end. Time elapsed: 8.47 s. mem usage=0.94 GB. avail mem=46.73 GB.
+[2026-05-13 21:16:41 TP7] Disable piecewise CUDA graph because --disable-piecewise-cuda-graph is set
+[2026-05-13 21:16:41 TP4] Capture cuda graph end. Time elapsed: 8.50 s. mem usage=0.94 GB. avail mem=45.79 GB.
+[2026-05-13 21:16:41 TP4] Disable piecewise CUDA graph because --disable-piecewise-cuda-graph is set
+[2026-05-13 21:16:41 TP3] Capture cuda graph end. Time elapsed: 8.53 s. mem usage=0.94 GB. avail mem=45.79 GB.
+[2026-05-13 21:16:41 TP3] Disable piecewise CUDA graph because --disable-piecewise-cuda-graph is set
+[2026-05-13 21:16:41 TP5] Capture cuda graph end. Time elapsed: 8.55 s. mem usage=0.94 GB. avail mem=45.79 GB.
+[2026-05-13 21:16:41 TP5] Disable piecewise CUDA graph because --disable-piecewise-cuda-graph is set
+[2026-05-13 21:16:41 TP6] Capture cuda graph end. Time elapsed: 8.55 s. mem usage=0.94 GB. avail mem=45.79 GB.
+[2026-05-13 21:16:41 TP6] Disable piecewise CUDA graph because --disable-piecewise-cuda-graph is set
+[2026-05-13 21:16:41 TP2] Capture cuda graph end. Time elapsed: 8.55 s. mem usage=0.94 GB. avail mem=45.79 GB.
+[2026-05-13 21:16:41 TP2] Disable piecewise CUDA graph because --disable-piecewise-cuda-graph is set
+[2026-05-13 21:16:42 TP0] Capture cuda graph end. Time elapsed: 8.65 s. mem usage=0.94 GB. avail mem=45.98 GB.
+[2026-05-13 21:16:42 TP0] Disable piecewise CUDA graph because --disable-piecewise-cuda-graph is set
+[2026-05-13 21:16:42 TP7] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:16:42 TP7] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:16:42 TP1] Capture cuda graph end. Time elapsed: 8.69 s. mem usage=0.94 GB. avail mem=45.79 GB.
+[2026-05-13 21:16:42 TP1] Disable piecewise CUDA graph because --disable-piecewise-cuda-graph is set
+[2026-05-13 21:16:42 TP4] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:16:42 TP4] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:16:42 TP3] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:16:42 TP3] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:16:42 TP5] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:16:42 TP5] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:16:42 TP6] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:16:42 TP6] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:16:42 TP2] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:16:42 TP2] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:16:42 TP0] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:16:42 TP0] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:16:42 TP1] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:16:42 TP1] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:16:42 TP4] Init torch distributed begin.
+[2026-05-13 21:16:42 TP0] Init torch distributed begin.
+[2026-05-13 21:16:42 TP6] Init torch distributed begin.
+[2026-05-13 21:16:42 TP2] Init torch distributed begin.
+[2026-05-13 21:16:42 TP5] Init torch distributed begin.
+[2026-05-13 21:16:42 TP7] Init torch distributed begin.
+[2026-05-13 21:16:42 TP1] Init torch distributed begin.
+[2026-05-13 21:16:42 TP3] Init torch distributed begin.
+[2026-05-13 21:16:42 TP0] Init torch distributed ends. elapsed=0.00 s, mem usage=0.00 GB
+[2026-05-13 21:16:42 TP7] Init torch distributed ends. elapsed=0.00 s, mem usage=0.00 GB
+[2026-05-13 21:16:42 TP6] Init torch distributed ends. elapsed=0.00 s, mem usage=0.00 GB
+[2026-05-13 21:16:42 TP5] Init torch distributed ends. elapsed=0.00 s, mem usage=0.00 GB
+[2026-05-13 21:16:42 TP4] Init torch distributed ends. elapsed=0.00 s, mem usage=0.00 GB
+[2026-05-13 21:16:42 TP3] Init torch distributed ends. elapsed=0.00 s, mem usage=0.00 GB
+[2026-05-13 21:16:42 TP2] Init torch distributed ends. elapsed=0.00 s, mem usage=0.00 GB
+[2026-05-13 21:16:42 TP1] Init torch distributed ends. elapsed=0.00 s, mem usage=0.00 GB
+[2026-05-13 21:16:42 TP7] Load weight begin. avail mem=46.73 GB
+[2026-05-13 21:16:42 TP6] Load weight begin. avail mem=45.79 GB
+[2026-05-13 21:16:42 TP4] Load weight begin. avail mem=45.79 GB
+[2026-05-13 21:16:42 TP0] Load weight begin. avail mem=45.98 GB
+[2026-05-13 21:16:42 TP3] Load weight begin. avail mem=45.79 GB
+[2026-05-13 21:16:42 TP2] Load weight begin. avail mem=45.79 GB
+[2026-05-13 21:16:42 TP5] Load weight begin. avail mem=45.79 GB
+[2026-05-13 21:16:42 TP1] Load weight begin. avail mem=45.79 GB
+Multi-thread loading shards:   0% Completed | 0/2 [00:00<?, ?it/s]Multi-thread loading shards:  50% Completed | 1/2 [00:00<00:00,  7.15it/s]Multi-thread loading shards: 100% Completed | 2/2 [00:00<00:00,  7.87it/s]Multi-thread loading shards: 100% Completed | 2/2 [00:00<00:00,  7.75it/s]
+[2026-05-13 21:16:43 TP2] Load weight end. elapsed=0.29 s, type=LlamaForCausalLMEagle3, avail mem=44.61 GB, mem usage=1.18 GB.
+[2026-05-13 21:16:43 TP0] Load weight end. elapsed=0.29 s, type=LlamaForCausalLMEagle3, avail mem=44.80 GB, mem usage=1.18 GB.
+[2026-05-13 21:16:43 TP4] Load weight end. elapsed=0.29 s, type=LlamaForCausalLMEagle3, avail mem=44.61 GB, mem usage=1.18 GB.
+[2026-05-13 21:16:43 TP6] Load weight end. elapsed=0.29 s, type=LlamaForCausalLMEagle3, avail mem=44.61 GB, mem usage=1.18 GB.
+[2026-05-13 21:16:43 TP3] Load weight end. elapsed=0.30 s, type=LlamaForCausalLMEagle3, avail mem=44.61 GB, mem usage=1.18 GB.
+[2026-05-13 21:16:43 TP1] Load weight end. elapsed=0.36 s, type=LlamaForCausalLMEagle3, avail mem=44.61 GB, mem usage=1.18 GB.
+[2026-05-13 21:16:43 TP5] Load weight end. elapsed=0.36 s, type=LlamaForCausalLMEagle3, avail mem=44.61 GB, mem usage=1.18 GB.
+[2026-05-13 21:16:43 TP7] Load weight end. elapsed=0.37 s, type=LlamaForCausalLMEagle3, avail mem=45.55 GB, mem usage=1.18 GB.
+[2026-05-13 21:16:43 TP0] Using KV cache dtype: torch.bfloat16
+[2026-05-13 21:16:43 TP6] KV Cache is allocated. #tokens: 2167296, K size: 4.13 GB, V size: 4.13 GB
+[2026-05-13 21:16:43 TP5] KV Cache is allocated. #tokens: 2167296, K size: 4.13 GB, V size: 4.13 GB
+[2026-05-13 21:16:43 TP6] Memory pool end. avail mem=36.34 GB
+[2026-05-13 21:16:43 TP7] KV Cache is allocated. #tokens: 2167296, K size: 4.13 GB, V size: 4.13 GB
+[2026-05-13 21:16:43 TP3] KV Cache is allocated. #tokens: 2167296, K size: 4.13 GB, V size: 4.13 GB
+[2026-05-13 21:16:43 TP4] KV Cache is allocated. #tokens: 2167296, K size: 4.13 GB, V size: 4.13 GB
+[2026-05-13 21:16:43 TP0] KV Cache is allocated. #tokens: 2167296, K size: 4.13 GB, V size: 4.13 GB
+[2026-05-13 21:16:43 TP1] KV Cache is allocated. #tokens: 2167296, K size: 4.13 GB, V size: 4.13 GB
+[2026-05-13 21:16:43 TP6] Overriding draft attention backend to trtllm_mha.
+[2026-05-13 21:16:43 TP2] KV Cache is allocated. #tokens: 2167296, K size: 4.13 GB, V size: 4.13 GB
+[2026-05-13 21:16:43 TP7] Memory pool end. avail mem=37.27 GB
+[2026-05-13 21:16:43 TP7] Overriding draft attention backend to trtllm_mha.
+[2026-05-13 21:16:43 TP3] Memory pool end. avail mem=36.34 GB
+[2026-05-13 21:16:43 TP4] Memory pool end. avail mem=36.34 GB
+[2026-05-13 21:16:43 TP5] Memory pool end. avail mem=36.34 GB
+[2026-05-13 21:16:43 TP0] Memory pool end. avail mem=36.52 GB
+[2026-05-13 21:16:43 TP1] Memory pool end. avail mem=36.34 GB
+[2026-05-13 21:16:43 TP2] Memory pool end. avail mem=36.34 GB
+[2026-05-13 21:16:43 TP4] Overriding draft attention backend to trtllm_mha.
+[2026-05-13 21:16:43 TP3] Overriding draft attention backend to trtllm_mha.
+[2026-05-13 21:16:43 TP5] Overriding draft attention backend to trtllm_mha.
+[2026-05-13 21:16:43 TP0] Overriding draft attention backend to trtllm_mha.
+[2026-05-13 21:16:43 TP2] Overriding draft attention backend to trtllm_mha.
+[2026-05-13 21:16:43 TP1] Overriding draft attention backend to trtllm_mha.
+[2026-05-13 21:16:43 TP6] Disable piecewise CUDA graph because --disable-piecewise-cuda-graph is set
+[2026-05-13 21:16:43 TP0] Disable piecewise CUDA graph because --disable-piecewise-cuda-graph is set
+[2026-05-13 21:16:43 TP2] Disable piecewise CUDA graph because --disable-piecewise-cuda-graph is set
+[2026-05-13 21:16:43 TP5] Disable piecewise CUDA graph because --disable-piecewise-cuda-graph is set
+[2026-05-13 21:16:43 TP1] Disable piecewise CUDA graph because --disable-piecewise-cuda-graph is set
+[2026-05-13 21:16:43 TP4] Disable piecewise CUDA graph because --disable-piecewise-cuda-graph is set
+[2026-05-13 21:16:43 TP3] Disable piecewise CUDA graph because --disable-piecewise-cuda-graph is set
+[2026-05-13 21:16:43 TP7] Disable piecewise CUDA graph because --disable-piecewise-cuda-graph is set
+[2026-05-13 21:16:43 TP6] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:16:43 TP6] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:16:43 TP5] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:16:43 TP5] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:16:43 TP4] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:16:43 TP4] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:16:43 TP2] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:16:43 TP2] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:16:43 TP7] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:16:43 TP7] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:16:43 TP0] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:16:43 TP0] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:16:43 TP3] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:16:43 TP3] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+[2026-05-13 21:16:43 TP1] Reloaded tiktoken model from /mnt/nvme/models/kimi-k26-fp8/tiktoken.model
+[2026-05-13 21:16:43 TP1] #words: 163840 - BOS ID: 163584 - EOS ID: 163585
+/sgl-workspace/sglang/python/sglang/srt/utils/hf_transformers_utils.py:873: UserWarning: Using a slow tokenizer. This might cause a significant slowdown. Consider using a fast tokenizer instead.
+  warnings.warn(
+/sgl-workspace/sglang/python/sglang/srt/utils/hf_transformers_utils.py:873: UserWarning: Using a slow tokenizer. This might cause a significant slowdown. Consider using a fast tokenizer instead.
+  warnings.warn(
+/sgl-workspace/sglang/python/sglang/srt/utils/hf_transformers_utils.py:873: UserWarning: Using a slow tokenizer. This might cause a significant slowdown. Consider using a fast tokenizer instead.
+  warnings.warn(
+/sgl-workspace/sglang/python/sglang/srt/utils/hf_transformers_utils.py:873: UserWarning: Using a slow tokenizer. This might cause a significant slowdown. Consider using a fast tokenizer instead.
+  warnings.warn(
+/sgl-workspace/sglang/python/sglang/srt/utils/hf_transformers_utils.py:873: UserWarning: Using a slow tokenizer. This might cause a significant slowdown. Consider using a fast tokenizer instead.
+  warnings.warn(
+/sgl-workspace/sglang/python/sglang/srt/utils/hf_transformers_utils.py:873: UserWarning: Using a slow tokenizer. This might cause a significant slowdown. Consider using a fast tokenizer instead.
+  warnings.warn(
+/sgl-workspace/sglang/python/sglang/srt/utils/hf_transformers_utils.py:873: UserWarning: Using a slow tokenizer. This might cause a significant slowdown. Consider using a fast tokenizer instead.
+  warnings.warn(
+/sgl-workspace/sglang/python/sglang/srt/utils/hf_transformers_utils.py:873: UserWarning: Using a slow tokenizer. This might cause a significant slowdown. Consider using a fast tokenizer instead.
+  warnings.warn(
+[2026-05-13 21:16:44 TP4] Capture draft cuda graph begin. This can take up to several minutes. avail mem=35.54 GB
+[2026-05-13 21:16:44 TP7] Capture draft cuda graph begin. This can take up to several minutes. avail mem=36.48 GB
+[2026-05-13 21:16:44 TP5] Capture draft cuda graph begin. This can take up to several minutes. avail mem=35.54 GB
+[2026-05-13 21:16:44 TP2] Capture draft cuda graph begin. This can take up to several minutes. avail mem=35.54 GB
+[2026-05-13 21:16:44 TP3] Capture draft cuda graph begin. This can take up to several minutes. avail mem=35.54 GB
+[2026-05-13 21:16:44 TP6] Capture draft cuda graph begin. This can take up to several minutes. avail mem=35.54 GB
+[2026-05-13 21:16:44 TP1] Capture draft cuda graph begin. This can take up to several minutes. avail mem=35.54 GB
+[2026-05-13 21:16:44 TP0] Capture draft cuda graph begin. This can take up to several minutes. avail mem=35.73 GB
+  0%|          | 0/23 [00:00<?, ?it/s]Capturing batches (bs=48 avail_mem=35.71 GB):   0%|          | 0/23 [00:00<?, ?it/s]Capturing batches (bs=48 avail_mem=35.71 GB):   4%|▍         | 1/23 [00:20<07:34, 20.68s/it]Capturing batches (bs=44 avail_mem=35.54 GB):   4%|▍         | 1/23 [00:20<07:34, 20.68s/it]Capturing batches (bs=44 avail_mem=35.54 GB):   9%|▊         | 2/23 [00:21<03:03,  8.73s/it]Capturing batches (bs=40 avail_mem=35.54 GB):   9%|▊         | 2/23 [00:21<03:03,  8.73s/it]Capturing batches (bs=32 avail_mem=35.54 GB):   9%|▊         | 2/23 [00:21<03:03,  8.73s/it]Capturing batches (bs=30 avail_mem=35.54 GB):   9%|▊         | 2/23 [00:21<03:03,  8.73s/it]Capturing batches (bs=28 avail_mem=35.54 GB):   9%|▊         | 2/23 [00:21<03:03,  8.73s/it]Capturing batches (bs=26 avail_mem=35.54 GB):   9%|▊         | 2/23 [00:21<03:03,  8.73s/it]Capturing batches (bs=24 avail_mem=35.54 GB):   9%|▊         | 2/23 [00:21<03:03,  8.73s/it]Capturing batches (bs=24 avail_mem=35.54 GB):  35%|███▍      | 8/23 [00:21<00:21,  1.46s/it]Capturing batches (bs=22 avail_mem=35.54 GB):  35%|███▍      | 8/23 [00:21<00:21,  1.46s/it]Capturing batches (bs=20 avail_mem=35.54 GB):  35%|███▍      | 8/23 [00:21<00:21,  1.46s/it]Capturing batches (bs=18 avail_mem=35.54 GB):  35%|███▍      | 8/23 [00:21<00:21,  1.46s/it]Capturing batches (bs=16 avail_mem=35.54 GB):  35%|███▍      | 8/23 [00:21<00:21,  1.46s/it]Capturing batches (bs=14 avail_mem=35.54 GB):  35%|███▍      | 8/23 [00:21<00:21,  1.46s/it]Capturing batches (bs=12 avail_mem=35.54 GB):  35%|███▍      | 8/23 [00:21<00:21,  1.46s/it]Capturing batches (bs=12 avail_mem=35.54 GB):  61%|██████    | 14/23 [00:21<00:06,  1.48it/s]Capturing batches (bs=10 avail_mem=35.54 GB):  61%|██████    | 14/23 [00:21<00:06,  1.48it/s]Capturing batches (bs=8 avail_mem=35.54 GB):  61%|██████    | 14/23 [00:21<00:06,  1.48it/s] Capturing batches (bs=7 avail_mem=35.54 GB):  61%|██████    | 14/23 [00:21<00:06,  1.48it/s]Capturing batches (bs=6 avail_mem=35.54 GB):  61%|██████    | 14/23 [00:21<00:06,  1.48it/s]Capturing batches (bs=5 avail_mem=35.54 GB):  61%|██████    | 14/23 [00:21<00:06,  1.48it/s]Capturing batches (bs=5 avail_mem=35.54 GB):  83%|████████▎ | 19/23 [00:21<00:01,  2.37it/s]Capturing batches (bs=4 avail_mem=35.53 GB):  83%|████████▎ | 19/23 [00:21<00:01,  2.37it/s]Capturing batches (bs=3 avail_mem=35.53 GB):  83%|████████▎ | 19/23 [00:21<00:01,  2.37it/s]Capturing batches (bs=2 avail_mem=35.53 GB):  83%|████████▎ | 19/23 [00:21<00:01,  2.37it/s]Capturing batches (bs=1 avail_mem=35.53 GB):  83%|████████▎ | 19/23 [00:21<00:01,  2.37it/s]Capturing batches (bs=1 avail_mem=35.53 GB): 100%|██████████| 23/23 [00:22<00:00,  2.62it/s]Capturing batches (bs=1 avail_mem=35.53 GB): 100%|██████████| 23/23 [00:22<00:00,  1.02it/s]
+[2026-05-13 21:17:07 TP0] Registering 207 cuda graph addresses
+[2026-05-13 21:17:07 TP3] Capture draft cuda graph end. Time elapsed: 23.43 s. mem usage=0.19 GB. avail mem=35.35 GB.
+[2026-05-13 21:17:07 TP7] Capture draft cuda graph end. Time elapsed: 23.43 s. mem usage=0.19 GB. avail mem=36.28 GB.
+[2026-05-13 21:17:07 TP2] Capture draft cuda graph end. Time elapsed: 23.43 s. mem usage=0.19 GB. avail mem=35.35 GB.
+[2026-05-13 21:17:07 TP6] Capture draft cuda graph end. Time elapsed: 23.44 s. mem usage=0.19 GB. avail mem=35.35 GB.
+[2026-05-13 21:17:07 TP5] Capture draft cuda graph end. Time elapsed: 23.45 s. mem usage=0.19 GB. avail mem=35.35 GB.
+[2026-05-13 21:17:07 TP4] Capture draft cuda graph end. Time elapsed: 23.45 s. mem usage=0.19 GB. avail mem=35.35 GB.
+[2026-05-13 21:17:07 TP0] Capture draft cuda graph end. Time elapsed: 23.49 s. mem usage=0.19 GB. avail mem=35.53 GB.
+[2026-05-13 21:17:07 TP0] max_total_num_tokens=2167296, chunked_prefill_size=16384, max_prefill_tokens=16384, max_running_requests=48, context_len=262144, available_gpu_mem=35.53 GB
+[2026-05-13 21:17:07 TP1] Capture draft cuda graph end. Time elapsed: 23.57 s. mem usage=0.19 GB. avail mem=35.35 GB.
+[2026-05-13 21:17:07] INFO:     Started server process [1]
+[2026-05-13 21:17:07] INFO:     Waiting for application startup.
+[2026-05-13 21:17:07] Calling super().encode with {'add_special_tokens': False}
+[2026-05-13 21:17:07] Calling super().encode with {'add_special_tokens': False}
+[2026-05-13 21:17:07] INFO:     Application startup complete.
+[2026-05-13 21:17:07] INFO:     Uvicorn running on http://0.0.0.0:30000 (Press CTRL+C to quit)
+[2026-05-13 21:17:08] INFO:     127.0.0.1:38394 - "GET /model_info HTTP/1.1" 200 OK
+[2026-05-13 21:17:09] INFO:     127.0.0.1:38412 - "GET /health HTTP/1.1" 503 Service Unavailable
+[2026-05-13 21:17:14] INFO:     127.0.0.1:38426 - "GET /health HTTP/1.1" 503 Service Unavailable
+2026-05-13 21:17:19.356 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP2] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.356 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP2] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.356 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP2] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.356 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP2] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.356 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP2] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.409 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP7] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.409 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP7] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.409 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP7] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.409 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP7] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.410 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP7] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.429 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP1] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.430 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP1] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.430 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP1] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.430 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP1] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.430 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP1] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.444 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP5] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.444 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP5] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.444 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP5] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.444 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP5] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.444 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP5] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.461 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP0] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.461 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP0] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.461 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP0] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.461 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP0] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.462 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP0] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.504 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP4] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.504 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP4] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.504 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP4] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.504 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP4] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.505 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP4] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.552 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP3] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.552 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP3] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.552 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP3] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.552 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP3] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.552 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP3] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.567 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP6] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.568 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP6] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.568 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP6] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.568 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP6] Persistent cache disabled, using in-memory JIT cache
+2026-05-13 21:17:19.568 DEBUG Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19 TP6] Persistent cache disabled, using in-memory JIT cache
+[2026-05-13 21:17:19] INFO:     127.0.0.1:36540 - "GET /health HTTP/1.1" 503 Service Unavailable
+[2026-05-13 21:17:24] INFO:     127.0.0.1:36548 - "GET /health HTTP/1.1" 503 Service Unavailable
+[2026-05-13 21:17:29] INFO:     127.0.0.1:52720 - "GET /health HTTP/1.1" 503 Service Unavailable
+[2026-05-13 21:17:34 TP0] Prefill batch, #new-seq: 1, #new-token: 64, #cached-token: 0, token usage: 0.00, #running-req: 0, #queue-req: 0, cuda graph: False, input throughput (token/s): 0.00
+[2026-05-13 21:17:34] INFO:     127.0.0.1:38400 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+[2026-05-13 21:17:34] The server is fired up and ready to roll!
+[2026-05-13 21:17:35 TP0] Prefill batch, #new-seq: 1, #new-token: 64, #cached-token: 0, token usage: 0.00, #running-req: 0, #queue-req: 0, cuda graph: False, input throughput (token/s): 72.63
+[2026-05-13 21:17:35] INFO:     127.0.0.1:52722 - "GET /health HTTP/1.1" 200 OK
+[2026-05-13 21:17:36 TP0] Prefill batch, #new-seq: 1, #new-token: 512, #cached-token: 0, token usage: 0.00, #running-req: 0, #queue-req: 0, cuda graph: False, input throughput (token/s): 78.24
+[2026-05-13 21:17:36 TP0] Decode batch, #running-req: 1, #token: 704, token usage: 0.00, accept len: 4.55, accept rate: 0.91, cuda graph: True, gen throughput (token/s): 0.85, #queue-req: 0
+[2026-05-13 21:17:36] INFO:     127.0.0.1:52728 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:39 TP0] Prefill batch, #new-seq: 1, #new-token: 64, #cached-token: 448, token usage: 0.00, #running-req: 0, #queue-req: 0, cuda graph: False, input throughput (token/s): 175.96
+[2026-05-13 21:17:39 TP0] Decode batch, #running-req: 1, #token: 640, token usage: 0.00, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 71.71, #queue-req: 0
+[2026-05-13 21:17:39] INFO:     127.0.0.1:52728 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:39 TP0] Prefill batch, #new-seq: 1, #new-token: 64, #cached-token: 448, token usage: 0.00, #running-req: 0, #queue-req: 0, cuda graph: False, input throughput (token/s): 99.71
+[2026-05-13 21:17:39 TP0] Decode batch, #running-req: 1, #token: 576, token usage: 0.00, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 380.59, #queue-req: 0
+[2026-05-13 21:17:40 TP0] Decode batch, #running-req: 1, #token: 768, token usage: 0.00, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 504.75, #queue-req: 0
+[2026-05-13 21:17:40] INFO:     127.0.0.1:52728 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:40 TP0] Prefill batch, #new-seq: 1, #new-token: 64, #cached-token: 448, token usage: 0.00, #running-req: 0, #queue-req: 0, cuda graph: False, input throughput (token/s): 99.82
+[2026-05-13 21:17:40 TP0] Decode batch, #running-req: 1, #token: 768, token usage: 0.00, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 384.02, #queue-req: 0
+[2026-05-13 21:17:41] INFO:     127.0.0.1:52728 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:41 TP0] Prefill batch, #new-seq: 1, #new-token: 64, #cached-token: 448, token usage: 0.00, #running-req: 0, #queue-req: 0, cuda graph: False, input throughput (token/s): 61.44
+[2026-05-13 21:17:41 TP0] Prefill batch, #new-seq: 7, #new-token: 448, #cached-token: 3136, token usage: 0.00, #running-req: 1, #queue-req: 0, cuda graph: False, input throughput (token/s): 133.67
+[2026-05-13 21:17:42 TP0] Decode batch, #running-req: 8, #token: 2496, token usage: 0.00, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 749.85, #queue-req: 0
+[2026-05-13 21:17:42] INFO:     127.0.0.1:46674 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:42] INFO:     127.0.0.1:46682 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:42] INFO:     127.0.0.1:46698 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:42] INFO:     127.0.0.1:46704 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:42] INFO:     127.0.0.1:46708 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:42] INFO:     127.0.0.1:46710 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:42] INFO:     127.0.0.1:46720 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:42] INFO:     127.0.0.1:46732 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:43 TP0] Prefill batch, #new-seq: 1, #new-token: 64, #cached-token: 448, token usage: 0.00, #running-req: 0, #queue-req: 0, cuda graph: False, input throughput (token/s): 378.59
+[2026-05-13 21:17:43 TP0] Prefill batch, #new-seq: 7, #new-token: 448, #cached-token: 3136, token usage: 0.00, #running-req: 1, #queue-req: 0, cuda graph: False, input throughput (token/s): 11102.29
+[2026-05-13 21:17:43 TP0] Decode batch, #running-req: 8, #token: 1984, token usage: 0.00, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 1542.22, #queue-req: 0
+[2026-05-13 21:17:44] INFO:     127.0.0.1:46732 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:44] INFO:     127.0.0.1:46720 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:44] INFO:     127.0.0.1:46704 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:44] INFO:     127.0.0.1:46682 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:44] INFO:     127.0.0.1:46710 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:44] INFO:     127.0.0.1:46698 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:44] INFO:     127.0.0.1:46674 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:44] INFO:     127.0.0.1:46708 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:44 TP0] Prefill batch, #new-seq: 1, #new-token: 64, #cached-token: 448, token usage: 0.00, #running-req: 0, #queue-req: 0, cuda graph: False, input throughput (token/s): 390.29
+[2026-05-13 21:17:44 TP0] Prefill batch, #new-seq: 7, #new-token: 448, #cached-token: 3136, token usage: 0.00, #running-req: 1, #queue-req: 0, cuda graph: False, input throughput (token/s): 1074.44
+[2026-05-13 21:17:44 TP0] Decode batch, #running-req: 8, #token: 1472, token usage: 0.00, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 1526.47, #queue-req: 0
+[2026-05-13 21:17:44 TP0] Decode batch, #running-req: 8, #token: 3008, token usage: 0.00, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 3005.81, #queue-req: 0
+[2026-05-13 21:17:45] INFO:     127.0.0.1:46732 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:45] INFO:     127.0.0.1:46704 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:45] INFO:     127.0.0.1:46710 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:45] INFO:     127.0.0.1:46682 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:45] INFO:     127.0.0.1:46698 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:45] INFO:     127.0.0.1:46720 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:45] INFO:     127.0.0.1:46674 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:45] INFO:     127.0.0.1:46708 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:45 TP0] Prefill batch, #new-seq: 1, #new-token: 64, #cached-token: 448, token usage: 0.00, #running-req: 0, #queue-req: 0, cuda graph: False, input throughput (token/s): 415.78
+[2026-05-13 21:17:45 TP0] Prefill batch, #new-seq: 7, #new-token: 448, #cached-token: 3136, token usage: 0.00, #running-req: 1, #queue-req: 0, cuda graph: False, input throughput (token/s): 9265.57
+[2026-05-13 21:17:45 TP0] Decode batch, #running-req: 8, #token: 2496, token usage: 0.00, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 1730.38, #queue-req: 0
+[2026-05-13 21:17:46] INFO:     127.0.0.1:46732 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:46] INFO:     127.0.0.1:46704 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:46] INFO:     127.0.0.1:46710 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:46] INFO:     127.0.0.1:46682 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:46] INFO:     127.0.0.1:46698 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:46] INFO:     127.0.0.1:46720 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:46] INFO:     127.0.0.1:46674 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:46] INFO:     127.0.0.1:46708 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:46 TP0] Prefill batch, #new-seq: 1, #new-token: 64, #cached-token: 448, token usage: 0.00, #running-req: 0, #queue-req: 0, cuda graph: False, input throughput (token/s): 297.25
+[2026-05-13 21:17:47 TP0] Prefill batch, #new-seq: 27, #new-token: 1728, #cached-token: 12096, token usage: 0.00, #running-req: 1, #queue-req: 0, cuda graph: False, input throughput (token/s): 254.43
+[2026-05-13 21:17:47 TP0] Prefill batch, #new-seq: 4, #new-token: 256, #cached-token: 1792, token usage: 0.00, #running-req: 28, #queue-req: 0, cuda graph: False, input throughput (token/s): 5540.33
+[2026-05-13 21:17:47 TP0] Decode batch, #running-req: 32, #token: 6592, token usage: 0.00, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 1885.08, #queue-req: 0
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46744 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46750 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46752 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46766 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46778 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46780 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46794 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46810 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46812 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46816 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46818 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46832 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46846 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46860 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46866 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46882 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46898 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46910 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46920 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46932 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46946 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46954 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46958 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46966 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46972 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46974 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46978 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:46988 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:47000 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:47008 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:47024 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49] INFO:     127.0.0.1:47028 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:49 TP0] Prefill batch, #new-seq: 1, #new-token: 64, #cached-token: 448, token usage: 0.00, #running-req: 0, #queue-req: 0, cuda graph: False, input throughput (token/s): 130.92
+[2026-05-13 21:17:49 TP0] Prefill batch, #new-seq: 29, #new-token: 1856, #cached-token: 12992, token usage: 0.00, #running-req: 1, #queue-req: 0, cuda graph: False, input throughput (token/s): 255.11
+[2026-05-13 21:17:49 TP0] Prefill batch, #new-seq: 2, #new-token: 128, #cached-token: 896, token usage: 0.00, #running-req: 30, #queue-req: 0, cuda graph: False, input throughput (token/s): 376140.99
+[2026-05-13 21:17:49 TP0] Decode batch, #running-req: 32, #token: 4544, token usage: 0.00, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 3197.84, #queue-req: 0
+[2026-05-13 21:17:50 TP0] Decode batch, #running-req: 32, #token: 10688, token usage: 0.00, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 8533.18, #queue-req: 0
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46810 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46966 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:47008 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46958 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46766 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46752 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46920 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46954 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46882 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46974 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46744 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46780 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46988 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46866 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46750 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46846 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46910 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46932 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46818 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46778 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46794 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:47028 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46898 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46860 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46972 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46816 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46946 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46978 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46812 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:46832 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:47024 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51] INFO:     127.0.0.1:47000 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:51 TP0] Prefill batch, #new-seq: 1, #new-token: 64, #cached-token: 448, token usage: 0.00, #running-req: 0, #queue-req: 0, cuda graph: False, input throughput (token/s): 65.33
+[2026-05-13 21:17:51 TP0] Prefill batch, #new-seq: 28, #new-token: 1792, #cached-token: 12544, token usage: 0.00, #running-req: 1, #queue-req: 0, cuda graph: False, input throughput (token/s): 253.98
+[2026-05-13 21:17:51 TP0] Prefill batch, #new-seq: 3, #new-token: 192, #cached-token: 1344, token usage: 0.00, #running-req: 29, #queue-req: 0, cuda graph: False, input throughput (token/s): 245820.20
+[2026-05-13 21:17:52 TP0] Decode batch, #running-req: 32, #token: 8640, token usage: 0.00, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 3211.14, #queue-req: 0
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46810 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46966 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:47008 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46958 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46766 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46752 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46920 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46954 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46882 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46974 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46744 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46780 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46988 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46866 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46750 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46846 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46910 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46932 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46818 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46778 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46794 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:47028 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46898 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46860 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46972 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46816 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46946 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46978 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46812 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:46832 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:47024 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:53] INFO:     127.0.0.1:47000 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:54 TP0] Prefill batch, #new-seq: 1, #new-token: 64, #cached-token: 448, token usage: 0.00, #running-req: 0, #queue-req: 0, cuda graph: False, input throughput (token/s): 94.82
+[2026-05-13 21:17:54 TP0] Prefill batch, #new-seq: 21, #new-token: 1344, #cached-token: 9408, token usage: 0.00, #running-req: 1, #queue-req: 0, cuda graph: False, input throughput (token/s): 246.51
+[2026-05-13 21:17:54 TP0] Prefill batch, #new-seq: 10, #new-token: 640, #cached-token: 4480, token usage: 0.00, #running-req: 22, #queue-req: 0, cuda graph: False, input throughput (token/s): 193139.75
+[2026-05-13 21:17:54 TP0] Decode batch, #running-req: 32, #token: 6592, token usage: 0.00, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 3100.26, #queue-req: 0
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46810 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46966 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:47008 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46958 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46766 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46752 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46920 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46954 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46882 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46974 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46744 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46780 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46988 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46866 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46750 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46846 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46910 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46932 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46818 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46778 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46794 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:47028 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46898 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46860 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46972 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46816 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46946 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46978 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46812 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:46832 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:47024 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56] INFO:     127.0.0.1:47000 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:56 TP0] Prefill batch, #new-seq: 1, #new-token: 64, #cached-token: 448, token usage: 0.00, #running-req: 0, #queue-req: 0, cuda graph: False, input throughput (token/s): 301.92
+[2026-05-13 21:17:56 TP0] Prefill batch, #new-seq: 29, #new-token: 1856, #cached-token: 12992, token usage: 0.00, #running-req: 1, #queue-req: 14, cuda graph: False, input throughput (token/s): 234.48
+[2026-05-13 21:17:56 TP0] Prefill batch, #new-seq: 18, #new-token: 1152, #cached-token: 8064, token usage: 0.00, #running-req: 30, #queue-req: 16, cuda graph: False, input throughput (token/s): 6736.42
+[2026-05-13 21:17:57 TP0] Decode batch, #running-req: 48, #token: 6592, token usage: 0.00, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 2892.47, #queue-req: 16
+[2026-05-13 21:17:58 TP0] Decode batch, #running-req: 48, #token: 15808, token usage: 0.01, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 10107.37, #queue-req: 16
+[2026-05-13 21:17:58 TP0] Prefill batch, #new-seq: 16, #new-token: 1024, #cached-token: 7168, token usage: 0.00, #running-req: 0, #queue-req: 0, cuda graph: False, input throughput (token/s): 713.58
+[2026-05-13 21:17:59 TP0] Decode batch, #running-req: 16, #token: 5568, token usage: 0.00, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 3363.62, #queue-req: 0
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44788 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44792 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44802 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44816 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44826 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44834 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44846 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44854 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44870 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44886 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44890 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44906 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44920 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44926 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44938 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44944 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44956 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44968 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44976 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44982 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44988 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:44992 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45006 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45008 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45024 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45036 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45040 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45056 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45064 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45068 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45074 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45086 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45094 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45110 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45118 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45134 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45146 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45158 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45170 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45182 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45194 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45206 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45220 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45230 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45242 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45250 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45260 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45276 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45278 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45282 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45294 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45306 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45318 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45320 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45326 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45338 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45340 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45348 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45350 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45354 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45364 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45372 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45382 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:17:59] INFO:     127.0.0.1:45384 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:00 TP0] Prefill batch, #new-seq: 1, #new-token: 64, #cached-token: 448, token usage: 0.00, #running-req: 0, #queue-req: 0, cuda graph: False, input throughput (token/s): 604.96
+[2026-05-13 21:18:00 TP0] Prefill batch, #new-seq: 30, #new-token: 1920, #cached-token: 13440, token usage: 0.00, #running-req: 1, #queue-req: 15, cuda graph: False, input throughput (token/s): 560.92
+[2026-05-13 21:18:00 TP0] Prefill batch, #new-seq: 17, #new-token: 1088, #cached-token: 7616, token usage: 0.00, #running-req: 31, #queue-req: 49, cuda graph: False, input throughput (token/s): 191679.57
+[2026-05-13 21:18:00 TP0] Decode batch, #running-req: 48, #token: 12736, token usage: 0.01, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 4053.89, #queue-req: 80
+[2026-05-13 21:18:01 TP0] Prefill batch, #new-seq: 48, #new-token: 3072, #cached-token: 21504, token usage: 0.00, #running-req: 0, #queue-req: 32, cuda graph: False, input throughput (token/s): 719.15
+[2026-05-13 21:18:02 TP0] Decode batch, #running-req: 48, #token: 9664, token usage: 0.00, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 7861.24, #queue-req: 32
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47276 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47280 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47284 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47298 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47308 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47312 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47328 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47330 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47336 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47344 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47354 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47366 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47382 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47386 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47402 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47418 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47422 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47430 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47438 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47444 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47450 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47460 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47464 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47478 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47492 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47506 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47512 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47518 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47526 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47530 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47534 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47536 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47540 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47542 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47550 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47554 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47556 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47558 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47572 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47576 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47582 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47590 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47598 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47604 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47606 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47618 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47632 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:02] INFO:     127.0.0.1:47634 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:03 TP0] Prefill batch, #new-seq: 32, #new-token: 2048, #cached-token: 14336, token usage: 0.00, #running-req: 0, #queue-req: 0, cuda graph: False, input throughput (token/s): 2298.69
+[2026-05-13 21:18:03 TP0] Decode batch, #running-req: 32, #token: 4544, token usage: 0.00, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 9018.97, #queue-req: 0
+[2026-05-13 21:18:03 TP0] Decode batch, #running-req: 32, #token: 10688, token usage: 0.00, accept len: 5.00, accept rate: 1.00, cuda graph: True, gen throughput (token/s): 8830.75, #queue-req: 0
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47648 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47656 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47670 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47686 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47696 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47704 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47718 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47728 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47730 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47734 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47744 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47752 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47756 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47764 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47780 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47796 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47804 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47808 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47826 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47834 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47850 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47854 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47868 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47882 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47894 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47906 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47914 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47918 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47924 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47936 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47948 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47960 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47970 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47974 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47990 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47996 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:48000 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:48002 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:48016 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:48030 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:48040 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:48052 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:48058 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:48070 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:48074 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:48090 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:48094 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:04] INFO:     127.0.0.1:47816 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48106 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48112 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48116 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48132 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48134 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48148 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48152 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48166 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48176 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48182 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48196 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48212 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48220 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48226 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48240 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48246 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48262 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48266 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48282 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48288 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48302 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48306 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48314 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48320 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48332 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48338 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48344 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48354 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48358 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48370 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48380 - "POST /generate HTTP/1.1" 200 OK
+[2026-05-13 21:18:05] INFO:     127.0.0.1:48394 - "POST /generate HTTP/1.1" 200 OK

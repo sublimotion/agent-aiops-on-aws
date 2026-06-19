@@ -1,0 +1,230 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "f47eabe9-051b-49c9-814b-b737f514b4c4",
+  "created_at": "2026-05-13T00:00:00Z",
+  "source_tool": {
+    "name": "custom",
+    "version": "0.1.0-embedding-bench",
+    "enrichment_version": "1.0.0"
+  },
+  "model": {
+    "name": "Qwen3-Embedding-8B",
+    "id": "Qwen/Qwen3-Embedding-8B",
+    "architecture": "embedding",
+    "parameters_total": "8B",
+    "quantization": "bf16",
+    "max_model_len": 8192
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.19.1",
+    "container_image": "vllm/vllm-openai:v0.19.1",
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "data_parallel": null,
+    "expert_parallel": null,
+    "replicas": 1,
+    "reasoning": false,
+    "kv_cache_dtype": "auto",
+    "attention_backend": "default",
+    "speculative_decoding": null,
+    "extra_args": {
+      "task": "embed",
+      "trust-remote-code": true,
+      "enforce-eager": false,
+      "enable-prefix-caching": true,
+      "torch-compile": "inductor"
+    }
+  },
+  "infrastructure": {
+    "substrate": "hyperpod-eks",
+    "instance_type": "ml.g5.4xlarge",
+    "region": "us-east-1",
+    "gpu": {
+      "name": "A10G",
+      "arch": "sm_86",
+      "count": 1,
+      "vram_gb": 24,
+      "interconnect": "none"
+    },
+    "eks": {
+      "cluster_version": "1.32",
+      "node_count": 1
+    },
+    "hyperpod": {
+      "cluster_name": "finetune-g5-cluster",
+      "instance_group": "llmd-validation",
+      "deep_health_checks": true,
+      "auto_recovery": true
+    }
+  },
+  "workload": {
+    "use_case": "rag",
+    "catalog_id": "rag-long-context",
+    "modality": "text",
+    "dataset": {
+      "type": "synthetic",
+      "input_tokens": {
+        "mean": null,
+        "std_dev": null
+      },
+      "output_tokens": {
+        "mean": 0,
+        "std_dev": 0
+      },
+      "note": "RAG Q&A \u2014 2-10K char mixed retrieved contexts"
+    },
+    "load": {
+      "type": "concurrency-sweep",
+      "levels": [
+        1,
+        2,
+        4,
+        8,
+        16,
+        32
+      ],
+      "num_prompts_per_level": null,
+      "warmup_requests": 0,
+      "current_level": 32
+    },
+    "api": {
+      "type": "embeddings",
+      "streaming": false,
+      "endpoint": "/v1/embeddings"
+    }
+  },
+  "metrics": {
+    "duration_s": 2.0820438861846924,
+    "completed": 256,
+    "failed": 0,
+    "error_rate": 0.0,
+    "e2e_ms": {
+      "mean": 249.77224320173264,
+      "p50": 242.78604984283447,
+      "p90": 315.20986557006836,
+      "p95": 325.0470161437988,
+      "p99": 345.2877998352051
+    },
+    "output_toks_per_s": 0.0,
+    "request_throughput": 122.95610178953305,
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+    "max_concurrent_requests": 32
+  },
+  "slo": {
+    "targets": {
+      "request_throughput_min": 100.0,
+      "error_rate_max": 0.001
+    },
+    "results": {
+      "request_throughput_min": {
+        "target": 100.0,
+        "actual": 122.95610178953305,
+        "pass": true
+      },
+      "error_rate_max": {
+        "target": 0.001,
+        "actual": 0.0,
+        "pass": true
+      }
+    },
+    "overall_pass": true
+  },
+  "extensions": {
+    "optimization_tier": {
+      "tier": "T5",
+      "note": "optimized: FLASH_ATTN + torch.compile Inductor + CUDA graphs + prefix cache (default)"
+    },
+    "sweep_levels": [
+      {
+        "concurrency": 1,
+        "completed": 8,
+        "failed": 0,
+        "duration_s": 1.1173272132873535,
+        "request_throughput": 7.159943752253858,
+        "e2e_ms": {
+          "mean": 138.0292773246765,
+          "p50": 106.19914531707764,
+          "p90": 223.77991676330566,
+          "p95": 223.77991676330566,
+          "p99": 223.77991676330566
+        }
+      },
+      {
+        "concurrency": 2,
+        "completed": 16,
+        "failed": 0,
+        "duration_s": 0.8927261829376221,
+        "request_throughput": 17.9226288035488,
+        "e2e_ms": {
+          "mean": 107.30022192001343,
+          "p50": 105.36587238311768,
+          "p90": 112.55097389221191,
+          "p95": 141.79396629333496,
+          "p99": 141.79396629333496
+        }
+      },
+      {
+        "concurrency": 4,
+        "completed": 32,
+        "failed": 0,
+        "duration_s": 1.0954351425170898,
+        "request_throughput": 29.21213566918296,
+        "e2e_ms": {
+          "mean": 129.6483650803566,
+          "p50": 138.04757595062256,
+          "p90": 149.72686767578125,
+          "p95": 160.43901443481445,
+          "p99": 168.46990585327148
+        }
+      },
+      {
+        "concurrency": 8,
+        "completed": 64,
+        "failed": 0,
+        "duration_s": 1.272758960723877,
+        "request_throughput": 50.284462317672656,
+        "e2e_ms": {
+          "mean": 149.03387054800987,
+          "p50": 148.84233474731445,
+          "p90": 185.1341724395752,
+          "p95": 191.25723838806152,
+          "p99": 197.39294052124023
+        }
+      },
+      {
+        "concurrency": 16,
+        "completed": 128,
+        "failed": 0,
+        "duration_s": 1.650238275527954,
+        "request_throughput": 77.5645565238447,
+        "e2e_ms": {
+          "mean": 199.41411539912224,
+          "p50": 190.79148769378662,
+          "p90": 280.40599822998047,
+          "p95": 301.52416229248047,
+          "p99": 308.7480068206787
+        }
+      },
+      {
+        "concurrency": 32,
+        "completed": 256,
+        "failed": 0,
+        "duration_s": 2.0820438861846924,
+        "request_throughput": 122.95610178953305,
+        "e2e_ms": {
+          "mean": 249.77224320173264,
+          "p50": 242.78604984283447,
+          "p90": 315.20986557006836,
+          "p95": 325.0470161437988,
+          "p99": 345.2877998352051
+        }
+      }
+    ],
+    "raw_tool_output": {
+      "uri": "results/tier-comparison/workload-rag-qa-t5-optimized.json",
+      "format": "json"
+    }
+  }
+}

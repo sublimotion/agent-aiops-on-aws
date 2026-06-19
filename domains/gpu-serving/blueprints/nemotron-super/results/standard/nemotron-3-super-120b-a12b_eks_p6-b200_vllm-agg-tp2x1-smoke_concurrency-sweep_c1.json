@@ -1,0 +1,172 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "2c3e7ad0-5337-4ad4-adaa-93b8eee1acc9",
+  "created_at": "2026-03-12T10:15:46Z",
+  "source_tool": {
+    "name": "custbench-legacy",
+    "version": "0.1.0",
+    "enrichment_version": "1.0.0"
+  },
+  "model": {
+    "name": "Nemotron-3-Super-120B-A12B",
+    "id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
+    "architecture": "hybrid-mamba-moe",
+    "parameters_total": "120B",
+    "parameters_active": "12B",
+    "quantization": "fp8",
+    "max_model_len": 256000
+  },
+  "engine": {
+    "name": "vllm",
+    "container_image": "nvcr.io/nvidia/ai-dynamo/vllm-runtime:0.9.1",
+    "base_image": null,
+    "dockerfile": null,
+    "tensor_parallel": 2,
+    "pipeline_parallel": 1,
+    "data_parallel": null,
+    "expert_parallel": null,
+    "replicas": 1,
+    "reasoning": false,
+    "kv_cache_dtype": "fp8",
+    "attention_backend": "auto",
+    "speculative_decode": null,
+    "extra_args": {
+      "trust-remote-code": true,
+      "tool-call-parser": "qwen3_coder",
+      "reasoning-parser": "nano_v3"
+    },
+    "engine_config_tag": "vllm-agg-tp2x1-smoke"
+  },
+  "framework": {
+    "name": "vllm",
+    "version": null,
+    "config": {
+      "mode": "aggregated"
+    }
+  },
+  "infrastructure": {
+    "substrate": "eks",
+    "instance_type": "p6-b200.48xlarge",
+    "region": "us-east-2",
+    "gpu": {
+      "name": "B200",
+      "arch": "sm_100",
+      "count": 8,
+      "vram_gb": 183,
+      "interconnect": "nvswitch-nvl5"
+    }
+  },
+  "workload": {
+    "use_case": "concurrency-sweep",
+    "catalog_id": "concurrency-sweep",
+    "modality": "text",
+    "dataset": {
+      "type": "synthetic",
+      "input_tokens": {
+        "mean": 1024,
+        "std_dev": 0
+      },
+      "output_tokens": {
+        "mean": 256,
+        "std_dev": 0
+      }
+    },
+    "load": {
+      "type": "concurrency",
+      "concurrency": 1,
+      "num_prompts": 10,
+      "warmup_requests": 0
+    },
+    "api": {
+      "type": "chat",
+      "streaming": true,
+      "endpoint": "/v1/chat/completions"
+    }
+  },
+  "metrics": {
+    "duration_s": 18.08,
+    "completed": 10,
+    "failed": 0,
+    "error_rate": 0.0,
+    "ttft_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "tpot_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "itl_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "e2e_ms": {
+      "mean": 1876.78,
+      "p50": 1876.78,
+      "p90": 2751.69,
+      "p95": 2751.69,
+      "p99": 2751.69
+    },
+    "output_toks_per_s": 0.0,
+    "request_throughput": 0.55,
+    "total_toks_per_s": 0.0,
+    "total_input_tokens": 10240,
+    "total_output_tokens": null,
+    "max_concurrent_requests": 1
+  },
+  "slo": {
+    "targets": {
+      "ttft_p99_ms": 500,
+      "tpot_p99_ms": 30,
+      "e2e_p99_ms": 15000,
+      "error_rate_max": 0.001
+    },
+    "results": {
+      "ttft_p99_ms": {
+        "target": 500,
+        "actual": null,
+        "pass": null
+      },
+      "tpot_p99_ms": {
+        "target": 30,
+        "actual": null,
+        "pass": null
+      },
+      "e2e_p99_ms": {
+        "target": 15000,
+        "actual": 2751.69,
+        "pass": true
+      },
+      "error_rate_max": {
+        "target": 0.001,
+        "actual": 0.0,
+        "pass": true
+      }
+    },
+    "overall_pass": true
+  },
+  "extensions": {
+    "cost": {
+      "instance_cost_per_hr": 48.0,
+      "dollars_per_1m_output_tokens": null,
+      "formula": null
+    },
+    "session_metadata": {
+      "engine_config_tag": "vllm-agg-tp2x1-smoke",
+      "source_filename": "agg-vllm-tp2x1-smoke_c1_in1024_out256_20260312-101546.json",
+      "mode": "agg",
+      "blueprint": "domains/gpu-serving/blueprints/nemotron-super",
+      "run_date": "20260312",
+      "enrichment_note": "Generated from legacy custbench flat format. TPOT derived from itl_ms (inter-token latency \u2014 includes first token gap). Per-request artifacts not preserved in v1 envelope."
+    }
+  }
+}

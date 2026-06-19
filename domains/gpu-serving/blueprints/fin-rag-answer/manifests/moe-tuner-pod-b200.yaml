@@ -1,0 +1,39 @@
+# Single-GPU MoE tile tuner pod. Reuses the vLLM image (kernels + benchmark_moe.py
+# prebaked); runs the ray-free tuner against the live FSx model config. 1 GPU so it
+# schedules on the 2 freed by scaling serving 4->3. Sleeps after; we exec the tuner.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: moe-tuner
+  namespace: ml-inference
+spec:
+  restartPolicy: Never
+  nodeName: ip-10-0-30-22.us-east-2.compute.internal
+  tolerations:
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+  volumes:
+    - name: fsx
+      hostPath: {path: /mnt/fsx-manual, type: Directory}
+    - name: script
+      configMap: {name: moe-tuner-script}
+    - name: shm
+      emptyDir: {medium: Memory, sizeLimit: 16Gi}
+    - name: tuned
+      hostPath: {path: /mnt/nvme/tuned-moe, type: DirectoryOrCreate}
+  containers:
+    - name: tuner
+      image: 615299764834.dkr.ecr.us-east-2.amazonaws.com/vllm-openai:v0.18.1
+      command: ["/bin/sh","-c","echo moe-tuner ready; sleep 36000"]
+      env:
+        - {name: HF_HUB_OFFLINE, value: "1"}
+        - {name: TRANSFORMERS_OFFLINE, value: "1"}
+        - {name: VLLM_MOE_TUNE_CACHE_CLEAR_INTERVAL, value: "50"}
+      volumeMounts:
+        - {name: fsx, mountPath: /fsx, readOnly: true}
+        - {name: script, mountPath: /script}
+        - {name: shm, mountPath: /dev/shm}
+        - {name: tuned, mountPath: /tmp/tuned-moe}
+      resources:
+        requests: {cpu: "8", memory: 48Gi, nvidia.com/gpu: "1"}
+        limits: {nvidia.com/gpu: "1"}

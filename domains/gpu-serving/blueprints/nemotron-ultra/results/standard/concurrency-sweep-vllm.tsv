@@ -1,0 +1,14 @@
+# nemotron-3-ultra | vLLM v0.22.0 | B200 p6-b200.48xlarge TP4 | us-east-2 az2 | nemotron_h_mtp k=5
+# captured 2026-06-06. real prompts, temp=1.0 top_p=0.95, 512 out. total_req = max(8, conc*3).
+# agg_tok_s = sum output tok / wall; per_req_med = wall-clock tok/s per request (incl prefill).
+# accept_len from Prometheus /metrics delta over the run (K=5).
+conc	total_req	agg_tok_s	per_req_med_tok_s	accept_len	dur_s	errors
+1	8	269.2	263.6	3.56	10.4	0
+4	12	449.2	153.7	3.56	12.1	0
+16	48	1457.1	119.0	3.58	14.2	0
+32	96	1760.6	64.9	3.55	22.4	0
+64	192	1841.9	63.0	3.55	45.4	0
+128	384	1870.1	62.6	3.56	88.6	0
+256	768	1882.9	62.7	3.57	177.0	0
+# Peak aggregate ~1883 tok/s @ c=256 (vs first-run SGLang 1030 -> ~1.8x). accept_len STABLE ~3.56 across all conc.
+# Throughput saturates by c=64 (~1842). 0 errors throughout. MTP acceptance does not degrade under load.

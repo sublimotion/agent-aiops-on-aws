@@ -1,0 +1,107 @@
+# Nemotron-3-Ultra-550B-A55B-NVFP4 Benchmark Sidecar
+# Deployment context for the Stage 0c serving-config resolver and the benchmark enricher.
+# Models the DEPLOYED config: SGLang v0.5.12.post1-cu130, TP4 single replica, B300, us-west-2b.
+# (vLLM v0.22.0-cu130 does NOT exist — see engine block + lessons.md for the pivot rationale.)
+
+model:
+  name: Nemotron-3-Ultra-550B-A55B
+  id: nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4
+  architecture: hybrid-mamba-latentmoe   # NemotronHForCausalLM: Mamba-2 + LatentMoE + Select Attention + MTP
+  parameters_total: "550B"
+  parameters_active: "55B"
+  quantization: nvfp4                     # native NVFP4 (fp4); mixed FP8/BF16 on latent/QKV/mamba/embeddings
+  max_model_len: 262144                   # == max_position_embeddings (verified from config.json)
+  # Facts read from the HF config.json (2026-06-05) so MoE divisibility rules can verify:
+  moe_intermediate_size: 5120             # 5120 / TP4 = 1280; 1280 % 128 == 0 (FP8-block safe); NVFP4 micro-block=16
+  max_position_embeddings: 262144
+  supports_mtp: true                      # num_nextn_predict_layers + mtp_layers_block_type present in config
+  is_mamba_hybrid: true                   # model_type=nemotron_h, layers_block_type interleaves mamba/attn/moe
+
+engine:
+  # PIVOT (2026-05->06): vllm/vllm-openai:v0.22.0-cu130 does NOT exist (cu130 caps at v0.20.0;
+  # v0.22.1 is cu129-only, won't run on sm_103 B300). B300 smoke + benchmarks use SGLang.
+  name: sglang
+  version: v0.5.12.post1-cu130
+  container_image: "lmsysorg/sglang:v0.5.12.post1-cu130"   # B300 sm_103, exists & pulls clean
+  tensor_parallel: 4                      # NVIDIA's documented single-node unit; one TP4 replica
+  pipeline_parallel: 1
+  expert_parallel: 1                      # NO EP — ep_size>1 breaks NVFP4 scale sharding (see lessons.md)
+  kv_cache_dtype: fp8_e4m3                # SGLang spelling (card's bare 'fp8' is rejected)
+  attention_backend: flashinfer           # auto-selected on sm100 for NemotronHForCausalLM
+  moe_runner_backend: flashinfer_trtllm   # NVFP4 Blackwell path; triton/cutlass_moe_fp4 asserts
+  prefix_caching: false                   # --disable-radix-cache (MTP+radix incompatible on mamba-hybrid)
+  mamba_scheduler_strategy: no_buffer
+  speculative_decode:
+    algorithm: EAGLE                      # SGLang spec-decode for nemotron_h MTP heads
+    num_steps: 5
+    eagle_topk: 1
+    num_draft_tokens: 6                   # SGLang derived 6 from steps=5
+    measured_acceptance: "accept_len 1.8-4.47 / accept_rate 0.16-0.69 (P0 smoke, c=1)"
+  extra_args:
+    trust-remote-code: true
+    reasoning-parser: nemotron_3          # SGLang spelling WITHOUT the v
+    tool-call-parser: qwen3_coder
+    context-length: 262144
+    mem-fraction-static: 0.85
+    chunked-prefill-size: 32768
+    fp8-gemm-backend: triton
+    disable-piecewise-cuda-graph: true    # auto-set by flashinfer_trtllm anyway
+
+infrastructure:
+  substrate: eks
+  instance_type: p6-b300.48xlarge
+  region: us-west-2
+  ami_family: al2023                      # AL2023 NVIDIA AMI (ib_umad/Fabric Manager for NVL5+) — passes b200-requires-al2023
+  gpu:
+    name: B300
+    arch: sm_103
+    count: 8                              # 8x B300; smoke uses GPUs 0-3 (one TP4 replica)
+    vram_gb: 275
+    interconnect: nvswitch
+
+# P1-P4 workload suite. Each entry references a canonical workload card by catalog_id
+# (standards/benchmark-commons/workloads/<id>.yaml) — do NOT inline divergent params.
+# All runs use the single deployable config (sglang-tp4-eagle) since the spec's vLLM legs
+# are unexecutable on cu130/sm_103. MTP-off is an ablation of the same config.
+workloads:
+  # P0 — smoke gate (PASSED 2026-06-05).
+  - catalog_id: null
+    custom:
+      name: smoke-1k-512
+      use_case: custom
+      dataset:
+        type: synthetic
+        input_tokens: {mean: 1024, std_dev: 0}
+        output_tokens: {mean: 512, std_dev: 0}
+      load:
+        type: constant
+        request_rate: 0.1
+        duration_s: 60
+        max_concurrency: 1
+
+  # P2 — single-stream speed (the 300 tok/s chase, c=1) + MTP on/off ablation.
+  - catalog_id: concurrency-sweep
+    note: "P2 headline. Run c=1 first for the DeepInfra 300 tok/s comparison; then sweep."
+
+  # P1 — standard workload suite.
+  - catalog_id: chatbot-short            # 256/128, reasoning on AND off
+  - catalog_id: chatbot-long             # 32768/512
+  - catalog_id: rag-long-context         # 16384 shared-prefix / 256
+  - catalog_id: coding-agent             # 4096 first-turn / 2048 out, multi-turn
+  - catalog_id: sharegpt-production-mix  # real token distribution, poisson r=4.0
+
+  # P4 — 1M long-context tiers (B300). Each tier is a separate measurement.
+  - catalog_id: rag-1m-context           # 64k/128k/256k/512k/1m
+
+# SLO targets. tpot_p99_ms 50 == 20 tok/s/req floor under load; single-stream target is
+# the DeepInfra 300 tok/s == ~3.33 ms/token (chased at c=1, evaluated separately).
+slo:
+  ttft_p99_ms: 2000
+  tpot_p99_ms: 50
+  e2e_p99_ms: 60000
+  error_rate_max: 0.001
+
+cost:
+  instance_type: p6-b300.48xlarge
+  spot_price_per_hr: 27.00                # CORRECTED: live ~$27/hr (spec's $15/hr is stale — see lessons.md)
+  utilization_target: 0.70

@@ -1,0 +1,118 @@
+# Voxtral-Mini-3B-2507 on g6e.2xlarge (L40S 48GB).
+# Spec target is g6.xlarge (L4 24GB) primary; running on L40S for session reuse.
+# Cost-efficiency rows must flag the substrate substitution (L4 ~57% cheaper at ~75% perf).
+#
+# vLLM 0.19.1 supports VoxtralForConditionalGeneration since 0.10.0.
+# Audio path needs mistral-common[audio] (soundfile + pyav). Use init container
+# to install at start since stock vllm-openai:v0.19.1 base image likely lacks it.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cto-voxtral-g6e-2xlarge
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: voxtral-g6e-2xlarge
+  namespace: cto-voxtral-g6e-2xlarge
+  labels:
+    app: voxtral-g6e-2xlarge
+    workload: voxtral
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: voxtral-g6e-2xlarge
+  template:
+    metadata:
+      labels:
+        app: voxtral-g6e-2xlarge
+        workload: voxtral
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: g6e.2xlarge
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: vllm
+        image: vllm/vllm-openai:v0.19.1
+        # mistral-common[audio] adds soundfile + pyav for the /v1/audio/transcriptions path.
+        # We do this in the main container's command rather than an init container because
+        # the install needs to land in the same Python env as vLLM.
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          set -euxo pipefail
+          pip install --no-cache-dir 'mistral-common[audio]' || \
+            pip install --no-cache-dir mistral-common soundfile av
+          exec vllm serve mistralai/Voxtral-Mini-3B-2507 \
+            --tokenizer_mode mistral \
+            --config_format mistral \
+            --load_format mistral \
+            --dtype bfloat16 \
+            --max-model-len 32768 \
+            --max-num-seqs 16 \
+            --gpu-memory-utilization 0.85 \
+            --trust-remote-code \
+            --host 0.0.0.0 \
+            --port 8000
+        env:
+        - name: HF_HUB_ENABLE_HF_TRANSFER
+          value: "1"
+        - name: VLLM_USAGE_SOURCE
+          value: production-cto
+        ports:
+        - containerPort: 8000
+          name: http
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+            memory: 32Gi
+            cpu: "7"
+          requests:
+            nvidia.com/gpu: 1
+            memory: 16Gi
+            cpu: "4"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 240
+          periodSeconds: 15
+          failureThreshold: 60
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 480
+          periodSeconds: 30
+          failureThreshold: 6
+        volumeMounts:
+        - name: hf-cache
+          mountPath: /root/.cache/huggingface
+        - name: shm
+          mountPath: /dev/shm
+      volumes:
+      - name: hf-cache
+        emptyDir:
+          sizeLimit: 40Gi
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 4Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: voxtral-g6e-2xlarge-svc
+  namespace: cto-voxtral-g6e-2xlarge
+spec:
+  selector:
+    app: voxtral-g6e-2xlarge
+  ports:
+  - port: 8000
+    targetPort: 8000
+    name: http
+  type: ClusterIP

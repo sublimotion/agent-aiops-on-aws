@@ -1,0 +1,100 @@
+# vLLM serving on B200 (sm_100): Nemotron-3-Super FP8, agg-tp1-x8 (8 replicas x TP=1 = 8 B200 GPUs).
+# THE untested B200 serving config. FP8 weights (~124GB) fit easily in a single B200's 183GB.
+# B200 has MORE per-GPU KV headroom than H200 (183 vs 141), so tp1x8 should comfortably hold
+# the c130 target. On H200, tp1x8 beat tp2x4 by ~2.6x throughput; this tests whether B200 tp1x8
+# beats its own tp2x4 ($0.126/1M). 8 independent replicas, ZERO TP collectives.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fin-rag-b200-vllm-fp8-tp1
+  namespace: ml-inference
+  labels: {app: fin-rag-b200-vllm-tp1, precision: fp8, config: agg-tp1-x8, hw: b200-sm100}
+spec:
+  replicas: 8
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {app: fin-rag-b200-vllm-tp1, precision: fp8}
+  template:
+    metadata:
+      labels: {app: fin-rag-b200-vllm-tp1, precision: fp8, config: agg-tp1-x8, hw: b200-sm100}
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+      volumes:
+        - name: nvme
+          hostPath: {path: /mnt/nvme, type: Directory}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 16Gi}
+      containers:
+        - name: vllm
+          image: 615299764834.dkr.ecr.us-east-2.amazonaws.com/vllm-openai:v0.22.1  # PRIMARY; fallback :v0.18.1
+          imagePullPolicy: IfNotPresent
+          command: ["python3", "-m", "vllm.entrypoints.openai.api_server"]
+          args:
+            - --model
+            - /mnt/nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+            - --served-model-name
+            - nemotron-3-super
+            - --tensor-parallel-size
+            - "1"
+            - --trust-remote-code
+            - --dtype
+            - auto
+            - --kv-cache-dtype
+            - fp8
+            - --gpu-memory-utilization
+            - "0.92"
+            - --max-model-len
+            - "16384"
+            - --enable-prefix-caching
+            - --mamba-cache-mode
+            - all
+            - --enable-chunked-prefill
+            - --max-num-batched-tokens
+            - "16384"
+            - --max-num-seqs
+            - "256"
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+          env:
+            - {name: HF_HUB_OFFLINE, value: "1"}
+            - {name: TRANSFORMERS_OFFLINE, value: "1"}
+            - {name: VLLM_USE_V1, value: "1"}
+          ports:
+            - {containerPort: 8000, name: http}
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 80
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            failureThreshold: 10
+          resources:
+            requests: {cpu: "8", memory: 48Gi, nvidia.com/gpu: "1"}
+            limits: {nvidia.com/gpu: "1"}
+          securityContext:
+            capabilities: {add: ["IPC_LOCK"]}
+          volumeMounts:
+            - {name: nvme, mountPath: /mnt/nvme}
+            - {name: shm, mountPath: /dev/shm}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fin-rag-b200-vllm-fp8-tp1
+  namespace: ml-inference
+  labels: {app: fin-rag-b200-vllm-tp1, precision: fp8}
+spec:
+  type: ClusterIP
+  selector: {app: fin-rag-b200-vllm-tp1, precision: fp8}
+  ports:
+    - {name: http, port: 8000, targetPort: 8000, protocol: TCP}

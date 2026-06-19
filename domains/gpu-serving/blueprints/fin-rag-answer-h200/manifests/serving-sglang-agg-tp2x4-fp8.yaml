@@ -1,0 +1,103 @@
+# SGLang serving on H200 (sm_90, NVSwitch NVL5): Nemotron-3-Super FP8, agg-tp2-x4.
+# Engine B per spec fin-rag-answer-h200.md — the science question: does SGLang's radix cache +
+# STANDARD DeepGEMM/CUTLASS FP8 path (no sm_120 workarounds) beat vLLM, where vLLM's automatic
+# prefix-cache was 0% on B200 for this hybrid Mamba2 + LatentMoE model?
+#
+# H200/sm_90 gets the CLEAN path — every sm_120 workaround from the g7e #20541 config is DROPPED:
+#   - DeepGEMM FP8 GEMM: WORKS on sm_90 (Hopper)        -> no SGLANG_DISABLE_DEEP_GEMM
+#   - FP8 GEMM backend:  default (DeepGEMM/CUTLASS)      -> no --fp8-gemm-backend triton
+#   - MoE runner:        default                          -> no --moe-runner-backend triton
+#   - Attention:         FlashInfer (sm_90 mature)        -> defaults
+#   - CUDA graphs:       WORK                              -> no --enforce-eager
+#   - KV cache fp8_e4m3: WORKS
+#   - Mamba scheduler:   no_buffer (model-level, keep — extra_buffer asserts are not sm-specific)
+#   - reasoning parser:  nemotron_3 (model-level; bench sends enable_thinking=False regardless)
+#   - radix cache:       ON by default (the headline science question)
+#   - HiCache:           NVSwitch NVL5 supports P2P (blocked only on g7e PCIe) -> test in H3b
+#
+# TP=2 x 4 replicas mirrors the vLLM tp2x4 leg for direct engine comparison. NCCL on cu130 is
+# mature on Hopper sm_90 (NVSwitch) — no NCCL-2.25.1 sm_120 bug here.
+# First FP8 ModelOpt load ~15 min on H200 (faster than g7e's 45 min); generous probe regardless.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fin-rag-h200-sglang-fp8
+  namespace: ml-inference
+  labels: {app: fin-rag-h200-sglang, precision: fp8, config: agg-tp2-x4, hw: h200-sm90}
+spec:
+  replicas: 4
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {app: fin-rag-h200-sglang, precision: fp8}
+  template:
+    metadata:
+      labels: {app: fin-rag-h200-sglang, precision: fp8, config: agg-tp2-x4, hw: h200-sm90}
+    spec:
+      nodeSelector:
+        fin-rag/hardware: h200-sm90
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        - {key: ai-infra/h200, operator: Exists, effect: NoSchedule}
+      volumes:
+        - name: nvme
+          hostPath: {path: /mnt/nvme, type: Directory}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 32Gi}
+      containers:
+        - name: sglang
+          image: 615299764834.dkr.ecr.us-east-2.amazonaws.com/sglang:v0.5.12.post1-cu130
+          imagePullPolicy: IfNotPresent
+          command: ["python3", "-m", "sglang.launch_server"]
+          args:
+            - --model-path
+            - /mnt/nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+            - --served-model-name
+            - nemotron-3-super
+            - --tp
+            - "2"
+            - --trust-remote-code
+            - --mamba-scheduler-strategy
+            - no_buffer
+            - --reasoning-parser
+            - nemotron_3
+            - --kv-cache-dtype
+            - fp8_e4m3
+            - --mem-fraction-static
+            - "0.90"
+            - --context-length
+            - "16384"
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+          env:
+            - {name: HF_HUB_OFFLINE, value: "1"}
+            - {name: TRANSFORMERS_OFFLINE, value: "1"}
+          ports:
+            - {containerPort: 8000, name: http}
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 90
+            periodSeconds: 15
+            failureThreshold: 100      # ~15 min first-load FP8 ModelOpt quant on H200
+          resources:
+            requests: {cpu: "16", memory: 96Gi, nvidia.com/gpu: "2"}
+            limits: {nvidia.com/gpu: "2"}
+          securityContext:
+            capabilities: {add: ["IPC_LOCK"]}
+          volumeMounts:
+            - {name: nvme, mountPath: /mnt/nvme}
+            - {name: shm, mountPath: /dev/shm}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fin-rag-h200-sglang-fp8
+  namespace: ml-inference
+  labels: {app: fin-rag-h200-sglang, precision: fp8}
+spec:
+  type: ClusterIP
+  selector: {app: fin-rag-h200-sglang, precision: fp8}
+  ports:
+    - {name: http, port: 8000, targetPort: 8000, protocol: TCP}

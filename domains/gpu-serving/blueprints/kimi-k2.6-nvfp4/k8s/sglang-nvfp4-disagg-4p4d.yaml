@@ -1,0 +1,95 @@
+# SGLang Kimi-K2.6-NVFP4 — single-node 4P/4D disaggregation (Stage 6c, "measure don't assume").
+# 3 containers in ONE pod sharing hostIPC (for cuda_ipc KV transfer over NVLink):
+#   - prefill server: GPUs 0-3 (TP4), --disaggregation-mode prefill, :30001 / bootstrap :9001
+#   - decode server:  GPUs 4-7 (TP4), --disaggregation-mode decode,  :30002
+#   - router: sglang_router --pd-disaggregation, serves :30000
+# CRITICAL (pd_disagg_single_node memory + audit P0): hostIPC:true + UCX_TLS=cuda_copy,cuda_ipc
+# else NIXL falls back to TCP loopback = 40x slower. TP4 = TP>1 NVSwitch → cuda_ipc-vs-collective
+# contention is the risk being measured.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sglang-kimi-nvfp4-disagg
+  namespace: default
+  labels: {app: sglang-kimi-nvfp4, phase: disagg-4p4d}
+spec:
+  restartPolicy: Never
+  nodeSelector: {blueprint: kimi-k2.6-nvfp4}
+  tolerations:
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+  hostNetwork: true
+  hostIPC: true                      # REQUIRED for cuda_ipc handles across prefill/decode (pd_disagg memory)
+  containers:
+    - name: prefill
+      image: lmsysorg/sglang:v0.5.13.post1-cu130
+      command:
+        - bash
+        - -c
+        - |
+          find /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins -name trtllmGen_bmm_export -exec rm -rf {} + 2>/dev/null || true
+          exec python3 -m sglang.launch_server \
+            --model-path /mnt/nvme/models/kimi-k26-nvfp4 \
+            --served-model-name Kimi-K2.6-NVFP4 --quantization modelopt_fp4 \
+            --tp 4 \
+            --disaggregation-mode prefill \
+            --disaggregation-transfer-backend mooncake \
+            --disaggregation-bootstrap-port 9001 \
+            --tool-call-parser kimi_k2 --reasoning-parser kimi_k2 \
+            --context-length 65536 --mem-fraction-static 0.85 \
+            --enable-metrics --trust-remote-code \
+            --host 0.0.0.0 --port 30001
+      env:
+        - {name: HF_HOME, value: /mnt/nvme/hf-cache}
+        - {name: CUDA_VISIBLE_DEVICES, value: "0,1,2,3"}
+        - {name: UCX_TLS, value: "cuda_copy,cuda_ipc"}
+        - {name: UCX_CUDA_IPC_ENABLE_GET_ZCOPY, value: "on"}
+      securityContext: {capabilities: {add: ["IPC_LOCK"]}}
+      volumeMounts:
+        - {name: nvme, mountPath: /mnt/nvme, mountPropagation: HostToContainer}
+        - {name: shm, mountPath: /dev/shm}
+    - name: decode
+      image: lmsysorg/sglang:v0.5.13.post1-cu130
+      command:
+        - bash
+        - -c
+        - |
+          find /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins -name trtllmGen_bmm_export -exec rm -rf {} + 2>/dev/null || true
+          exec python3 -m sglang.launch_server \
+            --model-path /mnt/nvme/models/kimi-k26-nvfp4 \
+            --served-model-name Kimi-K2.6-NVFP4 --quantization modelopt_fp4 \
+            --tp 4 \
+            --disaggregation-mode decode \
+            --disaggregation-transfer-backend mooncake \
+            --tool-call-parser kimi_k2 --reasoning-parser kimi_k2 \
+            --context-length 65536 --mem-fraction-static 0.85 \
+            --enable-metrics --trust-remote-code \
+            --host 0.0.0.0 --port 30002
+      env:
+        - {name: HF_HOME, value: /mnt/nvme/hf-cache}
+        - {name: CUDA_VISIBLE_DEVICES, value: "4,5,6,7"}
+        - {name: UCX_TLS, value: "cuda_copy,cuda_ipc"}
+        - {name: UCX_CUDA_IPC_ENABLE_GET_ZCOPY, value: "on"}
+      securityContext: {capabilities: {add: ["IPC_LOCK"]}}
+      volumeMounts:
+        - {name: nvme, mountPath: /mnt/nvme, mountPropagation: HostToContainer}
+        - {name: shm, mountPath: /dev/shm}
+    - name: router
+      image: lmsysorg/sglang:v0.5.13.post1-cu130
+      command:
+        - bash
+        - -c
+        - |
+          # wait for both servers to be healthy before starting the router
+          until curl -sf http://localhost:30001/health >/dev/null 2>&1; do echo "wait prefill"; sleep 15; done
+          until curl -sf http://localhost:30002/health >/dev/null 2>&1; do echo "wait decode"; sleep 15; done
+          echo "both up — starting PD router on :30000"
+          exec python3 -m sglang_router.launch_router --pd-disaggregation \
+            --prefill http://localhost:30001 9001 \
+            --decode http://localhost:30002 \
+            --policy cache_aware \
+            --host 0.0.0.0 --port 30000
+      volumeMounts:
+        - {name: nvme, mountPath: /mnt/nvme, mountPropagation: HostToContainer}
+  volumes:
+    - {name: nvme, hostPath: {path: /mnt/nvme, type: Directory}}
+    - {name: shm, emptyDir: {medium: Memory, sizeLimit: 64Gi}}

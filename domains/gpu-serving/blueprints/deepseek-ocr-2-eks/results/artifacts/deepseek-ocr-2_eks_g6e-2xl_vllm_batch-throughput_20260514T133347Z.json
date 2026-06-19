@@ -1,0 +1,247 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "7b51d741-6816-4dbf-995f-3d49aca1df71",
+  "created_at": "2026-05-14T13:35:11Z",
+  "source_tool": {
+    "name": "custom",
+    "version": "0.1.0-deepseek-ocr",
+    "enrichment_version": "1.0.0"
+  },
+  "model": {
+    "name": "DeepSeek-OCR-2",
+    "id": "deepseek-ai/DeepSeek-OCR-2",
+    "architecture": "vlm",
+    "parameters_total": "8B",
+    "quantization": "bf16",
+    "max_model_len": 8192
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.19.1",
+    "container_image": "vllm/vllm-openai:v0.19.1",
+    "base_image": null,
+    "dockerfile": null,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "data_parallel": null,
+    "expert_parallel": null,
+    "replicas": 1,
+    "reasoning": false,
+    "kv_cache_dtype": "auto",
+    "attention_backend": "flash-attn",
+    "speculative_decode": null,
+    "extra_args": {
+      "trust-remote-code": true,
+      "max-num-seqs": 32,
+      "gpu-memory-utilization": 0.9
+    }
+  },
+  "infrastructure": {
+    "substrate": "eks",
+    "instance_type": "g6e.2xlarge",
+    "region": "us-east-2",
+    "gpu": {
+      "name": "L40S",
+      "arch": "sm_89",
+      "count": 1,
+      "vram_gb": 48,
+      "interconnect": "none"
+    }
+  },
+  "workload": {
+    "use_case": "batch",
+    "catalog_id": "batch-throughput",
+    "modality": "multimodal",
+    "dataset": {
+      "type": "synthetic-stratified-corpus",
+      "source": "scripts/test-assets/{receipt,article,table,formula,dense,handwritten}.png",
+      "input_tokens": {
+        "mean": 898.8458149779735
+      },
+      "output_tokens": {
+        "mean": 495.1057268722467
+      }
+    },
+    "load": {
+      "type": "constant",
+      "max_concurrency": 32,
+      "duration_s": 60,
+      "warmup_s": 10
+    },
+    "api": {
+      "type": "chat",
+      "streaming": false,
+      "endpoint": "/v1/chat/completions",
+      "prompt_template": "<image>\n<|grounding|>Convert the document to markdown. "
+    }
+  },
+  "metrics": {
+    "duration_s": 66.88448649999918,
+    "completed": 454,
+    "failed": 4,
+    "error_rate": 0.008733624454148471,
+    "e2e_ms": {
+      "mean": 4447.169360675168,
+      "p50": 2620.1244999829214,
+      "p90": 9209.387791983318,
+      "p95": 9251.177500002086,
+      "p99": 9330.95995799522
+    },
+    "output_toks_per_s": 3360.6896271828705,
+    "request_throughput": 6.787822165607948,
+    "total_input_tokens": 408076,
+    "total_output_tokens": 224778,
+    "max_concurrent_requests": 32,
+    "ttft_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "tpot_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "itl_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    }
+  },
+  "extensions": {
+    "modality": "vision-language",
+    "image_toks_per_s": 6101.20554637143,
+    "equivalent_pages_per_s": 7.546937972339264,
+    "notes": "Stage 6 batch-throughput (saturation) on DeepSeek-OCR-2 BF16 @ c=32. Iteration 5: 32 worker loops fire back-to-back for 60s (after 10s warmup), each worker drawing round-robin from the 6-doc stratified corpus (receipt / article / table / formula / dense / handwritten). Non-streaming; e2e-only. Per-doc-type breakdown at extensions.stratification.per_doc_type[] shows how throughput and latency vary ~16x on image tokens and ~100x on output tokens across document types.",
+    "stratification": {
+      "corpus_size": 6,
+      "corpus_doc_types": [
+        "receipt",
+        "article",
+        "table",
+        "formula",
+        "dense",
+        "handwritten"
+      ],
+      "corpus_weights": {
+        "receipt": 0.16666666666666666,
+        "article": 0.16666666666666666,
+        "table": 0.16666666666666666,
+        "formula": 0.16666666666666666,
+        "dense": 0.16666666666666666,
+        "handwritten": 0.16666666666666666
+      },
+      "sampling": "round-robin",
+      "per_doc_type": [
+        {
+          "doc_type": "receipt",
+          "completed": 74,
+          "failed": 1,
+          "image_tokens_p50": 274,
+          "output_tokens_p50": 308,
+          "e2e_ms_p50": 2794.107374997111,
+          "e2e_ms_p99": 2897.9722500080243,
+          "total_input_tokens": 20276,
+          "total_output_tokens": 22792,
+          "mean_input_tokens": 274.0,
+          "mean_output_tokens": 308.0,
+          "request_throughput": 1.1063851106938065,
+          "output_toks_per_s": 340.7666140936924,
+          "image_toks_per_s": 303.149520330103,
+          "equivalent_pages_per_s": 0.5356803452075795
+        },
+        {
+          "doc_type": "article",
+          "completed": 80,
+          "failed": 1,
+          "image_tokens_p50": 1138,
+          "output_tokens_p50": 270,
+          "e2e_ms_p50": 2517.7430829789955,
+          "e2e_ms_p99": 2626.1168339988217,
+          "total_input_tokens": 91040,
+          "total_output_tokens": 21582,
+          "mean_input_tokens": 1138.0,
+          "mean_output_tokens": 269.775,
+          "request_throughput": 1.1960920115608717,
+          "output_toks_per_s": 322.6757224188342,
+          "image_toks_per_s": 1361.152709156272,
+          "equivalent_pages_per_s": 1.1045498501769766
+        },
+        {
+          "doc_type": "table",
+          "completed": 77,
+          "failed": 1,
+          "image_tokens_p50": 850,
+          "output_tokens_p50": 267,
+          "e2e_ms_p50": 2441.2756669917144,
+          "e2e_ms_p99": 2565.6627919815946,
+          "total_input_tokens": 65450,
+          "total_output_tokens": 20559,
+          "mean_input_tokens": 850.0,
+          "mean_output_tokens": 267.0,
+          "request_throughput": 1.1512385611273392,
+          "output_toks_per_s": 307.38069582099956,
+          "image_toks_per_s": 978.5527769582383,
+          "equivalent_pages_per_s": 0.9140694015089803
+        },
+        {
+          "doc_type": "formula",
+          "completed": 78,
+          "failed": 1,
+          "image_tokens_p50": 850,
+          "output_tokens_p50": 1024,
+          "e2e_ms_p50": 9146.82975001051,
+          "e2e_ms_p99": 9326.977290998911,
+          "total_input_tokens": 66300,
+          "total_output_tokens": 74005,
+          "mean_input_tokens": 850.0,
+          "mean_output_tokens": 948.7820512820513,
+          "request_throughput": 1.16618971127185,
+          "output_toks_per_s": 1106.459866444529,
+          "image_toks_per_s": 991.2612545810725,
+          "equivalent_pages_per_s": 1.7454630039646992
+        },
+        {
+          "doc_type": "dense",
+          "completed": 73,
+          "failed": 0,
+          "image_tokens_p50": 1138,
+          "output_tokens_p50": 1024,
+          "e2e_ms_p50": 9176.366874977248,
+          "e2e_ms_p99": 9350.495208986104,
+          "total_input_tokens": 83074,
+          "total_output_tokens": 74752,
+          "mean_input_tokens": 1138.0,
+          "mean_output_tokens": 1024.0,
+          "request_throughput": 1.0914339605492955,
+          "output_toks_per_s": 1117.6283756024786,
+          "image_toks_per_s": 1242.0518471050984,
+          "equivalent_pages_per_s": 1.963664649672286
+        },
+        {
+          "doc_type": "handwritten",
+          "completed": 72,
+          "failed": 0,
+          "image_tokens_p50": 1138,
+          "output_tokens_p50": 154,
+          "e2e_ms_p50": 1454.4131669972558,
+          "e2e_ms_p99": 1648.3254590129945,
+          "total_input_tokens": 81936,
+          "total_output_tokens": 11088,
+          "mean_input_tokens": 1138.0,
+          "mean_output_tokens": 154.0,
+          "request_throughput": 1.0764828104047846,
+          "output_toks_per_s": 165.77835280233683,
+          "image_toks_per_s": 1225.0374382406449,
+          "equivalent_pages_per_s": 0.7510819762788297
+        }
+      ]
+    }
+  }
+}

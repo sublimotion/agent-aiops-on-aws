@@ -1,0 +1,130 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "7622b3ce-410f-413f-9803-924a45dbb6dd",
+  "created_at": "2026-05-20T11:44:27.009371Z",
+  "source_tool": {
+    "name": "vllm-bench-serve",
+    "version": "0.21.0",
+    "enrichment_version": "1.0.0-deepseek-v4-flash"
+  },
+  "model": {
+    "name": "DeepSeek-V4-Flash",
+    "id": "deepseek-ai/DeepSeek-V4-Flash",
+    "architecture": "moe",
+    "parameters_total": "131B",
+    "parameters_active": "5.5B",
+    "quantization": "fp8",
+    "max_model_len": 524288
+  },
+  "engine": {
+    "name": "vllm",
+    "container_image": "vllm/vllm-openai:nightly-pr42320",
+    "base_image": "vllm/vllm-openai:nightly-pr42320",
+    "dockerfile": null,
+    "tensor_parallel": 8,
+    "pipeline_parallel": 1,
+    "data_parallel": null,
+    "expert_parallel": null,
+    "replicas": 1,
+    "reasoning": false,
+    "kv_cache_dtype": "fp8",
+    "attention_backend": "flashinfer",
+    "speculative_decode": null,
+    "engine_config_tag": "vllm-tp8-baseline",
+    "extra_args": {
+      "kv-cache-dtype": "fp8",
+      "trust-remote-code": true
+    }
+  },
+  "framework": {
+    "name": "vllm-native",
+    "version": "0.21.0",
+    "config": {}
+  },
+  "infrastructure": {
+    "substrate": "ec2-spot",
+    "instance_type": "p6-b300.48xlarge",
+    "region": "us-west-2",
+    "gpu": {
+      "name": "B300",
+      "arch": "sm_103",
+      "count": 8,
+      "vram_gb": 275,
+      "interconnect": "nvswitch-nv18"
+    }
+  },
+  "workload": {
+    "use_case": "rag-1m-context",
+    "catalog_id": "rag-1m-context",
+    "modality": "text",
+    "dataset": {
+      "type": "synthetic",
+      "input_tokens": {
+        "mean": 261888,
+        "std_dev": 0
+      },
+      "output_tokens": {
+        "mean": 256,
+        "std_dev": 0
+      }
+    },
+    "load": {
+      "type": "concurrency",
+      "concurrency": 1,
+      "num_prompts": 1
+    },
+    "api": {
+      "type": "completions",
+      "streaming": true,
+      "endpoint": "/v1/completions"
+    }
+  },
+  "metrics": {
+    "duration_s": 7.822825462000765,
+    "completed": 1,
+    "failed": 0,
+    "error_rate": 0.0,
+    "ttft_ms": {
+      "mean": 5024.7981200009235,
+      "p50": 5024.7981200009235,
+      "p90": null,
+      "p95": null,
+      "p99": 5024.7981200009235
+    },
+    "tpot_ms": {
+      "mean": 7.045255560782001,
+      "p50": 7.045255560782001,
+      "p90": null,
+      "p95": null,
+      "p99": 7.045255560782001
+    },
+    "itl_ms": {
+      "mean": 7.516905757321301,
+      "p50": 7.510561999879428,
+      "p90": null,
+      "p95": null,
+      "p99": 8.241596059997391
+    },
+    "e2e_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "output_toks_per_s": 32.72474903645945,
+    "request_throughput": 0.12783105092366973,
+    "total_toks_per_s": 33510.14301333448,
+    "total_input_tokens": 261888,
+    "total_output_tokens": 256,
+    "max_concurrent_requests": 1
+  },
+  "extensions": {
+    "normalized_from": "results/r2/single_256k.json",
+    "session_date": "2026-05-18",
+    "cost": {
+      "instance_cost_per_hr": 26.49,
+      "dollars_per_1m_output_tokens": 224.85530217925378
+    }
+  }
+}

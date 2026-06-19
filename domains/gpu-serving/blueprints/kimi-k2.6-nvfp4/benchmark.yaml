@@ -1,0 +1,262 @@
+# Kimi K2.6 NVFP4 — Benchmark Sidecar
+# Single-node knee-finding for a coding-agent-shaped production workload.
+# Operating point derived from customer 7-day stats (see spec kimi-k2.6-nvfp4.md):
+#   31,404-tok avg context, 1,024-tok output, 74.1% prompt cache hit,
+#   ~1,040 avg / ~1,500 peak concurrent, p95 TTFT ceiling ~15s.
+# Goal: find the single-node knee. Disagg explicitly NOT in scope (decode is ~8:1
+# smaller than prefill — independent decode scaling buys little).
+# ENGINE is the primary axis: run SGLang AND vLLM at matched NVFP4 + workload,
+# pick the most performant at the customer operating point, then sweep optimizations on it.
+
+model:
+  name: Kimi-K2.6-NVFP4
+  id: nvidia/Kimi-K2.6-NVFP4
+  architecture: deepseek-v3-mla-moe  # MLA + MoE; model_type kimi_k25, no native MTP but EXTERNAL EAGLE3 MLA draft exists
+  parameters_total: "1T"
+  parameters_active: "32B"
+  quantization: nvfp4               # MoE-linear weights+activations only (modelopt v0.44.0)
+  max_model_len: 65536
+  # Verified from config.json (2026-06-16). NVFP4 uses modelopt group_size=16 (NOT block_n=128),
+  # so fp8-moe-tp-divisibility (block-128 rule) is N/A — group-16 divides TP8 cleanly. KV cache is fp8.
+  moe_intermediate_size: 2048        # /TP8 = 256; group_size=16 divides → OK (no block-128 constraint)
+  max_position_embeddings: 262144    # >> 65536 max-model-len → OK
+  num_hidden_layers: 61
+  num_attention_heads: 64            # /TP8 = 8 heads/GPU (valid on NVIDIA; AMD AITER would need >=16)
+  n_routed_experts: 384
+  multimodal: true                   # KimiK25ForConditionalGeneration — vision_tower/mm_projector present (text-only bench)
+
+# ── Engine: PRIMARY AXIS — run BOTH at matched NVFP4 + workload, pick winner ──
+# Both serve nvidia/Kimi-K2.6-NVFP4 natively. Winner unknown: SGLang NVFP4 only
+# landed 2026-06-10 (cookbook PR #27714); vLLM historically had 2-3x lower TTFT
+# on K2.6 (FLASHINFER_MLA). Decide on measured TTFT/throughput/$ at the customer
+# operating point, then run the full optimization sweep on the winner only.
+engine:
+  comparison: [sglang, vllm]         # head-to-head; not a single committed engine
+  tensor_parallel: 8                 # B200/B300 NVIDIA: 8 heads/GPU OK (AMD AITER caps TP4, N/A here)
+  pipeline_parallel: 1
+  replicas: 1
+  reasoning: true
+
+  sglang:
+    container_image: "lmsysorg/sglang:latest"   # require >=0.5.9 (Kimi NVFP4 support); pin at deploy
+    min_version: "0.5.9"
+    launch: sglang.launch_server
+    kv_cache_dtype: auto
+    extra_args:
+      model-path: nvidia/Kimi-K2.6-NVFP4         # modelopt ckpt; NOT RedHatAI (#25331 load bug, OPEN)
+      quantization: modelopt_fp4
+      tp: 8
+      tool-call-parser: kimi_k2
+      reasoning-parser: kimi_k2
+      context-length: 65536
+      enable-metrics: true                       # REQUIRED or /metrics 404s → TTFT data lost (L8)
+      # KV tier + spec decode are optimization-phase sweeps, not baseline (see optimization:)
+
+  vllm:
+    container_image: "vllm/vllm-openai:latest"   # sm_100/cu128 for B200; -cu130 only if B300 fallback
+    attention_backend: flashinfer                # FLASHINFER_MLA — the 2-3x TTFT edge to verify
+    kv_cache_dtype: auto
+    extra_args:
+      model: nvidia/Kimi-K2.6-NVFP4
+      tensor-parallel-size: 8
+      tool-call-parser: kimi_k2
+      reasoning-parser: kimi_k2
+      enable-auto-tool-choice: true
+      enable-prefix-caching: true                # mandatory — reproducing 74% hit is the headline
+      max-model-len: 65536
+      trust-remote-code: true
+      # NOTE: mdc card flags [lmcache, mla] INCOMPATIBLE for Kimi → vLLM may be GPU-KV-only
+      # (no CPU offload tier). Record as a structural capacity difference vs SGLang+HiCache.
+
+# ── Full-stack optimization levers (run on the winning engine) ──────────────
+# PREFILL-bound workload (8K fresh-prefill tok/req after 74% cache vs ~30 decode
+# tok/s/req). Primary levers target prefill interleave + KV residency. Spec
+# decode IS now in scope (external EAGLE3 MLA draft exists upstream).
+optimization:
+  # MNBT (max-num-batched-tokens / SGLang chunked-prefill-size): controls
+  # chunked-prefill vs decode interleave — THE knob behind the 15s p95 TTFT
+  # blowout at peak. Sweep on both engines.
+  max_num_batched_tokens_sweep: [8192, 16384, 32768, 65536]
+  enable_chunked_prefill: true
+  max_num_seqs_sweep: [256, 512, 1024, 2048]   # concurrency admission cap
+  # CUDA graph capture (worth 6.4x on spec-decode per Kimi-spec L19); validate on plain NVFP4 too.
+  cuda_graphs: true
+  # KV cache dtype sweep — fp8 KV halves bytes/token, raising the residency knee.
+  kv_cache_dtype_sweep: [auto, fp8]
+
+  # NVFP4 MoE kernel check — NOT assumed slow anymore. SGLang >=0.5.9 ships FP4
+  # kernels (modelopt_fp4); the old "stock 0.5-1.0x of cutlass-3.x" caveat
+  # (qwen3-235b-spec L18) was vs SGLang 0.5.10 WITHOUT FP4. MEASURE vs CoreWeave/
+  # Azure 128-144 tok/s refs; if short, that gap is custom-kernel work (OOS).
+  # benchmark_moe.py tunes the FP8 Triton path only — N/A for the NVFP4 path.
+  moe_kernel:
+    autotune_required: false
+    measure_vs_commercial_refs: [coreweave_128, azure_144]
+
+  # SGLang-only: HiCache CPU/NVMe tiering — structural knee-raiser without disagg.
+  # Toggle on/off; expect help only while CAPACITY-bound, not under compute/BW-bound
+  # peak (kimi-k2.6 lesson: helped single-stream, neutral/negative at c>=16).
+  hicache:                                   # SGLANG ONLY (vLLM blocked: [lmcache, mla] incompatible)
+    enabled_sweep: [false, true]
+    flag: "--enable-hierarchical-cache --hicache-size 200"
+    # Per-rank host offload MUST exceed device KV pool/rank (~115 GB B200, ~210 GB B300) —
+    # HiCache asserts host>device (glm5-lmcache L14); 200-220 clears both. 500/rank OOMs (qwen3-235b L9).
+    # TOTAL host alloc = 220 × TP8 = 1,760 GB. If on EKS, pod mem limit must be
+    # >= hicache_size_gb * tp_size + 400 ≈ 2,160 GB (qwen3-235b-spec L9); standalone EC2 has ample RAM.
+    cpu_offload_gb: 220
+    nvme_tier_path: /mnt/nvme/kv-tier
+
+  # Spec decode — NOW AVAILABLE (reverses earlier "no MTP, OOS"). External EAGLE3 MLA
+  # draft exists upstream. Sweep as a decode-latency lever, NOT baseline.
+  speculative_decode:                        # SGLang verified; vLLM EAGLE3-MLA support TBD at deploy
+    enabled_sweep: [false, true]
+    algorithm: EAGLE3
+    draft_model: lightseekorg/kimi-k2.6-eagle3.1-mla
+    flags: "--speculative-algorithm EAGLE3 --speculative-num-steps 3 --speculative-eagle-topk 1 --speculative-num-draft-tokens 4"
+    caveat: "synthetic prompts inflate accept rate 3-5x vs real traffic (qwen3-235b-spec); report accept rate"
+
+framework:
+  name: head-to-head              # SGLang vs vLLM (see engine.comparison); winner runs the opt sweep
+  config:
+    mode: aggregated               # single-node aggregated. NOT disaggregated (out of scope).
+
+infrastructure:
+  substrate: eks                   # existing cluster qwen3-next-bench-eks-cluster (us-east-2)
+  cluster_name: qwen3-next-bench-eks-cluster
+  nodegroup: ai-infra-use2-b200-spot   # p6-b200.48xlarge SPOT, max=1, scaled desired=0 until deploy
+  instance_type: p6-b200.48xlarge  # NVIDIA-validated box for this NVFP4 release
+  region: us-east-2
+  az: us-east-2b                   # use2-az2 (nodegroup subnet subnet-03d03f1fb8d62d6a5)
+  node_selector: { blueprint: kimi-k2.6-nvfp4 }  # label the node after scale-up (node already has ai-infra/role=b200-spot)
+  # AMI is managed by the nodegroup (EKS-optimized AL2023+NVIDIA, nodeadm bootstrap) — not set here.
+  gpu:
+    name: B200
+    arch: sm_100                   # stock cu128 images (NOT -cu130, which is sm_103/B300)
+    count: 8
+    vram_gb: 180                   # KV-capacity ceiling vs B300's 275 — measure if knee is BW- or capacity-bound
+    interconnect: nvswitch         # NCCL-broken-on-PCIe (g7e sm_120) does NOT apply
+  # EKS substrate makes HiCache pod-memory limit LOAD-BEARING (EC2's 4TB RAM no longer hides it):
+  pod_memory_limit_gi: 2160        # 220 GB/rank × TP8 + 400 headroom (qwen3-235b-spec L9); else HiCache OOM-hangs
+  # Fallback only if knee is KV-capacity-bound AND HiCache can't recover peak:
+  fallback_instance_type: p6-b300.48xlarge  # 275 GB/GPU, sm_103, -cu130 tags (different cluster/region)
+
+# ── Workloads ───────────────────────────────────────────────────────────────
+# Coding-agent shape is primary (shared scaffold + short completions + bursty
+# multi-turn). Reference canonical cards by catalog_id; override only the
+# operating point. Do not fork divergent params (canonical-cards-are-source-of-truth).
+workloads:
+  # PRIMARY — find the SLO-max knee at the customer's context length.
+  - catalog_id: concurrency-sweep
+    override:
+      load:
+        levels: [64, 128, 256, 512, 1024, 1536, 2048]
+        num_prompts_per_level: 200
+      dataset:
+        input_tokens: {mean: 31404, std_dev: 8000}   # 16k peak-hrs ↔ 36k quiet-hrs swing
+        output_tokens: {mean: 1024, std_dev: 256}
+
+  # Coding-agent shape — the workload's true character (shared scaffold, tool loop).
+  - catalog_id: coding-agent
+    override:
+      dataset:
+        # Long shared system prompt / tool defs / retrieved files, short turns.
+        input_tokens: {mean: 31404, std_dev: 8000}
+        output_tokens: {mean: 1024, std_dev: 256}
+      load:
+        type: constant
+        request_rate: 32.0          # customer sustained ~1,909/min = 31.8/s
+        duration_s: 300
+
+  # CACHE-HIT VALIDATOR — tune shared prefix to reproduce the 74.1% hit rate.
+  - catalog_id: shared-prefix-multitenant
+    override:
+      dataset:
+        shared_system_prompt_tokens: 23250   # ~74% of 31,404 → targets the observed hit rate
+        per_user_query_tokens: {mean: 8154, std_dev: 2000}
+        prefix_reuse: cross-session
+        output_tokens: {mean: 1024, std_dev: 256}
+        # CRITICAL for SGLang RadixAttention (kimi-k2.6 lessons): the shared prefix MUST be
+        # BYTE-IDENTICAL across all sessions — no timestamps, request IDs, or reordered context
+        # in the prefix. Variation only in the suffix (per_user_query). Otherwise radix exact-match
+        # breaks and the measured hit rate collapses to ~1.0x (the scar from the prior Kimi run).
+        prefix_byte_identical: true
+      load:
+        concurrent_sessions: 1500            # the customer's peak band
+        num_sessions: 6000
+
+# ── SLO targets (from customer observed bands) ───────────────────────────────
+slo:
+  ttft_p50_ms: 2400      # customer p50 1.1-2.4s
+  ttft_p99_ms: 15000     # customer p95 5.8-15s — the knee crossing point
+  tpot_p99_ms: 50        # ~34.8 tok/s/req → ~28.7ms/tok mean; allow headroom
+  e2e_p99_ms: 45000      # 31K prefill + 1K decode is a long request
+  error_rate_max: 0.001
+  throughput_floor_toks: 32500   # customer aggregate decode 1.95M/min
+
+# ── Observability — MANDATORY (Kimi-spec lost all TTFT data; never again) ─────
+# Prometheus + DCGM + node-exporter from bootstrap (Stage 4b), smoke-tested
+# before first request, snapshotted to S3 every 10 min. bench-standard.py reads
+# from Prometheus so the envelope can't be emitted without capture.
+observability:
+  required: true
+  prometheus: { port: 9090, retention: 7d, s3_sync: true }
+  # Per-engine metric names differ; scrape whichever engine is running. The
+  # HEADLINE cache-hit number is NOT these gauges — it is the engine-agnostic
+  # token fraction Σ cached_input_tokens / Σ prompt_tokens (from per-request usage),
+  # so SGLang and vLLM are comparable to each other and to the customer's 74.1%.
+  # These gauges are operational signal + capture-assertion only (Kimi-spec lost
+  # all TTFT because live metrics were never scraped).
+  engine_metrics:
+    cache_hit_definition: "sum(cached_input_tokens) / sum(prompt_tokens)"  # token fraction, engine-agnostic
+    vllm:
+      endpoint: "http://localhost:8000/metrics"
+      required_histograms:
+        - "vllm:time_to_first_token_seconds_bucket"
+        - "vllm:time_per_output_token_seconds_bucket"
+        - "vllm:e2e_request_latency_seconds_bucket"
+      required_gauges:
+        - "vllm:gpu_cache_usage_perc"             # KV residency knee
+        - "vllm:num_requests_running"
+        - "vllm:num_requests_waiting"             # queue buildup → TTFT blowout signal
+        - "vllm:gpu_prefix_cache_hit_rate"        # cross-check only; not the headline
+        - "vllm:gpu_prefix_cache_queries_total"
+        - "vllm:gpu_prefix_cache_hits_total"
+      per_request_cache_field: "prompt_tokens_details.cached_tokens"
+    sglang:
+      endpoint: "http://localhost:30000/metrics"  # SGLang default port; needs --enable-metrics
+      required_histograms:
+        - "sglang:time_to_first_token_seconds_bucket"
+        - "sglang:inter_token_latency_seconds_bucket"
+        - "sglang:e2e_request_latency_seconds_bucket"
+      required_gauges:
+        - "sglang:token_usage"                    # KV pool utilization → residency knee
+        - "sglang:num_running_reqs"
+        - "sglang:num_queue_reqs"                 # queue buildup → TTFT blowout signal
+        - "sglang:cache_hit_rate"                 # radix cross-check only; not the headline
+      per_request_cache_field: "meta_info.cached_tokens"
+  dcgm:
+    endpoint: "http://localhost:9400/metrics"
+    profiler: on                           # else DCGM_FI_PROF_* return empty
+    required_metrics:
+      - DCGM_FI_PROF_DRAM_ACTIVE           # HBM BW util — roofline (decode BW-bound check)
+      - DCGM_FI_PROF_PIPE_TENSOR_ACTIVE    # tensor-core active — prefill compute-bound check
+      - DCGM_FI_PROF_SM_ACTIVE             # SM occupancy
+      - DCGM_FI_DEV_POWER_USAGE            # W — for power-normalized cost
+      - DCGM_FI_DEV_XID_ERRORS             # any non-zero = bad run
+      - DCGM_FI_DEV_GPU_TEMP
+      - DCGM_FI_PROF_NVLINK_TX_BYTES       # TP8 collective traffic on NV18
+      - DCGM_FI_PROF_NVLINK_RX_BYTES
+  node_exporter: { port: 9100 }
+
+# ── Cost & go/no-go ──────────────────────────────────────────────────────────
+cost:
+  instance_type: p6-b200.48xlarge
+  spot_price_per_hr: 18.00         # B200 us-east-2 spot; B300 fallback ~16.00 us-west-2
+  on_demand_price_per_hr: null
+  utilization_target: 0.70
+  # The decision number — compare derived $/Mtok at the knee to upstream:
+  upstream_blended_per_mtok: 0.338
+  upstream_input_per_mtok: 0.363
+  upstream_output_per_mtok: 3.76
+  # Derived by adapter (don't set manually):
+  # cost_per_m_input_tokens / cost_per_m_output_tokens from spot_price / measured throughput

@@ -1,0 +1,121 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "712c0cad-3a3d-45dc-ae6d-965c00ba1478",
+  "created_at": "2026-05-14T12:59:13Z",
+  "source_tool": {
+    "name": "custom",
+    "version": "0.1.0-deepseek-ocr",
+    "enrichment_version": "1.0.0"
+  },
+  "model": {
+    "name": "DeepSeek-OCR-2",
+    "id": "deepseek-ai/DeepSeek-OCR-2",
+    "architecture": "vlm",
+    "parameters_total": "8B",
+    "quantization": "bf16",
+    "max_model_len": 8192
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.19.1",
+    "container_image": "vllm/vllm-openai:v0.19.1",
+    "base_image": null,
+    "dockerfile": null,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "data_parallel": null,
+    "expert_parallel": null,
+    "replicas": 1,
+    "reasoning": false,
+    "kv_cache_dtype": "auto",
+    "attention_backend": "flash-attn",
+    "speculative_decode": null,
+    "extra_args": {
+      "trust-remote-code": true,
+      "max-num-seqs": 32,
+      "gpu-memory-utilization": 0.9
+    }
+  },
+  "infrastructure": {
+    "substrate": "eks",
+    "instance_type": "g6e.2xlarge",
+    "region": "us-east-2",
+    "gpu": {
+      "name": "L40S",
+      "arch": "sm_89",
+      "count": 1,
+      "vram_gb": 48,
+      "interconnect": "none"
+    }
+  },
+  "workload": {
+    "use_case": "batch",
+    "catalog_id": "batch-throughput",
+    "modality": "multimodal",
+    "dataset": {
+      "type": "synthetic-single-image",
+      "source": "scripts/test-assets/sample-doc.png",
+      "input_tokens": {
+        "mean": 274.0
+      },
+      "output_tokens": {
+        "mean": 160.0
+      }
+    },
+    "load": {
+      "type": "constant",
+      "max_concurrency": 32,
+      "duration_s": 60,
+      "warmup_s": 10
+    },
+    "api": {
+      "type": "chat",
+      "streaming": false,
+      "endpoint": "/v1/chat/completions",
+      "prompt_template": "<image>\n<|grounding|>Convert the document to markdown. "
+    }
+  },
+  "metrics": {
+    "duration_s": 60.48800237500109,
+    "completed": 1536,
+    "failed": 0,
+    "error_rate": 0.0,
+    "e2e_ms": {
+      "mean": 1258.0702451269872,
+      "p50": 1260.086208989378,
+      "p90": 1284.3805830052588,
+      "p95": 1290.2789999789093,
+      "p99": 1319.865416007815
+    },
+    "output_toks_per_s": 4062.954476102346,
+    "request_throughput": 25.393465475639662,
+    "total_input_tokens": 420864,
+    "total_output_tokens": 245760,
+    "max_concurrent_requests": 32,
+    "ttft_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "tpot_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "itl_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    }
+  },
+  "extensions": {
+    "modality": "vision-language",
+    "notes": "Stage 6 batch-throughput (saturation) on DeepSeek-OCR-2 BF16 @ c=32. 32 worker loops fire back-to-back for 60s (after 10s warmup), keeping the vLLM max_num_seqs=32 queue continuously full. Non-streaming; e2e-only (no TTFT for VLM non-stream)."
+  }
+}

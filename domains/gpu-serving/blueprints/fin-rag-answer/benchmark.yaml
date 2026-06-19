@@ -1,0 +1,73 @@
+# Fin RAG Answer Extraction — Benchmark Sidecar
+# Deployment context the bench tool doesn't know about. Referenced by the
+# enrichment wrapper and the Stage 0c serving-config resolver.
+# Spec: domains/gpu-serving/specs/fin-rag-answer.md
+# Workload card: standards/benchmark-commons/workloads/fin-support.yaml
+
+model:
+  name: Nemotron-3-Super-120B-A12B
+  id: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+  architecture: hybrid-mamba-moe       # Mamba-2 + LatentMoE + Select-Attention
+  hf_architecture: NemotronHForCausalLM # actual config.json value (Stage 0 verified)
+  parameters_total: "120B"
+  parameters_active: "12B"
+  quantization: fp8                     # per-tensor static FP8 (NOT NVFP4, NOT block-wise) — Stage 0 verified
+  fp8_granularity: per-tensor           # config.json: single config_group, Linear targets, dynamic:false → no block_n=128 constraint
+  moe_intermediate_size: 2688
+  max_model_len: 256000                 # we need ~12K
+
+engine:
+  name: vllm
+  # Image-resolution policy (updated 2026-06-11): try LATEST STABLE first, fall back
+  # only on Stage 0 smoke-test failure. The smoke test is the arbiter, not the number.
+  version: "0.22.1"                     # PRIMARY candidate — latest stable (Docker Hub 2026-06-05).
+                                        #   0.22 had output regression #44022; 0.22.1 is the point release / likely fix.
+  version_fallback: "0.18.1"            # known-clean baseline; used ONLY if 0.22.1 fails Stage 0 smoke.
+  # AVOID without smoke evidence: 0.19.0 (#39223 garble), 0.15.x (#34356 FP8), 0.20.0 (#41565 long-ctx).
+  # Do NOT use Docker Hub `latest` (nightly) or ECR nemotron-super-vllm:dynamo-0.9.1 (vLLM 0.14.1, too old).
+  container_image: null                 # set during deploy after smoke test selects the winner
+  candidate_images:
+    primary: "615299764834.dkr.ecr.us-east-2.amazonaws.com/vllm-openai:v0.22.1"
+    fallback: "615299764834.dkr.ecr.us-east-2.amazonaws.com/vllm-openai:v0.18.1"
+  tensor_parallel: 2
+  replicas: 4                           # agg-tp2-x4 = all 8 B200
+  reasoning: false                      # latency-sensitive extraction; reasoning OFF
+  kv_cache_dtype: fp8
+  attention_backend: TRITON_ATTN        # hybrid-safe default; FlashInfer leg in P1
+  speculative_decode: null              # P1 axis: n-gram + native MTP
+  prefix_caching: true                  # mamba_cache_mode=all — caches ~3050-tok shared header
+  extra_args:
+    trust-remote-code: true
+    reasoning-parser: nemotron_v3
+
+infrastructure:
+  substrate: eks
+  cluster: qwen3-next-bench-eks-cluster
+  instance_type: p6-b200.48xlarge
+  region: us-east-2
+  availability_zone: us-east-2b
+  nodegroup: ai-infra-use2-b200-spot
+  gpu:
+    name: B200
+    arch: sm_100
+    count: 8
+    vram_gb: 183
+    interconnect: nvswitch
+
+# Workload: the real Fin corpus, replayed + profile-matched augmentation.
+workloads:
+  - catalog_id: fin-support
+
+# SLO targets (from spec success criteria / fin-support card)
+slo:
+  e2e_p50_ms: 6500
+  e2e_p90_ms: 9500
+  ttft_p99_ms: 6000
+  tpot_p99_ms: 50
+  error_rate_max: 0.001
+
+cost:
+  instance_type: p6-b200.48xlarge
+  spot_price_per_hr: 32.00              # us-east-2b live rate 2026-06-11 (2c ~17.6)
+  on_demand_price_per_hr: 98.00
+  utilization_target: 0.70

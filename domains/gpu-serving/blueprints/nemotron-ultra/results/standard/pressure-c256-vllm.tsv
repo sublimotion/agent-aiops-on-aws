@@ -1,0 +1,17 @@
+# nemotron-3-ultra | vLLM v0.22.0 | B200 p6-b200.48xlarge TP4 | us-east-2 az2 | sustained saturation pressure test
+# captured 2026-06-06. c=256 held 150s, real prompts, temp=1.0, 512 out, ignore_eos. nemotron_h_mtp k=5.
+# Bounded worker model (CONC persistent workers, each re-submits on completion) — no unbounded task creation.
+# VRAM: ~171/183 GB on the 4 active GPUs (TP4); ~248W steady during run.
+elapsed_s	completed	errors	agg_tok_s
+15	49	0	1668.7
+30	101	0	1721.0
+45	156	0	1772.7
+60	211	0	1798.5
+75	267	0	1820.7
+90	323	0	1835.5
+105	377	0	1836.4
+120	433	0	1845.5
+135	486	0	1841.3
+150	541	0	1846.6
+# Steady-state sustained aggregate: ~1847 tok/s @ c=256, error_rate=0.0000 over 150s.
+# No preemption collapse, no KV exhaustion. vs first-run SGLang B300 TP8 ~1010 tok/s -> ~1.83x on half the GPUs.

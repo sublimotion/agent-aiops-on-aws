@@ -1,0 +1,50 @@
+# vLLM Kimi-K2.6-NVFP4 — TP8, FLASHINFER_MLA. The TTFT comparison arm of the head-to-head.
+# No HiCache (mdc card: [lmcache, mla] INCOMPATIBLE for Kimi) → GPU-KV-only. Lower capacity
+# knee than SGLang+HiCache by design — record as a structural difference, not a tuning gap.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vllm-kimi-nvfp4-mnbt16384
+  namespace: default
+  labels: {app: vllm-kimi-nvfp4, phase: mnbt16384}
+spec:
+  restartPolicy: Never
+  nodeSelector: {blueprint: kimi-k2.6-nvfp4}
+  tolerations:
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}   # the ACTUAL node taint (L2)
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+  hostNetwork: true
+  containers:
+    - name: vllm
+      image: vllm/vllm-openai:latest        # sm_100/cu128 stock for B200
+      command:
+        - bash
+        - -c
+        - |
+          exec python3 -m vllm.entrypoints.openai.api_server \
+            --model /mnt/nvme/models/kimi-k26-nvfp4 \
+            --served-model-name Kimi-K2.6-NVFP4 \
+            --tensor-parallel-size 8 \
+            --tool-call-parser kimi_k2 \
+            --reasoning-parser kimi_k2 \
+            --enable-auto-tool-choice \
+            --enable-prefix-caching \
+            --max-num-batched-tokens 16384 \
+            --max-model-len 65536 \
+            --gpu-memory-utilization 0.90 \
+            --trust-remote-code \
+            --host 0.0.0.0 --port 8000
+      env:
+        - {name: HF_HOME, value: /mnt/nvme/hf-cache}
+        - {name: VLLM_USE_V1, value: "1"}
+        - {name: VLLM_ATTENTION_BACKEND, value: FLASHINFER}   # FLASHINFER_MLA — the TTFT edge to verify
+      resources:
+        requests: {nvidia.com/gpu: "8", cpu: "48", memory: 256Gi}
+        limits:   {nvidia.com/gpu: "8", cpu: "96", memory: 512Gi}   # GPU-KV-only, no host tier
+      securityContext: {capabilities: {add: ["IPC_LOCK"]}}
+      volumeMounts:
+        - {name: nvme, mountPath: /mnt/nvme, mountPropagation: HostToContainer}
+        - {name: shm, mountPath: /dev/shm}
+  volumes:
+    - {name: nvme, hostPath: {path: /mnt/nvme, type: Directory}}
+    - {name: shm, emptyDir: {medium: Memory, sizeLimit: 64Gi}}

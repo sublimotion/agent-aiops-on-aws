@@ -1,0 +1,105 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bench-datasets
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mirror-ocr-datasets
+  namespace: bench-datasets
+  labels:
+    purpose: benchmark-dataset-mirror
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app: mirror-ocr-datasets
+    spec:
+      restartPolicy: OnFailure
+      nodeSelector:
+        role: system
+      tolerations:
+      - key: node.kubernetes.io/not-ready
+        operator: Exists
+        effect: NoExecute
+        tolerationSeconds: 300
+      containers:
+      - name: mirror
+        image: python:3.11-slim
+        resources:
+          requests:
+            cpu: "500m"
+            memory: 1Gi
+          limits:
+            cpu: "2"
+            memory: 4Gi
+        env:
+        - name: BUCKET
+          value: agent-aiops-bench-us-east-2
+        - name: AWS_DEFAULT_REGION
+          value: us-east-2
+        - name: HF_HUB_ENABLE_HF_TRANSFER
+          value: "1"
+        command:
+        - /bin/bash
+        - -euxc
+        - |
+          apt-get update -qq && apt-get install -y --no-install-recommends curl unzip ca-certificates
+          pip install --no-cache-dir "huggingface_hub[cli,hf_transfer]" boto3 awscli
+
+          mkdir -p /tmp/omnidoc /tmp/olmocr
+
+          echo "===== OmniDocBench ====="
+          hf download opendatalab/OmniDocBench --repo-type dataset --local-dir /tmp/omnidoc --max-workers 8
+          du -sh /tmp/omnidoc
+          aws s3 sync /tmp/omnidoc s3://$BUCKET/datasets/omnidocbench/ \
+              --only-show-errors --no-progress
+
+          echo "===== olmOCR-bench ====="
+          # Try canonical allenai repos; fall back if names differ
+          if ! hf download allenai/olmOCR-bench --repo-type dataset --local-dir /tmp/olmocr --max-workers 8; then
+            echo "allenai/olmOCR-bench not found; trying allenai/olmocr-mix-0225" >&2
+            hf download allenai/olmocr-mix-0225 --repo-type dataset --local-dir /tmp/olmocr --max-workers 8 \
+              || { echo "olmOCR-bench dataset name needs manual verification — downloading pip [bench] extras instead"; \
+                   pip install 'olmocr[bench]'; \
+                   python -c "import olmocr; print(olmocr.__file__)" > /tmp/olmocr/olmocr_pkg_location.txt; }
+          fi
+          du -sh /tmp/olmocr
+          aws s3 sync /tmp/olmocr s3://$BUCKET/datasets/olmocr-bench/ \
+              --only-show-errors --no-progress
+
+          echo "===== manifest ====="
+          aws s3 ls --recursive s3://$BUCKET/datasets/omnidocbench/ | wc -l
+          aws s3 ls --recursive s3://$BUCKET/datasets/olmocr-bench/ | wc -l
+          aws s3api head-bucket --bucket $BUCKET
+
+          cat > /tmp/MANIFEST.json <<EOF
+          {
+            "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "datasets": {
+              "omnidocbench": {
+                "source": "opendatalab/OmniDocBench (HF dataset)",
+                "s3_prefix": "s3://$BUCKET/datasets/omnidocbench/",
+                "purpose": "Periodic deeper O3 quality gate (DeepSeek-OCR-2 community score 90.25)"
+              },
+              "olmocr_bench": {
+                "source": "allenai/olmOCR-bench (HF dataset)",
+                "s3_prefix": "s3://$BUCKET/datasets/olmocr-bench/",
+                "purpose": "Primary O3 quality gate (DeepSeek self-reports 76.3)"
+              }
+            }
+          }
+          EOF
+          aws s3 cp /tmp/MANIFEST.json s3://$BUCKET/datasets/MANIFEST.json
+
+          echo "===== done ====="
+        volumeMounts:
+        - name: scratch
+          mountPath: /tmp
+      volumes:
+      - name: scratch
+        emptyDir:
+          sizeLimit: 30Gi

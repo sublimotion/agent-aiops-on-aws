@@ -1,0 +1,190 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "90032650-775f-4342-bcb0-004c42201abf",
+  "created_at": "2026-05-13T22:00:00Z",
+  "source_tool": {
+    "name": "custbench-async",
+    "version": "0.1.0",
+    "enrichment_version": "1.0.0"
+  },
+  "model": {
+    "name": "Kimi-K2.6",
+    "id": "moonshotai/Kimi-K2.6",
+    "architecture": "moe-mla-fp8",
+    "parameters_total": "1T",
+    "parameters_active": "32B",
+    "quantization": "fp8",
+    "max_model_len": 131072
+  },
+  "engine": {
+    "name": "sglang",
+    "container_image": "lmsysorg/sglang:v0.5.10-cu130",
+    "base_image": "lmsysorg/sglang:v0.5.10-cu130",
+    "dockerfile": null,
+    "tensor_parallel": 8,
+    "pipeline_parallel": 1,
+    "data_parallel": null,
+    "expert_parallel": null,
+    "replicas": 1,
+    "reasoning": false,
+    "kv_cache_dtype": "fp8",
+    "attention_backend": "trtllm_mha",
+    "speculative_decode": {
+      "algorithm": "EAGLE3",
+      "draft_model": "lightseekorg/kimi-k2.6-eagle3",
+      "num_steps": 1,
+      "num_draft_tokens": 4,
+      "eagle_topk": 1,
+      "draft_attention_backend": "trtllm_mha"
+    },
+    "extra_args": {
+      "reasoning-parser": "kimi_k2",
+      "tool-call-parser": "kimi_k2",
+      "trust-remote-code": true
+    }
+  },
+  "framework": {
+    "name": "sglang-native",
+    "version": "v0.5.10-cu130",
+    "config": {}
+  },
+  "infrastructure": {
+    "substrate": "ec2-spot",
+    "instance_type": "p6-b300.48xlarge",
+    "region": "us-east-1",
+    "gpu": {
+      "name": "B300",
+      "arch": "sm_103",
+      "count": 8,
+      "vram_gb": 275,
+      "interconnect": "nvswitch-nv18"
+    }
+  },
+  "workload": {
+    "use_case": "concurrency-sweep",
+    "catalog_id": "concurrency-sweep",
+    "modality": "text",
+    "dataset": {
+      "type": "synthetic",
+      "input_tokens": {
+        "mean": 512,
+        "std_dev": 0
+      },
+      "output_tokens": {
+        "mean": 256,
+        "std_dev": 0
+      }
+    },
+    "api": {
+      "type": "completions",
+      "streaming": false,
+      "endpoint": "/generate"
+    },
+    "load": {
+      "type": "concurrency-sweep",
+      "levels": [
+        1,
+        8,
+        32,
+        64,
+        128,
+        256,
+        512
+      ],
+      "num_prompts_per_level": 128,
+      "warmup_requests": 0,
+      "current_level": 32
+    }
+  },
+  "metrics": {
+    "duration_s": 12.703,
+    "completed": 128,
+    "failed": 0,
+    "error_rate": 0.0,
+    "ttft_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null,
+      "note": "Not measured \u2014 custbench-async records e2e only; TTFT not separable"
+    },
+    "tpot_ms": {
+      "mean": 12.3,
+      "p50": 12.3,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "itl_ms": {
+      "mean": 12.3,
+      "p50": 12.3,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "e2e_ms": {
+      "mean": 3035.0,
+      "p50": 3035.0,
+      "p90": 3671.0,
+      "p95": 3672.5,
+      "p99": 3674.0
+    },
+    "output_toks_per_s": 2579.6,
+    "request_throughput": 10.076,
+    "total_toks_per_s": 2579.6,
+    "total_input_tokens": 65536,
+    "total_output_tokens": 32768,
+    "max_concurrent_requests": 32
+  },
+  "slo": {
+    "targets": {
+      "ttft_p99_ms": 500,
+      "tpot_p99_ms": 30,
+      "e2e_p99_ms": 15000,
+      "error_rate_max": 0.001
+    },
+    "results": {
+      "ttft_p99_ms": {
+        "target": 500,
+        "actual": null,
+        "pass": null
+      },
+      "tpot_p99_ms": {
+        "target": 30,
+        "actual": 12.3,
+        "pass": true
+      },
+      "e2e_p99_ms": {
+        "target": 15000,
+        "actual": 3674.0,
+        "pass": true
+      },
+      "error_rate_max": {
+        "target": 0.001,
+        "actual": 0.0,
+        "pass": true
+      }
+    },
+    "overall_pass": true
+  },
+  "extensions": {
+    "speculative_decode_stats": {
+      "accept_rate_mean": 1.0,
+      "accept_length_mean": 2.0,
+      "effective_tokens_per_step": 2.0
+    },
+    "cost": {
+      "instance_cost_per_hr": 25.65,
+      "dollars_per_1m_output_tokens": 2.76,
+      "formula": "(25.65 / 2579.6) * (1000000 / 3600)"
+    },
+    "session_metadata": {
+      "phase": "phase-1b",
+      "variant": null,
+      "engine_config_tag": "sglang-eagle3-s1d4k1",
+      "blueprint": "domains/gpu-serving/blueprints/kimi-k2.6-speculative",
+      "run_date": "2026-05-13"
+    }
+  }
+}

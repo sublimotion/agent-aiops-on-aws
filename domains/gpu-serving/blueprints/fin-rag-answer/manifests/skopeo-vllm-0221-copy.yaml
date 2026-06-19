@@ -1,0 +1,59 @@
+# Mirror vLLM v0.22.1 (latest stable, Docker Hub pushed 2026-06-05) -> private ECR.
+# Primary image candidate per updated image-resolution directive (2026-06-11):
+#   try latest stable FIRST; Stage 0 coherence smoke test is the arbiter.
+#   Fallback v0.18.1 is mirrored by skopeo-vllm-018-copy (kept pre-staged in ECR).
+# Registry-to-registry copy (no node pull, no local docker daemon). Runs on a
+# non-GPU node so it never competes with serving for the B200.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: skopeo-vllm-0221-copy
+  namespace: ml-inference
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/os: linux
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: nvidia.com/gpu.present
+                operator: DoesNotExist
+      containers:
+      - name: skopeo
+        image: quay.io/skopeo/stable:latest
+        imagePullPolicy: Always
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Copying vllm/vllm-openai:v0.22.1 -> ECR ..."
+          skopeo copy --retry-times 5 \
+            --dest-creds "${ECR_USER}:${ECR_PW}" \
+            docker://docker.io/vllm/vllm-openai:v0.22.1 \
+            docker://615299764834.dkr.ecr.us-east-2.amazonaws.com/vllm-openai:v0.22.1
+          echo "COPY_DONE"
+        env:
+        - name: ECR_USER
+          valueFrom:
+            secretKeyRef:
+              name: ecr-push-creds
+              key: username
+        - name: ECR_PW
+          valueFrom:
+            secretKeyRef:
+              name: ecr-push-creds
+              key: password
+        resources:
+          requests:
+            cpu: "2"
+            memory: 4Gi
+          limits:
+            cpu: "4"
+            memory: 8Gi

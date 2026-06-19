@@ -1,0 +1,11 @@
+# P1 standard workload suite — Nemotron-3-Ultra-550B-A55B-NVFP4 on B300 TP8 wide-tree EAGLE (topk=4, draft=16)
+# SGLang v0.5.12.post1-cu130, flashinfer_trtllm MoE, no EP, no radix cache. temp=1.0 top_p=0.95, ignore_eos (full output token counts).
+# Aggregate throughput = sum of per-stream output tok/s at the given concurrency. accept_len = mean EAGLE/MTP accept length.
+# Measured 2026-06-05.
+workload	concurrency	input_tokens	output_tokens	agg_tok_s	e2e_median_s	accept_len	errors
+warmup	2	256	32	69.3	0.89	1.98	0
+chatbot-short	16	256	128	451.9	3.95	2.29	0
+chatbot-long	4	32768	512	166.7	11.98	2.45	0
+rag-long-context	8	16384	256	251.2	7.53	2.34	0
+coding-agent	8	4096	2048	637.7	17.00	3.84	0
+sharegpt-production-mix	16	512	256	662.6	5.67	2.31	0

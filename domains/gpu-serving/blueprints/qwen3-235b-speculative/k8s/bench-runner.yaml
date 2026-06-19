@@ -1,0 +1,126 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bench-scripts
+  namespace: default
+data:
+  bench-one.py: |
+    #!/usr/bin/env python3
+    # Minimal concurrency-driving bench — metrics come from Prometheus
+    import asyncio, aiohttp, time, sys, json, statistics
+
+    port = int(sys.argv[1])
+    conc = int(sys.argv[2])
+    ilen = int(sys.argv[3])
+    olen = int(sys.argv[4])
+    total = int(sys.argv[5])
+    out_file = sys.argv[6]
+    engine = sys.argv[7] if len(sys.argv) > 7 else "sglang"
+    prompt = " ".join(["hello"] * ilen)
+
+    async def one(session, i):
+        if engine == "sglang":
+            body = {"text": prompt, "sampling_params": {"max_new_tokens": olen, "temperature": 0.0}}
+            url = f"http://localhost:{port}/generate"
+        else:
+            body = {"model": "Qwen3-235B-A22B-FP8", "prompt": prompt, "max_tokens": olen, "temperature": 0.0}
+            url = f"http://localhost:{port}/v1/completions"
+        t0 = time.time()
+        async with session.post(url, json=body, timeout=aiohttp.ClientTimeout(total=600)) as r:
+            data = await r.json()
+        t1 = time.time()
+        meta = data.get("meta_info") or {}
+        tokens = meta.get("completion_tokens") or data.get("usage", {}).get("completion_tokens") or olen
+        return {"duration": t1-t0, "tokens": tokens,
+                "spec_accept_rate": meta.get("spec_accept_rate"),
+                "spec_accept_length": meta.get("spec_accept_length")}
+
+    async def main():
+        connector = aiohttp.TCPConnector(limit=conc*2)
+        async with aiohttp.ClientSession(connector=connector) as session:
+            sem = asyncio.Semaphore(conc)
+            async def gated(i):
+                async with sem:
+                    try: return await one(session, i)
+                    except Exception as e: return {"error": str(e)}
+            t_start = time.time()
+            results = await asyncio.gather(*[gated(i) for i in range(total)])
+            t_end = time.time()
+        ok = [r for r in results if "error" not in r]
+        errs = len(results) - len(ok)
+        total_tokens = sum(r["tokens"] for r in ok)
+        out = {
+            "concurrency": conc,
+            "requests_ok": len(ok),
+            "requests_err": errs,
+            "input_len": ilen,
+            "output_len_target": olen,
+            "total_tokens": total_tokens,
+            "duration_s": round(t_end - t_start, 3),
+            "t_start": t_start,
+            "t_end": t_end,
+            "agg_tok_per_s": round(total_tokens / (t_end - t_start), 1) if t_end > t_start else 0,
+            "per_req_tok_per_s": round(statistics.mean([r["tokens"]/r["duration"] for r in ok if r["duration"]>0]), 1) if ok else None,
+        }
+        accs = [r["spec_accept_rate"] for r in ok if r.get("spec_accept_rate") is not None]
+        lens = [r["spec_accept_length"] for r in ok if r.get("spec_accept_length") is not None]
+        if accs: out["spec_accept_rate_mean"] = round(sum(accs)/len(accs), 3)
+        if lens: out["spec_accept_length_mean"] = round(sum(lens)/len(lens), 3)
+        lats = sorted(r["duration"] for r in ok)
+        if lats:
+            out["p50_latency_s"] = round(lats[len(lats)//2], 3)
+            out["p90_latency_s"] = round(lats[int(len(lats)*0.9)], 3) if len(lats) > 10 else round(lats[-1], 3)
+            out["p99_latency_s"] = round(lats[int(len(lats)*0.99)], 3) if len(lats) > 10 else round(lats[-1], 3)
+        with open(out_file, "w") as f: json.dump(out, f, indent=2)
+        print(json.dumps(out, indent=2))
+
+    asyncio.run(main())
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sglang-qwen3-235b-eagle3
+  namespace: default
+spec:
+  selector:
+    app: sglang-qwen3-235b-eagle3
+  ports:
+    - port: 30000
+      targetPort: 30000
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bench-runner
+  namespace: default
+  labels: {app: bench-runner}
+spec:
+  restartPolicy: Always
+  hostNetwork: true
+  dnsPolicy: Default
+  containers:
+    - name: runner
+      image: python:3.12-slim
+      command: ["bash", "-c", "pip install -q aiohttp pyyaml requests && while true; do sleep 3600; done"]
+      volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+        - name: results
+          mountPath: /results
+      resources:
+        requests: {cpu: "2", memory: 2Gi}
+  volumes:
+    - name: scripts
+      configMap:
+        name: bench-scripts
+    - name: results
+      hostPath:
+        path: /mnt/nvme/bench-results
+        type: DirectoryOrCreate
+  nodeSelector:
+    blueprint: qwen3-235b-speculative
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule

@@ -1,0 +1,234 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "de50688e-61be-44c0-9d77-4da484d7452c",
+  "created_at": "2026-06-17T19:30:55Z",
+  "source_tool": {
+    "name": "bench-standard.py",
+    "version": "1.0.0",
+    "enrichment_version": "1.0.0"
+  },
+  "model": {
+    "name": "Kimi-K2.6-NVFP4",
+    "id": "nvidia/Kimi-K2.6-NVFP4",
+    "architecture": "deepseek-v3-mla-moe",
+    "parameters_total": "1T",
+    "parameters_active": "32B",
+    "quantization": "nvfp4",
+    "max_model_len": 65536,
+    "moe_intermediate_size": 2048,
+    "max_position_embeddings": 262144,
+    "num_hidden_layers": 61,
+    "num_attention_heads": 64,
+    "n_routed_experts": 384,
+    "multimodal": true
+  },
+  "engine": {
+    "comparison": [
+      "sglang",
+      "vllm"
+    ],
+    "tensor_parallel": 8,
+    "pipeline_parallel": 1,
+    "replicas": 1,
+    "reasoning": true,
+    "sglang": {
+      "container_image": "lmsysorg/sglang:latest",
+      "min_version": "0.5.9",
+      "launch": "sglang.launch_server",
+      "kv_cache_dtype": "auto",
+      "extra_args": {
+        "model-path": "nvidia/Kimi-K2.6-NVFP4",
+        "quantization": "modelopt_fp4",
+        "tp": 8,
+        "tool-call-parser": "kimi_k2",
+        "reasoning-parser": "kimi_k2",
+        "context-length": 65536,
+        "enable-metrics": true
+      }
+    },
+    "vllm": {
+      "container_image": "vllm/vllm-openai:latest",
+      "attention_backend": "flashinfer",
+      "kv_cache_dtype": "auto",
+      "extra_args": {
+        "model": "nvidia/Kimi-K2.6-NVFP4",
+        "tensor-parallel-size": 8,
+        "tool-call-parser": "kimi_k2",
+        "reasoning-parser": "kimi_k2",
+        "enable-auto-tool-choice": true,
+        "enable-prefix-caching": true,
+        "max-model-len": 65536,
+        "trust-remote-code": true
+      }
+    },
+    "engine_config_tag": "tp4dp2-b300-16k"
+  },
+  "framework": {
+    "name": "head-to-head",
+    "config": {
+      "mode": "aggregated"
+    }
+  },
+  "infrastructure": {
+    "substrate": "eks",
+    "cluster_name": "qwen3-next-bench-eks-cluster",
+    "nodegroup": "ai-infra-use2-b200-spot",
+    "instance_type": "p6-b200.48xlarge",
+    "region": "us-east-2",
+    "az": "us-east-2b",
+    "node_selector": {
+      "blueprint": "kimi-k2.6-nvfp4"
+    },
+    "gpu": {
+      "name": "B200",
+      "arch": "sm_100",
+      "count": 8,
+      "vram_gb": 180,
+      "interconnect": "nvswitch"
+    },
+    "pod_memory_limit_gi": 2160,
+    "fallback_instance_type": "p6-b300.48xlarge"
+  },
+  "workload": {
+    "use_case": "concurrency-sweep",
+    "catalog_id": "concurrency-sweep",
+    "modality": "text",
+    "dataset": {
+      "type": "synthetic",
+      "input_tokens": {
+        "mean": 16384,
+        "std_dev": 0
+      },
+      "output_tokens": {
+        "mean": 1024,
+        "std_dev": 0
+      }
+    },
+    "load": {
+      "type": "concurrency",
+      "concurrency": 64,
+      "num_prompts": 128,
+      "warmup_requests": 0
+    },
+    "api": {
+      "type": "completions",
+      "streaming": false,
+      "endpoint": "/generate"
+    }
+  },
+  "metrics": {
+    "duration_s": 25.397,
+    "completed": 128,
+    "failed": 0,
+    "error_rate": 0.0,
+    "ttft_ms": {
+      "p50": 4000.0,
+      "p90": 5620.29,
+      "p95": 5822.83,
+      "p99": 5984.86,
+      "mean": 3043.47
+    },
+    "tpot_ms": {
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null,
+      "mean": null
+    },
+    "itl_ms": {
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null,
+      "mean": null
+    },
+    "e2e_ms": {
+      "p50": 15062.62,
+      "p90": 19112.72,
+      "p95": 19618.98,
+      "p99": 23831.04,
+      "mean": 13984.38
+    },
+    "output_toks_per_s": 5160.9,
+    "request_throughput": 5.04,
+    "total_toks_per_s": 5160.9,
+    "total_input_tokens": 2097152,
+    "total_output_tokens": 131072,
+    "max_concurrent_requests": 64
+  },
+  "slo": {
+    "targets": {
+      "ttft_p50_ms": 2400,
+      "ttft_p99_ms": 15000,
+      "tpot_p99_ms": 50,
+      "e2e_p99_ms": 45000,
+      "error_rate_max": 0.001,
+      "throughput_floor_toks": 32500
+    },
+    "results": {
+      "ttft_p99_ms": {
+        "target": 15000,
+        "actual": 5984.86,
+        "pass": true
+      },
+      "tpot_p99_ms": {
+        "target": 50,
+        "actual": null,
+        "pass": null
+      },
+      "e2e_p99_ms": {
+        "target": 45000,
+        "actual": 23831.04,
+        "pass": true
+      },
+      "error_rate_max": {
+        "target": 0.001,
+        "actual": 0.0,
+        "pass": true
+      }
+    },
+    "overall_pass": false
+  },
+  "extensions": {
+    "gpu_telemetry": {
+      "gpu_util_pct_mean": 100.0,
+      "gpu_util_pct_max": 100.0,
+      "hbm_bw_util_pct_mean": null,
+      "hbm_bw_util_pct_max": null,
+      "sm_active_pct_mean": null,
+      "tensor_active_pct_mean": null,
+      "power_draw_w_mean": 370.4624583333333,
+      "power_draw_w_max": 665.541,
+      "temp_c_max": 48.0,
+      "memory_used_mib_mean": 253926.5833333333,
+      "xid_errors": 0.0
+    },
+    "cache_stats": {
+      "kv_utilization_pct_mean": null,
+      "prefix_hit_rate": null,
+      "preemption_count": 0.0
+    },
+    "speculative_decode_stats": {
+      "accept_rate_mean": null,
+      "accept_length_mean": null,
+      "effective_tokens_per_step": null
+    },
+    "cost": {
+      "instance_cost_per_hr": 18.0,
+      "dollars_per_1m_output_tokens": 0.97,
+      "formula": "(18.0 / 5160.9) * (1000000 / 3600)"
+    },
+    "reconciliation": {
+      "client_ok": 128,
+      "client_err": 0,
+      "prom_success": null,
+      "prom_error": null,
+      "reconciled": null
+    },
+    "session_metadata": {
+      "engine_config_tag": "tp4dp2-b300-16k",
+      "run_start": "2026-06-17T19:30:27Z",
+      "run_end": "2026-06-17T19:30:52Z"
+    }
+  }
+}

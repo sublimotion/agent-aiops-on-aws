@@ -1,0 +1,328 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "c1cc9b4e-39f5-42db-b770-30e70e063da5",
+  "created_at": "2026-05-14T13:33:43Z",
+  "source_tool": {
+    "name": "custom",
+    "version": "0.1.0-deepseek-ocr",
+    "enrichment_version": "1.0.0"
+  },
+  "model": {
+    "name": "DeepSeek-OCR-2",
+    "id": "deepseek-ai/DeepSeek-OCR-2",
+    "architecture": "vlm",
+    "parameters_total": "8B",
+    "quantization": "bf16",
+    "max_model_len": 8192
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.19.1",
+    "container_image": "vllm/vllm-openai:v0.19.1",
+    "base_image": null,
+    "dockerfile": null,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "data_parallel": null,
+    "expert_parallel": null,
+    "replicas": 1,
+    "reasoning": false,
+    "kv_cache_dtype": "auto",
+    "attention_backend": "flash-attn",
+    "speculative_decode": null,
+    "extra_args": {
+      "trust-remote-code": true,
+      "max-num-seqs": 32,
+      "gpu-memory-utilization": 0.9
+    }
+  },
+  "infrastructure": {
+    "substrate": "eks",
+    "instance_type": "g6e.2xlarge",
+    "region": "us-east-2",
+    "gpu": {
+      "name": "L40S",
+      "arch": "sm_89",
+      "count": 1,
+      "vram_gb": 48,
+      "interconnect": "none"
+    }
+  },
+  "workload": {
+    "use_case": "ocr",
+    "catalog_id": "concurrency-sweep",
+    "modality": "multimodal",
+    "dataset": {
+      "type": "synthetic-stratified-corpus",
+      "source": "scripts/test-assets/{receipt,article,table,formula,dense,handwritten}.png",
+      "input_tokens": {
+        "mean": 890.32
+      },
+      "output_tokens": {
+        "mean": 488.44
+      }
+    },
+    "load": {
+      "type": "concurrency-sweep",
+      "levels": [
+        1,
+        4,
+        16,
+        32
+      ],
+      "num_prompts_per_level": 50,
+      "warmup_requests": 10,
+      "current_level": 32
+    },
+    "api": {
+      "type": "chat",
+      "streaming": false,
+      "endpoint": "/v1/chat/completions",
+      "prompt_template": "<image>\n<|grounding|>Convert the document to markdown. "
+    }
+  },
+  "metrics": {
+    "duration_s": 9.797564750013407,
+    "completed": 50,
+    "failed": 0,
+    "error_rate": 0.0,
+    "e2e_ms": {
+      "mean": 4071.9657709036255,
+      "p50": 2651.837040990358,
+      "p90": 8387.967874994501,
+      "p95": 8504.151082976023,
+      "p99": 8533.638333989074
+    },
+    "output_toks_per_s": 2492.66022967254,
+    "request_throughput": 5.1033089625594545,
+    "total_input_tokens": 44516,
+    "total_output_tokens": 24422,
+    "max_concurrent_requests": 32,
+    "ttft_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "tpot_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "itl_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    }
+  },
+  "extensions": {
+    "modality": "vision-language",
+    "image_toks_per_s": 4543.578035545933,
+    "equivalent_pages_per_s": 5.608920541229894,
+    "notes": "Stage 6 concurrency sweep (latency range) on DeepSeek-OCR-2 BF16. Iteration 5: requests drawn round-robin from 6-doc stratified corpus (receipt / article / table / formula / dense / handwritten). Non-streaming, e2e-only. Headline metrics are from the peak-throughput level; per-doc-type breakdown is at the current (peak) level only \u2014 lower-concurrency levels have tiny bucket samples (~8 per doc_type) so headline per-doc stats are taken from the peak level. Per-level aggregates in extensions.sweep_levels.",
+    "stratification": {
+      "corpus_size": 6,
+      "corpus_doc_types": [
+        "receipt",
+        "article",
+        "table",
+        "formula",
+        "dense",
+        "handwritten"
+      ],
+      "corpus_weights": {
+        "receipt": 0.16666666666666666,
+        "article": 0.16666666666666666,
+        "table": 0.16666666666666666,
+        "formula": 0.16666666666666666,
+        "dense": 0.16666666666666666,
+        "handwritten": 0.16666666666666666
+      },
+      "sampling": "round-robin",
+      "level_for_per_doc_type": 32,
+      "per_doc_type": [
+        {
+          "doc_type": "receipt",
+          "completed": 9,
+          "failed": 0,
+          "image_tokens_p50": 274,
+          "output_tokens_p50": 308,
+          "e2e_ms_p50": 2722.594416991342,
+          "e2e_ms_p99": 3000.6853750091977,
+          "total_input_tokens": 2466,
+          "total_output_tokens": 2772,
+          "mean_input_tokens": 274.0,
+          "mean_output_tokens": 308.0,
+          "request_throughput": 0.9185956132607017,
+          "output_toks_per_s": 282.92744888429615,
+          "image_toks_per_s": 251.6951980334323,
+          "equivalent_pages_per_s": 0.4447579874869112
+        },
+        {
+          "doc_type": "article",
+          "completed": 9,
+          "failed": 0,
+          "image_tokens_p50": 1138,
+          "output_tokens_p50": 270,
+          "e2e_ms_p50": 2407.7374170010444,
+          "e2e_ms_p99": 2736.976667016279,
+          "total_input_tokens": 10242,
+          "total_output_tokens": 2429,
+          "mean_input_tokens": 1138.0,
+          "mean_output_tokens": 269.8888888888889,
+          "request_throughput": 0.9185956132607017,
+          "output_toks_per_s": 247.91874940113829,
+          "image_toks_per_s": 1045.3618078906786,
+          "equivalent_pages_per_s": 0.8484705064015189
+        },
+        {
+          "doc_type": "table",
+          "completed": 8,
+          "failed": 0,
+          "image_tokens_p50": 850,
+          "output_tokens_p50": 267,
+          "e2e_ms_p50": 2364.965500019025,
+          "e2e_ms_p99": 2646.8711250054184,
+          "total_input_tokens": 6800,
+          "total_output_tokens": 2136,
+          "mean_input_tokens": 850.0,
+          "mean_output_tokens": 267.0,
+          "request_throughput": 0.8165294340095127,
+          "output_toks_per_s": 218.0133588805399,
+          "image_toks_per_s": 694.0500189080858,
+          "equivalent_pages_per_s": 0.6483144295728519
+        },
+        {
+          "doc_type": "formula",
+          "completed": 8,
+          "failed": 0,
+          "image_tokens_p50": 850,
+          "output_tokens_p50": 1024,
+          "e2e_ms_p50": 8141.19779097382,
+          "e2e_ms_p99": 8446.800250007072,
+          "total_input_tokens": 6800,
+          "total_output_tokens": 7661,
+          "mean_input_tokens": 850.0,
+          "mean_output_tokens": 957.625,
+          "request_throughput": 0.8165294340095127,
+          "output_toks_per_s": 781.9289992433596,
+          "image_toks_per_s": 694.0500189080858,
+          "equivalent_pages_per_s": 1.2278004686674848
+        },
+        {
+          "doc_type": "dense",
+          "completed": 8,
+          "failed": 0,
+          "image_tokens_p50": 1138,
+          "output_tokens_p50": 1024,
+          "e2e_ms_p50": 8387.967874994501,
+          "e2e_ms_p99": 8533.638333989074,
+          "total_input_tokens": 9104,
+          "total_output_tokens": 8192,
+          "mean_input_tokens": 1138.0,
+          "mean_output_tokens": 1024.0,
+          "request_throughput": 0.8165294340095127,
+          "output_toks_per_s": 836.126140425741,
+          "image_toks_per_s": 929.2104959028254,
+          "equivalent_pages_per_s": 1.4690673397907168
+        },
+        {
+          "doc_type": "handwritten",
+          "completed": 8,
+          "failed": 0,
+          "image_tokens_p50": 1138,
+          "output_tokens_p50": 154,
+          "e2e_ms_p50": 1713.731292024022,
+          "e2e_ms_p99": 1763.3425829990301,
+          "total_input_tokens": 9104,
+          "total_output_tokens": 1232,
+          "mean_input_tokens": 1138.0,
+          "mean_output_tokens": 154.0,
+          "request_throughput": 0.8165294340095127,
+          "output_toks_per_s": 125.74553283746495,
+          "image_toks_per_s": 929.2104959028254,
+          "equivalent_pages_per_s": 0.569707695337086
+        }
+      ]
+    },
+    "sweep_levels": [
+      {
+        "concurrency": 1,
+        "completed": 50,
+        "failed": 0,
+        "duration_s": 65.60775258301874,
+        "request_throughput": 0.7621050566658415,
+        "output_toks_per_s": 380.35139168078814,
+        "image_toks_per_s": 678.517374050732,
+        "e2e_ms": {
+          "mean": 1312.1008891781094,
+          "p50": 753.2422499789391,
+          "p90": 2705.7157079980243,
+          "p95": 2712.5622910098173,
+          "p99": 2720.825458993204
+        },
+        "total_input_tokens": 44516,
+        "total_output_tokens": 24954
+      },
+      {
+        "concurrency": 4,
+        "completed": 50,
+        "failed": 0,
+        "duration_s": 27.6800579999981,
+        "request_throughput": 1.8063545965114465,
+        "output_toks_per_s": 901.5154520269327,
+        "image_toks_per_s": 1608.233624366071,
+        "e2e_ms": {
+          "mean": 2140.8451691787923,
+          "p50": 1244.464749994222,
+          "p90": 4379.003415990155,
+          "p95": 4402.9002920142375,
+          "p99": 4439.749250013847
+        },
+        "total_input_tokens": 44516,
+        "total_output_tokens": 24954
+      },
+      {
+        "concurrency": 16,
+        "completed": 50,
+        "failed": 0,
+        "duration_s": 13.631290000019362,
+        "request_throughput": 3.6680314188847114,
+        "output_toks_per_s": 1791.5399056116707,
+        "image_toks_per_s": 3265.7217328614365,
+        "e2e_ms": {
+          "mean": 3569.648864933988,
+          "p50": 2238.7327080068644,
+          "p90": 7469.324125006096,
+          "p95": 7666.908332990715,
+          "p99": 7776.183166977717
+        },
+        "total_input_tokens": 44516,
+        "total_output_tokens": 24421
+      },
+      {
+        "concurrency": 32,
+        "completed": 50,
+        "failed": 0,
+        "duration_s": 9.797564750013407,
+        "request_throughput": 5.1033089625594545,
+        "output_toks_per_s": 2492.66022967254,
+        "image_toks_per_s": 4543.578035545933,
+        "e2e_ms": {
+          "mean": 4071.9657709036255,
+          "p50": 2651.837040990358,
+          "p90": 8387.967874994501,
+          "p95": 8504.151082976023,
+          "p99": 8533.638333989074
+        },
+        "total_input_tokens": 44516,
+        "total_output_tokens": 24422
+      }
+    ]
+  }
+}

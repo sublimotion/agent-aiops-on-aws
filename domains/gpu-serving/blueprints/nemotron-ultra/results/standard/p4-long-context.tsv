@@ -1,0 +1,9 @@
+# nemotron-3-ultra | sglang-tp8-eagle-widetree | B300 | P4 long-context | temp=1.0 | ignore_eos | 256 out
+# captured 2026-06-05. Model max_position_embeddings=262144 (256k) — the "1M" tiers (512k/1m) in the spec
+# EXCEED the architectural limit and are NOT runnable. Feasible tiers: 64k/128k/256k only.
+tier	prompt_tokens	completion	e2e_s	decode_tps	accept_len
+64k	58536	256	4.67	(corrupt-specv1)	1.97
+128k	118152	256	7.60	131.0	2.25
+256k	236286	256	16.91	119.1	2.13
+# Long-context decode is STABLE: ~119-131 tok/s held at 236k context (near 262k max), no collapse/OOM.
+# TTFT/e2e scales with prefill: 4.7s @ 64k -> 16.9s @ 236k. KV pool (58.6M tok TP8) is far from the bottleneck.

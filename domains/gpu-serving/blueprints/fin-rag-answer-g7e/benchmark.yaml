@@ -1,0 +1,94 @@
+# Fin RAG Answer Extraction on g7e — Benchmark Sidecar (cost-comparison vs B200)
+# Spec: domains/gpu-serving/specs/fin-rag-answer-g7e.md  (addendum to fin-rag-answer.md)
+# Workload card: standards/benchmark-commons/workloads/fin-support.yaml  (unchanged from B200)
+# Compare results directly against blueprints/fin-rag-answer/results/ (B200).
+
+model:
+  name: Nemotron-3-Super-120B-A12B
+  id: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+  architecture: hybrid-mamba-moe        # Mamba-2 + LatentMoE + Select-Attention
+  hf_architecture: NemotronHForCausalLM
+  parameters_total: "120B"
+  parameters_active: "12B"
+  quantization: fp8                     # per-tensor static FP8 — no block_n=128 constraint, TP1/2/4 all valid
+  fp8_granularity: per-tensor
+  moe_intermediate_size: 2688
+  max_model_len: 256000                 # we need ~12K
+
+# Two engines under test on g7e. vLLM = apples-to-apples vs the B200 winner.
+# SGLang = reproduces upstream #20541's known-good sm_120 config (the comparison point;
+# also the only engine where prefix/radix cache actually works on this arch).
+engines:
+  - name: vllm
+    role: b200-mirror                   # direct cost comparison vs B200 vLLM winner
+    # latest-stable-first, smoke-gated (the policy the B200 run claimed but skipped).
+    version: "0.22.1"                   # PRIMARY — latest stable, already in ECR.
+    version_fallback: "0.18.1"          # the image the B200 run actually validated; use on smoke fail.
+    container_image: "615299764834.dkr.ecr.us-east-2.amazonaws.com/vllm-openai:v0.22.1"
+    image_caveat: "vLLM #44022 OPEN — Nemotron startup fail on 0.22, but NVFP4-specific; our ckpt is FP8 per-tensor. Stage 0 smoke is the gate."
+    tensor_parallel: 2                  # TP1 impossible (124GB FP8 > 96GB/GPU); TP2 mandatory
+    replicas: 4                         # agg-tp2-x4 = all 8 g7e GPUs
+    reasoning: false
+    kv_cache_dtype: fp8
+    attention_backend: TRITON_ATTN      # hybrid-safe default; re-verify on sm_120
+    prefix_caching: true                # mamba_cache_mode=all — expect 0 hits (proven dead on B200, re-confirm)
+    speculative_decode: null            # G2 axis: re-measure on vLLM g7e path (SGLang result does NOT transfer)
+    extra_args:
+      trust-remote-code: true
+      reasoning-parser: nemotron_v3
+  - name: sglang
+    role: 20541-repro                   # reproduce upstream sm_120 known-good config
+    version: "0.5.12.post1"             # latest stable; cu130 build => NCCL >> 2.26.2 (clears sm_120 bug)
+    container_image: "615299764834.dkr.ecr.us-east-2.amazonaws.com/sglang:v0.5.12.post1-cu130"
+    tensor_parallel: 2
+    replicas: 4
+    reasoning: false
+    kv_cache_dtype: fp8_e4m3
+    prefix_caching: true                # radix cache WORKS on g7e (#20541) — the key SGLang differentiator
+    speculative_decode: eagle           # #20541: accept 0.81, len 3.2 — but needs --speculative-moe-runner-backend triton
+    sm120_known_good:                   # from upstream #20541 — do NOT change without re-verifying on sm_120
+      disable_deep_gemm: true           # env SGLANG_DISABLE_DEEP_GEMM=1 (DeepGEMM FP8 GEMM fails on sm_120)
+      fp8_gemm_backend: triton          # CUTLASS also fails; Triton works
+      moe_runner_backend: triton
+      attention_backend: flashinfer     # works at defaults (GQA); trtllm_mha NOT ported
+      cuda_graphs: true                 # work on GQA — NO enforce-eager needed
+      mamba_scheduler_strategy: no_buffer  # extra_buffer asserts unsupported for NemotronHForCausalLM
+      reasoning_parser: nemotron_3      # NOT nano_v3/super_v3
+      first_load_minutes: 45            # one-time FP8 ModelOpt quant processing; ~14s thereafter
+
+infrastructure:
+  substrate: eks
+  cluster: qwen3-next-bench-eks-cluster   # SAME cluster as B200 — reuse staged weights, ECR, namespace
+  instance_type: g7e.48xlarge
+  region: us-east-2
+  availability_zone: us-east-2a           # cheapest g7e spot ($10.85 vs 2b $12.55); FSx in 2c -> cross-AZ copy
+  nodegroup: fin-rag-g7e-spot
+  weight_staging:
+    fsx_pvc: vllm-qwen3-fsx-pvc           # REUSED from B200 (holds FP8 ~124GB + BF16 ~240GB), no re-download
+    fsx_az: us-east-2c                    # cross-AZ from g7e node (2a) — one-time bulk copy to local NVMe
+    serving_tier: /mnt/nvme               # RAID0 over local instance NVMe
+  gpu:
+    name: RTX PRO 6000 Blackwell
+    arch: sm_120                          # Blackwell PCIe (NOT sm_100 B200, NOT sm_90 Hopper)
+    count: 8
+    vram_gb: 96
+    interconnect: pcie                    # PCIe Gen5 only — no NVLink/NVSwitch; favors LOWER TP
+    efa_interfaces: 4                     # SRD kernel-bypass, NOT true RDMA; not used here (single-node)
+  nccl_note: "NCCL 2.25.1 BROKEN on sm_120+PCIe (enqueue.cc:1500). vLLM custom-allreduce unaffected; SGLang TP path needs image NCCL>=2.26.2."
+
+workloads:
+  - catalog_id: fin-support               # unchanged from B200 — hardware-independent
+
+slo:                                      # carries over UNCHANGED from the customer
+  e2e_p50_ms: 6500
+  e2e_p90_ms: 9500
+  ttft_p99_ms: 6000
+  tpot_p99_ms: 50
+  error_rate_max: 0.001
+
+cost:
+  instance_type: g7e.48xlarge
+  spot_price_per_hr: 10.85                # us-east-2a live rate 2026-06-11 (2b ~12.55)
+  on_demand_price_per_hr: 33.00           # verify
+  utilization_target: 0.70
+  comparison_baseline: blueprints/fin-rag-answer/results/final-report-20260611.md  # B200 $0.040/1M tok @ spot $32

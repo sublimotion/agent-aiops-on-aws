@@ -1,0 +1,17 @@
+# nemotron-3-ultra | sglang-tp4-eagle | B300 | sustained saturation pressure test
+# captured 2026-06-05. c=256 held, real prompts, temp=1.0, 512 out. GPU: 88-92% util, ~755W, 255/275GB VRAM on the 4 active dies.
+# RESULT: 0 errors over 150s, throughput stable. No preemption collapse, no KV exhaustion failure.
+elapsed_s	issued	completed	errors	agg_tok_s
+15	74752	21	0	608.6
+30	143872	56	0	835.0
+45	212224	86	0	866.3
+60	280576	122	0	932.5
+75	348672	160	0	971.2
+90	416000	197	0	987.3
+105	486144	232	0	993.0
+120	552448	269	0	1012.4
+135	622592	301	0	1010.7
+150	687872	336	0	1011.2
+# Steady-state sustained aggregate: ~1010 tok/s @ c=256, error_rate=0.0000.
+# NOTE harness bug: task-creation loop unbounded (issued count is coroutine objects, not in-flight reqs);
+# in-flight capped at 256 by semaphore. Fixed in pressure.py v2 (bounded creation).

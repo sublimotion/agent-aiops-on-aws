@@ -1,0 +1,123 @@
+# Qwen3-Reranker-4B on g6e.2xlarge (L40S 48GB)
+# Reuses the existing g6e-ocr nodegroup node rather than a spec-preferred g6.xlarge L4.
+# Consequence: performance numbers are upper-bound per-stream; cost-efficiency row
+# must be flagged as not-spec-optimal (L4 would be ~57% cheaper at ~75% perf).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cto-reranker-g6e-2xlarge
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qwen3-reranker-g6e-2xlarge
+  namespace: cto-reranker-g6e-2xlarge
+  labels:
+    app: qwen3-reranker-g6e-2xlarge
+    workload: qwen3-reranker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qwen3-reranker-g6e-2xlarge
+  template:
+    metadata:
+      labels:
+        app: qwen3-reranker-g6e-2xlarge
+        workload: qwen3-reranker
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: g6e.2xlarge
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: vllm
+        image: vllm/vllm-openai:v0.19.1
+        command: ["vllm"]
+        args:
+        - serve
+        - Qwen/Qwen3-Reranker-4B
+        # Qwen3-Reranker ships as a CausalLM checkpoint — the official vLLM
+        # recipe synthesises a binary seq-cls head from the lm_head "no"/"yes"
+        # token rows. `--convert classify` alone fails with:
+        #   ValueError: Following weights were not initialized: {'score.weight'}
+        # because the repo has no score head. hf_overrides handles that.
+        - --hf-overrides
+        - '{"architectures":["Qwen3ForSequenceClassification"],"classifier_from_token":["no","yes"],"is_original_qwen3_reranker":true}'
+        - --runner
+        - pooling
+        - --convert
+        - classify
+        - --dtype
+        - bfloat16
+        - --max-model-len
+        - "4096"                # pair-length axis ceiling
+        - --max-num-seqs
+        - "64"                  # reranker pairs are short; room for more concurrent
+        - --gpu-memory-utilization
+        - "0.90"
+        - --trust-remote-code
+        - --host
+        - 0.0.0.0
+        - --port
+        - "8000"
+        env:
+        - name: HF_HUB_ENABLE_HF_TRANSFER
+          value: "1"
+        - name: VLLM_USAGE_SOURCE
+          value: production-cto
+        ports:
+        - containerPort: 8000
+          name: http
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+            memory: 32Gi
+            cpu: "7"
+          requests:
+            nvidia.com/gpu: 1
+            memory: 16Gi
+            cpu: "4"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 180
+          periodSeconds: 15
+          failureThreshold: 40
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 360
+          periodSeconds: 30
+          failureThreshold: 6
+        volumeMounts:
+        - name: hf-cache
+          mountPath: /root/.cache/huggingface
+        - name: shm
+          mountPath: /dev/shm
+      volumes:
+      - name: hf-cache
+        emptyDir:
+          sizeLimit: 40Gi
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 4Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qwen3-reranker-g6e-2xlarge-svc
+  namespace: cto-reranker-g6e-2xlarge
+spec:
+  selector:
+    app: qwen3-reranker-g6e-2xlarge
+  ports:
+  - port: 8000
+    targetPort: 8000
+    name: http
+  type: ClusterIP

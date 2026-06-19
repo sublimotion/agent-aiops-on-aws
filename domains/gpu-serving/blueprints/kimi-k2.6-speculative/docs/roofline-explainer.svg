@@ -1,0 +1,304 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" font-family="Inter, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#1e293b"/>
+    </linearGradient>
+    <linearGradient id="bwGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#60a5fa"/>
+    </linearGradient>
+    <linearGradient id="computeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#f59e0b"/>
+      <stop offset="100%" style="stop-color:#fbbf24"/>
+    </linearGradient>
+    <linearGradient id="specGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981"/>
+      <stop offset="100%" style="stop-color:#34d399"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="900" fill="url(#bgGrad)"/>
+
+  <!-- Title -->
+  <text x="600" y="45" text-anchor="middle" fill="#f8fafc" font-size="22" font-weight="700">Kimi K2.6 on B300: Roofline Analysis &amp; Optimization Headroom</text>
+  <text x="600" y="70" text-anchor="middle" fill="#94a3b8" font-size="13">Why speculative decode is the escape hatch from the memory bandwidth ceiling</text>
+
+  <!-- ═══════════════════ LEFT: ROOFLINE CHART ═══════════════════ -->
+  <g transform="translate(50, 95)">
+    <rect x="0" y="0" width="520" height="360" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1" filter="url(#shadow)"/>
+    <text x="260" y="28" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="600">Roofline Model: Throughput vs Batch Size</text>
+
+    <!-- Axes -->
+    <line x1="70" y1="310" x2="490" y2="310" stroke="#475569" stroke-width="1.5"/>
+    <line x1="70" y1="310" x2="70" y2="50" stroke="#475569" stroke-width="1.5"/>
+    <text x="280" y="345" text-anchor="middle" fill="#94a3b8" font-size="11">Batch Size (concurrent sequences)</text>
+    <text x="25" y="180" text-anchor="middle" fill="#94a3b8" font-size="11" transform="rotate(-90, 25, 180)">Throughput (tok/s)</text>
+
+    <!-- Y-axis labels -->
+    <text x="63" y="305" text-anchor="end" fill="#64748b" font-size="10">1K</text>
+    <text x="63" y="245" text-anchor="end" fill="#64748b" font-size="10">10K</text>
+    <text x="63" y="185" text-anchor="end" fill="#64748b" font-size="10">100K</text>
+    <text x="63" y="125" text-anchor="end" fill="#64748b" font-size="10">1M</text>
+    <text x="63" y="65" text-anchor="end" fill="#64748b" font-size="10">10M</text>
+
+    <!-- X-axis labels -->
+    <text x="100" y="325" text-anchor="middle" fill="#64748b" font-size="10">1</text>
+    <text x="170" y="325" text-anchor="middle" fill="#64748b" font-size="10">8</text>
+    <text x="240" y="325" text-anchor="middle" fill="#64748b" font-size="10">64</text>
+    <text x="310" y="325" text-anchor="middle" fill="#64748b" font-size="10">256</text>
+    <text x="380" y="325" text-anchor="middle" fill="#64748b" font-size="10">512</text>
+    <text x="450" y="325" text-anchor="middle" fill="#64748b" font-size="10">2048</text>
+
+    <!-- BW ceiling line (flat at high batch) -->
+    <path d="M 70 120 L 310 120 L 490 120" stroke="url(#bwGrad)" stroke-width="2.5" stroke-dasharray="8,4" fill="none" opacity="0.8"/>
+    <text x="495" y="118" fill="#60a5fa" font-size="10" font-weight="500">BW Ceiling</text>
+    <text x="495" y="132" fill="#60a5fa" font-size="9">1.7M tok/s</text>
+
+    <!-- Compute ceiling line -->
+    <path d="M 70 80 L 490 80" stroke="url(#computeGrad)" stroke-width="2" stroke-dasharray="6,3" fill="none" opacity="0.6"/>
+    <text x="495" y="78" fill="#fbbf24" font-size="10" font-weight="500">Compute Ceiling</text>
+    <text x="495" y="92" fill="#fbbf24" font-size="9">~240K tok/s</text>
+
+    <!-- Roofline (rising then flat) -->
+    <path d="M 100 290 L 170 255 L 240 200 L 310 155 L 380 130 L 450 120" stroke="#6366f1" stroke-width="3" fill="none" opacity="0.4"/>
+    <text x="260" y="148" fill="#6366f1" font-size="9" opacity="0.6">Theoretical Roofline</text>
+
+    <!-- Actual achieved (far below) -->
+    <path d="M 100 295 L 170 280 L 240 260 L 310 248 L 380 243 L 450 235" stroke="#10b981" stroke-width="3" fill="none" filter="url(#glow)"/>
+
+    <!-- Data points -->
+    <circle cx="100" cy="295" r="5" fill="#10b981"/>
+    <circle cx="170" cy="280" r="5" fill="#10b981"/>
+    <circle cx="240" cy="260" r="5" fill="#10b981"/>
+    <circle cx="310" cy="248" r="5" fill="#10b981"/>
+    <circle cx="380" cy="243" r="5" fill="#10b981" stroke="#fff" stroke-width="2"/>
+    <circle cx="450" cy="235" r="4" fill="#10b981" opacity="0.5"/>
+
+    <!-- Labels on data points -->
+    <text x="105" y="308" fill="#34d399" font-size="9">128</text>
+    <text x="175" y="293" fill="#34d399" font-size="9">1.2K</text>
+    <text x="245" y="273" fill="#34d399" font-size="9">4.7K</text>
+    <text x="315" y="261" fill="#34d399" font-size="9">8.9K</text>
+    <text x="360" y="233" fill="#34d399" font-size="9" font-weight="700">10,437</text>
+
+    <!-- Gap annotation -->
+    <line x1="380" y1="130" x2="380" y2="243" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,3"/>
+    <text x="395" y="188" fill="#ef4444" font-size="11" font-weight="600">GAP</text>
+    <text x="395" y="202" fill="#f87171" font-size="9">~16% efficiency</text>
+
+    <!-- Legend -->
+    <rect x="85" y="50" width="12" height="3" fill="#10b981" rx="1"/>
+    <text x="102" y="54" fill="#94a3b8" font-size="9">Achieved (K2.6 vLLM)</text>
+    <rect x="85" y="63" width="12" height="3" fill="#6366f1" rx="1" opacity="0.5"/>
+    <text x="102" y="67" fill="#94a3b8" font-size="9">Theoretical Max</text>
+  </g>
+
+  <!-- ═══════════════════ RIGHT: EFFICIENCY BREAKDOWN ═══════════════════ -->
+  <g transform="translate(620, 95)">
+    <rect x="0" y="0" width="530" height="360" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1" filter="url(#shadow)"/>
+    <text x="265" y="28" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="600">Where Does the 84% Gap Live?</text>
+    <text x="265" y="46" text-anchor="middle" fill="#64748b" font-size="11">Time breakdown per decode step @ c=512</text>
+
+    <!-- Stacked bar chart -->
+    <rect x="60" y="70" width="400" height="40" rx="4" fill="#334155"/>
+
+    <!-- MLA Attention: 81% of compute time, AT ceiling -->
+    <rect x="60" y="70" width="324" height="40" rx="4" fill="#3b82f6" opacity="0.9"/>
+    <text x="222" y="95" text-anchor="middle" fill="#fff" font-size="12" font-weight="600">MLA Attention — 81%</text>
+    <text x="222" y="107" text-anchor="middle" fill="#bfdbfe" font-size="9">AT HARDWARE CEILING (can't optimize)</text>
+
+    <!-- MoE: 12% -->
+    <rect x="384" y="70" width="48" height="40" fill="#8b5cf6" opacity="0.9"/>
+    <text x="408" y="95" text-anchor="middle" fill="#fff" font-size="10" font-weight="500">MoE</text>
+    <text x="408" y="106" text-anchor="middle" fill="#c4b5fd" font-size="8">12%</text>
+
+    <!-- Other: 7% -->
+    <rect x="432" y="70" width="28" height="40" rx="0 4 4 0" fill="#64748b" opacity="0.9"/>
+    <text x="446" y="95" text-anchor="middle" fill="#fff" font-size="9">7%</text>
+
+    <!-- But that's INSIDE the kernel... -->
+    <text x="60" y="140" fill="#94a3b8" font-size="11">But kernel time is only part of the story:</text>
+
+    <!-- Full system breakdown -->
+    <rect x="60" y="160" width="420" height="50" rx="4" fill="#334155"/>
+
+    <!-- Active compute: ~30% of wall time -->
+    <rect x="60" y="160" width="126" height="50" rx="4" fill="#3b82f6" opacity="0.7"/>
+    <text x="123" y="182" text-anchor="middle" fill="#fff" font-size="10" font-weight="600">GPU Compute</text>
+    <text x="123" y="196" text-anchor="middle" fill="#bfdbfe" font-size="9">~30%</text>
+
+    <!-- Scheduling + framework: ~25% -->
+    <rect x="186" y="160" width="105" height="50" fill="#f59e0b" opacity="0.7"/>
+    <text x="238" y="182" text-anchor="middle" fill="#fff" font-size="10" font-weight="600">Scheduling</text>
+    <text x="238" y="196" text-anchor="middle" fill="#fef3c7" font-size="9">~25%</text>
+
+    <!-- CUDA launch + sync: ~20% -->
+    <rect x="291" y="160" width="84" height="50" fill="#ef4444" opacity="0.7"/>
+    <text x="333" y="182" text-anchor="middle" fill="#fff" font-size="10" font-weight="600">Launch/Sync</text>
+    <text x="333" y="196" text-anchor="middle" fill="#fecaca" font-size="9">~20%</text>
+
+    <!-- KV cache mgmt: ~15% -->
+    <rect x="375" y="160" width="63" height="50" fill="#8b5cf6" opacity="0.7"/>
+    <text x="406" y="182" text-anchor="middle" fill="#fff" font-size="9" font-weight="600">KV Mgmt</text>
+    <text x="406" y="196" text-anchor="middle" fill="#e9d5ff" font-size="9">~15%</text>
+
+    <!-- Sampling + other: ~10% -->
+    <rect x="438" y="160" width="42" height="50" rx="0 4 4 0" fill="#64748b" opacity="0.7"/>
+    <text x="459" y="185" text-anchor="middle" fill="#fff" font-size="9">10%</text>
+
+    <!-- Arrow showing the insight -->
+    <path d="M 265 220 L 265 240" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+    <!-- Key insight box -->
+    <rect x="40" y="245" width="450" height="95" rx="8" fill="#1a2332" stroke="#10b981" stroke-width="1.5"/>
+    <text x="265" y="270" text-anchor="middle" fill="#10b981" font-size="12" font-weight="700">THE SPECULATIVE DECODE INSIGHT</text>
+    <text x="265" y="292" text-anchor="middle" fill="#e2e8f0" font-size="11">Each decode step reads 16 GB of weights regardless of tokens produced.</text>
+    <text x="265" y="310" text-anchor="middle" fill="#e2e8f0" font-size="11">Normal: 1 token per step. EAGLE3: 2-4 tokens per step.</text>
+    <text x="265" y="330" text-anchor="middle" fill="#34d399" font-size="12" font-weight="600">Same BW cost, 2-4x output. Exploits the ceiling instead of fighting it.</text>
+  </g>
+
+  <!-- ═══════════════════ BOTTOM LEFT: MULTI-NODE DECISION ═══════════════════ -->
+  <g transform="translate(50, 480)">
+    <rect x="0" y="0" width="520" height="380" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1" filter="url(#shadow)"/>
+    <text x="260" y="28" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="600">When to Go Multi-Node? (Resource Exhaustion Map)</text>
+
+    <!-- Resource bars showing capacity -->
+    <text x="30" y="60" fill="#94a3b8" font-size="10" font-weight="600">RESOURCE</text>
+    <text x="250" y="60" fill="#94a3b8" font-size="10" font-weight="600">UTILIZATION</text>
+    <text x="440" y="60" fill="#94a3b8" font-size="10" font-weight="600">STATUS</text>
+
+    <!-- KV Cache Memory -->
+    <text x="30" y="90" fill="#e2e8f0" font-size="11">KV Cache Memory</text>
+    <rect x="170" y="78" width="240" height="16" rx="3" fill="#334155"/>
+    <rect x="170" y="78" width="72" height="16" rx="3" fill="#10b981"/>
+    <text x="180" y="90" fill="#fff" font-size="9">30%</text>
+    <text x="420" y="90" fill="#10b981" font-size="10" font-weight="600">OK</text>
+    <text x="30" y="105" fill="#64748b" font-size="9">1,500 GB budget, ~450 GB used @ c=256</text>
+
+    <!-- HBM Bandwidth -->
+    <text x="30" y="135" fill="#e2e8f0" font-size="11">HBM Bandwidth</text>
+    <rect x="170" y="123" width="240" height="16" rx="3" fill="#334155"/>
+    <rect x="170" y="123" width="192" height="16" rx="3" fill="#f59e0b"/>
+    <text x="180" y="135" fill="#fff" font-size="9">80%</text>
+    <text x="420" y="135" fill="#f59e0b" font-size="10" font-weight="700">CEILING</text>
+    <text x="30" y="150" fill="#64748b" font-size="9">MLA kernel at 81% utilization (L2 amplification → 122%)</text>
+
+    <!-- Compute -->
+    <text x="30" y="180" fill="#e2e8f0" font-size="11">FP8 Compute</text>
+    <rect x="170" y="168" width="240" height="16" rx="3" fill="#334155"/>
+    <rect x="170" y="168" width="48" height="16" rx="3" fill="#10b981"/>
+    <text x="180" y="180" fill="#fff" font-size="9">20%</text>
+    <text x="420" y="180" fill="#10b981" font-size="10" font-weight="600">OK</text>
+    <text x="30" y="195" fill="#64748b" font-size="9">BW-bound at decode; compute headroom unused</text>
+
+    <!-- Prefill Load -->
+    <text x="30" y="225" fill="#e2e8f0" font-size="11">Prefill Load</text>
+    <rect x="170" y="213" width="240" height="16" rx="3" fill="#334155"/>
+    <rect x="170" y="213" width="12" height="16" rx="3" fill="#10b981"/>
+    <text x="180" y="225" fill="#fff" font-size="9">5%</text>
+    <text x="420" y="225" fill="#10b981" font-size="10" font-weight="600">OK</text>
+    <text x="30" y="240" fill="#64748b" font-size="9">Prefix caching eliminates 95%+ of prefill (agentic)</text>
+
+    <!-- NVSwitch -->
+    <text x="30" y="270" fill="#e2e8f0" font-size="11">NVSwitch BW</text>
+    <rect x="170" y="258" width="240" height="16" rx="3" fill="#334155"/>
+    <rect x="170" y="258" width="36" height="16" rx="3" fill="#10b981"/>
+    <text x="180" y="270" fill="#fff" font-size="9">15%</text>
+    <text x="420" y="270" fill="#10b981" font-size="10" font-weight="600">OK</text>
+    <text x="30" y="285" fill="#64748b" font-size="9">TP8 all-reduce is not the bottleneck</text>
+
+    <!-- Decision box -->
+    <rect x="20" y="300" width="480" height="60" rx="8" fill="#1a2332" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="260" y="322" text-anchor="middle" fill="#60a5fa" font-size="11" font-weight="700">VERDICT: Multi-node NOT needed for K2.6 agentic workloads</text>
+    <text x="260" y="340" text-anchor="middle" fill="#94a3b8" font-size="10">BW is the ceiling, but disagg doesn't help (each node hits same wall).</text>
+    <text x="260" y="355" text-anchor="middle" fill="#94a3b8" font-size="10">Scale horizontally with replicas only when QPS > 20 req/s sustained.</text>
+  </g>
+
+  <!-- ═══════════════════ BOTTOM RIGHT: OPTIMIZATION STACK ═══════════════════ -->
+  <g transform="translate(620, 480)">
+    <rect x="0" y="0" width="530" height="380" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1" filter="url(#shadow)"/>
+    <text x="265" y="28" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="600">Optimization Headroom: What's Left to Gain?</text>
+
+    <!-- Current state -->
+    <text x="30" y="58" fill="#94a3b8" font-size="10" font-weight="600">CURRENT: 10,437 tok/s @ c=512</text>
+
+    <!-- Staircase showing incremental gains -->
+    <!-- Step 0: Baseline -->
+    <rect x="30" y="75" width="80" height="35" rx="4" fill="#334155" stroke="#475569" stroke-width="1"/>
+    <text x="70" y="92" text-anchor="middle" fill="#e2e8f0" font-size="9" font-weight="600">Baseline</text>
+    <text x="70" y="105" text-anchor="middle" fill="#64748b" font-size="9">10,437</text>
+
+    <!-- Arrow -->
+    <path d="M 115 92 L 135 92" stroke="#475569" stroke-width="1.5" fill="none"/>
+    <polygon points="133,88 140,92 133,96" fill="#475569"/>
+
+    <!-- Step 1: EAGLE3 -->
+    <rect x="140" y="65" width="90" height="45" rx="4" fill="#10b981" opacity="0.2" stroke="#10b981" stroke-width="1.5"/>
+    <text x="185" y="82" text-anchor="middle" fill="#10b981" font-size="9" font-weight="600">+ EAGLE3</text>
+    <text x="185" y="95" text-anchor="middle" fill="#34d399" font-size="10" font-weight="700">~15-18K</text>
+    <text x="185" y="106" text-anchor="middle" fill="#6ee7b7" font-size="8">+50-70%</text>
+
+    <!-- Arrow -->
+    <path d="M 235 87 L 255 87" stroke="#475569" stroke-width="1.5" fill="none"/>
+    <polygon points="253,83 260,87 253,91" fill="#475569"/>
+
+    <!-- Step 2: + Dynamic MLA -->
+    <rect x="260" y="60" width="100" height="50" rx="4" fill="#3b82f6" opacity="0.2" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="310" y="77" text-anchor="middle" fill="#60a5fa" font-size="9" font-weight="600">+ Dynamic MLA</text>
+    <text x="310" y="92" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700">TTFT: 20ms</text>
+    <text x="310" y="104" text-anchor="middle" fill="#93c5fd" font-size="8">(latency, not tput)</text>
+
+    <!-- Arrow -->
+    <path d="M 365 85 L 385 85" stroke="#475569" stroke-width="1.5" fill="none"/>
+    <polygon points="383,81 390,85 383,89" fill="#475569"/>
+
+    <!-- Step 3: Full stack -->
+    <rect x="390" y="55" width="110" height="55" rx="4" fill="#8b5cf6" opacity="0.2" stroke="#8b5cf6" stroke-width="1.5"/>
+    <text x="445" y="72" text-anchor="middle" fill="#a78bfa" font-size="9" font-weight="600">Full Stack</text>
+    <text x="445" y="88" text-anchor="middle" fill="#c4b5fd" font-size="11" font-weight="700">~18-20K?</text>
+    <text x="445" y="102" text-anchor="middle" fill="#c4b5fd" font-size="8">+ HiCache + prefix</text>
+
+    <!-- The ceiling comparison -->
+    <line x1="30" y1="130" x2="500" y2="130" stroke="#475569" stroke-width="0.5" stroke-dasharray="3,3"/>
+
+    <!-- Theoretical vs Practical ceiling box -->
+    <rect x="30" y="140" width="470" height="110" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+
+    <text x="50" y="165" fill="#e2e8f0" font-size="11" font-weight="600">Ceiling Comparison (why 10K isn't 1.7M):</text>
+
+    <text x="50" y="190" fill="#f87171" font-size="10">1.</text>
+    <text x="65" y="190" fill="#cbd5e1" font-size="10">Not running batch=1.7M. Actual batch=512 sequences</text>
+    <text x="50" y="210" fill="#f87171" font-size="10">2.</text>
+    <text x="65" y="210" fill="#cbd5e1" font-size="10">Each sequence decodes serially (can't parallelize future tokens)</text>
+    <text x="50" y="230" fill="#f87171" font-size="10">3.</text>
+    <text x="65" y="230" fill="#cbd5e1" font-size="10">Scheduling overhead between steps (~25% of wall time idle)</text>
+    <text x="50" y="250" fill="#f87171" font-size="10">4.</text>
+    <text x="65" y="250" fill="#cbd5e1" font-size="10">Spec decode is the ONLY lever that produces more tokens per BW-limited step</text>
+
+    <!-- Pareto vs Theoretical distinction -->
+    <rect x="30" y="262" width="470" height="100" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+
+    <text x="50" y="285" fill="#e2e8f0" font-size="11" font-weight="600">Theoretical Limit vs Pareto Frontier:</text>
+
+    <circle cx="60" cy="305" r="6" fill="#fbbf24"/>
+    <text x="75" y="309" fill="#fbbf24" font-size="10" font-weight="600">Theoretical Limit</text>
+    <text x="75" y="323" fill="#94a3b8" font-size="9">= max tok/s if ALL hardware was perfectly utilized (physics ceiling)</text>
+
+    <circle cx="60" cy="342" r="6" fill="#10b981"/>
+    <text x="75" y="346" fill="#10b981" font-size="10" font-weight="600">Pareto Frontier</text>
+    <text x="75" y="360" fill="#94a3b8" font-size="9">= best (latency, throughput) tradeoffs achievable with current software</text>
+  </g>
+
+  <!-- Bottom summary bar -->
+  <rect x="50" y="870" width="1100" height="22" rx="4" fill="#0f172a" stroke="#334155" stroke-width="0.5"/>
+  <text x="600" y="885" text-anchor="middle" fill="#64748b" font-size="10">Phase 0 deliverable: Measured roofline at each concurrency point | Efficiency % | Per-layer time breakdown | Multi-node decision threshold</text>
+</svg>

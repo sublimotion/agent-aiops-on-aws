@@ -1,0 +1,110 @@
+# Serving: Nemotron-3-Super FP8, agg-tp2-x4 — MoE-TILE-TUNED variant.
+# Identical to serving-agg-tp2x4-fp8-fsx.yaml EXCEPT it mounts a tuned fused-MoE
+# tile config and points vLLM at it via VLLM_TUNED_CONFIG_FOLDER. The tuner
+# (scripts/tune-moe-rayfree.py) produced E=512,N=1344,B200,fp8_w8a8.json for the
+# grouped expert GEMM that vLLM otherwise served with the heuristic default
+# ("Using default MoE config. Performance might be sub-optimal!" in the logs).
+# DCGM at the c192 knee showed launch/scheduling-bound (SM~50%, tensor~11%,
+# HBM~15%) — this lever targets that, where a bigger GPU (B300) cannot.
+# FSx variant: reads weights from host lustre mount at /mnt/fsx-manual.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fin-rag-vllm-fp8
+  namespace: ml-inference
+  labels: {app: fin-rag-vllm, precision: fp8, config: agg-tp2-x4}
+spec:
+  replicas: 4
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {app: fin-rag-vllm, precision: fp8}
+  template:
+    metadata:
+      labels: {app: fin-rag-vllm, precision: fp8, config: agg-tp2-x4}
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+      volumes:
+        - name: fsx
+          hostPath: {path: /mnt/fsx-manual, type: Directory}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 32Gi}
+        - name: tuned-moe
+          hostPath: {path: /mnt/nvme/tuned-moe, type: Directory}
+      containers:
+        - name: vllm
+          image: 615299764834.dkr.ecr.us-east-2.amazonaws.com/vllm-openai:v0.18.1
+          imagePullPolicy: IfNotPresent
+          command: ["python3", "-m", "vllm.entrypoints.openai.api_server"]
+          args:
+            - --model
+            - /fsx/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+            - --served-model-name
+            - nemotron-3-super
+            - --tensor-parallel-size
+            - "2"
+            - --trust-remote-code
+            - --dtype
+            - auto
+            - --kv-cache-dtype
+            - fp8
+            - --attention-backend
+            - TRITON_ATTN
+            - --gpu-memory-utilization
+            - "0.90"
+            - --max-model-len
+            - "16384"
+            - --enable-prefix-caching
+            - --mamba-cache-mode
+            - all
+            - --enable-chunked-prefill
+            - --max-num-batched-tokens
+            - "16384"
+            - --max-num-seqs
+            - "256"
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+          env:
+            - {name: HF_HUB_OFFLINE, value: "1"}
+            - {name: TRANSFORMERS_OFFLINE, value: "1"}
+            - {name: VLLM_USE_V1, value: "1"}
+            - {name: VLLM_TUNED_CONFIG_FOLDER, value: "/tuned-moe"}  # takes precedence over builtin configs
+          ports:
+            - {containerPort: 8000, name: http}
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 120
+            periodSeconds: 15
+            failureThreshold: 140      # FSx lustre load ~45s/shard x26 (~20min) + JIT; do NOT let liveness kill mid-load
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 1500   # > full FSx weight load + compile; liveness must not fire during cold start
+            periodSeconds: 30
+            failureThreshold: 20
+          resources:
+            requests: {cpu: "16", memory: 96Gi, nvidia.com/gpu: "2"}
+            limits: {nvidia.com/gpu: "2"}
+          securityContext:
+            capabilities: {add: ["IPC_LOCK"]}
+          volumeMounts:
+            - {name: fsx, mountPath: /fsx, readOnly: true}
+            - {name: shm, mountPath: /dev/shm}
+            - {name: tuned-moe, mountPath: /tuned-moe, readOnly: true}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fin-rag-vllm-fp8
+  namespace: ml-inference
+  labels: {app: fin-rag-vllm, precision: fp8}
+spec:
+  type: ClusterIP
+  selector: {app: fin-rag-vllm, precision: fp8}
+  ports:
+    - {name: http, port: 8000, targetPort: 8000, protocol: TCP}

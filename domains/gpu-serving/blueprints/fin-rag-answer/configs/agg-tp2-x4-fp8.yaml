@@ -1,0 +1,59 @@
+# P0 baseline: aggregated vLLM, FP8, TP=2 x 4 workers = all 8 B200.
+# Prefix caching ON (mamba_cache_mode=all) for the ~3050-tok shared header.
+# Reasoning OFF: NO reasoning-parser flag passed (avoids buggy nemotron_v3
+# #39103/#39581 AND the super_v3 plugin); thinking disabled per-request via
+# chat_template_kwargs.enable_thinking=false in the bench driver.
+mode: aggregated
+backend: vllm
+config_name: agg-tp2-x4-fp8
+
+serving:
+  image: 615299764834.dkr.ecr.us-east-2.amazonaws.com/vllm-openai:v0.18.1
+  precision: fp8
+  tp_size: 2
+  num_workers: 4
+  total_gpus: 8
+  port: 8000
+  model_path: /mnt/nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+  served_model_name: nemotron-3-super
+
+  args:
+    - --model
+    - /mnt/nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+    - --served-model-name
+    - nemotron-3-super
+    - --tensor-parallel-size
+    - "2"
+    - --trust-remote-code
+    - --dtype
+    - auto
+    - --kv-cache-dtype
+    - fp8
+    - --attention-backend
+    - TRITON_ATTN
+    - --gpu-memory-utilization
+    - "0.90"
+    - --max-model-len
+    - "16384"
+    - --enable-prefix-caching
+    - --mamba-cache-mode
+    - all
+    - --enable-chunked-prefill
+    - --max-num-batched-tokens
+    - "8192"
+    - --max-num-seqs
+    - "256"
+    - --host
+    - 0.0.0.0
+    - --port
+    - "8000"
+
+  env:
+    HF_HUB_OFFLINE: "1"
+    TRANSFORMERS_OFFLINE: "1"
+    VLLM_USE_V1: "1"
+
+benchmark:
+  priority: P0
+  workload_catalog_id: fin-support
+  reasoning: false

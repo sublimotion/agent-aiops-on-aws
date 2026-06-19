@@ -1,0 +1,109 @@
+# vLLM serving on H200 (sm_90, NVSwitch): Nemotron-3-Super FP8, agg-tp2-x4 (4 replicas x TP=2 = 8 H200 GPUs).
+# This MIRRORS the B200 FP8 winner as the apples-to-apples vLLM baseline (spec H1b).
+#
+# H200 deltas vs B200 (mostly NONE — Hopper sm_90 is the mature gold-standard path):
+#   - toleration ai-infra/h200 (not ai-infra/b200), nodeSelector fin-rag/hardware=h200-sm90
+#   - 141GB/GPU VRAM (< B200 183GB). TP2 leaves large KV headroom (~70GB/GPU).
+#   - NVSwitch NVL5 like B200: TP collectives are cheap (NOT the g7e PCIe bottleneck).
+#   - NCCL mature on sm_90 — none of the g7e sm_120+PCIe NCCL-2.25.1 collective bug.
+#   - attention backend: leave vLLM default (FlashInfer on sm_90) — NOT the TRITON_ATTN
+#     workaround g7e needed. B200 found FlashInfer ~10% faster; sm_90 is its home turf.
+#
+# IMAGE POLICY (latest-stable-first, smoke-gated):
+#   PRIMARY  = v0.22.1 (latest stable, already in ECR). Stage 0 coherence smoke is the HARD GATE.
+#   FALLBACK = v0.18.1 (parent's validated version). Switch image line on smoke fail.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fin-rag-h200-vllm-fp8
+  namespace: ml-inference
+  labels: {app: fin-rag-h200-vllm, precision: fp8, config: agg-tp2-x4, hw: h200-sm90}
+spec:
+  replicas: 4
+  strategy:
+    type: Recreate            # all 8 GPUs consumed; RollingUpdate deadlocks
+  selector:
+    matchLabels: {app: fin-rag-h200-vllm, precision: fp8}
+  template:
+    metadata:
+      labels: {app: fin-rag-h200-vllm, precision: fp8, config: agg-tp2-x4, hw: h200-sm90}
+    spec:
+      nodeSelector:
+        fin-rag/hardware: h200-sm90
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        - {key: ai-infra/h200, operator: Exists, effect: NoSchedule}
+      volumes:
+        - name: nvme
+          hostPath: {path: /mnt/nvme, type: Directory}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 32Gi}
+      containers:
+        - name: vllm
+          image: 615299764834.dkr.ecr.us-east-2.amazonaws.com/vllm-openai:v0.22.1  # PRIMARY; fallback :v0.18.1 on smoke fail
+          imagePullPolicy: IfNotPresent
+          command: ["python3", "-m", "vllm.entrypoints.openai.api_server"]
+          args:
+            - --model
+            - /mnt/nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+            - --served-model-name
+            - nemotron-3-super
+            - --tensor-parallel-size
+            - "2"
+            - --trust-remote-code
+            - --dtype
+            - auto
+            - --kv-cache-dtype
+            - fp8
+            - --gpu-memory-utilization
+            - "0.90"
+            - --max-model-len
+            - "16384"
+            - --enable-prefix-caching
+            - --mamba-cache-mode
+            - all
+            - --enable-chunked-prefill
+            - --max-num-batched-tokens
+            - "16384"
+            - --max-num-seqs
+            - "256"
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+          env:
+            - {name: HF_HUB_OFFLINE, value: "1"}
+            - {name: TRANSFORMERS_OFFLINE, value: "1"}
+            - {name: VLLM_USE_V1, value: "1"}
+          ports:
+            - {containerPort: 8000, name: http}
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 80       # ~20min ceiling; FP8 ModelOpt first-load ~15min
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            failureThreshold: 10
+          resources:
+            requests: {cpu: "16", memory: 96Gi, nvidia.com/gpu: "2"}
+            limits: {nvidia.com/gpu: "2"}
+          securityContext:
+            capabilities: {add: ["IPC_LOCK"]}
+          volumeMounts:
+            - {name: nvme, mountPath: /mnt/nvme}
+            - {name: shm, mountPath: /dev/shm}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fin-rag-h200-vllm-fp8
+  namespace: ml-inference
+  labels: {app: fin-rag-h200-vllm, precision: fp8}
+spec:
+  type: ClusterIP
+  selector: {app: fin-rag-h200-vllm, precision: fp8}
+  ports:
+    - {name: http, port: 8000, targetPort: 8000, protocol: TCP}

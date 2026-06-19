@@ -1,0 +1,121 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "134608a0-b746-4272-87cb-d8dc57d03fe6",
+  "created_at": "2026-05-14T12:50:13Z",
+  "source_tool": {
+    "name": "custom",
+    "version": "0.1.0-deepseek-ocr-chatbot-short",
+    "enrichment_version": "1.0.0"
+  },
+  "model": {
+    "name": "DeepSeek-OCR-2",
+    "id": "deepseek-ai/DeepSeek-OCR-2",
+    "architecture": "vlm",
+    "parameters_total": "8B",
+    "quantization": "bf16",
+    "max_model_len": 8192
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.19.1",
+    "container_image": "vllm/vllm-openai:v0.19.1",
+    "base_image": null,
+    "dockerfile": null,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "data_parallel": null,
+    "expert_parallel": null,
+    "replicas": 1,
+    "reasoning": false,
+    "kv_cache_dtype": "auto",
+    "attention_backend": "flash-attn",
+    "speculative_decode": null,
+    "extra_args": {
+      "trust-remote-code": true,
+      "max-num-seqs": 32,
+      "gpu-memory-utilization": 0.9
+    }
+  },
+  "infrastructure": {
+    "substrate": "eks",
+    "instance_type": "g6e.2xlarge",
+    "region": "us-east-2",
+    "gpu": {
+      "name": "L40S",
+      "arch": "sm_89",
+      "count": 1,
+      "vram_gb": 48,
+      "interconnect": "none"
+    }
+  },
+  "workload": {
+    "use_case": "ocr",
+    "catalog_id": "chatbot-short",
+    "modality": "multimodal",
+    "dataset": {
+      "type": "synthetic-single-image",
+      "source": "scripts/test-assets/sample-doc.png",
+      "input_tokens": {
+        "mean": 274.0
+      },
+      "output_tokens": {
+        "mean": 160.0
+      }
+    },
+    "load": {
+      "type": "sequential",
+      "concurrency": 1,
+      "num_prompts": 100,
+      "warmup_requests": 10
+    },
+    "api": {
+      "type": "chat",
+      "streaming": false,
+      "endpoint": "/v1/chat/completions",
+      "prompt_template": "<image>\n<|grounding|>Convert the document to markdown. "
+    }
+  },
+  "metrics": {
+    "duration_s": 87.2606497919769,
+    "completed": 100,
+    "failed": 0,
+    "error_rate": 0.0,
+    "e2e_ms": {
+      "mean": 622.6840713302954,
+      "p50": 621.4441249903757,
+      "p90": 648.9936669822782,
+      "p95": 671.5505000029225,
+      "p99": 718.2883339992259
+    },
+    "output_toks_per_s": 183.35870794158473,
+    "request_throughput": 1.1459919246349046,
+    "total_input_tokens": 27400,
+    "total_output_tokens": 16000,
+    "max_concurrent_requests": 1,
+    "ttft_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "tpot_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "itl_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    }
+  },
+  "extensions": {
+    "modality": "vision-language",
+    "notes": "Stage 6 smoke cell: c=1 sequential, non-streaming, e2e-only (no TTFT for VLM non-stream). Proves Stage 6 artifact wiring."
+  }
+}

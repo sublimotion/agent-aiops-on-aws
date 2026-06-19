@@ -1,0 +1,197 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "6aaba5b5-00f1-4bac-8961-4d624a46c46a",
+  "created_at": "2026-05-14T12:57:58Z",
+  "source_tool": {
+    "name": "custom",
+    "version": "0.1.0-deepseek-ocr",
+    "enrichment_version": "1.0.0"
+  },
+  "model": {
+    "name": "DeepSeek-OCR-2",
+    "id": "deepseek-ai/DeepSeek-OCR-2",
+    "architecture": "vlm",
+    "parameters_total": "8B",
+    "quantization": "bf16",
+    "max_model_len": 8192
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.19.1",
+    "container_image": "vllm/vllm-openai:v0.19.1",
+    "base_image": null,
+    "dockerfile": null,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "data_parallel": null,
+    "expert_parallel": null,
+    "replicas": 1,
+    "reasoning": false,
+    "kv_cache_dtype": "auto",
+    "attention_backend": "flash-attn",
+    "speculative_decode": null,
+    "extra_args": {
+      "trust-remote-code": true,
+      "max-num-seqs": 32,
+      "gpu-memory-utilization": 0.9
+    }
+  },
+  "infrastructure": {
+    "substrate": "eks",
+    "instance_type": "g6e.2xlarge",
+    "region": "us-east-2",
+    "gpu": {
+      "name": "L40S",
+      "arch": "sm_89",
+      "count": 1,
+      "vram_gb": 48,
+      "interconnect": "none"
+    }
+  },
+  "workload": {
+    "use_case": "ocr",
+    "catalog_id": "concurrency-sweep",
+    "modality": "multimodal",
+    "dataset": {
+      "type": "synthetic-single-image",
+      "source": "scripts/test-assets/sample-doc.png",
+      "input_tokens": {
+        "mean": 274.0
+      },
+      "output_tokens": {
+        "mean": 160.0
+      }
+    },
+    "load": {
+      "type": "concurrency-sweep",
+      "levels": [
+        1,
+        4,
+        16,
+        32
+      ],
+      "num_prompts_per_level": 50,
+      "warmup_requests": 10,
+      "current_level": 32
+    },
+    "api": {
+      "type": "chat",
+      "streaming": false,
+      "endpoint": "/v1/chat/completions",
+      "prompt_template": "<image>\n<|grounding|>Convert the document to markdown. "
+    }
+  },
+  "metrics": {
+    "duration_s": 2.588721665990306,
+    "completed": 50,
+    "failed": 0,
+    "error_rate": 0.0,
+    "e2e_ms": {
+      "mean": 1306.018431642442,
+      "p50": 1220.302959001856,
+      "p90": 1488.4506250091363,
+      "p95": 1504.1304159967694,
+      "p99": 1505.0902500224765
+    },
+    "output_toks_per_s": 3090.328367510931,
+    "request_throughput": 19.31455229694332,
+    "total_input_tokens": 13700,
+    "total_output_tokens": 8000,
+    "max_concurrent_requests": 32,
+    "ttft_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "tpot_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "itl_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    }
+  },
+  "extensions": {
+    "modality": "vision-language",
+    "notes": "Stage 6 concurrency sweep (latency range) on DeepSeek-OCR-2 BF16. Non-streaming, e2e-only (no TTFT for VLM non-stream). Headline metrics are taken from the peak-throughput level; per-level breakdown lives in extensions.sweep_levels.",
+    "sweep_levels": [
+      {
+        "concurrency": 1,
+        "completed": 50,
+        "failed": 0,
+        "duration_s": 20.62300387499272,
+        "request_throughput": 2.4244770695422106,
+        "output_toks_per_s": 387.9163311267537,
+        "e2e_ms": {
+          "mean": 412.3833792208461,
+          "p50": 411.35208401829004,
+          "p90": 413.7809169769753,
+          "p95": 419.5011660049204,
+          "p99": 439.5423330133781
+        },
+        "total_input_tokens": 13700,
+        "total_output_tokens": 8000
+      },
+      {
+        "concurrency": 4,
+        "completed": 50,
+        "failed": 0,
+        "duration_s": 8.212113040994154,
+        "request_throughput": 6.088566943782233,
+        "output_toks_per_s": 974.1707110051573,
+        "e2e_ms": {
+          "mean": 638.6867241625441,
+          "p50": 641.3036659942009,
+          "p90": 655.0270419975277,
+          "p95": 658.6246250080876,
+          "p99": 664.6281669964083
+        },
+        "total_input_tokens": 13700,
+        "total_output_tokens": 8000
+      },
+      {
+        "concurrency": 16,
+        "completed": 50,
+        "failed": 0,
+        "duration_s": 3.7272638749855105,
+        "request_throughput": 13.414666006225376,
+        "output_toks_per_s": 2146.3465609960604,
+        "e2e_ms": {
+          "mean": 1065.1406924589537,
+          "p50": 1047.7791669836733,
+          "p90": 1213.472332980018,
+          "p95": 1230.0193749833852,
+          "p99": 1237.703082995722
+        },
+        "total_input_tokens": 13700,
+        "total_output_tokens": 8000
+      },
+      {
+        "concurrency": 32,
+        "completed": 50,
+        "failed": 0,
+        "duration_s": 2.588721665990306,
+        "request_throughput": 19.31455229694332,
+        "output_toks_per_s": 3090.328367510931,
+        "e2e_ms": {
+          "mean": 1306.018431642442,
+          "p50": 1220.302959001856,
+          "p90": 1488.4506250091363,
+          "p95": 1504.1304159967694,
+          "p99": 1505.0902500224765
+        },
+        "total_input_tokens": 13700,
+        "total_output_tokens": 8000
+      }
+    ]
+  }
+}

@@ -1,0 +1,117 @@
+# vLLM serving on g7e (sm_120, PCIe): Nemotron-3-Super FP8, agg-tp2-x4 (4 replicas x TP=2 = 8 g7e GPUs).
+# This MIRRORS the B200 FP8 winner as the apples-to-apples vLLM baseline. It is a STARTING POINT,
+# not an assumed-good config — sm_120 FP8 kernel behavior under vLLM is unverified (the upstream
+# #20541 matrix is SGLang). Smoke-test first; adjust per the G0 findings.
+#
+# IMAGE POLICY (latest-stable-first, smoke-gated — the policy the B200 run claimed but skipped):
+#   PRIMARY  = v0.22.1 (latest stable, already in ECR). Stage 0 coherence smoke on real Fin
+#              prompts is the HARD GATE. CAVEAT: vLLM #44022 (OPEN) reports Nemotron startup
+#              failure on 0.22 — but for NVFP4; our checkpoint is FP8 per-tensor, so likely
+#              unaffected. The smoke confirms it; do not wave it through.
+#   FALLBACK = v0.18.1 (the image the B200 run actually validated on this exact FP8 checkpoint).
+#              Switch the image line below to :v0.18.1 if 0.22.1 fails to start or garbles.
+#
+# g7e deltas vs B200:
+#   - toleration ai-infra/g7e (not ai-infra/b200)
+#   - PCIe interconnect: TP=2 crosses one PCIe hop (no NVLink). TP1 impossible (124GB FP8 > 96GB/GPU).
+#   - prefix cache flags kept for parity, but expect 0 hits (Mamba2 PC non-functional on vLLM 0.18.1,
+#     proven on B200 at any TP — re-confirm on g7e, do not rely on it).
+#   - NCCL: vLLM uses custom allreduce so the NCCL-2.25.1-on-sm120 bug does NOT affect this path;
+#     a TP collective path (SGLang) would need NCCL>=2.26.2 verified in-image.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fin-rag-g7e-vllm-fp8
+  namespace: ml-inference
+  labels: {app: fin-rag-g7e-vllm, precision: fp8, config: agg-tp2-x4, hw: g7e-sm120}
+spec:
+  replicas: 4
+  strategy:
+    type: Recreate            # all 8 GPUs consumed; RollingUpdate deadlocks
+  selector:
+    matchLabels: {app: fin-rag-g7e-vllm, precision: fp8}
+  template:
+    metadata:
+      labels: {app: fin-rag-g7e-vllm, precision: fp8, config: agg-tp2-x4, hw: g7e-sm120}
+    spec:
+      nodeSelector:
+        fin-rag/hardware: g7e-sm120
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        - {key: ai-infra/g7e, operator: Exists, effect: NoSchedule}
+      volumes:
+        - name: nvme
+          hostPath: {path: /mnt/nvme, type: Directory}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 32Gi}
+      containers:
+        - name: vllm
+          image: 615299764834.dkr.ecr.us-east-2.amazonaws.com/vllm-openai:v0.22.1  # PRIMARY; fallback :v0.18.1 on smoke fail
+          imagePullPolicy: IfNotPresent
+          command: ["python3", "-m", "vllm.entrypoints.openai.api_server"]
+          args:
+            - --model
+            - /mnt/nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+            - --served-model-name
+            - nemotron-3-super
+            - --tensor-parallel-size
+            - "2"
+            - --trust-remote-code
+            - --dtype
+            - auto
+            - --kv-cache-dtype
+            - fp8
+            - --attention-backend
+            - TRITON_ATTN
+            - --gpu-memory-utilization
+            - "0.90"
+            - --max-model-len
+            - "16384"
+            - --enable-prefix-caching
+            - --mamba-cache-mode
+            - all
+            - --enable-chunked-prefill
+            - --max-num-batched-tokens
+            - "16384"
+            - --max-num-seqs
+            - "256"
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+          env:
+            - {name: HF_HUB_OFFLINE, value: "1"}
+            - {name: TRANSFORMERS_OFFLINE, value: "1"}
+            - {name: VLLM_USE_V1, value: "1"}
+          ports:
+            - {containerPort: 8000, name: http}
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 80       # ~20min ceiling; sm_120 FP8 first-load may JIT longer
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            failureThreshold: 10
+          resources:
+            requests: {cpu: "16", memory: 96Gi, nvidia.com/gpu: "2"}
+            limits: {nvidia.com/gpu: "2"}
+          securityContext:
+            capabilities: {add: ["IPC_LOCK"]}
+          volumeMounts:
+            - {name: nvme, mountPath: /mnt/nvme}
+            - {name: shm, mountPath: /dev/shm}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fin-rag-g7e-vllm-fp8
+  namespace: ml-inference
+  labels: {app: fin-rag-g7e-vllm, precision: fp8}
+spec:
+  type: ClusterIP
+  selector: {app: fin-rag-g7e-vllm, precision: fp8}
+  ports:
+    - {name: http, port: 8000, targetPort: 8000, protocol: TCP}

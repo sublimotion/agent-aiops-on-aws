@@ -1,0 +1,45 @@
+# Privileged one-shot job: build RAID0 over local NVMe and mount at /mnt/nvme
+# on the B200 node, by nsenter-ing the host mount namespace.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nvme-raid-setup
+  namespace: ml-inference
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+      restartPolicy: Never
+      hostPID: true
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+      volumes:
+        - name: script
+          configMap:
+            name: nvme-setup-script
+            defaultMode: 0755
+        - name: host-tmp
+          hostPath:
+            path: /tmp
+            type: Directory
+      containers:
+        - name: setup
+          image: alpine:3.20
+          securityContext:
+            privileged: true
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              cp /script/setup-nvme-raid.sh /host-tmp/setup-nvme-raid.sh
+              nsenter -t 1 -m -u -i -n -p -- bash /tmp/setup-nvme-raid.sh
+          volumeMounts:
+            - name: script
+              mountPath: /script
+            - name: host-tmp
+              mountPath: /host-tmp

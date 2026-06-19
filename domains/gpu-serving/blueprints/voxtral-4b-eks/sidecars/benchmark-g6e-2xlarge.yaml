@@ -1,0 +1,143 @@
+# Voxtral-Mini-3B-2507 Benchmark Sidecar (g6e.2xlarge — substrate-alt, L4 spec-preferred)
+# Quality eval (LibriSpeech WER) is DEFERRED for this session — perf-only run.
+
+model:
+  name: Voxtral-Mini-3B
+  id: mistralai/Voxtral-Mini-3B-2507
+  modality: audio
+  architecture: VoxtralForConditionalGeneration
+  parameters_total: "3B"        # ~5B effective with audio encoder
+  quantization: bf16
+  max_model_len: 32768
+  audio:
+    internal_sample_rate_hz: 16000
+    max_transcription_minutes: 30
+    max_understanding_minutes: 40
+    languages: [en, es, fr, pt, hi, de, nl, it]
+
+engine:
+  name: vllm
+  version: "0.19.1"
+  container_image: vllm/vllm-openai:v0.19.1
+  tensor_parallel: 1
+  pipeline_parallel: 1
+  replicas: 1
+  reasoning: false
+  kv_cache_dtype: auto
+  attention_backend: flash-attn
+  task: transcription
+  extra_args:
+    tokenizer_mode: mistral
+    config_format: mistral
+    load_format: mistral
+    trust-remote-code: true
+    max-num-seqs: 16
+    gpu-memory-utilization: 0.85
+  runtime_extras:
+    - "mistral-common[audio]"
+
+infrastructure:
+  substrate: eks
+  instance_type: g6e.2xlarge
+  substrate_note: "spec-alt: L40S 48GB instead of spec-preferred L4 24GB; per-stream perf is upper bound, cost-row substrate-caveated"
+  region: us-east-2
+  gpu:
+    name: L40S
+    arch: sm_89
+    count: 1
+    vram_gb: 48
+    interconnect: none
+  eks:
+    cluster_name: qwen3-next-bench-eks-cluster
+    cluster_version: "1.32"
+    nodegroup: g6e-ocr
+    node_count: 1
+    ami: AL2_x86_64_GPU
+
+# Two API surfaces; benchmarks split across them.
+apis:
+  transcription:
+    path: /v1/audio/transcriptions
+    body_format: multipart
+    notes: "OpenAI Whisper-compat; full audio consumed before token streaming starts"
+  understanding:
+    path: /v1/chat/completions
+    body_format: json
+    audio_content_part: '{"type":"audio","path":"<base64 or local path>"}'
+    notes: "Streaming SSE per-token; audio content part references file path or base64-data"
+
+workloads:
+  # Transcription latency — short utterances
+  - catalog_id: chatbot-short
+    api: transcription
+    mode: latency
+    override:
+      audio_duration_axis: [3, 5, 10]   # seconds; LibriSpeech-clean median ~6s
+
+  # Transcription throughput — concurrency at fixed length
+  - catalog_id: concurrency-sweep
+    api: transcription
+    mode: latency
+    o_code: O1
+    override:
+      load:
+        levels: [1, 4, 16, 32]
+      audio_duration_s: 10              # fixed — sweep concurrency, not duration
+
+  # Audio-duration axis sweep at peak concurrency (TBD after iter 1)
+  - catalog_id: concurrency-sweep
+    api: transcription
+    mode: mixed
+    override:
+      audio_duration_axis: [3, 10, 30, 120]   # seconds; tests Mel-encoder + KV scaling
+      max_concurrency: 4                       # set after iter-1 reveals saturation point
+
+  # Understanding / Q&A endpoint cell
+  - catalog_id: chatbot-short
+    api: understanding
+    mode: latency
+    override:
+      audio_duration_s: 10
+      question: "Summarize the audio in one sentence."
+
+  # Engagement O-codes
+  - catalog_id: quantization-pareto
+    o_code: O3
+    deferred: "LibriSpeech mirror not staged; quality gate inactive this session"
+  - catalog_id: cold-start
+    o_code: O9
+    override:
+      break_out: [mistral_common_install, weights_load, mel_encoder, llm_decoder, cuda_graph]
+
+slo:
+  ttfw_p99_ms: 1000          # Time-To-First-Word — analog of TTFT for streaming ASR
+  rtfx_min: 1.0              # Real-Time-Factor inverse must clear 1.0 (audio_sec >= wall_sec)
+  error_rate_max: 0.001
+  audio_minutes_per_dollar_min: null   # populated post-run
+
+quality_baselines:
+  librispeech_clean:
+    bf16: 0.0188             # Mistral self-report (paper arXiv:2507.13264)
+    tolerance: 0.005
+    note: "DEFERRED — dataset not yet mirrored; perf-only this session"
+  librispeech_other:
+    bf16: 0.041
+    tolerance: 0.005
+    note: "DEFERRED"
+
+cost:
+  instance_type: g6e.2xlarge
+  on_demand_price_per_hr: 2.24
+  spec_preferred_instance: g6.xlarge
+  spec_preferred_price_per_hr: 0.80
+  utilization_target: 0.70
+  audio_minutes_per_dollar: null   # derived: rtfx * 3600 / on_demand_price_per_hr
+  note: "cost row in report must carry substrate-alt caveat"
+
+version_pins:
+  vllm_image_sha: null
+  driver_version: null
+  cuda_version: null
+  mistral_common: null
+
+artifacts: {}

@@ -1,0 +1,109 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cto-ocr-g6e-2xlarge
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deepseek-ocr-g6e-2xlarge
+  namespace: cto-ocr-g6e-2xlarge
+  labels:
+    app: deepseek-ocr-g6e-2xlarge
+    workload: deepseek-ocr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: deepseek-ocr-g6e-2xlarge
+  template:
+    metadata:
+      labels:
+        app: deepseek-ocr-g6e-2xlarge
+        workload: deepseek-ocr
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: g6e.2xlarge
+        workload: deepseek-ocr
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: vllm
+        image: vllm/vllm-openai:v0.19.1
+        command: ["vllm"]
+        args:
+        - serve
+        - deepseek-ai/DeepSeek-OCR-2
+        - --dtype
+        - bfloat16
+        - --max-model-len
+        - "8192"
+        - --max-num-seqs
+        - "32"
+        - --gpu-memory-utilization
+        - "0.90"
+        - --trust-remote-code
+        - --host
+        - 0.0.0.0
+        - --port
+        - "8000"
+        env:
+        - name: HF_HUB_ENABLE_HF_TRANSFER
+          value: "1"
+        - name: VLLM_USAGE_SOURCE
+          value: production-cto
+        ports:
+        - containerPort: 8000
+          name: http
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+            memory: 48Gi
+            cpu: "7"
+          requests:
+            nvidia.com/gpu: 1
+            memory: 32Gi
+            cpu: "4"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 300
+          periodSeconds: 15
+          failureThreshold: 60
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 600
+          periodSeconds: 30
+          failureThreshold: 6
+        volumeMounts:
+        - name: hf-cache
+          mountPath: /root/.cache/huggingface
+        - name: shm
+          mountPath: /dev/shm
+      volumes:
+      - name: hf-cache
+        emptyDir:
+          sizeLimit: 80Gi
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 8Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: deepseek-ocr-g6e-2xlarge-svc
+  namespace: cto-ocr-g6e-2xlarge
+spec:
+  selector:
+    app: deepseek-ocr-g6e-2xlarge
+  ports:
+  - port: 8000
+    targetPort: 8000
+    name: http
+  type: ClusterIP

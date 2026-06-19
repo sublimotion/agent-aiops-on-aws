@@ -1,0 +1,137 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "8adf4b53-36c8-4811-8862-591272d93eec",
+  "created_at": "2026-05-20T11:44:27.060327Z",
+  "source_tool": {
+    "name": "vllm-bench-serve",
+    "version": "0.21.0",
+    "enrichment_version": "1.0.0-deepseek-v4-flash"
+  },
+  "model": {
+    "name": "DeepSeek-V4-Flash",
+    "id": "deepseek-ai/DeepSeek-V4-Flash",
+    "architecture": "moe",
+    "parameters_total": "131B",
+    "parameters_active": "5.5B",
+    "quantization": "fp8",
+    "max_model_len": 524288
+  },
+  "engine": {
+    "name": "vllm",
+    "container_image": "vllm/vllm-openai:nightly-pr42320",
+    "base_image": "vllm/vllm-openai:nightly-pr42320",
+    "dockerfile": null,
+    "tensor_parallel": 8,
+    "pipeline_parallel": 1,
+    "data_parallel": null,
+    "expert_parallel": null,
+    "replicas": 1,
+    "reasoning": false,
+    "kv_cache_dtype": "fp8",
+    "attention_backend": "flashinfer",
+    "speculative_decode": {
+      "algorithm": "MTP",
+      "draft_model": "self",
+      "num_steps": 1,
+      "num_draft_tokens": 1
+    },
+    "engine_config_tag": "vllm-tp8-mtp",
+    "extra_args": {
+      "kv-cache-dtype": "fp8",
+      "trust-remote-code": true
+    }
+  },
+  "framework": {
+    "name": "vllm-native",
+    "version": "0.21.0",
+    "config": {}
+  },
+  "infrastructure": {
+    "substrate": "ec2-spot",
+    "instance_type": "p6-b300.48xlarge",
+    "region": "us-west-2",
+    "gpu": {
+      "name": "B300",
+      "arch": "sm_103",
+      "count": 8,
+      "vram_gb": 275,
+      "interconnect": "nvswitch-nv18"
+    }
+  },
+  "workload": {
+    "use_case": "qps-sweep",
+    "catalog_id": "qps-sweep",
+    "modality": "text",
+    "dataset": {
+      "type": "sharegpt",
+      "input_tokens": {
+        "mean": 219,
+        "std_dev": 0
+      },
+      "output_tokens": {
+        "mean": 207,
+        "std_dev": 0
+      }
+    },
+    "load": {
+      "type": "constant",
+      "request_rate": 4.0,
+      "num_prompts": 200
+    },
+    "api": {
+      "type": "completions",
+      "streaming": true,
+      "endpoint": "/v1/completions"
+    }
+  },
+  "metrics": {
+    "duration_s": 62.98366489299951,
+    "completed": 199,
+    "failed": 1,
+    "error_rate": 0.005,
+    "ttft_ms": {
+      "mean": 6218.008329542738,
+      "p50": 6093.877227000121,
+      "p90": null,
+      "p95": null,
+      "p99": 13159.649083459191
+    },
+    "tpot_ms": {
+      "mean": 214.05307598670916,
+      "p50": 84.91592411115158,
+      "p90": null,
+      "p95": null,
+      "p99": 2173.491545305837
+    },
+    "itl_ms": {
+      "mean": 131.50894073191188,
+      "p50": 24.1905590009992,
+      "p90": null,
+      "p95": null,
+      "p99": 2471.8379239596834
+    },
+    "e2e_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "output_toks_per_s": 656.4876793093018,
+    "request_throughput": 3.1595493901168394,
+    "total_toks_per_s": 1349.3498694364816,
+    "total_input_tokens": 43639,
+    "total_output_tokens": 41348,
+    "max_concurrent_requests": 133,
+    "spec_accept_rate": 70.41243030501803,
+    "spec_accept_length": 1.7041243030501803
+  },
+  "extensions": {
+    "normalized_from": "results/r3/t6_mtp_sharegpt_qps4.json",
+    "session_date": "2026-05-19",
+    "cost": {
+      "instance_cost_per_hr": 26.49,
+      "dollars_per_1m_output_tokens": 11.208638890337012
+    }
+  }
+}

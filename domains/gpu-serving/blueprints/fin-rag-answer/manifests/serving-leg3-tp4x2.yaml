@@ -1,0 +1,102 @@
+# LEG 3 (P2): agg-tp4-x2 — 2 replicas x TP=4 (all 8 B200) vs agg-tp2-x4 winner.
+# TP4 is arithmetically SAFE for this checkpoint: per-tensor static FP8 (no block_n=128
+# constraint). Question: does more KV headroom per replica (or extra NVSwitch comms cost)
+# help or hurt vs tp2-x4? Back on the winner's attention backend (TRITON_ATTN) + fp8 KV +
+# mnbt=16384. 2 replicas x 4 GPU = 8 GPU. Recreate.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fin-rag-vllm-fp8
+  namespace: ml-inference
+  labels: {app: fin-rag-vllm, precision: fp8, config: leg3-tp4x2}
+spec:
+  replicas: 2
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {app: fin-rag-vllm, precision: fp8}
+  template:
+    metadata:
+      labels: {app: fin-rag-vllm, precision: fp8, config: leg3-tp4x2}
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+      volumes:
+        - name: nvme
+          hostPath: {path: /mnt/nvme, type: Directory}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 32Gi}
+      containers:
+        - name: vllm
+          image: 615299764834.dkr.ecr.us-east-2.amazonaws.com/vllm-openai:v0.18.1
+          imagePullPolicy: IfNotPresent
+          command: ["python3", "-m", "vllm.entrypoints.openai.api_server"]
+          args:
+            - --model
+            - /mnt/nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+            - --served-model-name
+            - nemotron-3-super
+            - --tensor-parallel-size
+            - "4"
+            - --trust-remote-code
+            - --dtype
+            - auto
+            - --kv-cache-dtype
+            - fp8
+            - --attention-backend
+            - TRITON_ATTN
+            - --gpu-memory-utilization
+            - "0.90"
+            - --max-model-len
+            - "16384"
+            - --enable-prefix-caching
+            - --mamba-cache-mode
+            - all
+            - --enable-chunked-prefill
+            - --max-num-batched-tokens
+            - "16384"
+            - --max-num-seqs
+            - "256"
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+          env:
+            - {name: HF_HUB_OFFLINE, value: "1"}
+            - {name: TRANSFORMERS_OFFLINE, value: "1"}
+            - {name: VLLM_USE_V1, value: "1"}
+          ports:
+            - {containerPort: 8000, name: http}
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 80
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            failureThreshold: 10
+          resources:
+            requests: {cpu: "32", memory: 192Gi, nvidia.com/gpu: "4"}
+            limits: {nvidia.com/gpu: "4"}
+          securityContext:
+            capabilities: {add: ["IPC_LOCK"]}
+          volumeMounts:
+            - {name: nvme, mountPath: /mnt/nvme}
+            - {name: shm, mountPath: /dev/shm}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fin-rag-vllm-fp8
+  namespace: ml-inference
+  labels: {app: fin-rag-vllm, precision: fp8}
+spec:
+  type: ClusterIP
+  selector: {app: fin-rag-vllm, precision: fp8}
+  ports:
+    - {name: http, port: 8000, targetPort: 8000, protocol: TCP}

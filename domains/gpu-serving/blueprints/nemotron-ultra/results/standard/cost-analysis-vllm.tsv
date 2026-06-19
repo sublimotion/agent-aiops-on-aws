@@ -1,0 +1,23 @@
+# nemotron-3-ultra | vLLM v0.22.0 | B200 p6-b200.48xlarge TP4 | us-east-2 az2 | P3 cost analysis
+# captured 2026-06-06. Instance: p6-b200.48xlarge SPOT @ ~$40.57/hr (8 GPUs; we use 4 via TP4 -> full instance billed).
+# $/M = hourly_rate / (agg_tok_s * 3600 / 1e6). Output-token cost (workload is output-heavy).
+scenario	agg_tok_s	usd_per_hr	usd_per_M_output	vs_retail_2.50	measured
+sustained-c256	1846.6	40.57	6.10	2.44x	yes
+peak-sweep-c256	1882.9	40.57	5.99	2.40x	yes
+single-stream-c1	297.7	40.57	37.86	15.1x	yes
+2-replica-ideal-2.0x	3765.8	40.57	2.99	1.20x	PROJECTED
+2-replica-realistic-1.8x	3389.2	40.57	3.33	1.33x	PROJECTED
+# Managed-retail reference: ~$2.50/M output, ~$0.50/M input, 262K ctx, ~300 tok/s single-stream.
+# VERDICT (cost, MEASURED): single TP4 replica at full-batch ~$6.00-6.10/M output, 2.4x the ~$2.50/M retail reference.
+#   Retail prices at scale-amortized multi-tenant batching + reserved/owned hardware; our number is raw spot with zero margin.
+# VERDICT (latency, MEASURED): single-stream decode 297.7 tok/s ESSENTIALLY MATCHES the 300 tok/s reference (0.99x); first-run SGLang missed (177).
+#
+# 2-REPLICA HEADROOM (PROJECTED, NOT MEASURED): the benchmark used only 4 of 8 GPUs (TP4). A second independent TP4
+#   replica fits on GPUs 4-7 (each replica used ~171/183 GB/GPU; replicas don't share GPUs). It does NOT raise single-stream
+#   speed (per-request latency is unchanged - a replica serves *different* requests), but ~doubles aggregate throughput at
+#   the SAME instance cost, halving $/M:
+#     - ideal 2.0x scaling:    ~3766 tok/s -> ~$2.99/M (1.20x retail) - essentially infra-level parity (our $ has no margin).
+#     - realistic 1.8x (NVSwitch contention): ~3389 tok/s -> ~$3.33/M (1.33x retail).
+#   Caveat: projection assumes linear/near-linear replica scaling; not validated on hardware (node already torn down).
+#   Alternative: a single TP8 replica across all 8 GPUs would also use the idle GPUs - likely better single-stream latency
+#   (fewer effective decode hops) but $/M stays ~flat; 2x TP4 maximizes aggregate throughput/$ instead.

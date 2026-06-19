@@ -1,0 +1,102 @@
+# Serving: Nemotron-3-Super FP8, agg-tp2-x4 (4 replicas x TP=2 = all 8 B200). THE WINNER.
+# One ClusterIP Service round-robins across the 4 independent vLLM engines.
+# Each engine keeps its own prefix cache (NOTE: hit rate is 0 at any TP on vLLM 0.18.1 for
+# this Mamba2 model — see lessons.md Leg 4; flags accepted but caching non-functional).
+# Reasoning OFF (no parser flag). max-num-batched-tokens=16384 is the P1 winner (== max-model-len).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fin-rag-vllm-fp8
+  namespace: ml-inference
+  labels: {app: fin-rag-vllm, precision: fp8, config: agg-tp2-x4}
+spec:
+  replicas: 4
+  strategy:
+    type: Recreate            # all 8 GPUs are consumed; RollingUpdate deadlocks (new pods Pending, old won't drain)
+  selector:
+    matchLabels: {app: fin-rag-vllm, precision: fp8}
+  template:
+    metadata:
+      labels: {app: fin-rag-vllm, precision: fp8, config: agg-tp2-x4}
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+        - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+      volumes:
+        - name: nvme
+          hostPath: {path: /mnt/nvme, type: Directory}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 32Gi}
+      containers:
+        - name: vllm
+          image: 615299764834.dkr.ecr.us-east-2.amazonaws.com/vllm-openai:v0.18.1
+          imagePullPolicy: IfNotPresent
+          command: ["python3", "-m", "vllm.entrypoints.openai.api_server"]
+          args:
+            - --model
+            - /mnt/nvme/models/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+            - --served-model-name
+            - nemotron-3-super
+            - --tensor-parallel-size
+            - "2"
+            - --trust-remote-code
+            - --dtype
+            - auto
+            - --kv-cache-dtype
+            - fp8
+            - --attention-backend
+            - TRITON_ATTN
+            - --gpu-memory-utilization
+            - "0.90"
+            - --max-model-len
+            - "16384"
+            - --enable-prefix-caching
+            - --mamba-cache-mode
+            - all
+            - --enable-chunked-prefill
+            - --max-num-batched-tokens
+            - "16384"
+            - --max-num-seqs
+            - "256"
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+          env:
+            - {name: HF_HUB_OFFLINE, value: "1"}
+            - {name: TRANSFORMERS_OFFLINE, value: "1"}
+            - {name: VLLM_USE_V1, value: "1"}
+          ports:
+            - {containerPort: 8000, name: http}
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 60    # DeepGEMM JIT cache warms on NVMe; failureThreshold covers a cold first-ever JIT
+            periodSeconds: 15
+            failureThreshold: 80       # 60 + 80*15 = ~20min ceiling for a cold DeepGEMM JIT first start
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            failureThreshold: 10
+          resources:
+            requests: {cpu: "16", memory: 96Gi, nvidia.com/gpu: "2"}
+            limits: {nvidia.com/gpu: "2"}
+          securityContext:
+            capabilities: {add: ["IPC_LOCK"]}
+          volumeMounts:
+            - {name: nvme, mountPath: /mnt/nvme}
+            - {name: shm, mountPath: /dev/shm}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fin-rag-vllm-fp8
+  namespace: ml-inference
+  labels: {app: fin-rag-vllm, precision: fp8}
+spec:
+  type: ClusterIP
+  selector: {app: fin-rag-vllm, precision: fp8}
+  ports:
+    - {name: http, port: 8000, targetPort: 8000, protocol: TCP}

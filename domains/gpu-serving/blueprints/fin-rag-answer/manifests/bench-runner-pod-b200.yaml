@@ -1,0 +1,30 @@
+# Bench-runner pinned to the B200 node. Uses the vLLM ECR image (aiohttp prebaked)
+# so NO pip egress is needed (GPU-node egress/DNS is broken on this cluster).
+# Hits the serving ClusterIP directly (iptables LB, no DNS). Sleeps so we can
+# exec the driver repeatedly.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bench-runner
+  namespace: ml-inference
+spec:
+  restartPolicy: Never
+  nodeName: ip-10-0-30-22.us-east-2.compute.internal
+  tolerations:
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+  volumes:
+    - name: script
+      configMap: {name: fin-bench-script}
+    - name: results
+      hostPath: {path: /mnt/nvme/bench-results, type: DirectoryOrCreate}
+  containers:
+    - name: runner
+      image: 615299764834.dkr.ecr.us-east-2.amazonaws.com/vllm-openai:v0.22.1
+      command: ["/bin/sh","-c","mkdir -p /results; echo bench-runner ready; sleep 36000"]
+      volumeMounts:
+        - {name: script, mountPath: /script}
+        - {name: results, mountPath: /results}
+      resources:
+        requests: {cpu: "4", memory: 8Gi}
+        limits: {cpu: "8", memory: 16Gi}

@@ -1,0 +1,184 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "9114c351-170a-42d0-b760-40fcfa8f5c45",
+  "created_at": "2026-05-14T18:00:00Z",
+  "source_tool": {
+    "name": "custbench-async",
+    "version": "0.2.0",
+    "enrichment_version": "1.0.0"
+  },
+  "model": {
+    "name": "Qwen3-235B-A22B-FP8",
+    "id": "Qwen/Qwen3-235B-A22B-FP8",
+    "architecture": "moe",
+    "parameters_total": "235B",
+    "parameters_active": "22B",
+    "quantization": "fp8",
+    "max_model_len": 40960
+  },
+  "engine": {
+    "name": "sglang",
+    "container_image": "lmsysorg/sglang:v0.5.10-cu130",
+    "base_image": "lmsysorg/sglang:v0.5.10-cu130",
+    "dockerfile": null,
+    "tensor_parallel": 4,
+    "pipeline_parallel": 1,
+    "data_parallel": null,
+    "expert_parallel": null,
+    "replicas": 1,
+    "reasoning": true,
+    "kv_cache_dtype": "auto",
+    "attention_backend": "trtllm_mha",
+    "speculative_decode": {
+      "algorithm": "EAGLE3",
+      "draft_model": "lmsys/Qwen3-235B-A22B-EAGLE3",
+      "num_steps": 4,
+      "num_draft_tokens": 6,
+      "eagle_topk": 1,
+      "draft_attention_backend": "trtllm_mha"
+    },
+    "engine_config_tag": "sglang-eagle3-s4d6k1",
+    "extra_args": {
+      "tool-call-parser": "qwen3_coder",
+      "reasoning-parser": "qwen3-thinking",
+      "trust-remote-code": true,
+      "context-length": 40960,
+      "mem-fraction-static": 0.9,
+      "enable-metrics": true
+    }
+  },
+  "framework": {
+    "name": "sglang-native",
+    "version": "v0.5.10-cu130",
+    "config": {}
+  },
+  "infrastructure": {
+    "substrate": "eks",
+    "instance_type": "p6-b300.48xlarge",
+    "region": "us-west-2",
+    "gpu": {
+      "name": "B300",
+      "arch": "sm_103",
+      "count": 8,
+      "vram_gb": 275,
+      "interconnect": "nvswitch-nv18"
+    }
+  },
+  "workload": {
+    "use_case": "concurrency-sweep",
+    "catalog_id": "concurrency-sweep",
+    "modality": "text",
+    "dataset": {
+      "type": "synthetic",
+      "input_tokens": {
+        "mean": 512,
+        "std_dev": 0
+      },
+      "output_tokens": {
+        "mean": 256,
+        "std_dev": 0
+      }
+    },
+    "load": {
+      "type": "concurrency",
+      "concurrency": 32,
+      "num_prompts": 128,
+      "warmup_requests": 0
+    },
+    "api": {
+      "type": "completions",
+      "streaming": false,
+      "endpoint": "/generate"
+    }
+  },
+  "metrics": {
+    "duration_s": 6.818,
+    "completed": 128,
+    "failed": 0,
+    "error_rate": 0.0,
+    "ttft_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "tpot_ms": {
+      "mean": 6.54,
+      "p50": 6.54,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "itl_ms": {
+      "mean": 6.54,
+      "p50": 6.54,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "e2e_ms": {
+      "mean": 1805.0,
+      "p50": 1805.0,
+      "p90": 2029.0,
+      "p95": 2030.0,
+      "p99": 2031.0
+    },
+    "output_toks_per_s": 4805.9,
+    "request_throughput": 18.774,
+    "total_toks_per_s": 4805.9,
+    "total_input_tokens": 65536,
+    "total_output_tokens": 32768,
+    "max_concurrent_requests": 32
+  },
+  "slo": {
+    "targets": {
+      "ttft_p99_ms": 500,
+      "tpot_p99_ms": 30,
+      "e2e_p99_ms": 15000,
+      "error_rate_max": 0.001
+    },
+    "results": {
+      "ttft_p99_ms": {
+        "target": 500,
+        "actual": null,
+        "pass": null
+      },
+      "tpot_p99_ms": {
+        "target": 30,
+        "actual": 6.54,
+        "pass": true
+      },
+      "e2e_p99_ms": {
+        "target": 15000,
+        "actual": 2031.0,
+        "pass": true
+      },
+      "error_rate_max": {
+        "target": 0.001,
+        "actual": 0.0,
+        "pass": true
+      }
+    },
+    "overall_pass": true
+  },
+  "extensions": {
+    "speculative_decode_stats": {
+      "accept_rate_mean": 1.0,
+      "accept_length_mean": 5.02,
+      "effective_tokens_per_step": 5.02
+    },
+    "cost": {
+      "instance_cost_per_hr": 25.47,
+      "dollars_per_1m_output_tokens": 1.47,
+      "formula": "(25.47 / 4805.9) * (1000000 / 3600)"
+    },
+    "session_metadata": {
+      "phase": "phase-1b",
+      "engine_config_tag": "sglang-eagle3-s4d6k1",
+      "blueprint": "domains/gpu-serving/blueprints/qwen3-235b-speculative",
+      "run_date": "2026-05-14",
+      "enrichment_note": "TTFT not captured by custbench-async non-streaming client. Prometheus scrape available but not yet queried \u2014 future enrichment pass should populate ttft_ms from sglang:time_to_first_token_seconds_bucket."
+    }
+  }
+}

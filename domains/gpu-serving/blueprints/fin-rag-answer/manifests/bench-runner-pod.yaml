@@ -1,0 +1,40 @@
+# Bench-runner pod, PINNED to the B200 node (cross-node pod routing is broken on
+# this cluster, and B200-node pods can't reach kube-dns). hostNetwork=true so it
+# uses the node resolver AND can reach the serving pods via their node-local
+# kube-proxy ClusterIP / pod IPs. Sleeps so we can exec the driver repeatedly.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bench-runner
+  namespace: ml-inference
+spec:
+  restartPolicy: Never
+  hostNetwork: true
+  dnsPolicy: Default
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
+  tolerations:
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+  volumes:
+    - name: script
+      configMap: {name: fin-bench-script}
+    - name: results
+      hostPath: {path: /mnt/nvme/bench-results, type: DirectoryOrCreate}
+  containers:
+    - name: runner
+      image: python:3.11-slim
+      command:
+        - /bin/sh
+        - -c
+        - |
+          pip install --no-cache-dir -q aiohttp
+          mkdir -p /results
+          echo "bench-runner ready"
+          sleep 36000
+      volumeMounts:
+        - {name: script, mountPath: /script}
+        - {name: results, mountPath: /results}
+      resources:
+        requests: {cpu: "4", memory: 8Gi}
+        limits: {cpu: "8", memory: 16Gi}

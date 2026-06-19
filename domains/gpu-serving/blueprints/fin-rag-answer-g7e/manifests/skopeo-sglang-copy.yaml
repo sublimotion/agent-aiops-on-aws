@@ -1,0 +1,59 @@
+# Mirror SGLang v0.5.12.post1-cu130 (latest STABLE, Docker Hub) -> private ECR.
+# cu130 build chosen deliberately: CUDA 13.0 ships NCCL >> 2.26.2, clearing the
+# sm_120+PCIe NCCL-2.25.1 collective bug that would otherwise break SGLang's TP=2 path.
+# (v0.5.13-cu130 exists on Docker Hub but is not in the stable releases list yet — nightly;
+#  stick to the latest stable post1 per the latest-stable directive.)
+# Registry-to-registry copy on a non-GPU node (never competes with serving for the g7e).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: skopeo-sglang-copy
+  namespace: ml-inference
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/os: linux
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: nvidia.com/gpu.present
+                operator: DoesNotExist
+      containers:
+      - name: skopeo
+        image: quay.io/skopeo/stable:latest
+        imagePullPolicy: Always
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Copying lmsysorg/sglang:v0.5.12.post1-cu130 -> ECR ..."
+          skopeo copy --retry-times 5 \
+            --dest-creds "${ECR_USER}:${ECR_PW}" \
+            docker://docker.io/lmsysorg/sglang:v0.5.12.post1-cu130 \
+            docker://615299764834.dkr.ecr.us-east-2.amazonaws.com/sglang:v0.5.12.post1-cu130
+          echo "COPY_DONE"
+        env:
+        - name: ECR_USER
+          valueFrom:
+            secretKeyRef:
+              name: ecr-push-creds
+              key: username
+        - name: ECR_PW
+          valueFrom:
+            secretKeyRef:
+              name: ecr-push-creds
+              key: password
+        resources:
+          requests:
+            cpu: "2"
+            memory: 4Gi
+          limits:
+            cpu: "4"
+            memory: 8Gi

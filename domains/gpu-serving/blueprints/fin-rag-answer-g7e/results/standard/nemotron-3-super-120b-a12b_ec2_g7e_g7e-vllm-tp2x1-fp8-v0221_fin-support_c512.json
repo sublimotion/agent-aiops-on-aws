@@ -1,0 +1,201 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "0ef1d0f4-1ee0-4882-b910-d76dcd74e7f3",
+  "created_at": "2026-06-12T10:46:32Z",
+  "source_tool": {
+    "name": "custbench-async",
+    "version": "0.1.0",
+    "enrichment_version": "1.0.0"
+  },
+  "model": {
+    "name": "Nemotron-3-Super-120B-A12B",
+    "id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
+    "architecture": "hybrid-mamba-moe",
+    "parameters_total": "120B",
+    "parameters_active": "12B",
+    "quantization": "fp8",
+    "max_model_len": 16384
+  },
+  "engine": {
+    "name": "vllm",
+    "container_image": "vllm/vllm-openai:v0.22.1",
+    "base_image": null,
+    "dockerfile": null,
+    "tensor_parallel": 2,
+    "pipeline_parallel": 1,
+    "data_parallel": null,
+    "expert_parallel": null,
+    "replicas": 1,
+    "reasoning": false,
+    "kv_cache_dtype": "fp8",
+    "attention_backend": "auto",
+    "speculative_decode": null,
+    "engine_config_tag": "g7e-vllm-tp2x1-fp8-v0221",
+    "extra_args": {
+      "enable-prefix-caching": true,
+      "mamba-cache-mode": "all"
+    }
+  },
+  "infrastructure": {
+    "substrate": "ec2",
+    "instance_type": "g7e.12xlarge",
+    "region": "ap-northeast-1",
+    "gpu": {
+      "name": "RTX PRO 6000 Blackwell",
+      "arch": "sm_120",
+      "count": 2,
+      "vram_gb": 96,
+      "interconnect": "pcie"
+    }
+  },
+  "workload": {
+    "use_case": "fin-support",
+    "catalog_id": "fin-support",
+    "modality": "text",
+    "dataset": {
+      "type": "rag-augmented",
+      "input_tokens": {
+        "mean": 9068.7,
+        "p50": 8878,
+        "p90": 12010
+      },
+      "output_tokens": {
+        "mean": 76,
+        "p90": 105
+      }
+    },
+    "load": {
+      "type": "concurrency",
+      "concurrency": 512,
+      "num_prompts": 4096,
+      "warmup_requests": 0
+    },
+    "api": {
+      "type": "chat",
+      "streaming": true,
+      "endpoint": "/v1/chat/completions"
+    }
+  },
+  "metrics": {
+    "duration_s": 1702.99,
+    "completed": 4060,
+    "failed": 36,
+    "error_rate": 0.008789,
+    "ttft_ms": {
+      "mean": 122321.2,
+      "p50": 122321.2,
+      "p90": 127727.9,
+      "p95": 155711.1,
+      "p99": 183694.3
+    },
+    "tpot_ms": {
+      "mean": 1155.6,
+      "p50": 1155.6,
+      "p90": null,
+      "p95": null,
+      "p99": 1177.8
+    },
+    "itl_ms": {
+      "mean": 1155.6,
+      "p50": 1155.6,
+      "p90": null,
+      "p95": null,
+      "p99": 1177.8
+    },
+    "e2e_ms": {
+      "mean": 207261.0,
+      "p50": 206482.7,
+      "p90": 244186.2,
+      "p95": 264781.4,
+      "p99": 285376.6
+    },
+    "output_toks_per_s": 181.2,
+    "request_throughput": 2.384,
+    "total_toks_per_s": 21801.4,
+    "total_input_tokens": 36818922,
+    "total_output_tokens": 308560,
+    "max_concurrent_requests": 512
+  },
+  "slo": {
+    "targets": {
+      "e2e_p50_ms": 6500,
+      "e2e_p90_ms": 9500,
+      "ttft_p99_ms": 6000,
+      "tpot_p99_ms": 50,
+      "error_rate_max": 0.001
+    },
+    "results": {
+      "e2e_p50_ms": {
+        "target": 6500,
+        "actual": 206482.7,
+        "pass": false
+      },
+      "e2e_p90_ms": {
+        "target": 9500,
+        "actual": 244186.2,
+        "pass": false
+      },
+      "ttft_p99_ms": {
+        "target": 6000,
+        "actual": 183694.3,
+        "pass": false
+      },
+      "tpot_p99_ms": {
+        "target": 50,
+        "actual": 1177.8,
+        "pass": false
+      },
+      "error_rate_max": {
+        "target": 0.001,
+        "actual": 0.0088,
+        "pass": false
+      }
+    },
+    "overall_pass": false
+  },
+  "extensions": {
+    "cost": {
+      "instance_cost_per_hr": 12.01727,
+      "cost_basis": "on-demand",
+      "dollars_per_1m_total_tokens": 0.1531,
+      "dollars_per_1m_output_tokens": 18.4224,
+      "formula": "(12.01727 / 21801.4 tot_tok/s) * (1e6 / 3600)"
+    },
+    "prefix_cache": {
+      "hit_rate_measured": 0.0,
+      "corpus_ceiling": 0.3,
+      "pre": {
+        "hits": 3562514180.153087,
+        "queries": 3591759417.1530685,
+        "hit_rate": 0.9918576848827024,
+        "spec_accepted": 0.0,
+        "spec_draft": 0.0
+      },
+      "post": {
+        "hits": 3562514180.153087,
+        "queries": 3615811663.1530685,
+        "hit_rate": 0.9852598840965338,
+        "spec_accepted": 0.0,
+        "spec_draft": 0.0
+      }
+    },
+    "augmentation_audit": {
+      "real_vs_synthetic_split": {
+        "synthetic": 0,
+        "real": 4096
+      },
+      "distinct_prompt_fraction": 1.0
+    },
+    "reliability_flags": {
+      "prefix_hit_rate_gt_corpus_ceiling": false
+    },
+    "session_metadata": {
+      "platform": "g7e",
+      "engine_config_tag": "g7e-vllm-tp2x1-fp8-v0221",
+      "source_filename": "fin-support_g7e-vllm-tp2x1-fp8-v0221_c512_20260612-104632.json",
+      "blueprint": "domains/gpu-serving/blueprints/fin-rag-answer-g7e",
+      "run_date": "20260612",
+      "enrichment_note": "Generated from custbench fin-support flat format. Cost is $/1M TOTAL tokens (prefill+decode) \u2014 this is a prefill-dominated RAG workload; output-only $/1M also emitted. TPOT has p50/p99 only (no p90 captured by driver)."
+    }
+  }
+}

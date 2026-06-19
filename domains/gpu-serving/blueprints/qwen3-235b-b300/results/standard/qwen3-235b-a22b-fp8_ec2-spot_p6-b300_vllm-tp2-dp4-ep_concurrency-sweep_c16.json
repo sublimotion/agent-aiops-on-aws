@@ -1,0 +1,173 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "e45ba3bb-a8b7-4095-a4f4-a03cc33368f3",
+  "created_at": "2026-04-22T00:00:00Z",
+  "source_tool": {
+    "name": "custbench-legacy",
+    "version": "0.1.0",
+    "enrichment_version": "1.0.0"
+  },
+  "model": {
+    "name": "Qwen3-235B-A22B-FP8",
+    "id": "Qwen/Qwen3-235B-A22B-Instruct-FP8",
+    "architecture": "moe",
+    "parameters_total": "235B",
+    "parameters_active": "22B",
+    "quantization": "fp8",
+    "max_model_len": 40960
+  },
+  "engine": {
+    "name": "vllm",
+    "container_image": "vllm/vllm-openai:v0.19.1",
+    "base_image": null,
+    "dockerfile": null,
+    "tensor_parallel": 2,
+    "pipeline_parallel": 1,
+    "data_parallel": 4,
+    "expert_parallel": true,
+    "replicas": 1,
+    "reasoning": false,
+    "kv_cache_dtype": "auto",
+    "attention_backend": "flashinfer",
+    "speculative_decode": null,
+    "engine_config_tag": "vllm-tp2-dp4-ep",
+    "extra_args": {
+      "trust-remote-code": true,
+      "tool-call-parser": "hermes",
+      "reasoning-parser": "deepseek_r1",
+      "enable-prefix-caching": true
+    }
+  },
+  "framework": {
+    "name": "vllm",
+    "version": "v0.19.1",
+    "config": {
+      "mode": "aggregated"
+    }
+  },
+  "infrastructure": {
+    "substrate": "ec2-spot",
+    "instance_type": "p6-b300.48xlarge",
+    "region": "us-east-1",
+    "gpu": {
+      "name": "B300",
+      "arch": "sm_103",
+      "count": 8,
+      "vram_gb": 275,
+      "interconnect": "nvswitch-nv18"
+    }
+  },
+  "workload": {
+    "use_case": "concurrency-sweep",
+    "catalog_id": "concurrency-sweep",
+    "modality": "text",
+    "dataset": {
+      "type": "synthetic",
+      "input_tokens": {
+        "mean": 2048,
+        "std_dev": 0
+      },
+      "output_tokens": {
+        "mean": 512,
+        "std_dev": 0
+      }
+    },
+    "load": {
+      "type": "concurrency",
+      "concurrency": 16,
+      "num_prompts": 16,
+      "warmup_requests": 0
+    },
+    "api": {
+      "type": "chat",
+      "streaming": true,
+      "endpoint": "/v1/chat/completions"
+    }
+  },
+  "metrics": {
+    "duration_s": 5.3,
+    "completed": 16,
+    "failed": 0,
+    "error_rate": 0.0,
+    "ttft_ms": {
+      "mean": null,
+      "p50": 174.4,
+      "p90": null,
+      "p95": 175.2,
+      "p99": 175.4
+    },
+    "tpot_ms": {
+      "mean": null,
+      "p50": 21.28,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "itl_ms": {
+      "mean": null,
+      "p50": 20.6,
+      "p90": null,
+      "p95": 20.9,
+      "p99": 21.9
+    },
+    "e2e_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null,
+      "note": "E2E not captured in legacy custbench output"
+    },
+    "output_toks_per_s": 751.5,
+    "request_throughput": 3.019,
+    "total_toks_per_s": 751.5,
+    "total_input_tokens": 32768,
+    "total_output_tokens": 4020,
+    "max_concurrent_requests": 16
+  },
+  "slo": {
+    "targets": {
+      "ttft_p99_ms": 500,
+      "tpot_p99_ms": 30,
+      "e2e_p99_ms": 15000,
+      "error_rate_max": 0.001
+    },
+    "results": {
+      "ttft_p99_ms": {
+        "target": 500,
+        "actual": 175.4,
+        "pass": true
+      },
+      "tpot_p99_ms": {
+        "target": 30,
+        "actual": 21.28,
+        "pass": true
+      },
+      "e2e_p99_ms": {
+        "target": 15000,
+        "actual": null,
+        "pass": null
+      },
+      "error_rate_max": {
+        "target": 0.001,
+        "actual": 0.0,
+        "pass": true
+      }
+    },
+    "overall_pass": true
+  },
+  "extensions": {
+    "cost": {
+      "instance_cost_per_hr": 16.47,
+      "dollars_per_1m_output_tokens": 6.09,
+      "formula": "(16.47 / 751.5) * (1000000 / 3600)"
+    },
+    "session_metadata": {
+      "engine_config_tag": "vllm-tp2-dp4-ep",
+      "blueprint": "domains/gpu-serving/blueprints/qwen3-235b-b300",
+      "phase": "baseline",
+      "run_date": "2026-04-22",
+      "enrichment_note": "Legacy custbench format. p90 percentiles and E2E not captured. TPOT derived as 1000/avg_tps_per_request."
+    }
+  }
+}

@@ -1,0 +1,57 @@
+# SGLang Kimi-K2.6-NVFP4 — full-stack (HiCache tier + EAGLE3 MLA spec decode).
+# Run AFTER the baseline establishes the no-spec/no-tier knee. Levers here are swept
+# independently (toggle HiCache, toggle EAGLE3) — this manifest enables both.
+# pod memory limit is LOAD-BEARING on EKS: 220 GB/rank × TP8 + headroom (qwen3-235b-spec L9).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sglang-kimi-nvfp4-fullstack
+  namespace: default
+  labels: {app: sglang-kimi-nvfp4, phase: fullstack}
+spec:
+  restartPolicy: Never
+  nodeSelector: {blueprint: kimi-k2.6-nvfp4}
+  tolerations:
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}   # the ACTUAL node taint (L2)
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+  hostNetwork: true
+  containers:
+    - name: sglang
+      image: lmsysorg/sglang:v0.5.13.post1-cu130   # cu130 bundles cutlass (NVFP4 path); cu129 does NOT (L7). Runs on sm_100.
+      command:
+        - bash
+        - -c
+        - |
+          find /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins -name trtllmGen_bmm_export -exec rm -rf {} + 2>/dev/null || true
+          exec python3 -m sglang.launch_server \
+            --model-path /mnt/nvme/models/kimi-k26-nvfp4 \
+            --served-model-name Kimi-K2.6-NVFP4 \
+            --quantization modelopt_fp4 \
+            --tp 8 \
+            --tool-call-parser kimi_k2 \
+            --reasoning-parser kimi_k2 \
+            --context-length 65536 \
+            --mem-fraction-static 0.90 \
+            --enable-hierarchical-cache \
+            --hicache-size 220 \
+            --speculative-algorithm EAGLE3 \
+            --speculative-num-steps 3 \
+            --speculative-eagle-topk 1 \
+            --speculative-num-draft-tokens 4 \
+            --speculative-draft-model-path /mnt/nvme/models/kimi-k26-eagle3-mla \
+            --enable-metrics \
+            --trust-remote-code \
+            --host 0.0.0.0 --port 30000
+      env:
+        - {name: HF_HOME, value: /mnt/nvme/hf-cache}
+      resources:
+        requests: {nvidia.com/gpu: "8", cpu: "48", memory: 1800Gi}
+        # HiCache 220 GB/rank × TP8 = 1760 GB host + ~400 headroom (qwen3-235b-spec L9)
+        limits:   {nvidia.com/gpu: "8", cpu: "96", memory: 2160Gi}
+      securityContext: {capabilities: {add: ["IPC_LOCK"]}}
+      volumeMounts:
+        - {name: nvme, mountPath: /mnt/nvme, mountPropagation: HostToContainer}
+        - {name: shm, mountPath: /dev/shm}
+  volumes:
+    - {name: nvme, hostPath: {path: /mnt/nvme, type: Directory}}
+    - {name: shm, emptyDir: {medium: Memory, sizeLimit: 64Gi}}

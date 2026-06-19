@@ -1,0 +1,46 @@
+model:
+  name: qwen3-embedding-8b
+  id: Qwen/Qwen3-Embedding-8B
+  architecture: embedding
+  parameters_total: "8B"
+  quantization: bf16
+  max_model_len: 8192
+
+engine:
+  name: vllm
+  version: v0.19.1
+  container_image: vllm/vllm-openai:v0.19.1
+  tensor_parallel: 1
+  pipeline_parallel: 1
+  replicas: 1
+  reasoning: false
+  kv_cache_dtype: auto
+  attention_backend: default
+
+infrastructure:
+  substrate: hyperpod-eks
+  cluster_name: finetune-g5-cluster
+  eks_cluster: finetune-eks
+  instance_type: ml.g5.2xlarge
+  region: us-east-1
+  gpu:
+    name: A10G
+    arch: sm_86
+    count: 1
+    vram_gb: 24
+    interconnect: none
+
+cost:
+  instance_type: ml.g5.2xlarge
+  on_demand_price_per_hr: 1.52
+  utilization_target: 0.7
+
+quality_baselines:
+  banking77:
+    bf16: null        # seeded from this run
+    tolerance: 0.01
+  fiqa:
+    bf16: null
+    tolerance: 0.015
+
+artifacts: {}
