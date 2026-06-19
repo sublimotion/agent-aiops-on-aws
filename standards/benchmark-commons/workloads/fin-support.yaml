@@ -1,0 +1,121 @@
+catalog_id: fin-support
+use_case: customer-support-rag
+description: >
+  Customer-support RAG answer extraction (Intercom Fin-style). The most
+  complex component of a support agent: at the end of retrieval, the model
+  is handed a large system prompt + 25-45 guidelines + ~10 retrieved
+  document passages + multi-turn chat history, and must stream a grounded,
+  text-message-style answer to the end user.
+
+  Derived from a real production corpus of 5,000 obfuscated Fin prompts.
+  Measured shape (production tokenizer telemetry, NOT char heuristics):
+    - ISL  p50 8,823 / p90 11,952 tokens
+    - OSL  p50   243 / p90    415 tokens  (short, "feels like a text message")
+    - temperature 0.0, max_tokens cap 2,000 (real outputs use ~5-8x less)
+  Corpus structure (from prefix-reuse analysis, vLLM 16-tok block hashing):
+    - ~3,050-token system header is byte-identical across 94% of requests
+    - ~89% of request PAIRS share that full header
+    - ~27% of all KV blocks are repeats of an already-seen prefix block
+  So attention-layer prefix caching of the shared header is the single
+  realistic cache win; the retrieved-doc tails are unique per request.
+
+  This is a PREFILL-DOMINATED workload (≈9K in / ≈300 out): prefill
+  throughput and queue behaviour at high concurrency dominate E2E, not
+  decode. Use it to validate that a long-context, high-concurrency support
+  deployment holds its streaming-answer SLO.
+
+  Distinct from `rag-long-context` (synthetic 16K shared-prefix cache test)
+  and `chatbot-long` (synthetic 32K single prompt): this card replays REAL
+  customer prompts and augments with profile-matched synthetic tails when
+  the run needs more requests than the 5,000-prompt corpus holds.
+
+modality: text
+
+dataset:
+  # Real trace as the seed/anchor; profile-matched synthetic augmentation
+  # kicks in only when num_prompts > corpus_size. The synthetic tails keep
+  # the real ~3,050-token header VERBATIM (the genuinely shared, cacheable
+  # part) and generate UNIQUE bodies (recombined guidelines + synthetic
+  # retrieved passages + varied user query) sized to the measured ISL dist.
+  # This preserves the realistic ~27% cross-request reuse instead of the
+  # FAKE ~100% hit rate you get from naively looping identical prompts.
+  type: real-seeded-synthetic
+  seed_corpus:
+    source: custom                      # sidecar supplies workload_overrides.trace.path
+    fallback: sharegpt                   # so the card is runnable out-of-the-box
+    corpus_size: 5000
+    description: 5,000 obfuscated Fin support prompts (prompt-only, no completions)
+  # Measured token distribution (production telemetry). The synthetic
+  # augmenter samples ISL from this and emits short answers per the OSL dist.
+  input_tokens:  {p50: 8823, p90: 11952, mean: 9200}
+  output_tokens: {p50: 243,  p90: 415,   mean: 280, max_cap: 2000}
+  shared_prefix_tokens: 3050             # the verbatim, cacheable system header
+  approx_prefix_reuse_ceiling: 0.30      # cross-request block-reuse ceiling on REAL data
+  sources_per_request: {min: 2, p50: 10, max: 31}
+  augmentation:
+    enabled: true
+    policy: verbatim-header-unique-tail  # keep header, regenerate unique bodies
+    tag_each_request: true               # mark real|synthetic so metrics split cleanly
+    forbid_identical_replay: true        # never resend an identical prompt (cache realism)
+
+load:
+  # Concurrency sweep to find the SLO-max operating point and the saturation
+  # ceiling. The customer's stated point is 130 concurrent; the sweep
+  # brackets it (8/32/128/512) so we see headroom and the knee.
+  type: concurrency-sweep
+  levels: [8, 32, 128, 512]
+  request_rate: inf                      # max-rate within each concurrency cap
+  num_prompts_per_level: 2000            # > corpus at high levels -> exercises augmentation
+  warmup_requests: 50                    # warms the shared header into the prefix cache
+  # Production reference (for SLO interpretation, not a load step):
+  #   peak 25 RPS, average 14 RPS, target 130 concurrent requests.
+
+slo:
+  # End-to-end is the customer's contractual metric (streaming answer).
+  e2e_p50_ms: 6500
+  e2e_p90_ms: 9500
+  # Supporting component SLOs (prefill-dominated, so TTFT is the big slice):
+  ttft_p99_ms: 6000                      # ~9K-token prefill is the dominant cost
+  tpot_p99_ms: 50                        # streaming decode, ~20 tok/s minimum
+  error_rate_max: 0.001
+
+extensions:
+  cache_stats:
+    prefix_hit_rate: required            # MUST measure on attention layers (shared header)
+    kv_utilization_pct: required
+    eviction_rate: required
+  rag:
+    sources_per_request_distribution: required
+    isl_distribution: required           # confirm replayed ISL matches p50 8823 / p90 11952
+  augmentation_audit:
+    real_vs_synthetic_split: required    # report fraction of requests that were synthetic
+    isl_ks_distance_real_vs_synth: required  # synthetic ISL must track the real distribution
+    distinct_prompt_fraction: required   # ~1.0 expected; low value => identical-replay leak
+
+validation:
+  required_metrics:
+    - e2e_p50_ms_at_130_concurrent       # the headline customer SLO
+    - prefix_hit_rate                    # attention-layer header caching
+    - real_vs_synthetic_split
+
+  reliability_flags:
+    - rule: prefix_hit_rate_gt_corpus_ceiling
+      action: flag_invalid_cache_inflation
+      reason: |
+        If measured prefix-cache hit rate materially exceeds the real-corpus
+        reuse ceiling (~30% of blocks), the augmentation is leaking identical
+        replays and the cache is being warmed artificially. Results are
+        INVALID for SLO purposes — fix the augmenter (unique tails) and rerun.
+        This is the exact failure mode that "just loop the prompts" causes.
+    - rule: synthetic_isl_distribution_drift
+      action: flag_unrealistic
+      reason: |
+        If synthetic-tail ISL distribution diverges from the measured real
+        distribution (KS distance high), augmentation has distorted the
+        workload. The headline number no longer characterises Fin traffic.
+    - rule: output_len_exceeds_telemetry
+      action: flag_review
+      reason: |
+        Real OSL is p50 243 / p90 415. If generated answers routinely approach
+        the 2,000-token cap, the model is over-generating vs production
+        behaviour (prompt/stop-token mismatch) and decode cost is overstated.

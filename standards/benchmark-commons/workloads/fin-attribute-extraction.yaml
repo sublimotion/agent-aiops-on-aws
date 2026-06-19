@@ -1,0 +1,86 @@
+catalog_id: fin-attribute-extraction
+use_case: conversation-attribute-extraction
+description: >
+  Structured attribute extraction from support conversations: given a
+  textual definition of each attribute plus a conversation transcript, the
+  model emits a short structured value (label / enum / short span). This is
+  a classification-style call, NOT a generative one — the output is tiny and
+  the cost is almost entirely prefill.
+
+  Measured shape (production tokenizer telemetry):
+    - ISL  p50 1,654 / p90 4,690 tokens   (definitions + conversation)
+    - OSL  p50    20 / p90    23 tokens   (a value, not a paragraph)
+
+  Because output is ~20 tokens, this workload is essentially PREFILL-ONLY.
+  Speculative decoding is NOT relevant here (there is almost no decode to
+  accelerate). The levers that matter are prefill throughput, batching
+  (max-num-seqs), and FP8 MoE kernels — the deployment must sustain a tight
+  1s/2s E2E SLO at high request rate, where queueing under load is the risk.
+
+  Tight latency SLO at high RPS makes this a QPS-sweep workload (find where
+  the 1s/2s E2E SLO breaks) rather than a max-concurrency throughput hunt.
+
+  No real corpus was shared for this use case, so it is modelled as
+  synthetic input sized to the measured ISL/OSL distribution. If a real
+  corpus becomes available, switch dataset.type to real-seeded-synthetic
+  (see fin-support.yaml) for fidelity.
+
+modality: text
+
+dataset:
+  # Synthetic random input sized to the measured distribution. Vendor-
+  # executable (maps to --dataset-name random). No shared-prefix claim:
+  # attribute definitions MAY be shared per customer, but the conversation
+  # transcript dominates ISL and is unique per request, so we do not assume
+  # cross-request prefix reuse. If definitions are confirmed shared, model
+  # them as a shared_prefix and switch to generated-shared-prefix.
+  type: synthetic
+  input_tokens:  {p50: 1654, p90: 4690, mean: 2500}
+  output_tokens: {p50: 20,   p90: 23,   mean: 22}
+
+load:
+  # QPS sweep brackets the production rates (avg 40, peak 70) plus an
+  # over-provision point (100) to expose the SLO knee. Each rate is a
+  # separate measurement against the 1s/2s E2E SLO.
+  type: sweep
+  rates: [20, 40, 70, 100]
+  num_prompts_per_rate: 2000
+  # Production reference (for SLO interpretation, not a load step):
+  #   peak 70 RPS, average 40 RPS, target 50 concurrent requests.
+
+slo:
+  # End-to-end is tight because this gates a synchronous extraction step.
+  e2e_p50_ms: 1000
+  e2e_p90_ms: 2000
+  # Prefill-dominated: TTFT essentially IS the latency (output is ~20 tokens).
+  ttft_p99_ms: 1800
+  tpot_p99_ms: 50
+  error_rate_max: 0.001
+
+extensions:
+  cache_stats:
+    kv_utilization_pct: required
+    prefix_hit_rate: optional            # only meaningful if definitions are shared
+  prefill:
+    isl_distribution: required           # confirm p50 1654 / p90 4690 replayed
+    ttft_by_rate: required               # TTFT vs RPS — where does the SLO break?
+  throughput:
+    sustained_rps_at_slo: required       # max RPS that still meets e2e_p90 2000ms
+
+validation:
+  required_metrics:
+    - e2e_p90_ms_at_70_rps               # headline: hold 2s SLO at peak
+    - sustained_rps_at_slo
+  reliability_flags:
+    - rule: output_len_exceeds_telemetry
+      action: flag_review
+      reason: |
+        Real OSL is ~20-23 tokens. If generated outputs are much longer, the
+        extraction prompt/stop-token is misconfigured — decode cost and E2E
+        will be overstated and the workload no longer reflects production.
+    - rule: slo_met_only_below_peak
+      action: highlight_capacity_gap
+      reason: |
+        If the 1s/2s E2E SLO holds at 40 RPS (avg) but breaks before 70 RPS
+        (peak), the deployment cannot absorb peak traffic — surface as a
+        capacity finding, not a pass.

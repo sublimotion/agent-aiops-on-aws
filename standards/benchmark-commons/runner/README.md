@@ -4,20 +4,40 @@ Orchestrates benchmark execution on AWS infrastructure (EKS, HyperPod, bare meta
 
 ## Architecture
 
+A workload card declares *what* to measure; `compile_card` deterministically
+resolves it to *exactly one* execution path. The runner never guesses — an
+unmapped workload raises instead of falling back to a default. **Extending the
+framework? Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first** — it is the
+agent-navigable map of every extension point.
+
 ```
-run-benchmark.sh
-  ├── platforms/          # Infrastructure-specific job submission
-  │   ├── eks.py          # kubectl apply benchmark-job → collect results
-  │   ├── hyperpod.py     # Slurm/SSM job submission → collect results
-  │   └── local.py        # SSH + direct execution (bare metal, spot)
-  ├── adapters/           # Tool output → common artifact conversion
-  │   ├── vllm.py         # vLLM bench_serving.py output → artifact
-  │   ├── sglang.py       # SGLang bench_serving.py output → artifact
-  │   ├── genai_perf.py   # NVIDIA GenAI-Perf output → artifact
-  │   └── recon_perf.py   # recon-perf native export (passthrough)
-  ├── publish.py          # Artifact → PR to target repos
-  ├── compare.py          # Cross-artifact comparison + regression detection
-  └── run-benchmark.sh    # Entry point
+run-benchmark.sh            # Entry point — decides platform, names artifacts
+  │
+  ├── registry.py           # (dataset.type, load.type) -> resolution. THE contract.
+  │   compiler.py           # compile_card(card, sidecar, tool) -> ExecutionPlan (PURE)
+  │                         #   vendor plan (concrete argv) | orchestrated (named executor)
+  │
+  ├── platforms/            # WHERE to run — execute the compiled plan
+  │   ├── eks.py            # kubectl apply benchmark-job → collect results
+  │   ├── hyperpod.py       # Slurm/SSM job submission → collect results
+  │   └── local.py          # direct execution (bare metal, spot, localhost)
+  ├── orchestrators.py      # bespoke executors for non-vendor cards (stateful,
+  │                         #   multi-model, soak, cold-start, multimodal)
+  ├── adapters/             # vendor tool output → v1 envelope
+  │   ├── vllm.py           # vLLM bench_serving.py output → artifact
+  │   ├── sglang.py         # SGLang bench_serving.py output → artifact
+  │   ├── genai_perf.py     # NVIDIA GenAI-Perf output → artifact
+  │   └── recon_perf.py     # recon-perf native export (passthrough)
+  ├── validate-run.py       # post-run claim-strength gate (baseline vs production)
+  ├── tests/                # conformance gate: all cards compile or declare-unsupported
+  ├── publish.py            # Artifact → PR to target repos
+  └── compare.py            # Cross-artifact comparison + regression detection
+```
+
+Run the conformance test before committing any card or registry change:
+
+```bash
+python3 -m unittest discover -s runner/tests -v
 ```
 
 ## Usage
@@ -96,11 +116,27 @@ run-benchmark.sh
    b. Collects raw tool output (vLLM/SGLang JSON)
    c. Runs adapter to produce common artifact
    d. Validates artifact against JSON Schema
-   e. Enriches with GPU telemetry (if scraper running)
-   f. Writes to blueprint results/ directory
+   e. Classifies benchmark validity with `validate-run.py`
+   f. Enriches with GPU telemetry (if scraper running)
+   g. Writes to blueprint results/ directory
 4. Analyze: benchmark-analyst agent reads artifacts
 5. Compare: ./compare.py across configs/engines
 6. Publish: ./publish.py --target ai-on-eks
+```
+
+### Claim-Strength Gate
+
+`validate-run.py` writes a `validity` block into each artifact:
+
+- `valid_controlled_baseline` — deterministic synthetic or fixed-shape run, good for A/B comparisons and regressions.
+- `valid_production_representative` — real/trace workload with required metrics, good for production-facing claims.
+- `valid_smoke_only` — compatibility or short sanity run.
+- `invalid_or_incomplete` — missing metrics, unsupported production claim, or failed reconciliation.
+
+Synthetic cards can pass as controlled baselines, but they cannot support production claims. To make a production claim fail closed:
+
+```bash
+./run-benchmark.sh ... --workload production-mix --claim production --strict-production
 ```
 
 ### Incremental composition benchmarking

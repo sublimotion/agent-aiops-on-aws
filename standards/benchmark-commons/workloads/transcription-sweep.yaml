@@ -1,0 +1,28 @@
+catalog_id: transcription-sweep
+use_case: transcription
+description: Audio-to-text transcription throughput across concurrency levels. Measures requests/sec and per-clip latency for audio modality models (e.g., Voxtral, Whisper).
+modality: audio
+
+dataset:
+  type: audio-clips
+  duration_s: {mean: 30, std_dev: 10}
+  language: en
+  sample_rate_hz: 16000
+
+load:
+  type: concurrency-sweep
+  levels: [1, 4, 16, 32]
+  num_prompts_per_level: 50
+  warmup_requests: 5
+  stop_condition:
+    error_rate_max: 0.01
+    p99_e2e_ms: null
+
+slo:
+  e2e_p99_ms: 30000      # 30s per 30s clip = real-time factor 1
+  rtfx_min: 1.0          # real-time factor (audio_seconds / wall_seconds)
+  error_rate_max: 0.001
+
+extensions:
+  primary_throughput_metric: requests_per_sec   # NOT agg_tok_per_s
+  primary_latency_metric: e2e_p50_ms

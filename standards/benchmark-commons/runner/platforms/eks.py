@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
-"""
-EKS platform — submits benchmark as a Kubernetes Job and collects results.
+"""EKS platform — executes a COMPILED plan as Kubernetes Job(s).
 
-For in-cluster endpoints (ClusterIP services), runs the benchmark pod in the same
-namespace. For external endpoints (LoadBalancer), can run from anywhere.
+This platform decides WHERE the benchmark runs (a pod in the cluster). It does
+NOT decide WHAT runs — that is `compiler.compile_card`, the single deterministic
+source of truth. Each compiled vendor step becomes one Job; the step's argv
+(dataset flags, request-rate, goodput) comes straight from the compiler. The old
+version built argv inline and silently dropped unmapped dataset types — that
+logic is gone.
+
+A vendor plan with N sweep steps submits N Jobs (one per step). An orchestrated
+plan cannot run as a vendor Job and fails closed.
 """
 
 import argparse
@@ -14,6 +20,17 @@ import tempfile
 import time
 import yaml
 from pathlib import Path
+
+# runner/ is the parent of platforms/
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from compiler import compile_card  # noqa: E402
+from registry import UnsupportedWorkload  # noqa: E402
+
+
+TOOL_IMAGE = {
+    "vllm": ("vllm/vllm-openai:latest", "vllm.entrypoints.openai.bench_serving"),
+    "sglang": ("lmsysorg/sglang:latest", "sglang.bench_serving"),
+}
 
 
 JOB_TEMPLATE = """
@@ -62,46 +79,31 @@ def generate_run_id() -> str:
     return hashlib.md5(datetime.now().isoformat().encode()).hexdigest()[:8]
 
 
-def submit_job(endpoint: str, workload_path: Path, tool: str, namespace: str = "default") -> str:
-    """Submit benchmark job to EKS and return job name."""
-    run_id = generate_run_id()
-
-    with open(workload_path) as f:
-        workload = yaml.safe_load(f)
-
-    # Build args based on tool
+def step_args(tool: str, endpoint: str, model: str, step_argv: list[str]) -> list[str]:
+    """Prepend connection flags to a compiled step's argv (k8s container args)."""
+    args = ["--base-url", endpoint]
     if tool == "vllm":
-        module = "vllm.entrypoints.openai.bench_serving"
-        image = "vllm/vllm-openai:latest"
+        args += ["--model", model, "--save-result"]
     elif tool == "sglang":
-        module = "sglang.bench_serving"
-        image = "lmsysorg/sglang:latest"
-    else:
-        raise ValueError(f"Unsupported tool for EKS: {tool}")
+        args += ["--backend", "sglang", "--model", model]
+    return args + step_argv
 
-    # Basic args
-    dataset = workload.get("dataset", {})
-    load = workload.get("load", {})
-    args = [
-        "--base-url", endpoint,
-        "--num-prompts", str(load.get("num_prompts", 100)),
-    ]
 
-    if load.get("request_rate"):
-        args.extend(["--request-rate", str(load["request_rate"])])
-
+def submit_job(endpoint: str, workload_stem: str, tool: str, args: list[str],
+               namespace: str) -> str:
+    """Submit one benchmark Job with the given vendor args. Returns job name."""
+    run_id = generate_run_id()
+    image, module = TOOL_IMAGE[tool]
     job_name = f"benchmark-{run_id}"
     job_yaml = JOB_TEMPLATE.format(
         run_id=run_id,
         namespace=namespace,
-        workload=workload_path.stem,
+        workload=workload_stem,
         image=image,
         module=module,
         args=json.dumps(args),
         endpoint=endpoint,
     )
-
-    # Apply job
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write(job_yaml)
         f.flush()
@@ -112,7 +114,6 @@ def submit_job(endpoint: str, workload_path: Path, tool: str, namespace: str = "
         if result.returncode != 0:
             print(f"Failed to submit job: {result.stderr}")
             sys.exit(1)
-
     print(f"Submitted job: {job_name}")
     return job_name
 
@@ -186,10 +187,11 @@ def collect_results(job_name: str, output_path: Path, namespace: str = "default"
 
 
 def main():
-    parser = argparse.ArgumentParser(description="EKS platform benchmark execution")
+    parser = argparse.ArgumentParser(description="EKS platform — execute a compiled benchmark plan")
     parser.add_argument("--endpoint", required=True)
     parser.add_argument("--workload", required=True, type=Path)
-    parser.add_argument("--tool", required=True)
+    parser.add_argument("--sidecar", type=Path, help="benchmark.yaml sidecar (for overrides)")
+    parser.add_argument("--tool", required=True, choices=list(TOOL_IMAGE))
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--namespace", default="default")
     parser.add_argument("--timeout", type=int, default=600)
@@ -198,24 +200,52 @@ def main():
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
+    card = yaml.safe_load(open(args.workload))
+    sidecar = yaml.safe_load(open(args.sidecar)) if args.sidecar else {}
+    model = sidecar.get("model", {}).get("id", "default")
+
+    # Compile — fail closed and loud on anything unmapped.
+    try:
+        plan = compile_card(card, sidecar, args.tool)
+    except UnsupportedWorkload as e:
+        print(f"ERROR: workload did not compile: {e}", file=sys.stderr)
+        print("This is a card/sidecar problem. Fix the declaration or add a "
+              "registry handler — do not hand-write a one-off driver.", file=sys.stderr)
+        sys.exit(3)
+
+    if plan.kind == "orchestrated":
+        msg = (f"Card '{plan.catalog_id}' requires the '{plan.orchestrator}' "
+               f"orchestrated executor.\nReason: {plan.reason}")
+        if args.dry_run:
+            print(f"[DRY RUN] {msg}")
+            return
+        print(f"ERROR: {msg}\n\nOrchestrated cards cannot run as a vendor "
+              f"Kubernetes Job. Run on the 'local' platform where "
+              f"orchestrators.py is dispatched, or implement an EKS-native "
+              f"executor.", file=sys.stderr)
+        sys.exit(4)
+
+    # Vendor plan: one Job per step.
+    print(f"Compiled '{plan.catalog_id}' -> {len(plan.steps)} vendor step(s) [{args.tool}]")
+    for i, step in enumerate(plan.steps):
+        step_argv = step_args(args.tool, args.endpoint, model, step.argv)
+        if args.dry_run:
+            image, module = TOOL_IMAGE[args.tool]
+            print(f"  [step {i+1}/{len(plan.steps)}] {step.label}:")
+            print(f"    image={image} module={module}")
+            print(f"    args={json.dumps(step_argv)}")
+            continue
+        print(f"  [step {i+1}/{len(plan.steps)}] {step.label}: submitting Job...")
+        job_name = submit_job(
+            args.endpoint, args.workload.stem, args.tool, step_argv, args.namespace)
+        if not wait_for_job(job_name, args.namespace, args.timeout):
+            sys.exit(1)
+        step_out = (args.output if len(plan.steps) == 1
+                    else args.output.with_name(f"{args.output.stem}__{step.label}.json"))
+        collect_results(job_name, step_out, args.namespace)
+
     if args.dry_run:
-        print(f"[DRY RUN] Would submit benchmark job to EKS:")
-        print(f"  Endpoint:  {args.endpoint}")
-        print(f"  Workload:  {args.workload}")
-        print(f"  Tool:      {args.tool}")
-        print(f"  Namespace: {args.namespace}")
-        return
-
-    # Submit
-    job_name = submit_job(args.endpoint, args.workload, args.tool, args.namespace)
-
-    # Wait
-    success = wait_for_job(job_name, args.namespace, args.timeout)
-    if not success:
-        sys.exit(1)
-
-    # Collect
-    collect_results(job_name, args.output, args.namespace)
+        print("Dry run complete. No Job submitted.")
 
 
 if __name__ == "__main__":

@@ -40,6 +40,10 @@ class ModelSpec:
     max_model_len: Optional[int] = None
     # Card facts the sidecar usually lacks — required for some divisibility rules.
     moe_intermediate_size: Optional[int] = None
+    # FP8 quant granularity: "block" (fine-grained, block_n=128 → TP-divisibility
+    # constraint applies), "per-tensor"/"per-channel" (no block sharding → no
+    # constraint), or None (unknown → treat conservatively as block-wise).
+    fp8_granularity: Optional[str] = None
     max_position_embeddings: Optional[int] = None
     supports_mtp: Optional[bool] = None         # native multi-token-prediction heads
     is_mla: bool = False                        # MLA / NSA fused-KV attention
@@ -52,6 +56,19 @@ class ModelSpec:
     @property
     def is_fp8(self) -> bool:
         return (self.quantization or "").lower() in ("fp8", "fp8_e4m3", "fp8_e5m2")
+
+    @property
+    def is_fp8_block_quantized(self) -> bool:
+        """The block_n=128 TP-divisibility constraint only applies to fine-grained
+        (block-wise) FP8. Per-tensor / per-channel FP8 has no block sharding, so
+        moe_intermediate_size need not be divisible by TP*128. Unknown → treat as
+        block-wise (conservative, fail-closed)."""
+        if not self.is_fp8:
+            return False
+        g = (self.fp8_granularity or "").lower()
+        if g in ("per-tensor", "per_tensor", "per-channel", "per_channel", "tensor", "channel"):
+            return False
+        return True  # "block" or unknown
 
 
 @dataclass(frozen=True)
@@ -165,6 +182,7 @@ def from_sidecar(sidecar: dict, *, card: Optional[dict] = None,
         max_model_len=_as_int(m.get("max_model_len")),
         moe_intermediate_size=_as_int(
             m.get("moe_intermediate_size", card.get("moe_intermediate_size"))),
+        fp8_granularity=m.get("fp8_granularity", card.get("fp8_granularity")),
         max_position_embeddings=_as_int(
             m.get("max_position_embeddings", card.get("max_position_embeddings"))),
         supports_mtp=m.get("supports_mtp", card.get("supports_mtp")),

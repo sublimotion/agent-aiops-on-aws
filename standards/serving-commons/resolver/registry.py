@@ -58,6 +58,10 @@ def _chk_fp8_moe_tp_divisibility(cfg: ServingConfig) -> Optional[Finding]:
     m, e = cfg.model, cfg.engine
     if not (m.is_moe and m.is_fp8):
         return None
+    # block_n=128 sharding only constrains fine-grained (block-wise) FP8.
+    # Per-tensor / per-channel FP8 has no such constraint.
+    if not m.is_fp8_block_quantized:
+        return None
     if m.moe_intermediate_size is None:
         return Finding(
             rule="fp8-moe-tp-divisibility",
@@ -188,11 +192,21 @@ def _chk_specdec_acceptance_gate(cfg: ServingConfig) -> Optional[Finding]:
                  "(sharegpt/production-mix, NOT synthetic random) and read "
                  "vllm:spec_decode_num_accepted_tokens_total / "
                  "vllm:spec_decode_num_drafts_total. Disable if <0.60."))
-    if sd.measured_acceptance < 0.60:
+    try:
+        acceptance = float(sd.measured_acceptance)
+    except (TypeError, ValueError):
+        return Finding(
+            rule="specdec-acceptance-gate",
+            verdict="warn",
+            reason=(f"measured_acceptance={sd.measured_acceptance!r} is not numeric — "
+                    "cannot evaluate the 60% break-even gate."),
+            source=f"{TECH_STACK} §'Speculative decoding under ~60% draft acceptance rate is a net throughput LOSS'",
+            fix="Set engine.speculative_decode.measured_acceptance to a number in [0,1].")
+    if acceptance < 0.60:
         return Finding(
             rule="specdec-acceptance-gate",
             verdict="fail",
-            reason=(f"Measured draft acceptance {sd.measured_acceptance:.0%} is below "
+            reason=(f"Measured draft acceptance {acceptance:.0%} is below "
                     f"the ~60% break-even. <60% acceptance is a net throughput LOSS "
                     f"— verification pass cost dominates and ITL roughly doubles."),
             source=f"{TECH_STACK} §'Speculative decoding under ~60% draft acceptance rate is a net throughput LOSS'",

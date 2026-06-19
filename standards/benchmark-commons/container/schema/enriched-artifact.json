@@ -261,7 +261,28 @@
       }
     },
     "cost": {"type": "object"},
-    "extensions": {"type": "object"}
+    "extensions": {"type": "object"},
+    "validity": {
+      "type": "object",
+      "description": "Post-run claim-strength classification from runner/validate-run.py",
+      "required": ["classification", "production_representative", "reasons", "warnings", "failures", "required_next"],
+      "properties": {
+        "classification": {
+          "type": "string",
+          "enum": [
+            "valid_controlled_baseline",
+            "valid_production_representative",
+            "valid_smoke_only",
+            "invalid_or_incomplete"
+          ]
+        },
+        "production_representative": {"type": "boolean"},
+        "reasons": {"type": "array", "items": {"type": "string"}},
+        "warnings": {"type": "array", "items": {"type": "string"}},
+        "failures": {"type": "array", "items": {"type": "string"}},
+        "required_next": {"type": "array", "items": {"type": "string"}}
+      }
+    }
   },
   "$defs": {
     "latency_metric": {

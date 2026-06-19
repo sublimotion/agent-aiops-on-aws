@@ -32,6 +32,8 @@ QUALITY_GATE="true"           # if true, fail the run when any eval fails
 LOAD_FRACTION=""              # O11 sweep: 0.25 / 0.50 / 0.75 / 1.0
 BURN_IN_HOURS=""              # O5 burn-in; when set, run stability capture
 SENTINEL_PROMPTS=""           # O10 golden-prompt file path
+CLAIM="auto"                  # auto | baseline | production | smoke
+STRICT_PRODUCTION=false       # fail if production claim is not fully supported
 
 usage() {
   cat <<EOF
@@ -60,6 +62,8 @@ CTO engagement extensions (for O3/O5/O9/O10/O11 cells):
   --load-fraction F    Record O11 load fraction (0.25 / 0.50 / 0.75 / 1.0)
   --burn-in-hours H    O5 burn-in mode: run load for H hours and capture drift
   --sentinel PATH      O10 golden-prompt JSON for silent-corruption canary
+  --claim C            auto | baseline | production | smoke (default: auto)
+  --strict-production  Fail if production claim lacks real workload/reconciliation/required metrics
 
 Workloads:
   chatbot-short        256 tok in, 128 out, 2 QPS
@@ -105,6 +109,8 @@ while [[ $# -gt 0 ]]; do
     --load-fraction) LOAD_FRACTION="$2"; shift 2 ;;
     --burn-in-hours) BURN_IN_HOURS="$2"; shift 2 ;;
     --sentinel) SENTINEL_PROMPTS="$2"; shift 2 ;;
+    --claim) CLAIM="$2"; shift 2 ;;
+    --strict-production) STRICT_PRODUCTION=true; shift ;;
     -h|--help) usage ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
@@ -115,6 +121,10 @@ done
 [[ -z "$WORKLOAD" ]] && echo "Error: --workload required" && exit 1
 [[ -z "$SIDECAR" ]] && echo "Error: --sidecar required" && exit 1
 [[ ! -f "$SIDECAR" ]] && echo "Error: sidecar not found: $SIDECAR" && exit 1
+case "$CLAIM" in
+  auto|baseline|production|smoke) ;;
+  *) echo "Error: --claim must be auto, baseline, production, or smoke"; exit 1 ;;
+esac
 
 # Load workload config
 WORKLOAD_FILE="$WORKLOAD_DIR/$WORKLOAD.yaml"
@@ -265,6 +275,7 @@ case $PLATFORM in
     python3 "$SCRIPT_DIR/platforms/local.py" \
       --endpoint "$ENDPOINT" \
       --workload "$WORKLOAD_FILE" \
+      --sidecar "$SIDECAR" \
       --tool "$TOOL" \
       --output "$RAW_OUTPUT" \
       ${NUM_PROMPTS:+--num-prompts "$NUM_PROMPTS"} \
@@ -275,6 +286,7 @@ case $PLATFORM in
     python3 "$SCRIPT_DIR/platforms/eks.py" \
       --endpoint "$ENDPOINT" \
       --workload "$WORKLOAD_FILE" \
+      --sidecar "$SIDECAR" \
       --tool "$TOOL" \
       --output "$RAW_OUTPUT" \
       ${NUM_PROMPTS:+--num-prompts "$NUM_PROMPTS"} \
@@ -285,6 +297,7 @@ case $PLATFORM in
     python3 "$SCRIPT_DIR/platforms/hyperpod.py" \
       --endpoint "$ENDPOINT" \
       --workload "$WORKLOAD_FILE" \
+      --sidecar "$SIDECAR" \
       --tool "$TOOL" \
       --output "$RAW_OUTPUT" \
       ${NUM_PROMPTS:+--num-prompts "$NUM_PROMPTS"} \
@@ -344,7 +357,16 @@ echo ""
 echo "--- Step 3: Validate artifact ---"
 python3 "$ARTIFACT_DIR/container/validate-artifact.py" "$ARTIFACT_OUTPUT"
 
-# Step 4: Summary
+# Step 4: Validate benchmark claim strength
+echo ""
+echo "--- Step 4: Validate benchmark claim strength ---"
+VALIDITY_ARGS=(--workload "$WORKLOAD_FILE" --claim "$CLAIM" --update)
+if [[ "$STRICT_PRODUCTION" == "true" ]]; then
+  VALIDITY_ARGS+=(--strict-production)
+fi
+python3 "$SCRIPT_DIR/validate-run.py" "$ARTIFACT_OUTPUT" "${VALIDITY_ARGS[@]}"
+
+# Step 5: Summary
 echo ""
 echo "--- Results ---"
 python3 -c "
@@ -371,6 +393,9 @@ if 'hardware_errors' in art:
 if 'stability' in art:
     s = art['stability']
     print(f\"  Drift:        {s.get('throughput_drift_pct', 0):.2f}% over {s.get('duration_hours', 0)}h\")
+if 'validity' in art:
+    v = art['validity']
+    print(f\"  Validity:     {v['classification']} (production={v['production_representative']})\")
 "
 
 echo ""
