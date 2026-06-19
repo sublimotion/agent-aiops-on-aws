@@ -29,6 +29,28 @@ Bash/Read/Edit/Write/Grep/Skill/Agent tools, wrote report+log to private S3.
 - **Node pinning made optional** (`AGENT_RUNNER_NODE_POOL`) — empty schedules on existing
   untainted CPU nodes; set it only when a dedicated Bottlerocket pool exists.
 
+## Interactive mode (added 2026-06-19)
+
+`launch --interactive` runs the harness in a **tmux session**; `attach` = `kubectl exec -it
+… tmux attach`. Verified live on us-east-2: typed an instruction into the remote REPL, the
+agent (Opus 4.8 via Bedrock/IRSA) used the Write tool, file created. Detach (Ctrl-b d) keeps
+the session running; reattach from any laptop; `stop` kills it (verified).
+
+- **Claude Code is a TUI with cascading first-run dialogs** that stall a headless-interactive
+  pod: theme picker → folder-trust → MCP-server approval (the repo's `.mcp.json` `gpu-infra`).
+  Fix: pre-seed `/root/.claude.json` with `hasCompletedOnboarding`, the worktree pre-trusted,
+  and MCP approval suppressed. Do NOT rely on `--dangerously-skip-permissions` — **it's refused
+  when running as root** (the container is root).
+- **Interactive pods stay alive** until the REPL exits or `stop` — `while tmux has-session`.
+  So the `activeDeadlineSeconds` ceiling and `stop` are the lifecycle controls; an idle
+  interactive pod burns node resources until stopped.
+- **Report/verdict are degraded in interactive mode** — tmux `pipe-pane` captures raw text, not
+  structured stream-json, so the verdict logic doesn't apply (status goes INTERACTIVE→ENDED, not
+  SUCCEEDED/FAILED). Batch mode keeps full fidelity. This is the accepted tmux tradeoff.
+- **tmux send-keys races shell readiness** — when scripting the pane, the opening prompt can
+  interleave with prompt-dismissal keystrokes. For real operator use this is moot (you type into
+  the live `❯`); only matters for automated pane-driving.
+
 ## Still open
 
 - Image is stock `python:3.12-slim` + install-deps at startup (~2-4 min cold start). Bake
