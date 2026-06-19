@@ -86,6 +86,7 @@ Read these files **on demand** based on what you're doing:
 | `domains/gpu-serving/blueprints/fin-attribute-extraction/` | `domains/gpu-serving/specs/fin-attribute-extraction.md` |
 | `domains/gpu-serving/blueprints/qwen3-embedding-8b-hyperpod/` | `domains/gpu-serving/specs/qwen3-embedding-8b-hyperpod.md` |
 | `domains/agent-runtime/blueprints/research-agent/` | `domains/agent-runtime/specs/research-agent.md` |
+| `domains/agent-runtime/blueprints/managed-agent-runner/` | `domains/agent-runtime/specs/managed-agent-runner.md` |
 | `domains/autoresearch/blueprints/training-recipes/` | `domains/autoresearch/specs/training-recipes.md` |
 | `domains/autoresearch/blueprints/agent-harness/` | `domains/autoresearch/specs/agent-harness.md` |
 | `domains/autoresearch/blueprints/finetuning-recipes/` | `domains/autoresearch/specs/finetuning-recipes.md` |
