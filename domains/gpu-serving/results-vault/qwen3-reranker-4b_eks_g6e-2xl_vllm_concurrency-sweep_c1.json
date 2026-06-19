@@ -1,0 +1,145 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "4537b62b-00db-46e5-909a-79d907fe508e",
+  "created_at": "2026-05-14T16:31:02Z",
+  "source_tool": {
+    "name": "custom",
+    "version": "0.1.0-qwen3-reranker",
+    "enrichment_version": "1.0.0"
+  },
+  "model": {
+    "name": "Qwen3-Reranker-4B",
+    "id": "Qwen/Qwen3-Reranker-4B",
+    "architecture": "cross-encoder",
+    "parameters_total": "4B",
+    "quantization": "bf16",
+    "max_model_len": 4096
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.19.1",
+    "container_image": "vllm/vllm-openai:v0.19.1",
+    "base_image": null,
+    "dockerfile": null,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "data_parallel": null,
+    "expert_parallel": null,
+    "replicas": 1,
+    "reasoning": false,
+    "kv_cache_dtype": "auto",
+    "attention_backend": "flash-attn",
+    "speculative_decode": null,
+    "extra_args": {
+      "runner": "pooling",
+      "convert": "classify",
+      "trust-remote-code": true,
+      "max-num-seqs": 64,
+      "gpu-memory-utilization": 0.9,
+      "hf_overrides": {
+        "architectures": [
+          "Qwen3ForSequenceClassification"
+        ],
+        "classifier_from_token": [
+          "no",
+          "yes"
+        ],
+        "is_original_qwen3_reranker": true
+      }
+    }
+  },
+  "infrastructure": {
+    "substrate": "eks",
+    "instance_type": "g6e.2xlarge",
+    "region": "us-east-2",
+    "gpu": {
+      "name": "L40S",
+      "arch": "sm_89",
+      "count": 1,
+      "vram_gb": 48,
+      "interconnect": "none"
+    },
+    "substrate_deviation": {
+      "spec_preferred_instance": "g6.xlarge",
+      "spec_preferred_gpu": "L4 24GB",
+      "reason": "Session reuse \u2014 g6e.2xlarge already provisioned for deepseek-ocr. Cost-efficiency row is NOT valid for L4; per-stream latency is an upper bound (L40S has ~33% more TFLOPS and 2x VRAM headroom)."
+    }
+  },
+  "workload": {
+    "use_case": "reranker",
+    "catalog_id": "concurrency-sweep",
+    "modality": "text",
+    "dataset": {
+      "type": "synthetic-lorem-corpus",
+      "source": "scripts/_common.py::build_corpus",
+      "input_tokens": {
+        "mean": 84665.0
+      },
+      "output_tokens": {
+        "mean": 0
+      }
+    },
+    "load": {
+      "type": "concurrency",
+      "num_prompts_per_level": 50,
+      "warmup_requests": 10,
+      "concurrency": 1
+    },
+    "api": {
+      "type": "score",
+      "streaming": false,
+      "endpoint": "/v1/score",
+      "prompt_template": "query + k=50 candidates"
+    }
+  },
+  "metrics": {
+    "duration_s": 15.771523708011955,
+    "completed": 50,
+    "failed": 0,
+    "error_rate": 0.0,
+    "e2e_ms": {
+      "mean": 315.3645473596407,
+      "p50": 298.7520000024233,
+      "p90": 330.02125000348315,
+      "p95": 472.1167079987936,
+      "p99": 475.59479100164026
+    },
+    "output_toks_per_s": 0.0,
+    "request_throughput": 3.1702707313307927,
+    "total_input_tokens": 4233250,
+    "total_output_tokens": 0,
+    "max_concurrent_requests": 1,
+    "ttft_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "tpot_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "itl_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    }
+  },
+  "extensions": {
+    "reranker": {
+      "k_candidates": 50,
+      "pair_length_target": 1024,
+      "pairs_per_s": 386.11649416402594,
+      "total_pairs_scored": 2500
+    },
+    "substrate_caveat": "Measured on g6e.2xlarge (L40S 48GB) \u2014 spec-preferred is g6.xlarge (L4 24GB). Per-stream latency is an upper bound for L40S; cost claims should NOT be projected to the L4 row from this artifact.",
+    "notes": "Iteration 1 concurrency sweep for Qwen3-Reranker-4B on vLLM 0.19.1 (--runner pooling --convert classify + hf_overrides). Levels [1,4,16,64]; k=50 candidates/req; pair_length=1024. 256 concurrency + pair-length axis deferred. Headline metrics are from the peak-throughput level; per-level aggregates in extensions.sweep_levels.",
+    "normalized_from": "blueprints/qwen3-reranker-4b-eks/results/artifacts/qwen3-reranker-4b_eks_g6e-2xl_vllm_concurrency-sweep_20260514T163014Z.json"
+  }
+}

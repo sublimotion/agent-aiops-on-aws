@@ -168,6 +168,22 @@ def summarize(path: Path) -> dict:
         "agg_tok_per_s": metrics.get("output_toks_per_s"),
         "request_throughput_per_s": metrics.get("request_throughput"),
         "total_toks_per_s": metrics.get("total_toks_per_s"),
+
+        # primary_throughput: modality-aware metric to use in charts.
+        # Text generation → output tok/s. Embedding/reranker/audio → requests/s
+        # (because output tokens are 0 or meaningless for those modalities).
+        "primary_throughput": (
+            metrics.get("output_toks_per_s")
+            if (workload.get("modality") == "text"
+                and (metrics.get("output_toks_per_s") or 0) > 0)
+            else metrics.get("request_throughput")
+        ),
+        "primary_throughput_unit": (
+            "tok/s"
+            if (workload.get("modality") == "text"
+                and (metrics.get("output_toks_per_s") or 0) > 0)
+            else "req/s"
+        ),
         "ttft_p50_ms": (metrics.get("ttft_ms") or {}).get("p50"),
         "ttft_p99_ms": (metrics.get("ttft_ms") or {}).get("p99"),
         "tpot_p50_ms": (metrics.get("tpot_ms") or {}).get("p50"),

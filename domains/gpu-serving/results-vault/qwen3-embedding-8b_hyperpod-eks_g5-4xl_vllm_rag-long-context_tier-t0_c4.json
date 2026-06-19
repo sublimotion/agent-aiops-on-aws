@@ -1,0 +1,136 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "b1cfc846-eea5-448b-a575-f8c88a31a501",
+  "created_at": "2026-05-13T00:00:00Z",
+  "source_tool": {
+    "name": "custom",
+    "version": "0.1.0-embedding-bench",
+    "enrichment_version": "1.0.0"
+  },
+  "model": {
+    "name": "Qwen3-Embedding-8B",
+    "id": "Qwen/Qwen3-Embedding-8B",
+    "architecture": "embedding",
+    "parameters_total": "8B",
+    "quantization": "bf16",
+    "max_model_len": 8192
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.19.1",
+    "container_image": "vllm/vllm-openai:v0.19.1",
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "data_parallel": null,
+    "expert_parallel": null,
+    "replicas": 1,
+    "reasoning": false,
+    "kv_cache_dtype": "auto",
+    "attention_backend": "default",
+    "speculative_decoding": null,
+    "extra_args": {
+      "task": "embed",
+      "trust-remote-code": true,
+      "enforce-eager": true,
+      "enable-prefix-caching": false
+    }
+  },
+  "infrastructure": {
+    "substrate": "hyperpod-eks",
+    "instance_type": "ml.g5.4xlarge",
+    "region": "us-east-1",
+    "gpu": {
+      "name": "A10G",
+      "arch": "sm_86",
+      "count": 1,
+      "vram_gb": 24,
+      "interconnect": "none"
+    },
+    "eks": {
+      "cluster_version": "1.32",
+      "node_count": 1
+    },
+    "hyperpod": {
+      "cluster_name": "finetune-g5-cluster",
+      "instance_group": "llmd-validation",
+      "deep_health_checks": true,
+      "auto_recovery": true
+    }
+  },
+  "workload": {
+    "use_case": "rag",
+    "catalog_id": "rag-long-context",
+    "modality": "text",
+    "dataset": {
+      "type": "synthetic",
+      "input_tokens": {
+        "mean": null,
+        "std_dev": null
+      },
+      "output_tokens": {
+        "mean": 0,
+        "std_dev": 0
+      },
+      "note": "RAG Q&A \u2014 2-10K char mixed retrieved contexts"
+    },
+    "load": {
+      "type": "concurrency",
+      "num_prompts_per_level": null,
+      "warmup_requests": 0,
+      "concurrency": 4
+    },
+    "api": {
+      "type": "embeddings",
+      "streaming": false,
+      "endpoint": "/v1/embeddings"
+    }
+  },
+  "metrics": {
+    "duration_s": 5.739648818969727,
+    "completed": 32,
+    "failed": 0,
+    "error_rate": 0.0,
+    "e2e_ms": {
+      "mean": 675.8607104420662,
+      "p50": 693.0325031280518,
+      "p90": 915.416955947876,
+      "p95": 919.334888458252,
+      "p99": 978.4519672393799
+    },
+    "output_toks_per_s": 0.0,
+    "request_throughput": 5.575253993630927,
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+    "max_concurrent_requests": 4
+  },
+  "slo": {
+    "targets": {
+      "request_throughput_min": 100.0,
+      "error_rate_max": 0.001
+    },
+    "results": {
+      "request_throughput_min": {
+        "target": 100.0,
+        "actual": 6.6615132621548865,
+        "pass": false
+      },
+      "error_rate_max": {
+        "target": 0.001,
+        "actual": 0.0,
+        "pass": true
+      }
+    },
+    "overall_pass": false
+  },
+  "extensions": {
+    "optimization_tier": {
+      "tier": "T0",
+      "note": "baseline: --enforce-eager, --no-enable-prefix-caching (no torch.compile, no CUDA graphs)"
+    },
+    "raw_tool_output": {
+      "uri": "results/tier-comparison/workload-rag-qa-t0-baseline.json",
+      "format": "json"
+    },
+    "normalized_from": "blueprints/qwen3-embedding-8b-hyperpod/results/artifacts/qwen3-embedding-8b_hyperpod-eks_g5-4xl_vllm_rag-long-context_tier-t0_20260513T000000Z.json"
+  }
+}

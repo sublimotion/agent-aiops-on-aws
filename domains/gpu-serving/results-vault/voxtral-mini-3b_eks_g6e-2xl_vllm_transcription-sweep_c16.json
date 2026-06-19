@@ -1,0 +1,179 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "ef991bf5-4c82-4aef-b13f-93c259d4030e",
+  "created_at": "2026-05-15T13:27:23Z",
+  "source_tool": {
+    "name": "custom",
+    "version": "0.1.0-voxtral",
+    "enrichment_version": "1.0.0"
+  },
+  "model": {
+    "name": "Voxtral-Mini-3B",
+    "id": "mistralai/Voxtral-Mini-3B-2507",
+    "architecture": "VoxtralForConditionalGeneration",
+    "parameters_total": "3B",
+    "quantization": "bf16",
+    "max_model_len": 32768
+  },
+  "engine": {
+    "name": "vllm",
+    "version": "0.19.1",
+    "container_image": "vllm/vllm-openai:v0.19.1",
+    "base_image": null,
+    "dockerfile": null,
+    "tensor_parallel": 1,
+    "pipeline_parallel": 1,
+    "data_parallel": null,
+    "expert_parallel": null,
+    "replicas": 1,
+    "reasoning": false,
+    "kv_cache_dtype": "auto",
+    "attention_backend": "flash-attn",
+    "speculative_decode": null,
+    "extra_args": {
+      "tokenizer_mode": "mistral",
+      "config_format": "mistral",
+      "load_format": "mistral",
+      "trust-remote-code": true,
+      "max-num-seqs": 16,
+      "gpu-memory-utilization": 0.85
+    }
+  },
+  "infrastructure": {
+    "substrate": "eks",
+    "instance_type": "g6e.2xlarge",
+    "substrate_deviation": "spec-alt: L40S 48GB instead of spec-preferred L4 24GB. Per-stream perf is upper bound; cost-row $/audio-min reflects L40S on-demand price ($2.24/hr) \u2014 L4 (~$0.80/hr) would be ~2.8x more cost-efficient if the model is L4-fittable (it is).",
+    "region": "us-east-2",
+    "gpu": {
+      "name": "L40S",
+      "arch": "sm_89",
+      "count": 1,
+      "vram_gb": 48,
+      "interconnect": "none"
+    }
+  },
+  "workload": {
+    "use_case": "speech",
+    "catalog_id": "transcription-sweep",
+    "modality": "audio",
+    "dataset": {
+      "type": "synthetic-chirp-corpus",
+      "source": "scripts/test-assets/{short-3s,medium-10s,long-30s}.wav",
+      "buckets_seconds": [
+        3,
+        10,
+        30
+      ],
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "format": "wav-pcm16",
+      "input_tokens": {
+        "mean": 0
+      },
+      "output_tokens": {
+        "mean": 5.5
+      }
+    },
+    "load": {
+      "type": "concurrency",
+      "num_prompts_per_level": 30,
+      "warmup_requests": 5,
+      "concurrency": 16
+    },
+    "api": {
+      "type": "transcription",
+      "streaming": false,
+      "endpoint": "/v1/audio/transcriptions",
+      "prompt_template": "<multipart audio file>"
+    }
+  },
+  "metrics": {
+    "duration_s": 0.892084374994738,
+    "completed": 30,
+    "failed": 0,
+    "error_rate": 0.0,
+    "e2e_ms": {
+      "mean": 343.70588473490596,
+      "p50": 346.4743329968769,
+      "p90": 672.645625018049,
+      "p95": 729.88600001554,
+      "p99": 735.4280000145081
+    },
+    "output_toks_per_s": 184.96008295288576,
+    "request_throughput": 33.629105991433775,
+    "total_input_tokens": 0,
+    "total_output_tokens": 165,
+    "max_concurrent_requests": 16,
+    "ttft_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "tpot_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "itl_ms": {
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    }
+  },
+  "extensions": {
+    "modality": "audio",
+    "substrate_caveat": "spec-alt: L40S 48GB instead of spec-preferred L4 24GB. Per-stream perf is upper bound; cost-row $/audio-min reflects L40S on-demand price ($2.24/hr) \u2014 L4 (~$0.80/hr) would be ~2.8x more cost-efficient if the model is L4-fittable (it is).",
+    "audio": {
+      "rtfx_p50": 40.79257248759658,
+      "rtfx_p99": 126.45178077843566,
+      "rtfx_aggregate": 482.01718587721746,
+      "ttfw_ms": null,
+      "ttfw_note": "non-streaming; transcription endpoint returns full text in single response",
+      "audio_seconds_processed": 430.0,
+      "audio_minutes_per_dollar": 12911.174621711181,
+      "audio_minutes_per_dollar_per_req_p50": 1092.6581916320513,
+      "on_demand_price_per_hr_usd": 2.24,
+      "duration_buckets": [
+        {
+          "bucket": "short-3s",
+          "audio_seconds_per_request": 3.0,
+          "completed": 10,
+          "wall_ms_p50": 202.44029199238867,
+          "wall_ms_p99": 392.0437079796102,
+          "rtfx_p50": 8.65865004790136,
+          "rtfx_p99": 26.967706091660304,
+          "audio_minutes_per_dollar_p50": 231.92812628307217
+        },
+        {
+          "bucket": "medium-10s",
+          "audio_seconds_per_request": 10.0,
+          "completed": 10,
+          "wall_ms_p50": 160.9460829931777,
+          "wall_ms_p99": 374.71516701043583,
+          "rtfx_p50": 53.10655643850382,
+          "rtfx_p99": 93.3865590836327,
+          "audio_minutes_per_dollar_p50": 1422.4970474599236
+        },
+        {
+          "bucket": "long-30s",
+          "audio_seconds_per_request": 30.0,
+          "completed": 10,
+          "wall_ms_p50": 522.9261250060517,
+          "wall_ms_p99": 735.4280000145081,
+          "rtfx_p50": 55.272798442997896,
+          "rtfx_p99": 126.45178077843566,
+          "audio_minutes_per_dollar_p50": 1480.5213868660148
+        }
+      ]
+    },
+    "output_tokens_proxy": "word_count_of_response_text (transcription endpoint does not expose usage)",
+    "notes": "Stage 6 transcription concurrency sweep on Voxtral-Mini-3B BF16 (vLLM 0.19.1). Synthetic chirp corpus (3s/10s/30s) \u2014 perf-only; LibriSpeech WER gate deferred. Headline metrics from peak-aggregate-rtfx level. Per-bucket breakdown in extensions.audio.duration_buckets. ttft_ms/tpot_ms/itl_ms are null-filled per non-streaming + non-token-stream convention (transcription endpoint emits one JSON response with the full transcript).",
+    "normalized_from": "blueprints/voxtral-4b-eks/results/artifacts/voxtral-mini-3b_eks_g6e-2xl_vllm_transcription-sweep_20260515T132713Z.json"
+  }
+}
