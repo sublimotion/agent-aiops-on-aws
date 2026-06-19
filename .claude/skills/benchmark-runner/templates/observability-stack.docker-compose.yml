@@ -1,0 +1,66 @@
+# Observability stack for benchmark GPU nodes.
+# Launches Prometheus + DCGM exporter + node exporter on :9090, :9400, :9100 respectively.
+# Scrapes SGLang/vLLM /metrics, stores 7 days locally on /mnt/nvme/prom-data.
+#
+# Usage on the GPU node:
+#   mkdir -p /mnt/nvme/prom-data /mnt/nvme/prom-snapshots
+#   chown 65534:65534 /mnt/nvme/prom-data   # Prometheus nobody UID
+#   sudo docker compose -f observability-stack.docker-compose.yml up -d
+#   # Then run smoke test: observability-smoke-test.sh
+
+version: "3.8"
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: prometheus-bench
+    restart: unless-stopped
+    network_mode: host
+    user: "65534:65534"
+    volumes:
+      - /etc/prometheus-bench/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - /mnt/nvme/prom-data:/prometheus
+      - /mnt/nvme/prom-snapshots:/snapshots
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-admin-api          # required for snapshot endpoint
+      - --web.enable-lifecycle
+      - --web.listen-address=:9090
+
+  dcgm-exporter:
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:3.3.9-3.6.1-ubuntu22.04
+    container_name: dcgm-exporter-bench
+    restart: unless-stopped
+    network_mode: host
+    runtime: nvidia
+    cap_add: [SYS_ADMIN]
+    # Profiling metrics (HBM BW, tensor core util, SM occupancy) require:
+    #   --collectors /etc/dcgm-exporter/dcp-metrics-included.csv
+    # They add ~2% GPU overhead but are essential for bottleneck analysis.
+    command:
+      - -f
+      - /etc/dcgm-exporter/dcp-metrics-included.csv
+      - --address
+      - :9400
+    environment:
+      DCGM_EXPORTER_LISTEN: ":9400"
+      DCGM_EXPORTER_KUBERNETES: "false"
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: node-exporter-bench
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/rootfs
+      - --web.listen-address=:9100
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)

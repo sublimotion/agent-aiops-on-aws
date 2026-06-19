@@ -117,6 +117,28 @@ Improvements inspired by OpenAI's harness engineering patterns, ghost library co
 
 ---
 
+### 6. Entropic Objective + PUCT Archive for RL Blueprints (TTT-Discover)
+**Effort**: Medium (1-2 days for entropic-objective swap; 2-3 days for PUCT archive harness) | **Impact**: Medium-High for RL work, low otherwise
+**What**: Lift two specific techniques from TTT-Discover (Stanford/NVIDIA/Together, May 2026) into our RL-flavored blueprints — `kernel-optimization-agent`, `rl-conductor`, `verifier-reward` follow-ups, and any future RLVR work.
+**Why**: The paper's headline framing ("RL at test time") is mostly marketing. The actual levers are (a) the **entropic objective** `J_β = log E[exp(β·r)]` with β tuned per-step to a fixed KL budget — beats expected-reward RL by ~40% on TriMul (1985 → 1203 µs at matched compute); (b) a **PUCT archive of (code, thinking-tokens) pairs** as warm-starts — without it, the same method collapses to worse-than-best-of-N (5274 µs). Both are recipe-level changes, not new algorithms, and both ablate cleanly. We don't need to reproduce the paper to benefit.
+**How to implement**:
+1. Document both techniques as a steering note (`.claude/steering/rl-recipes.md` or extend `tech-stack.md`) so future RL blueprints reach for them by default.
+2. For `kernel-optimization-agent`: lift the reward shape (`1 / geomean(runtime)`, hard-0 on incorrect/timeout) and PUCT archive design from `examples/circle_packing/` and the TriMul reward in https://github.com/test-time-training/discover.
+3. For `verifier-reward` Phase 2 / RLVR follow-up: try the entropic objective with adaptive β (KL budget γ = ln 2) as the default loss instead of GRPO/PPO. LoRA rank 32, lr 4e-5, single grad step per 512-rollout batch are the reference hyperparameters.
+4. Skip running TTT-Discover's pipeline end-to-end — it's gated on Tinker credits ($500/problem) and gpt-oss-120b. We have our own GPU access; the value is the technique, not the reproduction.
+
+**Threshold check**: Only worth pulling in once we have an active RL blueprint with verifiable reward (kernel runtime, gold test pass, etc.). For pure inference/serving work, no leverage.
+
+**References**:
+- Paper: https://test-time-training.github.io/discover.pdf
+- Repo: https://github.com/test-time-training/discover
+- Key ablation: Table 8 (TriMul) — entropic vs expected-reward, with/without PUCT reuse
+- Adjacent blueprint: `domains/autoresearch/blueprints/kernel-optimization-agent/`
+- Adjacent blueprint: `domains/autoresearch/blueprints/verifier-reward/` — recall ceiling root cause is semantic mismatch, but entropic objective could help if we move to RLVR
+- Negative result the authors own: failed to improve second autocorrelation inequality (0.959 vs prior 0.961) — entropic + PUCT isn't magic.
+
+---
+
 ## Priority Order
 
 | # | Item | Effort | Impact | Dependencies |
@@ -126,5 +148,6 @@ Improvements inspired by OpenAI's harness engineering patterns, ghost library co
 | 2 | Doc-gardener agent | Medium | High | None |
 | 4 | Deployment telemetry | Medium | Medium | Learned Verifier adapter |
 | 3 | Ghost library modules | High | Medium | infra specs, blueprint-reviewer |
+| 6 | TTT-Discover techniques (entropic obj + PUCT) | Medium | Medium-High (RL only) | Active RL blueprint with verifiable reward |
 
-Recommended sequence: Start with #5 (quick win, enables #2), then #1 and #2 in parallel, then #4 (connects to Learned Verifier research), then #3 (largest scope, evaluate after other improvements are in place).
+Recommended sequence: Start with #5 (quick win, enables #2), then #1 and #2 in parallel, then #4 (connects to Learned Verifier research), then #3 (largest scope, evaluate after other improvements are in place). #6 fires when the next RL blueprint kicks off.

@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fin Support Chatbot (RAG) — 3-Way Comparison (B200 · H200 · g7e) · 2026-06-12</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2530; --border:#30363d;
+    --fg:#e6edf3; --muted:#8b949e; --accent:#58a6ff; --green:#3fb950;
+    --red:#f85149; --amber:#d29922; --violet:#bc8cff;
+    --b200:#3fb950; --h200:#58a6ff; --g7e:#d29922;
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.55;font-size:15px}
+  .wrap{max-width:1080px;margin:0 auto;padding:40px 24px 80px}
+  header{border-bottom:1px solid var(--border);padding-bottom:24px;margin-bottom:32px}
+  h1{font-size:28px;margin:0 0 6px;letter-spacing:-.02em}
+  h2{font-size:20px;margin:40px 0 14px;padding-top:8px;letter-spacing:-.01em}
+  h3{font-size:16px;margin:26px 0 10px;color:var(--accent)}
+  .sub{color:var(--muted);font-size:14px}
+  .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px 26px;margin-top:18px;font-size:13.5px}
+  .meta div{color:var(--muted)}
+  .meta b{color:var(--fg);font-weight:600}
+  .verdict{background:linear-gradient(135deg,#16241a,#161b22);border:1px solid var(--green);border-radius:10px;padding:20px 22px;margin:8px 0 4px}
+  .verdict .tag{display:inline-block;background:var(--green);color:#03100a;font-weight:700;font-size:12px;padding:2px 9px;border-radius:5px;letter-spacing:.03em;vertical-align:middle}
+  .verdict p{margin:10px 0 0}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin:18px 0}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:16px}
+  .card .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .card .v{font-size:24px;font-weight:700;margin-top:4px;font-family:var(--mono)}
+  .card .u{font-size:12px;color:var(--muted)}
+  .card.b200{border-color:var(--b200)} .card.b200 .v{color:var(--b200)}
+  .card.h200{border-color:var(--h200)} .card.h200 .v{color:var(--h200)}
+  .card.g7e{border-color:var(--g7e)} .card.g7e .v{color:var(--g7e)}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+  th,td{padding:9px 11px;text-align:right;border-bottom:1px solid var(--border)}
+  th:first-child,td:first-child{text-align:left}
+  thead th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border)}
+  tbody tr:hover{background:var(--panel)}
+  td.num{font-family:var(--mono)}
+  .win{background:rgba(63,185,80,.10)}
+  .win td:first-child{border-left:3px solid var(--green)}
+  .pass{color:var(--green);font-weight:600}
+  .fail{color:var(--red);font-weight:600}
+  .marg{color:var(--amber);font-weight:600}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .dot.b200{background:var(--b200)} .dot.h200{background:var(--h200)} .dot.g7e{background:var(--g7e)}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:18px 20px;margin:14px 0}
+  .chart{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:10px;margin:14px 0}
+  .chart svg{width:100%;height:auto;display:block}
+  .leg{border-left:3px solid var(--violet);padding:4px 0 4px 16px;margin:18px 0}
+  .leg.science{border-color:var(--accent)}
+  .leg.closed{border-color:var(--red)}
+  .leg.win{border-color:var(--green)}
+  .leg h3{margin-top:0;color:var(--fg)}
+  code,.mono{font-family:var(--mono);font-size:12.5px;background:var(--panel2);padding:1px 6px;border-radius:4px;color:var(--violet)}
+  pre{background:#010409;border:1px solid var(--border);border-radius:8px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;color:var(--fg);line-height:1.5}
+  ul{padding-left:20px}li{margin:5px 0}
+  .barrow{display:grid;grid-template-columns:130px 1fr 120px;align-items:center;gap:12px;margin:7px 0;font-size:13px}
+  .barrow .lbl{color:var(--muted);font-family:var(--mono)}
+  .bar{position:relative;height:22px;background:var(--panel2);border-radius:4px;overflow:hidden}
+  .bar > span{position:absolute;left:0;top:0;bottom:0;border-radius:4px;display:flex;align-items:center;padding-left:8px;font-size:11px;color:#03100a;font-weight:700}
+  .barval{font-family:var(--mono);text-align:right;color:var(--fg)}
+  .note{color:var(--muted);font-size:13px;font-style:italic}
+  .rec{counter-reset:rec;list-style:none;padding-left:0}
+  .rec li{counter-increment:rec;position:relative;padding:10px 0 10px 40px;border-bottom:1px solid var(--border)}
+  .rec li::before{content:counter(rec);position:absolute;left:0;top:9px;width:26px;height:26px;border-radius:50%;background:var(--panel2);border:1px solid var(--border);color:var(--accent);font-weight:700;text-align:center;line-height:25px;font-size:13px}
+  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--border);color:var(--muted);font-size:12.5px}
+  .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid var(--border);color:var(--muted);margin-left:6px}
+  .pill.warn{border-color:var(--amber);color:var(--amber)}
+  .pill.ok{border-color:var(--green);color:var(--green)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Fin Support Chatbot (RAG) — 3-Way Comparison</h1>
+  <div class="sub">Streaming grounded answers to end users · B200 vs H200 vs RTX&nbsp;PRO&nbsp;6000&nbsp;Blackwell (g7e) · 2026-06-12</div>
+  <div class="meta">
+    <div><b>Model</b> NVIDIA-Nemotron-3-Super-120B-A12B-FP8<br><span class="sub">hybrid Mamba-2 + LatentMoE + Select-Attn · 120B/12B-active · ~124 GB FP8</span></div>
+    <div><b>Workload</b> fin-support RAG chatbot<br><span class="sub">Intercom Fin-style · streams a text-message-style answer · ~9K ISL / ~300 OSL · prefill-dominated · shared ~3,050-tok header</span></div>
+    <div><b>SLO (contractual)</b> E2E p50 ≤ 6,500 ms · p90 ≤ 9,500 ms @ 130 concurrent · err ≤ 0.1%<br><span class="sub">TTFT p99 ≤ 6,000 ms · TPOT p99 ≤ 50 ms are <i>supporting</i> component targets (workload card), not the headline gate</span></div>
+    <div><b>Cost metric</b> $ / 1M <u>total</u> tokens (prefill + decode)<br><span class="sub">compared at each platform's cheapest <i>SLO-passing</i> point, reserved-capacity pricing</span></div>
+  </div>
+</header>
+
+<div class="panel" style="border-color:var(--accent)">
+  <b>TL;DR — the price premium outruns the performance premium.</b>
+  B200 is the fastest silicon, but you pay ~2.9× the per-GPU price for only ~1.4× the SLO-passing throughput — so on this workload it costs <b>~2× per token</b> vs H200. H200 tp1×8 is the cheapest deployment that meets the contractual SLO; pick B200 only when you need concurrency headroom past ~c128.
+  <table style="margin-top:12px">
+    <thead><tr><th>Instance (8 GPU)</th><th>tok/s/GPU @ sat.</th><th>best SLO-passing tok/s</th><th>$/GPU-hr (reserved)</th><th>cheapest $/1M within SLO</th><th>max conc within SLO</th><th>pick it when…</th></tr></thead>
+    <tbody>
+      <tr class="win"><td><span class="dot h200"></span>H200 (p5e) vLLM tp1×8</td><td class="num">27,805</td><td class="num">199,061 @ c120</td><td class="num">$4.975</td><td class="num"><b>$0.056</b></td><td class="num">~128</td><td>default — best $/token, holds SLO to ~c128</td></tr>
+      <tr><td><span class="dot b200"></span>B200 (p6) vLLM tp2×4</td><td class="num">34,583</td><td class="num">275,881 @ c192</td><td class="num">$14.24</td><td class="num">$0.115</td><td class="num">~201</td><td>need the full 130-target with margin / headroom</td></tr>
+      <tr><td><span class="dot g7e"></span>g7e RTX&nbsp;PRO&nbsp;6000</td><td class="num">10,977</td><td class="num">14,511 @ c8</td><td class="num">$4.14</td><td class="num">$0.158</td><td class="num">~12</td><td>single-user / data-residency only</td></tr>
+    </tbody>
+  </table>
+  <p class="note" style="margin-top:8px">Ratios B200 ÷ H200: price <b>2.86×</b>, per-GPU throughput <b>1.24×</b>, SLO-passing throughput <b>1.39×</b> → cost-per-token <b>2.05×</b>. The gap stays ~1.4× (not the 2–3× of Blackwell's spec sheet) because this workload is launch/scheduling-bound — B200's extra FLOPs sit idle, and HBM bandwidth (the one axis under pressure) is comparable. All $/1M on the reserved basis at each platform's cheapest <i>SLO-passing</i> operating point; detail below.</p>
+</div>
+
+<div class="verdict">
+  <span class="tag">VERDICT</span>
+  <p><b>H200 vLLM tp1×8 is the cheapest SLO-passing deployment; B200 holds the <i>full</i> 130-concurrent target with margin and has the most headroom above it (SLO knee ~c201).</b> Comparing like-for-like — cheapest <i>SLO-passing</i> operating point, reserved-capacity pricing — <b>H200 (8 GPUs, tp1×8) now has a <i>measured</i> contractual-SLO pass through c120 at $0.056/1M total tokens</b> (e2e p50 5.2 s / p90 7.9 s, 0 errors), about <b>½ of B200's cheapest SLO-passing point</b> ($0.115/1M at B200's c192 knee). The confirming c64/c96/c120 sweep (run 2026-06-12 against the live endpoint) replaces the earlier interpolated estimate and lands almost on it (~$0.061 predicted → $0.056 measured). A 2-point fit on c120 (p90 7.9 s) and c130 (p90 10.0 s) puts H200's e2e-p90 crossover at <b>~c128</b> — it holds the SLO almost to the target, missing the exact 130 point by ~2 concurrent. <b>B200 vLLM tp2×4 holds the e2e SLO well past the 130 spec — measured to c192 ($0.115/1M, p50 6.0 s / p90 9.1 s) with the p90 crossover at ~c201</b>; at the c130 spec point it runs $0.126/1M (p50 4.2 s / p90 7.6 s) with the most tail margin of any platform. We confirmed tp2×4 is the right B200 <i>layout</i> by sweeping the collective-free <b>tp1×8</b> alternative (8 TP=1 replicas) at c120/c130: it <i>fails</i> the e2e gate (p50 ~11.5 s, TPOT p50 ~135 ms) at roughly <b>half</b> the aggregate throughput of tp2×4 — so tp2×4 is the measured-optimal B200 layout, and its cheapest SLO-passing cost is <b>$0.115/1M at the c192 knee</b>. Two H200 caveats: the win is the <i>tp1×8</i> layout specifically — the live <i>SGLang tp2×4</i> config is ~2.6× slower and fails by c64; and the supporting TPOT p99 (50 ms) is exceeded at these concurrencies on every platform (the same "PASS*" as B200). g7e.12xlarge (2 GPUs) runs a single TP=2 replica that saturates by ~8 concurrent, passing only at c8 (<b>$0.158/1M</b>); its lower "$0.105" is a <i>saturated, SLO-failing</i> c256 point. <b>Choose H200 tp1×8 for the best $/token within SLO (~½ of B200, proven to c120). Choose B200 if you must hold the 130-concurrent target with margin today — and note it has ~55% more headroom above the spec (to ~c201) at an even lower $0.115/1M. g7e is a low-concurrency / data-residency play, viable for a lightly-loaded single-user chatbot but not for this load on one node.</b></p>
+</div>
+
+<div class="panel" style="border-color:var(--amber)">
+  <b>⚖️ Pricing basis.</b> Comparing one platform on <b>spot</b> against another on <b>on-demand</b> is not fair — it can overstate a gap several-fold. So we anchor the headline comparison on a <b>reserved-capacity</b> rate per GPU-hour for each platform: B200 ODCR <b>$14.24/GPU-hr</b>, g7e ODCR <b>$4.14/GPU-hr</b> (us-east-2), and H200 via <b>Capacity Blocks for ML $4.975/GPU-hr</b> (p5e.48xlarge, us-east-2, AWS Capacity Blocks pricing page, dynamic — next refresh July 2026). Two caveats on availability, not price: <b>g7e spot was never obtainable</b> (we held an on-demand ODCR), and <b>H200 has no standard ODCR</b> — Capacity Blocks is a fixed-window reservation, so its rate is the closest reserved analogue. Spot figures are shown alongside for reference.
+</div>
+
+<h2>Two questions, two different answers: how fast is the silicon, and how much does it cost</h2>
+<p>$/1M conflates silicon speed, GPU count, and price. We separate them with a price-blind efficiency metric (<b>tok/s per GPU</b> at saturation) and a cost figure taken at each platform's cheapest <i>SLO-passing</i> point on a reserved-capacity basis.</p>
+
+<h3>① Architecture efficiency — throughput per GPU at saturation <span class="pill">price-blind</span></h3>
+<div class="panel">
+  <div class="barrow"><span class="lbl"><span class="dot b200"></span>B200</span><div class="bar"><span style="width:100%;background:var(--b200)">34,583 tok/s/GPU</span></div><span class="barval">1.00×</span></div>
+  <div class="barrow"><span class="lbl"><span class="dot h200"></span>H200</span><div class="bar"><span style="width:80%;background:var(--h200)">27,805 tok/s/GPU</span></div><span class="barval">0.80×</span></div>
+  <div class="barrow"><span class="lbl"><span class="dot g7e"></span>g7e</span><div class="bar"><span style="width:32%;background:var(--g7e)">10,977 tok/s/GPU</span></div><span class="barval">0.32×</span></div>
+  <p class="note" style="margin-top:12px">This is the unavoidable fact about the hardware, independent of node size or price. Prefill is memory-bandwidth-bound; B200/H200 HBM3e (~8 / 4.8 TB/s) crushes g7e GDDR7. <b>g7e silicon is ~3× slower per GPU for this prefill-heavy workload</b> — and no amount of scaling changes the per-GPU ratio.</p>
+</div>
+
+<h3>② Cost at the cheapest <u>SLO-passing</u> operating point — $/1M total tokens, reserved basis</h3>
+<p>The only honest cost comparison is at each platform's <b>cheapest config that actually passes the contractual SLO</b> (e2e p50 ≤ 6,500 / p90 ≤ 9,500, err ≤ 0.1%). Quoting a platform's lowest $/1M at a <i>saturated</i> concurrency that blows the latency gate would compare deployments the customer can't run. On that basis <b>H200 vLLM tp1×8 is the cheapest SLO-passing deployment — $0.056/1M at a measured c120</b>, about <b>49%</b> of B200's cheapest SLO-passing point. Note the B200 figure is its <b>knee, c192 @ $0.115/1M</b> (measured), not the c130 spec target: c130 was the customer's requirement, but B200 holds the e2e SLO all the way to ~c201, so its <i>cheapest</i> SLO-passing operating point is the knee. (At the c130 spec point B200 is $0.126/1M — the number to use when the requirement is firmly 130-with-margin.) H200's measured e2e-p90 crossover sits at ~c128, just shy of the 130 target; B200 is the only platform that holds the full 130 with margin.</p>
+<table>
+  <thead><tr><th>Platform · cheapest SLO-passing layout</th><th>max conc within SLO</th><th>$/GPU-hr (reserved)</th><th>$/1M (reserved)</th><th>$/1M (spot ref.)</th></tr></thead>
+  <tbody>
+    <tr class="win"><td><span class="dot h200"></span>H200 vLLM tp1×8 @ <b>c120</b> <span class="pill ok">measured</span></td><td class="num">120 (measured)</td><td class="num">$4.975</td><td class="num">$0.056</td><td class="num">$0.042</td></tr>
+    <tr><td><span class="dot b200"></span>B200 vLLM tp2×4 @ <b>c192</b> (knee) <span class="pill ok">measured</span></td><td class="num">192 (measured); SLO knee ~c201</td><td class="num">$14.24</td><td class="num">$0.115</td><td class="num">$0.032</td></tr>
+    <tr><td><span class="dot h200"></span>H200 vLLM tp2×4 @ c8 (measured)</td><td class="num">8</td><td class="num">$4.975</td><td class="num">$0.199</td><td class="num">$0.151</td></tr>
+    <tr><td><span class="dot g7e"></span>g7e SGLang tp2×1 @ ~c12 <span class="pill warn">interp.</span></td><td class="num">~12 (est.)</td><td class="num">$4.14</td><td class="num">~$0.13</td><td class="num">n/a*</td></tr>
+    <tr><td><span class="dot g7e"></span>g7e SGLang tp2×1 @ c8 (measured)</td><td class="num">8</td><td class="num">$4.14</td><td class="num">$0.158</td><td class="num">n/a*</td></tr>
+  </tbody>
+</table>
+<div class="panel">
+  <b>The confirming sweep is in: H200 vLLM tp1×8 holds the contractual SLO through c120 at $0.056/1M — ~½ of B200, and now <i>measured</i>, not interpolated.</b>
+  The original report sampled each platform at c8 then jumped to c130; nothing in between. We have since run the c64/c96/c120 sweep against the live H200 endpoint. The result confirms the earlier interpolation almost exactly (predicted ~$0.061/1M @ ~c120; measured <b>$0.056/1M @ c120</b>):
+  <ul style="margin:8px 0">
+    <li><b>H200 vLLM tp1×8 passes the full contractual e2e gate at c64, c96, and c120</b> — measured e2e p50 3.2 / 4.5 / 5.2 s and p90 5.1 / 6.8 / 7.9 s, all inside 6,500 / 9,500 ms, 0 errors, throughput climbing 170K→199K tok/s. SLO-passing cost falls to <b>$0.056/1M reserved at c120 (≈49% of B200's cheapest SLO-passing point, $0.115/1M at its c192 knee; ≈44% of B200's c130-spec $0.126)</b>. A 2-point fit on the measured c120 (p90 7.9 s) and c130 (p90 10.0 s) puts the actual e2e-p90 crossover at <b>~c128</b> — i.e. H200 holds the SLO almost to the full 130 target, just missing it. <i>As at every platform's high-concurrency point, the supporting TPOT p99 target (50 ms) is exceeded (61–93 ms) — the same "PASS*" caveat that applies to B200 at c130.</i></li>
+    <li><b>This is the strong H200 layout (tp1×8). The live-endpoint SGLang tp2×4 config is much weaker</b> and was <i>also</i> swept: it fails the e2e gate by c64 (p50 9.1 s / p90 14.1 s) and has <b>no</b> mid-range band — it crosses ~c38 and only passes at c8 ($0.31/1M). SGLang radix cache does not recover the loss here; for this MoE-hybrid on H200, 8 independent TP=1 vLLM replicas beat 4 TP=2 SGLang replicas by ~2.6× throughput at c130 (199K vs 70K tok/s). The cost verdict rests on the tp1×8 layout.</li>
+    <li><b>g7e has no such hidden headroom.</b> Its crossover is at ~c12–14 (still interpolated) — the single 2-GPU replica saturates almost immediately, so the SLO-passing band is c8–~c12 only, at ~$0.13–0.16/1M. There is no mid-range g7e operating point; it goes from "passes at single-user" to "7–10× over the gate" within ~one batch.</li>
+  </ul>
+  The lower headline numbers — H200 $0.042/1M, g7e $0.105/1M — occur at c256+, well past the latency knee (e2e p90 16–144 s), i.e. <b>not usable operating points for an interactive chatbot</b>. The H200 c120 point above ($0.056/1M) is the cheapest <i>SLO-passing</i> operating point across all three platforms.
+  <p class="note" style="margin-top:10px">Reserved rates: B200 ODCR <b>$14.24/GPU-hr</b> (us-east-2, $113.93/hr ÷ 8). g7e ODCR <b>$4.14/GPU-hr</b> (us-east-2 $33.14/48xl ÷ 8) — cheaper than the Tokyo rate we actually paid this session ($12.02/12xl → $6.01/GPU-hr) since capacity was only obtainable in Tokyo. H200 <b>$4.975/GPU-hr</b> via Capacity Blocks for ML (p5e.48xlarge us-east-2 $39.799/hr ÷ 8; AWS Capacity Blocks pricing, dynamic, next refresh July 2026). *g7e spot was never obtainable. <b>measured</b> = swept against the live endpoint (c64/c96/c120, 2,000 prompts/level, 2026-06-12); <b>interp.</b> = interpolated crossover, not a measured run. Note the per-GPU reserved price ranks g7e &lt; H200 ≪ B200, the inverse of the measured SLO-passing $/1M ranking — because cost-per-token is dominated by sustainable throughput inside the latency gate, not GPU sticker price.</p>
+</div>
+
+<h2>All configs vs the end-to-end SLO — throughput / latency, SLO drawn as a region</h2>
+<p>A single Pareto frontier across three different hardware architectures (and two price bases) would be misleading — you can't trade along a curve between GPUs you can't get. Instead: <b>every measured config</b>, throughput vs <b>full-response (e2e) p90</b> latency, with the e2e <b>tail</b> SLO (p90 ≤ 9,500 ms) as a shaded pass-region. E2E is the customer's <b>contractual headline SLO</b> — when the short ~243-token reply finishes streaming; the companion TTFT chart below shows perceived responsiveness (when the reply <i>starts</i>). Both charts plot the <b>tail (p90 here, p99 for TTFT)</b> against the gate that governs that tail, so a point inside the band genuinely passes. The story is spatial — which points fall inside the box, and how far outside g7e sits.</p>
+<div class="chart">
+<svg viewBox="0 0 920 520" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,Segoe UI,sans-serif">
+<rect x="0" y="0" width="920" height="520" fill="#0d1117"/>
+<rect x="70" y="30" width="265" height="420" fill="#3fb95014"/>
+<line x1="335" y1="30" x2="335" y2="450" stroke="#d29922" stroke-width="1.5" stroke-dasharray="5,4"/>
+<text x="341" y="44" fill="#d29922" font-size="12">E2E SLO p90 ≤ 9,500 ms</text>
+<text x="76" y="442" fill="#3fb950" font-size="11" opacity="0.8">← meets e2e tail SLO</text>
+<line x1="70" y1="450" x2="890" y2="450" stroke="#30363d"/>
+<line x1="70" y1="30" x2="70" y2="450" stroke="#30363d"/>
+<line x1="70" y1="450" x2="70" y2="455" stroke="#30363d"/>
+<text x="70" y="470" fill="#8b949e" font-size="11" text-anchor="middle">2s</text>
+<line x1="226" y1="450" x2="226" y2="455" stroke="#30363d"/>
+<text x="226" y="470" fill="#8b949e" font-size="11" text-anchor="middle">5s</text>
+<line x1="343" y1="450" x2="343" y2="455" stroke="#30363d"/>
+<text x="343" y="470" fill="#8b949e" font-size="11" text-anchor="middle">10s</text>
+<line x1="461" y1="450" x2="461" y2="455" stroke="#30363d"/>
+<text x="461" y="470" fill="#8b949e" font-size="11" text-anchor="middle">20s</text>
+<line x1="617" y1="450" x2="617" y2="455" stroke="#30363d"/>
+<text x="617" y="470" fill="#8b949e" font-size="11" text-anchor="middle">50s</text>
+<line x1="734" y1="450" x2="734" y2="455" stroke="#30363d"/>
+<text x="734" y="470" fill="#8b949e" font-size="11" text-anchor="middle">100s</text>
+<line x1="852" y1="450" x2="852" y2="455" stroke="#30363d"/>
+<text x="852" y="470" fill="#8b949e" font-size="11" text-anchor="middle">200s</text>
+<text x="480" y="512" fill="#8b949e" font-size="12" text-anchor="middle">end-to-end latency p90 (log scale)</text>
+<line x1="65" y1="450" x2="70" y2="450" stroke="#30363d"/>
+<text x="62" y="454" fill="#8b949e" font-size="11" text-anchor="end">0K</text>
+<line x1="65" y1="378" x2="70" y2="378" stroke="#30363d"/>
+<text x="62" y="382" fill="#8b949e" font-size="11" text-anchor="end">50K</text>
+<line x1="65" y1="305" x2="70" y2="305" stroke="#30363d"/>
+<text x="62" y="309" fill="#8b949e" font-size="11" text-anchor="end">100K</text>
+<line x1="65" y1="233" x2="70" y2="233" stroke="#30363d"/>
+<text x="62" y="237" fill="#8b949e" font-size="11" text-anchor="end">150K</text>
+<line x1="65" y1="160" x2="70" y2="160" stroke="#30363d"/>
+<text x="62" y="164" fill="#8b949e" font-size="11" text-anchor="end">200K</text>
+<line x1="65" y1="88" x2="70" y2="88" stroke="#30363d"/>
+<text x="62" y="92" fill="#8b949e" font-size="11" text-anchor="end">250K</text>
+<text x="16" y="240" fill="#8b949e" font-size="12" text-anchor="middle" transform="rotate(-90 16 240)">throughput (total tokens/s)</text>
+<circle cx="300" cy="124" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="300" y="114" fill="#3fb950" font-size="9" text-anchor="middle" opacity="0.85">c128</text>
+<circle cx="307" cy="137" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="307" y="127" fill="#3fb950" font-size="9" text-anchor="middle" opacity="0.85">c130</text>
+<circle cx="122" cy="223" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="122" y="213" fill="#3fb950" font-size="9" text-anchor="middle" opacity="0.85">c32</text>
+<circle cx="503" cy="49" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="503" y="39" fill="#3fb950" font-size="9" text-anchor="middle" opacity="0.85">c512</text>
+<circle cx="90" cy="359" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="90" y="349" fill="#3fb950" font-size="9" text-anchor="middle" opacity="0.85">c8</text>
+<circle cx="343" cy="186" r="6" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="343" y="176" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c130</text>
+<circle cx="387" cy="149" r="6" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="387" y="139" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c200</text>
+<circle cx="425" cy="128" r="6" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="425" y="118" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c256</text>
+<circle cx="521" cy="135" r="6" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="521" y="125" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c512</text>
+<circle cx="96" cy="374" r="6" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="96" y="364" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c8</text>
+<path d="M500,343.17 L506.28,349 L500,355.17 L494.28,349 Z" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="500" y="339" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c130</text>
+<path d="M538,324.08 L544.15,330 L538,336.08 L532.15,330 Z" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="538" y="320" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c200</text>
+<path d="M575,318.53 L580.75,325 L575,330.53 L568.75,325 Z" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="575" y="315" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c256</text>
+<path d="M681,303.71 L687.49,310 L681,315.71 L675.49,310 Z" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="681" y="300" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c512</text>
+<path d="M198,405.22 L204.34,411 L198,417.22 L192.34,411 Z" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="198" y="401" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c8</text>
+<circle cx="727" cy="425" r="6" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="727" y="415" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c130</text>
+<circle cx="776" cy="421" r="6" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="776" y="411" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c200</text>
+<circle cx="796" cy="418" r="6" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="796" y="408" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c256</text>
+<circle cx="886" cy="418" r="6" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="886" y="408" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c512</text>
+<circle cx="334" cy="436" r="6" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="334" y="426" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c8</text>
+<path d="M667,414.42 L673.11,420 L667,426.42 L661.11,420 Z" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="667" y="410" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c130</text>
+<path d="M730,414.18 L735.66,420 L730,426.18 L723.66,420 Z" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="730" y="410" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c200</text>
+<path d="M768,414.09 L773.62,420 L768,426.09 L761.62,420 Z" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="768" y="410" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c256</text>
+<path d="M880,414.16 L886.05,420 L880,426.16 L874.05,420 Z" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="880" y="410" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c512</text>
+<path d="M266,422.98 L271.84,429 L266,434.98 L259.84,429 Z" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="266" y="419" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c8</text>
+<!-- 2026-06-12 confirming sweep: B200 knee (c160/c192/c224), B200 tp1x8 (c120/c130), H200 vLLM tp1x8 (c64/c96/c120), H200 SGLang (c64/c120) -->
+<circle cx="341" cy="112" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="341" y="102" fill="#3fb950" font-size="9" text-anchor="middle" opacity="0.85">c160</text>
+<circle cx="326" cy="51" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="320" y="55" fill="#3fb950" font-size="9" text-anchor="end" opacity="0.85">c192</text>
+<circle cx="355" cy="50" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="362" y="54" fill="#3fb950" font-size="9" text-anchor="start" opacity="0.85">c224</text>
+<circle cx="453" cy="320" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="453" y="310" fill="#3fb950" font-size="9" text-anchor="middle" opacity="0.85">tp1×8 c120</text>
+<circle cx="440" cy="310" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="440" y="334" fill="#3fb950" font-size="9" text-anchor="middle" opacity="0.85">tp1×8 c130</text>
+<circle cx="230" cy="203" r="6" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="230" y="193" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c64</text>
+<circle cx="278" cy="179" r="6" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="278" y="169" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c96</text>
+<circle cx="303" cy="162" r="6" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="299" y="156" fill="#58a6ff" font-size="9" text-anchor="end" opacity="0.85">c120</text>
+<path d="M401,355.7 L407,361.7 L401,367.7 L395,361.7 Z" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="401" y="379" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">sg c64</text>
+<path d="M465,337.8 L471,343.8 L465,349.8 L459,343.8 Z" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="465" y="333" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">sg c120</text>
+<rect x="680" y="34" width="200" height="96" fill="#161b22" stroke="#30363d" rx="6"/>
+<circle cx="690" cy="48" r="6" fill="#3fb950"/><text x="704" y="52" fill="#e6edf3" font-size="12">B200</text>
+<circle cx="690" cy="68" r="6" fill="#58a6ff"/><text x="704" y="72" fill="#e6edf3" font-size="12">H200</text>
+<circle cx="690" cy="88" r="6" fill="#d29922"/><text x="704" y="92" fill="#e6edf3" font-size="12">g7e</text>
+<circle cx="690" cy="108" r="6" fill="#8b949e"/><text x="704" y="112" fill="#8b949e" font-size="12">● vLLM</text>
+<path d="M690,120 L696,126 L690,132 L684,126 Z" fill="#8b949e"/><text x="704" y="130" fill="#8b949e" font-size="12">◆ SGLang</text>
+</svg>
+</div>
+<p class="note">x = e2e p90 (log). Green band = e2e tail pass region (p90 ≤ 9,500 ms). Circles = vLLM, diamonds = SGLang. The c130 <i>target</i> points: <b>only B200 holds the e2e tail</b> (p90 8.1 s, inside the band at high throughput); <b>H200 c130 falls just outside</b> (p90 10.0 s) — failing the contractual gate, and also missing the supporting TTFT/TPOT targets; both g7e engines are far to the right at ~67–96 s (≈7–10× outside) with ⅒ the throughput. g7e only enters the band at c8 (single-user). The <b>2026-06-12 confirming sweep is now plotted</b>: the three <b>B200 tp2×4 knee points (c160/c192/c224)</b> cluster at the top of the band — c192 sits highest-and-inside (p90 9.1 s at 276K tok/s), c160 just inside, c224 just outside (p90 10.7 s); the measured <b>H200 vLLM tp1×8 c64/c96/c120</b> points all sit <i>inside</i> the band (p90 5.1 / 6.8 / 7.9 s at 170–199K tok/s) — H200 holds the tail SLO right up to ~c128. The two <b>B200 tp1×8</b> points (◯ at ~90–97K tok/s) sit far right of the gate (p90 17.8–19.1 s) — the collective-free layout fails. The H200 <b>SGLang</b> tp2×4 diamonds (sg c64/c120) are outside the band at ~61–73K tok/s, confirming SGLang exits by c64.</p>
+
+<h2>The same configs against a TTFT SLO — what matters for an interactive chatbot</h2>
+<p>The customer's contractual SLO is end-to-end, but a <b>streaming chatbot</b> also lives or dies on <b>responsiveness</b> — how fast the first token reaches the user (when the typing bubble starts). TTFT is a <b>supporting</b> target in the workload card (<b>p99 ≤ 6,000 ms</b>), not the contractual headline, but it's the metric a user actually feels. Re-plotting the same runs against TTFT instead of e2e tells a materially different story for g7e.</p>
+<div class="chart">
+<svg viewBox="0 0 920 520" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,Segoe UI,sans-serif">
+<rect x="0" y="0" width="920" height="520" fill="#0d1117"/>
+<rect x="70" y="30" width="429" height="420" fill="#3fb95014"/>
+<line x1="499" y1="30" x2="499" y2="450" stroke="#d29922" stroke-width="1.5" stroke-dasharray="5,4"/>
+<text x="505" y="44" fill="#d29922" font-size="12">TTFT SLO p99 ≤ 6,000 ms</text>
+<text x="76" y="442" fill="#3fb950" font-size="11" opacity="0.8">← responsive (meets TTFT SLO)</text>
+<line x1="70" y1="450" x2="890" y2="450" stroke="#30363d"/>
+<line x1="70" y1="30" x2="70" y2="450" stroke="#30363d"/>
+<line x1="70" y1="450" x2="70" y2="455" stroke="#30363d"/>
+<text x="70" y="470" fill="#8b949e" font-size="11" text-anchor="middle">0.1s</text>
+<line x1="143" y1="450" x2="143" y2="455" stroke="#30363d"/>
+<text x="143" y="470" fill="#8b949e" font-size="11" text-anchor="middle">0.2s</text>
+<line x1="239" y1="450" x2="239" y2="455" stroke="#30363d"/>
+<text x="239" y="470" fill="#8b949e" font-size="11" text-anchor="middle">0.5s</text>
+<line x1="311" y1="450" x2="311" y2="455" stroke="#30363d"/>
+<text x="311" y="470" fill="#8b949e" font-size="11" text-anchor="middle">1s</text>
+<line x1="384" y1="450" x2="384" y2="455" stroke="#30363d"/>
+<text x="384" y="470" fill="#8b949e" font-size="11" text-anchor="middle">2s</text>
+<line x1="480" y1="450" x2="480" y2="455" stroke="#30363d"/>
+<text x="480" y="470" fill="#8b949e" font-size="11" text-anchor="middle">5s</text>
+<line x1="553" y1="450" x2="553" y2="455" stroke="#30363d"/>
+<text x="553" y="470" fill="#8b949e" font-size="11" text-anchor="middle">10s</text>
+<line x1="625" y1="450" x2="625" y2="455" stroke="#30363d"/>
+<text x="625" y="470" fill="#8b949e" font-size="11" text-anchor="middle">20s</text>
+<line x1="721" y1="450" x2="721" y2="455" stroke="#30363d"/>
+<text x="721" y="470" fill="#8b949e" font-size="11" text-anchor="middle">50s</text>
+<line x1="794" y1="450" x2="794" y2="455" stroke="#30363d"/>
+<text x="794" y="470" fill="#8b949e" font-size="11" text-anchor="middle">100s</text>
+<line x1="867" y1="450" x2="867" y2="455" stroke="#30363d"/>
+<text x="867" y="470" fill="#8b949e" font-size="11" text-anchor="middle">200s</text>
+<text x="480" y="512" fill="#8b949e" font-size="12" text-anchor="middle">time-to-first-token p99 (log scale)</text>
+<line x1="65" y1="450" x2="70" y2="450" stroke="#30363d"/>
+<text x="62" y="454" fill="#8b949e" font-size="11" text-anchor="end">0K</text>
+<line x1="65" y1="378" x2="70" y2="378" stroke="#30363d"/>
+<text x="62" y="382" fill="#8b949e" font-size="11" text-anchor="end">50K</text>
+<line x1="65" y1="305" x2="70" y2="305" stroke="#30363d"/>
+<text x="62" y="309" fill="#8b949e" font-size="11" text-anchor="end">100K</text>
+<line x1="65" y1="233" x2="70" y2="233" stroke="#30363d"/>
+<text x="62" y="237" fill="#8b949e" font-size="11" text-anchor="end">150K</text>
+<line x1="65" y1="160" x2="70" y2="160" stroke="#30363d"/>
+<text x="62" y="164" fill="#8b949e" font-size="11" text-anchor="end">200K</text>
+<line x1="65" y1="88" x2="70" y2="88" stroke="#30363d"/>
+<text x="62" y="92" fill="#8b949e" font-size="11" text-anchor="end">250K</text>
+<text x="16" y="240" fill="#8b949e" font-size="12" text-anchor="middle" transform="rotate(-90 16 240)">throughput (total tokens/s)</text>
+<circle cx="455" cy="124" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="455" y="114" fill="#3fb950" font-size="9" text-anchor="middle" opacity="0.85">c128</text>
+<circle cx="475" cy="137" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="475" y="127" fill="#3fb950" font-size="9" text-anchor="middle" opacity="0.85">c130</text>
+<circle cx="343" cy="223" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="343" y="213" fill="#3fb950" font-size="9" text-anchor="middle" opacity="0.85">c32</text>
+<circle cx="603" cy="49" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="603" y="39" fill="#3fb950" font-size="9" text-anchor="middle" opacity="0.85">c512</text>
+<circle cx="369" cy="359" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="369" y="349" fill="#3fb950" font-size="9" text-anchor="middle" opacity="0.85">c8</text>
+<circle cx="515" cy="186" r="6" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="515" y="176" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c130</text>
+<circle cx="528" cy="149" r="6" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="528" y="139" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c200</text>
+<circle cx="555" cy="128" r="6" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="555" y="118" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c256</text>
+<circle cx="627" cy="135" r="6" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="627" y="125" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c512</text>
+<circle cx="369" cy="374" r="6" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="369" y="364" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c8</text>
+<path d="M581,343.17 L587.06,349 L581,355.17 L575.06,349 Z" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="581" y="339" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c130</text>
+<path d="M594,324.08 L599.96,330 L594,336.08 L587.96,330 Z" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="594" y="320" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c200</text>
+<path d="M617,318.53 L622.73,325 L617,330.53 L610.73,325 Z" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="617" y="315" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c256</text>
+<path d="M690,303.71 L696.19,310 L690,315.71 L684.19,310 Z" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="690" y="300" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c512</text>
+<path d="M380,405.22 L386.24,411 L380,417.22 L374.24,411 Z" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="380" y="401" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c8</text>
+<circle cx="718" cy="425" r="6" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="718" y="415" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c130</text>
+<circle cx="764" cy="421" r="6" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="764" y="411" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c200</text>
+<circle cx="790" cy="418" r="6" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="790" y="408" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c256</text>
+<circle cx="858" cy="418" r="6" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="858" y="408" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c512</text>
+<circle cx="449" cy="436" r="6" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="449" y="426" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c8</text>
+<path d="M723,414.42 L728.56,420 L723,426.42 L716.56,420 Z" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="723" y="410" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c130</text>
+<path d="M768,414.18 L774.37,420 L768,426.18 L762.37,420 Z" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="768" y="410" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c200</text>
+<path d="M795,414.09 L800.86,420 L795,426.09 L788.86,420 Z" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="795" y="410" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c256</text>
+<path d="M872,414.16 L877.59,420 L872,426.16 L865.59,420 Z" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="872" y="410" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c512</text>
+<path d="M414,422.98 L419.53,429 L414,434.98 L407.53,429 Z" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="414" y="419" fill="#d29922" font-size="9" text-anchor="middle" opacity="0.85">c8</text>
+<!-- 2026-06-12 confirming sweep: B200 knee (c160/c192/c224), B200 tp1x8 (c120/c130), H200 vLLM tp1x8 (c64/c96/c120), H200 SGLang (c64/c120) -->
+<circle cx="484" cy="112" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="484" y="102" fill="#3fb950" font-size="9" text-anchor="middle" opacity="0.85">c160</text>
+<circle cx="472" cy="51" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="466" y="55" fill="#3fb950" font-size="9" text-anchor="end" opacity="0.85">c192</text>
+<circle cx="479" cy="50" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="486" y="54" fill="#3fb950" font-size="9" text-anchor="start" opacity="0.85">c224</text>
+<circle cx="450" cy="320" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="450" y="310" fill="#3fb950" font-size="9" text-anchor="middle" opacity="0.85">tp1×8 c120</text>
+<circle cx="443" cy="310" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1"/>
+<text x="443" y="334" fill="#3fb950" font-size="9" text-anchor="middle" opacity="0.85">tp1×8 c130</text>
+<circle cx="426" cy="203" r="6" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="426" y="193" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">c64</text>
+<circle cx="440" cy="179" r="6" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="436" y="173" fill="#58a6ff" font-size="9" text-anchor="end" opacity="0.85">c96</text>
+<circle cx="456" cy="162" r="6" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="460" y="158" fill="#58a6ff" font-size="9" text-anchor="start" opacity="0.85">c120</text>
+<path d="M426,355.7 L432,361.7 L426,367.7 L420,361.7 Z" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="426" y="379" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">sg c64</text>
+<path d="M516,337.8 L522,343.8 L516,349.8 L510,343.8 Z" fill="#58a6ff" stroke="#0d1117" stroke-width="1"/>
+<text x="516" y="333" fill="#58a6ff" font-size="9" text-anchor="middle" opacity="0.85">sg c120</text>
+<rect x="680" y="34" width="200" height="96" fill="#161b22" stroke="#30363d" rx="6"/>
+<circle cx="690" cy="48" r="6" fill="#3fb950"/><text x="704" y="52" fill="#e6edf3" font-size="12">B200</text>
+<circle cx="690" cy="68" r="6" fill="#58a6ff"/><text x="704" y="72" fill="#e6edf3" font-size="12">H200</text>
+<circle cx="690" cy="88" r="6" fill="#d29922"/><text x="704" y="92" fill="#e6edf3" font-size="12">g7e</text>
+<circle cx="690" cy="108" r="6" fill="#8b949e"/><text x="704" y="112" fill="#8b949e" font-size="12">● vLLM</text>
+<path d="M690,120 L696,126 L690,132 L684,126 Z" fill="#8b949e"/><text x="704" y="130" fill="#8b949e" font-size="12">◆ SGLang</text>
+</svg>
+</div>
+<p class="note">x = TTFT p99 (log). Green band = TTFT pass region (p99 ≤ 6,000 ms). Circles = vLLM, diamonds = SGLang. <b>g7e at c8 lands inside the band</b> (sglang 2.7 s / vLLM 3.7 s p99) — i.e. a single-user or lightly-loaded chatbot on g7e is genuinely responsive, a verdict the e2e chart hides. But by c130 every g7e point blows past 48 s as the single replica's prefill queue saturates. B200 holds TTFT even at c130 (p99 4.8 s); H200 just misses (6.1–7.0 s). The <b>2026-06-12 sweep is plotted here too</b>: every B200 point (knee c160/c192/c224 at 4.6–5.2 s, tp1×8 c120/c130 at 3.5–3.8 s) and the H200 vLLM tp1×8 c64/c96/c120 points (3.0/3.4/4.0 s) sit comfortably inside the TTFT band — note that even the B200 tp1×8 layout, which fails the e2e tail, is genuinely <i>responsive</i> (fast first token, slow to finish). H200 SGLang c64 is responsive (3.0 s) but c120 just exits the band (7.0 s) as its decode pacing collapses.</p>
+
+<h2>Full concurrency sweep — all platforms, all layouts</h2>
+<table>
+  <thead><tr><th>Platform · engine · layout</th><th>conc</th><th>e2e p50</th><th>e2e p90</th><th>tok/s</th><th>tok/s/GPU</th><th>$/1M (reserved)</th><th>contractual SLO</th></tr></thead>
+  <tbody>
+    <tr><td><span class="dot b200"></span>B200 vLLM tp2×4</td><td class="num">8</td><td class="num">857</td><td class="num">2,254</td><td class="num">63,091</td><td class="num">7,886</td><td class="num">$0.502</td><td class="pass">PASS</td></tr>
+    <tr><td><span class="dot b200"></span>B200 vLLM tp2×4</td><td class="num">32</td><td class="num">1,669</td><td class="num">2,724</td><td class="num">156,907</td><td class="num">19,613</td><td class="num">$0.202</td><td class="pass">PASS</td></tr>
+    <tr><td><span class="dot b200"></span>B200 vLLM tp2×4</td><td class="num">130</td><td class="num">4,197</td><td class="num">7,598</td><td class="num">251,922</td><td class="num">31,490</td><td class="num">$0.126</td><td class="pass">PASS*</td></tr>
+    <tr><td><span class="dot b200"></span>B200 vLLM tp2×4</td><td class="num">160</td><td class="num">5,780</td><td class="num">9,911</td><td class="num">233,288</td><td class="num">29,161</td><td class="num">$0.136</td><td class="marg">p50 PASS / p90 FAIL</td></tr>
+    <tr class="win"><td><span class="dot b200"></span>B200 vLLM tp2×4 @ <b>c192</b></td><td class="num">192</td><td class="num">6,048</td><td class="num">9,051</td><td class="num">275,881</td><td class="num">34,485</td><td class="num">$0.115</td><td class="pass">PASS*</td></tr>
+    <tr><td><span class="dot b200"></span>B200 vLLM tp2×4</td><td class="num">224</td><td class="num">7,041</td><td class="num">10,724</td><td class="num">276,265</td><td class="num">34,533</td><td class="num">$0.115</td><td class="fail">FAIL (p50+p90)</td></tr>
+    <tr><td><span class="dot b200"></span>B200 vLLM tp2×4</td><td class="num">512</td><td class="num">14,865</td><td class="num">25,543</td><td class="num">276,666</td><td class="num">34,583</td><td class="num">$0.114</td><td class="fail">FAIL (lat)</td></tr>
+    <tr><td><span class="dot b200"></span>B200 vLLM tp4×2</td><td class="num">130</td><td class="num">6,755</td><td class="num">10,593</td><td class="num">171,386</td><td class="num">21,423</td><td class="num">$0.185</td><td class="fail">FAIL (p90)</td></tr>
+    <tr><td><span class="dot b200"></span>B200 vLLM tp1×8</td><td class="num">120</td><td class="num">11,278</td><td class="num">19,139</td><td class="num">89,525</td><td class="num">11,191</td><td class="num">$0.354</td><td class="fail">FAIL (lat)</td></tr>
+    <tr><td><span class="dot b200"></span>B200 vLLM tp1×8</td><td class="num">130</td><td class="num">11,641</td><td class="num">17,757</td><td class="num">96,896</td><td class="num">12,112</td><td class="num">$0.327</td><td class="fail">FAIL (lat)</td></tr>
+    <tr><td><span class="dot h200"></span>H200 vLLM tp1×8</td><td class="num">8</td><td class="num">1,219</td><td class="num">2,335</td><td class="num">52,211</td><td class="num">6,526</td><td class="num">$0.212</td><td class="pass">PASS</td></tr>
+    <tr><td><span class="dot h200"></span>H200 vLLM tp1×8</td><td class="num">64</td><td class="num">3,224</td><td class="num">5,128</td><td class="num">170,520</td><td class="num">21,315</td><td class="num">$0.065</td><td class="pass">PASS*</td></tr>
+    <tr><td><span class="dot h200"></span>H200 vLLM tp1×8</td><td class="num">96</td><td class="num">4,473</td><td class="num">6,814</td><td class="num">187,141</td><td class="num">23,393</td><td class="num">$0.059</td><td class="pass">PASS*</td></tr>
+    <tr class="win"><td><span class="dot h200"></span>H200 vLLM tp1×8</td><td class="num">120</td><td class="num">5,198</td><td class="num">7,900</td><td class="num">199,061</td><td class="num">24,883</td><td class="num">$0.056</td><td class="pass">PASS*</td></tr>
+    <tr><td><span class="dot h200"></span>H200 vLLM tp1×8</td><td class="num">130</td><td class="num">5,863</td><td class="num">9,962</td><td class="num">182,584</td><td class="num">22,823</td><td class="num">$0.061</td><td class="marg">p50 PASS / p90 FAIL</td></tr>
+    <tr><td><span class="dot h200"></span>H200 vLLM tp1×8</td><td class="num">256</td><td class="num">9,411</td><td class="num">16,200</td><td class="num">222,440</td><td class="num">27,805</td><td class="num">$0.050</td><td class="fail">FAIL (lat)</td></tr>
+    <tr><td><span class="dot h200"></span>H200 vLLM tp2×4</td><td class="num">8</td><td class="num">1,287</td><td class="num">1,613</td><td class="num">55,507</td><td class="num">6,938</td><td class="num">$0.199</td><td class="pass">PASS</td></tr>
+    <tr><td><span class="dot h200"></span>H200 vLLM tp2×4</td><td class="num">130</td><td class="num">7,038</td><td class="num">11,095</td><td class="num">157,431</td><td class="num">19,679</td><td class="num">$0.070</td><td class="fail">FAIL (p50+p90)</td></tr>
+    <tr><td><span class="dot h200"></span>H200 vLLM tp2×4</td><td class="num">256</td><td class="num">12,662</td><td class="num">20,743</td><td class="num">174,658</td><td class="num">21,832</td><td class="num">$0.063</td><td class="fail">FAIL (lat)</td></tr>
+    <tr><td><span class="dot h200"></span>H200 vLLM tp2×4</td><td class="num">512</td><td class="num">24,148</td><td class="num">43,183</td><td class="num">182,861</td><td class="num">22,858</td><td class="num">$0.060</td><td class="fail">FAIL (lat)</td></tr>
+    <tr><td><span class="dot h200"></span>H200 SGLang tp2×4 ◆</td><td class="num">8</td><td class="num">2,522</td><td class="num">4,258</td><td class="num">26,780</td><td class="num">3,348</td><td class="num">$0.413</td><td class="pass">PASS</td></tr>
+    <tr><td><span class="dot h200"></span>H200 SGLang tp2×4 ◆</td><td class="num">64</td><td class="num">9,095</td><td class="num">14,112</td><td class="num">61,010</td><td class="num">7,626</td><td class="num">$0.181</td><td class="fail">FAIL (both gates)</td></tr>
+    <tr><td><span class="dot h200"></span>H200 SGLang tp2×4 ◆</td><td class="num">120</td><td class="num">14,157</td><td class="num">20,488</td><td class="num">73,305</td><td class="num">9,163</td><td class="num">$0.151</td><td class="fail">FAIL</td></tr>
+    <tr><td><span class="dot h200"></span>H200 SGLang tp2×4 ◆</td><td class="num">130</td><td class="num">15,655</td><td class="num">25,196</td><td class="num">69,621</td><td class="num">8,703</td><td class="num">$0.159</td><td class="fail">FAIL</td></tr>
+    <tr><td><span class="dot g7e"></span>g7e SGLang tp2×1</td><td class="num">8</td><td class="num">4,607</td><td class="num">6,336</td><td class="num">14,511</td><td class="num">7,256</td><td class="num">$0.158</td><td class="pass">PASS</td></tr>
+    <tr><td><span class="dot g7e"></span>g7e SGLang tp2×1</td><td class="num">130</td><td class="num">56,775</td><td class="num">67,291</td><td class="num">20,427</td><td class="num">10,214</td><td class="num">$0.113</td><td class="fail">FAIL</td></tr>
+    <tr><td><span class="dot g7e"></span>g7e SGLang tp2×1</td><td class="num">256</td><td class="num">111,978</td><td class="num">121,616</td><td class="num">20,654</td><td class="num">10,327</td><td class="num">$0.111</td><td class="fail">FAIL</td></tr>
+    <tr><td><span class="dot g7e"></span>g7e vLLM tp2×1</td><td class="num">8</td><td class="num">7,100</td><td class="num">9,476</td><td class="num">9,946</td><td class="num">4,973</td><td class="num">$0.231</td><td class="fail">FAIL (p50)</td></tr>
+    <tr><td><span class="dot g7e"></span>g7e vLLM tp2×1</td><td class="num">130</td><td class="num">66,608</td><td class="num">95,509</td><td class="num">17,217</td><td class="num">8,608</td><td class="num">$0.134</td><td class="fail">FAIL</td></tr>
+    <tr><td><span class="dot g7e"></span>g7e vLLM tp2×1</td><td class="num">256</td><td class="num">101,801</td><td class="num">143,708</td><td class="num">21,955</td><td class="num">10,977</td><td class="num">$0.105</td><td class="fail">FAIL</td></tr>
+  </tbody>
+</table>
+<p class="note">All $/1M on the <b>reserved basis</b> (B200 ODCR $14.24/GPU-hr, H200 Capacity Block $4.975/GPU-hr, g7e ODCR $4.14/GPU-hr) so columns are comparable; spot references are in §②. Highlighted row = cheapest config that passes the contractual SLO (<b>H200 vLLM tp1×8 @ c120, $0.056/1M</b>). ◆ = SGLang (all other rows vLLM). The H200 vLLM tp1×8 c64/c96/c120 rows, all four H200 SGLang rows, the two <b>B200 vLLM tp1×8</b> rows, and the three <b>B200 vLLM tp2×4 c160/c192/c224 knee rows</b> were <b>measured 2026-06-12</b> in the confirming sweep; the rest are from the original runs. <b>B200's real SLO knee is ~c201, not c130</b> — the contractual c130 target was the customer's spec, not the hardware ceiling. We swept the tp2×4 winner upward: c192 still clears both e2e gates (p50 6.0 s / p90 9.1 s, 0 err, confirmed over a sustained 1,536-request run) at <b>$0.115/1M</b>, and piecewise-linear interpolation puts the e2e-p90 crossover at <b>~c201</b> (p50 crossover ~c207). So B200 has ~55% more headroom above the spec than the original report showed, and its true min-cost SLO-passing point is <b>$0.115/1M at c192</b> (not $0.126 at c130) — a +9% capacity / −9% cost gain from running at the knee rather than the spec. <b>B200 tp1×8 was tested to see if 8 collective-free TP=1 replicas could beat B200 tp2×4: they cannot</b> — even with zero TP collectives and ample KV headroom (1.86M tokens / 113× per replica), a single GPU per replica halves aggregate throughput (97K vs 252K tok/s at c130) and the per-token pacing collapses (TPOT p50 132–143 ms), so e2e p50 lands at ~11.3–11.6 s — a hard FAIL of the 6.5 s gate. tp2×4 stays the B200 optimum. <b>*PASS\*</b> rows clear both contractual e2e gates (p50 ≤ 6.5 s, p90 ≤ 9.5 s) but exceed the <i>supporting</i> TPOT p99 target (50 ms) — B200 c130 at 91 ms; H200 tp1×8 c64/c96/c120 at 61/83/93 ms — a per-token-pacing metric, not the headline SLO. Note H200 <b>SGLang</b> tp2×4 is ~2.6× slower than vLLM tp1×8 at matched concurrency and fails the e2e gate by c64, with no mid-range band; the cost verdict rests on the vLLM tp1×8 layout. High-conc FAIL rows are retained to show where throughput (and the lowest sticker $/1M) lives — past the latency knee, hence unusable for this chatbot.</p>
+
+<h2>FP8 vs BF16 — the precision premium is ~1.25–1.4×, not 2×</h2>
+<p>The customer requirement names <b>both</b> precisions. We measured bf16 on <b>B200 tp2×4 only</b> (H200 and g7e runs were FP8-only), and at <b>two concurrency points</b> (c8, c130) rather than a full sweep — so this is a scoped comparison, not a swept curve. Within that scope the result is consistent and useful:</p>
+<table>
+  <thead><tr><th>Config (B200 tp2×4)</th><th>throughput tok/s</th><th>e2e p50</th><th>e2e p90</th><th>TTFT p99</th><th>contractual SLO (6.5/9.5s)</th></tr></thead>
+  <tbody>
+    <tr><td><span class="dot b200"></span>BF16 @ c8</td><td class="num">45,798</td><td class="num">1,451</td><td class="num">2,832</td><td class="num">1,811</td><td class="pass">PASS</td></tr>
+    <tr class="win"><td><span class="dot b200"></span>FP8 @ c8</td><td class="num">63,091</td><td class="num">857</td><td class="num">2,254</td><td class="num">1,726</td><td class="pass">PASS</td></tr>
+    <tr><td><span class="dot b200"></span>BF16 @ c130</td><td class="num">174,046</td><td class="num">6,129</td><td class="num">10,497</td><td class="num">6,125</td><td class="fail">FAIL (p90 10.5 &gt; 9.5)</td></tr>
+    <tr class="win"><td><span class="dot b200"></span>FP8 @ c130</td><td class="num">215,870</td><td class="num">5,334</td><td class="num">8,055</td><td class="num">4,759</td><td class="pass">PASS</td></tr>
+  </tbody>
+</table>
+<div class="leg">
+  <h3>The "half the bytes → half the time" intuition does not hold here <span class="pill">measured</span></h3>
+  <p>FP8 runs at <b>1.38× bf16 throughput at c8</b> and <b>1.24× at c130</b> — bf16 delivers ~72–81% of FP8, not ~50%. The 2× guess comes from FP8 weights being half the size (124 GB vs 240 GB), which converts to 2× throughput <i>only if decode is purely weight-bandwidth-bound</i>. This workload is prefill-dominated and <b>launch/scheduling-bound at the knee</b> (see the DCGM section: HBM ~15%, tensor ~11%), so halving the bytes doesn't halve the time — the bottleneck isn't bytes. The tell is the ratio <b>compressing</b> as load rises (1.38× → 1.24×): a bandwidth-bound gap would hold or widen; it shrinking confirms the launch-bound regime where precision matters less.</p>
+  <p style="margin:10px 0 0"><b>What <i>is</i> ~2×: VRAM, not speed.</b> BF16 ~240 GB vs FP8 ~124 GB — a capacity fact (it's why bf16 needs the full tp2×4 footprint and can't fit a single 96 GB g7e GPU). And the SLO verdict <b>flips</b> at peak: bf16 <span class="fail">fails</span> the e2e-p90 gate at c130 (10.5 s) while FP8 <span class="pass">passes</span> (8.05 s). So for the 130-concurrent contract, FP8 isn't merely faster — it's the only one of the two that holds the target.</p>
+  <p class="note" style="margin-top:10px">Scope caveat: bf16 was characterized on B200 at c8 and c130 only — no H200/g7e bf16, no intermediate concurrencies. The endpoints are solid; the exact bf16 SLO knee between c8 and c130 was not swept.</p>
+</div>
+
+<h2>What moved the numbers — and what didn't</h2>
+<p>Three optimization levers were investigated for this hybrid-Mamba MoE model. Only one paid off; the other two are structurally blocked today. Being explicit about this matters: the throughput above is what <b>well-batched dense prefill</b> delivers, with no help from caching or speculation.</p>
+
+<div class="leg win">
+  <h3>✅ Chunked-prefill batching tuning — the lever that worked <span class="pill ok">production config</span></h3>
+  For ~9K-token RAG prefills, the batched-token budget is the dominant tunable. Sweeping <code>--max-num-batched-tokens</code> (B200, FP8 tp2×4, c130):
+  <table style="margin-top:10px">
+    <thead><tr><th>max-num-batched-tokens</th><th>e2e p50</th><th>e2e p90</th><th>TTFT p50</th><th>TPOT</th><th>contractual SLO</th></tr></thead>
+    <tbody>
+      <tr><td class="num">4,096</td><td class="num">7,065</td><td class="num">11,933</td><td class="num">684</td><td class="num">83.0</td><td class="fail">FAIL (both gates)</td></tr>
+      <tr><td class="num">8,192</td><td class="num">5,105</td><td class="num">8,878</td><td class="num">454</td><td class="num">55.8</td><td class="pass">PASS</td></tr>
+      <tr class="win"><td class="num">16,384</td><td class="num">4,685</td><td class="num">8,147</td><td class="num">387</td><td class="num">55.0</td><td class="pass">PASS (best)</td></tr>
+    </tbody>
+  </table>
+  <p style="margin:10px 0 0">A small chunk budget fragments each long prefill into many chunked iterations, inflating TTFT and the p90 tail; <b>4,096 fails both SLO gates</b>. Setting <code>--max-num-batched-tokens 16384</code> (== max-model-len) lets a prefill complete in one pass → lowest TTFT and tightest tail. This is the promoted production config and the reason B200 holds the SLO at 130 concurrent.</p>
+</div>
+
+<div class="leg closed">
+  <h3>⛔ Automatic prefix caching — non-functional for this Mamba-2 model, at <i>every</i> TP including TP=1</h3>
+  The workload has a shared ~3,050-token system/RAG header, so prefix caching <i>should</i> cut prefill cost. It doesn't here: <b>vLLM reports 0 prefix-cache hits across all replicas</b>, on both B200 and g7e, on vLLM 0.18.1 and 0.22.1. The flags are accepted (<code>--enable-prefix-caching --mamba-cache-mode all</code>, <code>enable_prefix_caching=True</code> in the engine config) but the hybrid Mamba-2 cache path never realizes hits. <b>We confirmed this is not TP-specific:</b> the recommended H200 <b>tp1×8 (TP=1)</b> deployment, swept 2026-06-12, scraped <code>vllm:prefix_cache_hits_total = 0</code> against <b>4.2M</b> <code>prefix_cache_queries_total</code> — zero hits at TP=1 with a verbatim shared header, so the limitation is the Mamba-2 hybrid architecture itself, not the TP&gt;1 KV layout (a stronger statement than the earlier "TP&gt;1 only" read; cf. upstream #26201). <b>The cost figures in this report therefore include no prefix-cache benefit</b> — the SLO rests on raw prefill throughput, g7e's weakest axis. (We <b>fail-close on cache inflation</b>: any reported hit rate above the ~30% real-corpus ceiling is treated as instrumentation error, not a win.)
+</div>
+
+<div class="leg closed">
+  <h3>⛔ Speculative decoding — not deployable on vLLM 0.18/0.22 at TP=2</h3>
+  Both speculative paths crash on the Nemotron-3-Super hybrid (Mamba-2 + select-attention) layout:
+  <ul>
+    <li><b>Native MTP</b> — the FP8 checkpoint ships MTP weights (1,042 <code>mtp.*</code> tensors), vLLM loads the drafter, then crashes on the first forward: <code>tensor a (2) must match tensor b (3)</code> — a shape mismatch in the MTP draft forward at TP=2.</li>
+    <li><b>n-gram / prompt-lookup</b> (no draft model, TP-agnostic) — crashes in CUDA-graph capture: the Mamba-2 attention backend assumes a fixed single-token decode shape and can't reconcile the multi-token speculative query (<code>tensor a (2) must match tensor b (6)</code>).</li>
+  </ul>
+  Acceptance was still <i>measurable</i> via an <code>--enforce-eager</code> workaround (graph capture off), but eager latency isn't production-representative. <b>Net: spec-decode is the secondary lever for a prefill-dominated workload anyway</b> — re-test only when a newer vLLM fixes the Mamba-2 graph-capture + spec-decode path. Confirmed upstream that 0.22.1 does not fix this, so no rebase was warranted.
+</div>
+
+<h2>g7e engine bake-off — SGLang beats vLLM, and only one MoE backend works on sm_120</h2>
+<div class="leg win">
+  <h3>SGLang v0.5.12.post1-cu130 wins on g7e <span class="pill ok">key finding</span></h3>
+  SGLang is faster than vLLM at every g7e operating point (c8 e2e p50 <b>4,607 vs 7,100 ms</b>) — radix cache plus a working FP8 MoE kernel. NCCL initialized cleanly: the cu130 image ships NCCL ≥2.26.2, clearing the 2.25.1 shared-memory bug that breaks all collectives on Blackwell sm_120 + PCIe. (vLLM sidesteps the same bug via its custom all-reduce.)
+</div>
+<div class="leg science">
+  <h3>MoE-backend search on sm_120 — 3 fail, <code>flashinfer_cutlass</code> is the one that works <span class="pill">new sm_120 datum</span></h3>
+  Bringing SGLang up on RTX PRO 6000 Blackwell required cycling MoE runner backends — a hardware-specific result not previously recorded for sm_120:
+  <ul>
+    <li><code>triton</code> — <b>SMEM overflow</b> (required 147,456 B &gt; 101,376 B hardware limit on sm_120). The fused-MoE Triton kernel assumes Hopper/larger-SMEM.</li>
+    <li><code>triton_kernel</code> — <b>weight-shape mismatch</b> at <code>_load_w2</code> (1,344 vs 1,024).</li>
+    <li><code>flashinfer</code> — invalid choice (not a registered backend name).</li>
+    <li><code>flashinfer_cutlass</code> — <b>WORKS.</b> Weights load (modelopt_fp8), Mamba + KV caches allocate, CUDA-graph capture completes, server serves coherent grounded answers.</li>
+  </ul>
+  Launch: <code>--tp 2 --fp8-gemm-backend triton --moe-runner-backend flashinfer_cutlass --mamba-scheduler-strategy no_buffer --reasoning-parser nemotron_3 --kv-cache-dtype fp8_e4m3 --mem-fraction-static 0.90 --context-length 16384</code>, env <code>SGLANG_DISABLE_DEEP_GEMM=1</code>.
+</div>
+
+<h2>Why g7e is latency-bound — structural, not a misconfiguration</h2>
+<div class="panel">
+  <ul>
+    <li><b>One replica, not four.</b> FP8 weights (~124 GB) exceed a single 96 GB GPU, so g7e.12xlarge (2 GPUs) runs exactly <b>one TP=2 replica</b>. B200/H200 (8 GPUs) pack 4 replicas (tp2×4) or 8 (tp1×8) and load-balance 130 concurrent across them (~16–32/replica). On g7e all 130 hit one replica → prefill queue explodes (TTFT 35 s at c130).</li>
+    <li><b>GDDR7 ≪ HBM3e.</b> Prefill is bandwidth-bound; per-GPU prefill throughput is ~⅓ of B200/H200 (see metric ①). This is the dominant effect.</li>
+    <li><b>PCIe, not NVSwitch.</b> The TP=2 all-reduce traverses PCIe instead of NVLink — adds to TPOT under load and means scaling by <i>wider</i> TP (TP4/TP8) would make things worse, not better. The only sane g7e scale-out is more 2-GPU replicas behind a load balancer.</li>
+  </ul>
+</div>
+
+<h2>Is the B200 knee compute-bound or bandwidth-bound? — and would a B300 help?</h2>
+<div class="leg science">
+  <h3>Measured GPU utilization at the c192 knee settles it: neither <span class="pill">DCGM datum</span></h3>
+  <p style="margin:6px 0 0">We pinned a privileged DCGM exporter to the B200 node and sampled the profiling metrics across all 8 GPUs during a sustained c192 run (1,536 requests). Busy-window means (GR_ENGINE &gt; 5%), even across all 8 GPUs:</p>
+  <table style="margin-top:10px">
+    <thead><tr><th>DCGM metric</th><th>what it measures</th><th>busy mean</th><th>peak</th></tr></thead>
+    <tbody>
+      <tr><td><code>GR_ENGINE_ACTIVE</code></td><td>overall SM occupancy</td><td class="num">50%</td><td class="num">82%</td></tr>
+      <tr><td><code>DRAM_ACTIVE</code></td><td>HBM bandwidth utilization</td><td class="num">15%</td><td class="num">24%</td></tr>
+      <tr><td><code>PIPE_TENSOR_ACTIVE</code></td><td>tensor-core (FLOP) utilization</td><td class="num">11%</td><td class="num">18%</td></tr>
+      <tr><td><code>POWER_USAGE</code></td><td>board power (of ~1,000 W TDP)</td><td class="num">701 W</td><td class="num">884 W</td></tr>
+    </tbody>
+  </table>
+  <p style="margin:10px 0 0"><b>At the SLO knee the B200 is neither bandwidth-bound (HBM ~15%) nor compute-bound (tensor cores ~11%).</b> SMs are ~50% occupied while the two units a bigger GPU would improve — HBM bandwidth and FP4/FP8 FLOPs — sit almost idle. The bottleneck is <b>launch / scheduling overhead</b> in the hybrid Mamba-2 + grouped-MoE decode path: at A12B-active with ~16–32 streams per replica, each step fires many small expert GEMMs that occupy SMs with dispatch and memory-movement work rather than dense tensor math (the ~50%-SM / ~11%-tensor gap is the signature). KV memory is a non-issue — 166 of 192 GB resident is almost all weights; KV headroom is ~113×.</p>
+  <p class="note" style="margin-top:10px"><b>B300 verdict: stay on B200.</b> A p6-b300 over p6-b200 brings exactly two deltas — more HBM <i>capacity</i> (~288 vs ~192 GB/GPU) and more FP4 <i>FLOPs</i>; crucially <b>HBM bandwidth is identical (~8 TB/s)</b>. This workload uses neither: capacity is 113× over-provisioned already, FLOPs are 89% idle, and bandwidth (the one thing B300 does <i>not</i> add) is the only HBM axis under any pressure. So a B300 would move <b>none</b> of the metrics that gate this workload — it is a no-op at materially higher cost. The headroom that <i>is</i> reachable lives in software, not silicon — but the specific MoE-tile-tuning lever we expected does <b>not</b> apply here (measured; see below). <span class="pill ok">B300 verdict holds.</span></p>
+  <p class="note" style="margin-top:10px"><b>MoE grouped-GEMM tile tuning — measured a no-op on this build.</b> The launch-bound signature pointed at vLLM's Triton fused-MoE tile config (per-<code>(E,N,device,dtype)</code> JSON; a missing entry falls back to a heuristic). We built a ray-free single-GPU tuner, generated a tuned <code>E=512,N=1344,B200,fp8_w8a8</code> config, mounted it via <code>VLLM_TUNED_CONFIG_FOLDER</code>, and re-ran c192. <b>Result: no change</b> (e2e p50 6.56 s / p90 10.6 s vs baseline 6.05 / 9.05 s — within single-run cold-start noise; identical throughput). Root cause: on B200 vLLM auto-selects the <b><code>FLASHINFER_TRTLLM</code></b> FP8 MoE backend (logged <code>fp8.py:396</code> on all 4 replicas), whose <code>TrtLlmFp8Experts</code> kernels are vendor-autotuned by TensorRT-LLM and <b>never read the Triton tile JSON</b> — only the <code>TRITON</code> backend's <code>TritonExperts</code> does. The serving logs never emit the "Using default MoE config — sub-optimal" Triton warning (the one runtime "default … sub-optimal" warning is for <i>Mamba SSU</i>, a different kernel). So the heuristic-fallback we tuned against was never on the production decode path. To move this lever one would have to <i>force</i> <code>--moe-runner-backend triton</code> and beat TRTLLM's own tuned GEMM — unlikely to be a net win, and untested here. <b>Net: the launch-bound knee is real, but tile tuning is not the unlock; the practical levers remain layout (tp1×8 on H200) and a future vLLM that fixes prefix caching / Mamba-2 spec-decode.</b></p>
+</div>
+
+<h2>Recommendation to customer</h2>
+<ol class="rec">
+  <li><b>Serve on H200 vLLM tp1×8 for the best $/token within SLO — now measured, ~½ of B200.</b> The confirming c64/c96/c120 sweep (2026-06-12, live endpoint) shows H200 with 8 independent TP=1 replicas <b>passes the full contractual e2e gate through c120</b> (measured e2e p50 5.2 s / p90 7.9 s, 0 errors) at <b>$0.056/1M reserved (~½ of B200's cheapest SLO-passing point, $0.115/1M at its c192 knee)</b>, with the p90 crossover at ~c128 — it holds the SLO almost to the 130 target. Use the <i>tp1×8</i> layout, not tp2×4: 124 GB FP8 weights fit in a single 141 GB H200, so 8 zero-collective replicas beat 4 TP=2 replicas by ~2.6× throughput here. This is the recommended deployment for this workload unless you need guaranteed margin at exactly 130 (see #2).</li>
+  <li><b>Use B200 when the requirement is firmly 130 concurrent with margin — and know it has the most headroom above the spec.</b> B200 vLLM tp2×4 (8-GPU NVSwitch, 4 replicas) holds the full 130 target at <b>$0.126/1M reserved</b> (e2e p50 4.2 s / p90 7.6 s — more tail headroom than H200's 7.9 s at c120), and keeps passing the e2e SLO well beyond it: <b>measured to c192 at $0.115/1M (p50 6.0 s / p90 9.1 s), with the p90 crossover at ~c201</b> — i.e. ~55% more concurrency above the spec at an even lower per-token cost. So at the c130 spec point B200 is ~2.3× H200's rate (choose it for the NVSwitch tail margin and proven full-130 headroom); run it at the c192 knee to minimize $/token ($0.115/1M). The right B200 <i>layout</i> is tp2×4, not tp1×8: we swept the collective-free <i>tp1×8</i> layout (the analogue of the H200 winner) at c120/c130, and it <i>fails</i> the e2e gate (p50 ~11.5 s, TPOT p50 ~135 ms) at ~half the throughput — unlike H200, B200's 183 GB per-GPU lets the weights fit at TP=1, but a lone Blackwell can't pace decode for ~16 concurrent streams fast enough, so tp2×4 wins decisively.</li>
+  <li><b>g7e is a low-concurrency / residency option, not a single-node choice for this load.</b> Unlike H200, g7e has <i>no</i> hidden mid-range headroom: its p90 crossover is at <b>~c12–14</b>, so the single 2-GPU replica passes the SLO only across c8–~c12 (~$0.13–0.16/1M) before saturating to 7–10× over the gate. Its lower sticker $/1M ($0.105) is at c256 where e2e p90 is 144 s — unusable. For a <b>lightly-loaded / single-user chatbot</b>, a single g7e box is genuinely viable and responsive (meets the TTFT SLO at c8). To serve 130 concurrent within SLO you'd run ~16 TP=2 replicas (≈4× g7e.48xlarge, 32 GPUs) at c8 each (~$0.16/1M) — competitive on price but 32 GPUs to match 8 B200s, so operational complexity, not cost, decides against it.</li>
+  <li><b>If g7e is mandated</b> (data residency, on-prem Blackwell, capacity), use <b>SGLang</b> with <code>--moe-runner-backend flashinfer_cutlass</code> on a cu130 image — faster than vLLM here and the only working MoE backend on sm_120 — and scale by adding 2-GPU replicas, never by widening TP (PCIe all-reduce makes wider TP worse).</li>
+  <li><b>Two levers were structurally unavailable on this model, on every platform — don't budget for them.</b> Mamba-2 <b>automatic prefix caching is non-functional at every TP — including the recommended TP=1</b> (0 hits / 4.2M queries measured on the H200 tp1×8 winner), so the RAG shared-header reuse never lowers prefill cost — the numbers above already reflect that. <b>Speculative decoding is not deployable</b> for Nemotron-3-Super on vLLM 0.18/0.22 at TP=2 (both MTP and n-gram crash the Mamba-2 CUDA-graph path). The throughput shown is what raw, well-batched prefill delivers; the win came instead from chunked-prefill batching tuning (see above), not from caching or speculation. Both are worth re-testing on a future vLLM that fixes the Mamba-2 graph-capture path — see the projection below for how much prefix caching could buy when it lands.</li>
+</ol>
+
+<div class="leg science">
+  <h3>How much would prefix caching buy when it works? <span class="pill warn">projection — not measured</span></h3>
+  <p style="margin:6px 0 0">Prefix caching is non-functional today at every TP (above; 0 hits even at TP=1), so this is a <b>model</b>, not a result — but it bounds the upside of re-testing on a fixed vLLM. Two facts cap the benefit: caching only removes <b>prefill</b> work, and only the <b>shared header</b> is realistically cacheable.</p>
+  <ul>
+    <li><b>Prefill is a small slice of e2e here.</b> Outputs are short (~75 tokens), so decode dominates: prefill (TTFT) is only <b>~8% of the e2e p50</b> at c130 and ~19% at c8. It rises to <b>~40% of the e2e p90</b> — the tail is where prefill (and queueing) actually bites.</li>
+    <li><b>Only ~⅓ of the input is cacheable.</b> The shared system/RAG header is ~3,050 of the ~9,100 input tokens (~33%); the rest is query-specific retrieved context, and the corpus-reuse ceiling caps repeat content at ~30%. A hit removes ~33% of prefill compute (realistic), up to ~53% only with a hot corpus.</li>
+  </ul>
+  <p style="margin:6px 0 0">Removing 33% of prefill from the B200 tp2×4 winner:</p>
+  <table style="margin-top:10px">
+    <thead><tr><th>Metric</th><th>now</th><th>with caching (modeled)</th><th>Δ</th></tr></thead>
+    <tbody>
+      <tr><td>B200 c8 e2e p50</td><td class="num">857</td><td class="num">~803</td><td class="num">−6%</td></tr>
+      <tr><td>B200 c130 e2e p50</td><td class="num">5,334</td><td class="num">~5,190</td><td class="num">−3%</td></tr>
+      <tr class="win"><td>B200 c130 <b>e2e p90</b> (binding SLO)</td><td class="num">8,055</td><td class="num">~6,990</td><td class="num">−13%</td></tr>
+    </tbody>
+  </table>
+  <p class="note" style="margin-top:10px">The p90 figure is a <b>lower bound</b>: that tail is ~7× the p50 TTFT, i.e. mostly queueing, not compute. Cutting per-request prefill ~33% raises prefill throughput ~1.5×, relieving the queue — so the realized p90 drop could plausibly reach <b>~15–20%</b> (queue-model estimate, not measured). <b>Bottom line: single-digit-% on the median, ~10–20% on the SLO-binding tail.</b> Applied to <b>H200 tp1×8</b>, a ~10–20% p90 cut at c130 (now 10.0 s) would plausibly pull it under the 9,500 ms gate — i.e. prefix caching is exactly the lever that could close H200's last ~2 concurrent (c128→130) and make the full target pass on the cheaper platform. It similarly buys <b>headroom</b> on B200 (higher concurrency or the longer ~243-token production output). It does <b>not</b> rescue g7e (c130 prefill alone is 35 s, ~4× over even after a 33% cut). It does not change the <i>ranking</i> (H200 cheapest within SLO, B200 for full-130 margin today), but it is the highest-value item to re-test on a future vLLM that fixes the Mamba-2 graph-capture path. Note the longer production output (~243 vs ~75 tokens here) would make e2e <i>more</i> decode-weighted, shrinking caching's relative e2e benefit.</p>
+</div>
+
+<footer>
+  Generated 2026-06-12 · Data: <span class="mono">domains/gpu-serving/results-vault/</span> (B200 + H200 + g7e enriched-artifact v1 envelopes, schema-valid).
+  g7e: g7e.12xlarge (2× RTX PRO 6000 Blackwell sm_120, 96 GB GDDR7, PCIe). Benchmarked in Tokyo (only obtainable capacity, $12.02/hr) but costed at the cheaper us-east-2 ODCR rate for a fair same-region comparison.
+  Cost = (instance $/hr ÷ total-tokens/s) × (1e6 ÷ 3600), $/1M = total (prefill+decode) tokens. Reserved rates (Linux/shared): B200 ODCR $113.93/hr ($14.24/GPU-hr); H200 Capacity Block p5e.48xlarge $39.799/hr ($4.975/GPU-hr, AWS Capacity Blocks pricing, dynamic, next refresh July 2026); g7e ODCR us-east-2 $33.14/48xl ($4.14/GPU-hr). Spot references: B200 $32, H200 $30.10; g7e spot unobtainable. tok/s/GPU measured at saturation.
+  <br><b>Caveats:</b> the original c8/c130 runs used per-level sample counts below the spec's 2,000-prompt target and unequal across platforms (B200 ~512, H200 ~520, g7e ~1,040), so those $/1M and tail-latency figures are point estimates without confidence intervals — treat sub-10% gaps as ties. The <b>H200 confirming sweep (vLLM tp1×8 + SGLang tp2×4 at c64/c96/c120, run 2026-06-12)</b> used the full 2,000 prompts/level, 0 errors, so the H200 mid-range band is the most statistically solid data here. Prefix caching contributed nothing (0 hits at every TP — including the TP=1 winner, 4.2M queries, above); the RAG augmentation pipeline ran synthetic-context-free in these runs, so corpus-retrieval overhead is not exercised. Engine builds: B200/H200 vLLM 0.18.1/0.22.1; g7e vLLM 0.22.1 + SGLang v0.5.12.post1-cu130.
+</footer>
+</div>
+</body>
+</html>

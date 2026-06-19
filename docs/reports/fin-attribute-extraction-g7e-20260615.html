@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fin Attribute Extraction — Qwen3.6-35B-A3B on g7e · 2026-06-15</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2530; --border:#30363d;
+    --fg:#e6edf3; --muted:#8b949e; --accent:#58a6ff; --green:#3fb950;
+    --red:#f85149; --amber:#d29922; --violet:#bc8cff;
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.58;font-size:15px}
+  .wrap{max-width:1040px;margin:0 auto;padding:40px 24px 80px}
+  header{border-bottom:1px solid var(--border);padding-bottom:24px;margin-bottom:24px}
+  h1{font-size:27px;margin:0 0 6px;letter-spacing:-.02em}
+  h2{font-size:20px;margin:42px 0 12px;padding-top:8px;letter-spacing:-.01em;border-top:1px solid var(--border)}
+  h3{font-size:15px;margin:22px 0 8px;color:var(--accent)}
+  .sub{color:var(--muted);font-size:14px}
+  p{margin:11px 0}
+  b,strong{color:#fff;font-weight:650}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+  th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);vertical-align:top}
+  th:first-child,td:first-child{text-align:left}
+  thead th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  tbody tr:hover{background:var(--panel)}
+  td.num{font-family:var(--mono)}
+  tr.win{background:rgba(63,185,80,.08)}
+  .pass{color:var(--green);font-weight:650}
+  .fail{color:var(--red);font-weight:650}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:16px 18px;margin:14px 0}
+  .panel.accent{border-color:var(--accent)}
+  .panel.amber{border-color:var(--amber)}
+  .verdict{background:linear-gradient(135deg,#16241a,#161b22);border:1px solid var(--green);border-radius:10px;padding:18px 20px;margin:8px 0}
+  .verdict.warn{background:linear-gradient(135deg,#2a2012,#161b22);border-color:var(--amber)}
+  .verdict .tag{display:inline-block;background:var(--green);color:#03100a;font-weight:700;font-size:12px;padding:2px 9px;border-radius:5px;letter-spacing:.03em}
+  .verdict.warn .tag{background:var(--amber);color:#1a1204}
+  code,.mono{font-family:var(--mono);font-size:12.5px;background:var(--panel2);padding:1px 6px;border-radius:4px;color:var(--violet)}
+  .note{color:var(--muted);font-size:12.5px;font-style:italic}
+  .chart{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:14px;margin:16px 0}
+  .chart svg{width:100%;height:auto;display:block}
+  .legendrow{display:flex;flex-wrap:wrap;gap:16px;margin:6px 0 0;font-size:12px}
+  .legendrow span{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+  .sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
+  ul{padding-left:22px}li{margin:5px 0}
+  footer{margin-top:48px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Fin Attribute Extraction — Qwen3.6-35B-A3B: g7e vs H200 vs B200</h1>
+  <div class="sub">Prefill-dominated structured extraction (ISL ~1.6K / OSL ~22) · tight 1s/2s E2E SLO @ 70 RPS peak · g7e (RTX PRO 6000 sm_120) · H200 (p5en sm_90) · B200 (p6 sm_100) · vLLM 0.22.1 FP8 · 2026-06-15→16</div>
+</header>
+
+<div class="verdict">
+  <span class="tag">HEADLINE</span>
+  <p style="margin:10px 0 0"><b>Serve this as independent FP8 <code>TP1</code> replicas behind a router — not TP2, not disaggregated.</b> The model (3B-active MoE, ~32 GB FP8) fits one GPU with ~113× headroom, so TP-splitting buys nothing, and the ~22-token output leaves no decode phase to disaggregate. For the 70 RPS peak: <b>~4 H200 or ~4 B200 GPUs, or ~6 g7e GPUs</b> at <code>mnbt=8192</code> (size mnbt ≥ ISL; do not chunk below it). The key mechanism finding across three GPUs: the launch-bound wall that caps g7e at ~12 RPS/GPU is <b>engine-specific, not hardware-fundamental</b> — <b>H200 (~20) and B200 (~22) both lift it ~2×</b>, purely because vLLM's full CUDA-graph capture works on sm_90/sm_100 but <b>crashes on g7e's sm_120</b>, flipping the box from launch-bound to compute-bound. Per unit of SLO-safe capacity all three FP8 configs sit in a tight ~$0.096–0.116 band (<b>H200 cheapest</b>), so the choice is constraints not cost: <b>g7e.48xl</b> lowest absolute spend for ≤96 RPS, <b>H200</b> best $/capacity + density, <b>B200</b> max headroom. Per-request latency (~180–200 ms unloaded) is excellent on all three; the levers are <b>mnbt sizing (+~20%) and graph capture</b>, not kernel tuning (a measured no-op) or TP.</p>
+</div>
+
+<h2>The SLO curve — E2E p90 vs offered request rate (single TP1 replica)</h2>
+<div class="chart">
+<svg viewBox="0 0 920 390" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,Segoe UI,sans-serif">
+  <rect x="0" y="0" width="920" height="390" fill="#0d1117"/>
+  <!-- plot area: x 70..880 (rate 0..30), y 40..330 (e2e 0..11000ms); x=70+rate*27 ; y=330-ms*0.026364 -->
+  <!-- SLO band (<=2000ms): y(2000)=277 -->
+  <rect x="70" y="277" width="810" height="53" fill="#3fb950" opacity="0.10"/>
+  <line x1="70" y1="277" x2="880" y2="277" stroke="#3fb950" stroke-dasharray="5 4" opacity="0.7"/>
+  <text x="876" y="271" fill="#3fb950" font-size="11" text-anchor="end">2s E2E p90 SLO</text>
+  <!-- axes -->
+  <line x1="70" y1="330" x2="880" y2="330" stroke="#30363d"/>
+  <line x1="70" y1="40" x2="70" y2="330" stroke="#30363d"/>
+  <!-- x ticks: 5,10,15,20,25,30 -> 205,340,475,610,745,880 -->
+  <g fill="#8b949e" font-size="11" text-anchor="middle">
+    <text x="205" y="348">5</text><text x="340" y="348">10</text><text x="475" y="348">15</text>
+    <text x="610" y="348">20</text><text x="745" y="348">25</text><text x="880" y="348">30</text>
+    <text x="475" y="368" fill="#8b949e">offered request rate (RPS)</text>
+  </g>
+  <!-- y ticks: 0,2k,5k,10k -> 330,277,198,69 -->
+  <g fill="#8b949e" font-size="10" text-anchor="end">
+    <text x="64" y="334">0</text><text x="64" y="281">2s</text><text x="64" y="202">5s</text><text x="64" y="72">10s</text>
+  </g>
+  <!-- B200 FP8 mnbt=8192 (violet): (10,863)(12,916)(14,948)(18,1439)(22,1829)(26,2670)(30,3876) -->
+  <!-- x:340,394,448,556,664,772,880 ; y:307,306,305,292,282,260,228 -->
+  <polyline points="340,307 394,306 448,305 556,292 664,282 772,260 880,228" fill="none" stroke="#bc8cff" stroke-width="2.5"/>
+  <g fill="#bc8cff">
+    <circle cx="340" cy="307" r="5"/><circle cx="394" cy="306" r="5"/><circle cx="448" cy="305" r="5"/><circle cx="556" cy="292" r="5"/><circle cx="664" cy="282" r="5"/><circle cx="772" cy="260" r="5"/><circle cx="880" cy="228" r="5"/>
+  </g>
+  <!-- H200 FP8 mnbt=8192 (green): (10,800)(12,894)(14,970)(18,1160)(20,1559)(22,2354)(26,2763) -->
+  <!-- x:340,394,448,556,610,664,772 ; y:309,306,304,299,289,268,257 -->
+  <polyline points="340,309 394,306 448,304 556,299 610,289 664,268 772,257" fill="none" stroke="#3fb950" stroke-width="2.5"/>
+  <g fill="#3fb950">
+    <circle cx="340" cy="309" r="5"/><circle cx="394" cy="306" r="5"/><circle cx="448" cy="304" r="5"/><circle cx="556" cy="299" r="5"/><circle cx="610" cy="289" r="5"/><circle cx="664" cy="268" r="5"/><circle cx="772" cy="257" r="5"/>
+  </g>
+  <!-- g7e FP8 mnbt=8192 (blue): (8,1124)(10,1401)(12,1991)(14,3489) -->
+  <!-- x:286,340,394,448 ; y:300,293,277,238 -->
+  <polyline points="286,300 340,293 394,277 448,238" fill="none" stroke="#58a6ff" stroke-width="2.5"/>
+  <g fill="#58a6ff">
+    <circle cx="286" cy="300" r="5"/><circle cx="340" cy="293" r="5"/><circle cx="394" cy="277" r="5"/><circle cx="448" cy="238" r="5"/>
+  </g>
+  <!-- g7e bf16 (amber): (5,1272)(10,6096)(15,9885) -->
+  <!-- x:205,340,475 ; y:296,169,69 -->
+  <polyline points="205,296 340,169 475,69" fill="none" stroke="#d29922" stroke-width="2.5"/>
+  <g fill="#d29922">
+    <circle cx="205" cy="296" r="5"/><circle cx="340" cy="169" r="5"/><circle cx="475" cy="69" r="5"/>
+  </g>
+  <!-- annotations -->
+  <text x="700" y="276" fill="#bc8cff" font-size="10.5" text-anchor="middle">B200 ~22 · H200 ~20</text>
+  <text x="448" y="232" fill="#58a6ff" font-size="10.5" text-anchor="start">g7e FP8 breaks @~12</text>
+  <text x="205" y="290" fill="#d29922" font-size="10.5" text-anchor="start">g7e bf16 edge @~5</text>
+</svg>
+<div class="legendrow">
+  <span><span class="sw" style="background:#bc8cff"></span>B200 FP8 — 1 replica (~22)</span>
+  <span><span class="sw" style="background:#3fb950"></span>H200 FP8 — 1 replica (~20)</span>
+  <span><span class="sw" style="background:#58a6ff"></span>g7e FP8 — 1 replica (~12)</span>
+  <span><span class="sw" style="background:#d29922"></span>g7e BF16 — 1 replica (~5)</span>
+</div>
+</div>
+<p class="note">All curves are a single TP1 replica, random 2,500-in / 22-out, mnbt=8192, warm. <b>B200 (violet ~22) and H200 (green ~20) sit together</b>, both ~2× <b>g7e FP8 (blue ~12, breaks at ~14)</b>; g7e bf16 (amber) only reaches ~5. The datacenter parts win because <b>full CUDA-graph capture works on sm_90 (H200) and sm_100 (B200) but crashes on sm_120 (g7e)</b> — same Triton MoE kernel, launch wall removed. Per-GPU, not per-node: an 8-GPU node = 8 of these replicas. <span class="note" style="font-style:normal">(SLO region = E2E p90 ≤ 2s, green band.)</span></p>
+
+<h2>Per-replica numbers — FP8, all three GPUs (single TP1 replica, mnbt=8192)</h2>
+<table>
+  <thead><tr><th>GPU</th><th>Rate (RPS)</th><th>Achieved req/s</th><th>TPOT med (ms)</th><th>E2E p50 (ms)</th><th>E2E p90 (ms)</th><th>SLO (2s p90)</th></tr></thead>
+  <tbody>
+    <tr><td><span class="dot" style="background:#58a6ff"></span>g7e</td><td class="num">10</td><td class="num">9.9</td><td class="num">—</td><td class="num">699</td><td class="num">1401</td><td class="pass">PASS</td></tr>
+    <tr><td><span class="dot" style="background:#58a6ff"></span>g7e</td><td class="num">12</td><td class="num">11.7</td><td class="num">—</td><td class="num">1099</td><td class="num">1991</td><td class="pass">PASS (knee)</td></tr>
+    <tr><td><span class="dot" style="background:#58a6ff"></span>g7e</td><td class="num">14</td><td class="num">~14 (sat)</td><td class="num">—</td><td class="num">2076</td><td class="num">3489</td><td class="fail">FAIL</td></tr>
+    <tr class="win"><td><span class="dot" style="background:#3fb950"></span>H200</td><td class="num">14</td><td class="num">13.8</td><td class="num">22</td><td class="num">664</td><td class="num">970</td><td class="pass">PASS</td></tr>
+    <tr class="win"><td><span class="dot" style="background:#3fb950"></span>H200</td><td class="num">20</td><td class="num">19.8</td><td class="num">44</td><td class="num">1113</td><td class="num">1559</td><td class="pass">PASS (knee)</td></tr>
+    <tr><td><span class="dot" style="background:#3fb950"></span>H200</td><td class="num">22</td><td class="num">21.3</td><td class="num">49</td><td class="num">1267</td><td class="num">2354</td><td class="fail">FAIL</td></tr>
+    <tr class="win"><td><span class="dot" style="background:#bc8cff"></span>B200</td><td class="num">14</td><td class="num">13.8</td><td class="num">24</td><td class="num">690</td><td class="num">948</td><td class="pass">PASS</td></tr>
+    <tr class="win"><td><span class="dot" style="background:#bc8cff"></span>B200</td><td class="num">22</td><td class="num">21.4</td><td class="num">52</td><td class="num">1331</td><td class="num">1829</td><td class="pass">PASS (knee)</td></tr>
+    <tr><td><span class="dot" style="background:#bc8cff"></span>B200</td><td class="num">26</td><td class="num">25.4</td><td class="num">86</td><td class="num">2191</td><td class="num">2670</td><td class="fail">FAIL</td></tr>
+  </tbody>
+</table>
+<p class="note">SLO-safe knee per GPU: <b>g7e ~12, H200 ~20, B200 ~22 RPS/replica</b>. The TPOT column tells the compute-bound story on the datacenter parts — it climbs gently (22→52 ms) as load rises, whereas on g7e it explodes once past the launch-bound knee (≥159 ms by rate 15, the run-away that drives the p90 blow-up). Unloaded (rate 1, real p50 ISL 1654) all three are ~90–98 ms TTFT / ~180–237 ms E2E — per-request latency easily beats the 1s SLO on every platform; capacity, not latency, is the constraint. (g7e TPOT at mnbt=8192 not separately captured; default-mnbt g7e TPOT was 24 ms @ rate 10, 159 ms @ rate 15.)</p>
+
+<h2>Why g7e is launch-bound — DCGM at saturation</h2>
+<div class="panel accent">
+  <p style="margin-top:0">g7e FP8 single-replica DCGM (GPU0) across the sweep:</p>
+  <table style="margin-bottom:6px">
+    <thead><tr><th>Rate</th><th>SM occupancy</th><th>HBM mem-util</th></tr></thead>
+    <tbody>
+      <tr><td class="num">5</td><td class="num">25%</td><td class="num">~0%</td></tr>
+      <tr><td class="num">10</td><td class="num">35%</td><td class="num">~0%</td></tr>
+      <tr><td class="num">15</td><td class="num">40%</td><td class="num">~0%</td></tr>
+      <tr><td class="num">20 (sat)</td><td class="num">43%</td><td class="num">~0%</td></tr>
+    </tbody>
+  </table>
+  <p style="margin:8px 0 0">At the saturation knee <b>SM is only ~43% and HBM bandwidth is idle (~0%)</b> — neither compute- nor bandwidth-bound. The model is <b>35B-total / 3B-active MoE with 256 tiny experts</b> (<code>moe_intermediate_size=512</code>) and a hybrid <b>Gated-DeltaNet</b> linear-attention path. Decode fires many small expert + scan kernels, so the SMs fill with <b>kernel-launch and scheduling work, not dense math</b>. The tell: TPOT climbs to 123–168 ms loaded for a 3B-active model — anomalously high unless the bottleneck is launch overhead. Same signature as Nemotron-3-Super and the bottleneck-migration thesis. <b>Note this launch wall turned out to be engine-specific (CUDA-graph capture), not hardware-fundamental — B200 lifts it ~2×; see the B200 section.</b> <span class="note">(This <i>g7e</i> DCGM is launch-bound at ~43% SM; the same workload on B200 with working graph capture runs SM ~99% — compute-bound.)</span></p>
+</div>
+
+<h2>Capacity &amp; cost — what it takes to hold 70 RPS</h2>
+<table>
+  <thead><tr><th>Config (1 GPU = 1 TP1 replica)</th><th>SLO-safe RPS / GPU</th><th>GPUs for 70 RPS</th><th>spot $/GPU-hr</th><th>$/sustained-RPS-hr</th></tr></thead>
+  <tbody>
+    <tr class="win"><td><span class="dot" style="background:#3fb950"></span>H200 FP8 mnbt=8192</td><td class="num">~20</td><td class="num">~4</td><td class="num">$1.91</td><td class="num">$0.096</td></tr>
+    <tr><td><span class="dot" style="background:#bc8cff"></span>B200 FP8 mnbt=8192</td><td class="num">~22</td><td class="num">~4</td><td class="num">$2.36</td><td class="num">$0.107</td></tr>
+    <tr><td><span class="dot" style="background:#58a6ff"></span>g7e FP8 mnbt=8192</td><td class="num">~12</td><td class="num">~6</td><td class="num">$1.40</td><td class="num">$0.116</td></tr>
+    <tr><td><span class="dot" style="background:#d29922"></span>g7e bf16</td><td class="num">~5–6</td><td class="num">~12</td><td class="num">$1.40</td><td class="num">~$0.25</td></tr>
+  </tbody>
+</table>
+<p class="note">Spot, us-east-2, 2026-06-16, ÷8 GPU/node: H200 p5en.48xlarge $15.31/hr → $1.91/GPU; B200 p6-b200.48xlarge $18.90 → $2.36; g7e.48xlarge $11.17 → $1.40. "$/sustained-RPS-hr" = $/GPU-hr ÷ SLO-safe RPS/GPU — the cost to hold one request/sec of capacity.</p>
+<div class="panel accent">
+  <b>H200 is the cheapest per unit of SLO-safe capacity ($0.096) — it gets ~B200 throughput at a lower spot price</b> (~10% under B200, ~17% under g7e per sustained-RPS). All three FP8 configs land within a tight ~$0.096–0.116 band, so <b>capacity-per-dollar is roughly a wash and the choice is about constraints, not cost:</b>
+  <ul style="margin:8px 0 0">
+    <li><b>Cheapest whole-node for ≤96 RPS</b> → <b>g7e.48xlarge ($11.17/hr)</b>, lowest absolute spend and sufficient (96 RPS headroom).</li>
+    <li><b>Best $/capacity + density (4 GPUs/node)</b> → <b>H200 p5en</b> if its spot price holds; ~B200 throughput, cheaper.</li>
+    <li><b>Max headroom on one node</b> → <b>B200</b> (~176 RPS/node, slight throughput edge).</li>
+  </ul>
+  <span class="note" style="font-style:normal">Caveat: p5en spot is volatile ($13–16/hr seen); at the high end H200's edge over B200 narrows. p5e (non-EN, ~$10.64) would be cheaper still — networking is unused here (TP1, no collective).</span>
+</div>
+
+<h3>Use 8×TP1, not TP2 — the model fits one GPU with ~113× headroom</h3>
+<p>FP8 is ~32 GB and fits a single B200 (183 GB) or g7e GPU (96 GB) with enormous headroom. So <b>TP2 would split a model that doesn't need splitting</b>, paying an all-reduce collective every layer for <i>zero</i> capacity benefit. Run <b>independent TP1 replicas</b> (8 per B200 node ≈ 176 RPS; 8 per g7e.48xl ≈ 96 RPS) behind a router. The fin-rag caveat that sank B200-TP1 there — a lone Blackwell couldn't pace <i>decode</i> for ~16 streams/replica — <b>does not apply</b>: this workload's output is ~22 tokens, so there's almost no decode to pace, and prefill parallelizes perfectly across replicas. <b>8×TP1 beats 4×TP2 here by ~2×/GPU.</b> (Use independent replicas, not vLLM data-parallel — FP8 DP is broken on 0.22.1, see gotchas.)</p>
+<p>The spec's decision gate — <i>"start on g7e, escalate to B200 only if the SLO breaks before 70 RPS"</i> — resolves: g7e is viable at <b>48xl</b> (8×TP1 FP8 @ mnbt=8192 ≈ 96 RPS) and is the cheaper whole-node choice for the 70 RPS target; B200 is the denser option if peak grows.</p>
+
+<h3>Why NOT prefill/decode disaggregation — this is the textbook non-disagg case</h3>
+<p>Disaggregation pays off only when prefill and decode have <b>opposite rooflines that interfere</b>, the phases want <b>different parallelism</b>, and load forces you <b>multi-node</b>. This workload fails all three gates:</p>
+<table>
+  <thead><tr><th>Gate for disagg</th><th>This workload</th><th></th></tr></thead>
+  <tbody>
+    <tr><td><b>Two phases to separate</b></td><td>Output is <b>~22 tokens</b> — it's ~95% prefill. There is almost no decode phase to isolate; a dedicated decode pool would sit idle.</td><td class="fail">FAILS</td></tr>
+    <tr><td><b>Different parallelism</b> (the only thing one engine can't fake)</td><td>Model fits one GPU at <b>TP1</b>; prefill and decode both run fine there. No EP, no heterogeneity.</td><td class="fail">FAILS</td></tr>
+    <tr><td><b>Forced multi-node</b></td><td>70 RPS = ~4 B200 GPUs = <b>half a node</b>. Never crosses a node boundary.</td><td class="fail">FAILS</td></tr>
+  </tbody>
+</table>
+<div class="panel">
+  <b>The B200 result makes the disagg case <i>weaker</i>, not stronger.</b> The instinct "it's compute-bound prefill now, so split prefill off" inverts what disagg does — disagg <i>relocates</i> prefill across pools, it doesn't add prefill throughput, and at the knee the single aggregated engine already runs <b>SM ~99%</b> (compute-bound, no idle resource to reclaim). The thing that <i>was</i> wrong (launch overhead) was fixed by a <b>software lever</b> (CUDA-graph capture), not by architectural separation. Adding a KV/state-transfer tax and a second pool would buy zero extra capacity here. <b>Right scaling lever: replica count.</b> This would only flip to a disagg case if ISL exploded (100K+ context forcing cross-node prefill) — here ISL is ~2,500. <span class="note">(If a future version sent <i>images</i>, the vision encoder is a third compute phase → that's E/P/D-disaggregation territory, not the text-only case measured here.)</span></p>
+</div>
+
+<h2>Two software levers tested: mnbt helps ~20%, kernel tuning is dead</h2>
+<p>The launch-bound diagnosis says hardware won't help — so the levers that <i>could</i> are software. We tested both the spec's Axis-B knobs on the FP8 single replica (with graph capture).</p>
+
+<h3>✅ <code>--max-num-batched-tokens</code> — the lever that worked</h3>
+<table>
+  <thead><tr><th>Rate (RPS)</th><th>mnbt=4096 p90</th><th>mnbt=8192 p90</th><th>SLO (2s)</th></tr></thead>
+  <tbody>
+    <tr><td class="num">8</td><td class="num">1256</td><td class="num">1124</td><td class="pass">both PASS</td></tr>
+    <tr><td class="num">10</td><td class="num">1746</td><td class="num">1401</td><td class="pass">both PASS</td></tr>
+    <tr class="win"><td class="num">12</td><td class="num">2450 <span class="fail">FAIL</span></td><td class="num">1991 <span class="pass">PASS</span></td><td>only 8192</td></tr>
+    <tr><td class="num">14</td><td class="num">3318</td><td class="num">3489</td><td class="fail">both FAIL</td></tr>
+  </tbody>
+</table>
+<p><b>mnbt=8192 extends the SLO-safe ceiling from ~10 to ~12 RPS — a ~20% per-replica capacity gain from one flag.</b> Monotonic: bigger is better. <b>Mechanism</b>: the ISL is ~2,500, so any mnbt below it (2048, 4096) <i>forces</i> prefill chunking → extra scheduler iterations → more kernel launches, which is exactly the scarce resource on a launch-bound box. mnbt ≥ ISL runs each prefill in one step. <span class="note">(The spec hypothesized sweeping mnbt down to <i>pack</i> short-output requests — for this prefill-heavy shape the direction is reversed; size it up. Same lesson as Nemotron-3-Super.)</span></p>
+
+<h3>⛔ MoE tile tuning — a measured no-op, even though the tuner is live here</h3>
+<p>On g7e/sm_120 the FP8 MoE path is <b>Triton</b> (logged <code>Using TRITON Fp8 MoE backend</code>) and vLLM warned <code>Using default MoE config — sub-optimal</code> for shape <code>E=256,N=512,fp8_w8a8</code>. We generated the missing tile config with the ray-free tuner (batches 8–32, pruned to the launch-bound small-M regime), mounted it, and <b>confirmed it loaded</b> (<code>Using configuration from /tuned/E=256,N=512,…json</code> — warning gone).</p>
+<table>
+  <thead><tr><th>Rate</th><th>untuned p90</th><th>tuned p90</th></tr></thead>
+  <tbody>
+    <tr><td class="num">10</td><td class="num">1401</td><td class="num">1921</td></tr>
+    <tr><td class="num">12</td><td class="num">1991</td><td class="num">2531</td></tr>
+    <tr><td class="num">14</td><td class="num">3489</td><td class="num">5102</td></tr>
+  </tbody>
+</table>
+<div class="panel amber">
+  <b>No improvement (slightly worse, within run variance).</b> This differs from Nemotron-3-Super in a telling way: there, tuning was inert because the kernel was <b>FlashInfer</b> and <i>never read</i> the Triton JSON. <b>Here the kernel IS Triton and DID load the tuned config — yet still no gain.</b> So the launch-bound knee is not in the MoE GEMM tile selection; it's the <b>number of kernel launches and scheduling</b> across the 256-expert + Gated-DeltaNet path. Tile tuning optimizes each GEMM's throughput; it cannot reduce dispatch count. <b>Conclusion: don't tune MoE tiles for this model.</b> <span class="note">(We initially inferred from this that a bigger GPU also wouldn't help per-replica — the B200 run below <b>disproves that</b>: the launch wall was graph-capture-specific, not hardware-fundamental.)</span>
+</div>
+
+<h2>The launch wall is a software story, not a silicon tier — H200 ≈ B200 ≈ 2× g7e</h2>
+<p>We benchmarked the identical config (FP8, TP1, mnbt=8192) on <b>H200 (p5en.48xlarge)</b> and <b>B200 (p6-b200.48xlarge)</b> to test whether g7e's launch-bound ceiling is hardware-fundamental or engine-specific. It is <b>not</b> fundamental: both datacenter parts hold the SLO to <b>~20–22 RPS/replica vs g7e's ~12</b>.</p>
+<table>
+  <thead><tr><th>Rate (RPS)</th><th>g7e p90</th><th>H200 p90</th><th>B200 p90</th><th>g7e</th><th>H200</th><th>B200</th></tr></thead>
+  <tbody>
+    <tr><td class="num">10</td><td class="num">1401</td><td class="num">800</td><td class="num">863</td><td class="pass">PASS</td><td class="pass">PASS</td><td class="pass">PASS</td></tr>
+    <tr><td class="num">14</td><td class="num">3489</td><td class="num">970</td><td class="num">948</td><td class="fail">FAIL</td><td class="pass">PASS</td><td class="pass">PASS</td></tr>
+    <tr><td class="num">18</td><td class="num">—</td><td class="num">1160</td><td class="num">1439</td><td>(sat ~14)</td><td class="pass">PASS</td><td class="pass">PASS</td></tr>
+    <tr class="win"><td class="num">20</td><td class="num">—</td><td class="num">1559</td><td class="num">—</td><td>—</td><td class="pass">PASS (knee)</td><td class="pass">PASS</td></tr>
+    <tr><td class="num">22</td><td class="num">—</td><td class="num">2354</td><td class="num">1829</td><td>—</td><td class="fail">FAIL</td><td class="pass">PASS (knee)</td></tr>
+    <tr><td class="num">26</td><td class="num">—</td><td class="num">2763</td><td class="num">2670</td><td>—</td><td class="fail">FAIL</td><td class="fail">FAIL</td></tr>
+  </tbody>
+</table>
+<div class="panel accent">
+  <b>Why the datacenter parts win — measured across three GPUs:</b>
+  <ul style="margin:8px 0">
+    <li><b>FP8 MoE backend = TRITON on all three</b> (<code>fp8.py:405</code>). The MoE kernel path is <i>identical</i> — so it is <b>not</b> the differentiator. (Refutes the guess that Blackwell picks FlashInfer TRTLLM for this model.)</li>
+    <li><b>Full CUDA-graph capture: SUCCEEDS on H200 (sm_90) and B200 (sm_100), CRASHES on g7e (sm_120).</b> Both datacenter parts logged <code>Capturing CUDA graphs (decode, FULL): 100%</code>; g7e crashed full-decode capture (<code>1 != ISL</code> shape assert) and effectively ran without it. <b>This is the difference</b> — full decode-graph capture collapses the many small per-step kernel launches into one replay, removing exactly the overhead that capped g7e. The ~2× gap tracks the <i>vLLM version's sm-specific graph support</i>, not raw FLOPs or bandwidth.</li>
+  </ul>
+  <b>Bottleneck class flips:</b> g7e at saturation was SM ~43% / HBM ~0% (<b>launch-bound</b>). Both datacenter parts are <b>compute-bound</b> at their knee: B200 SM ~99% / HBM ~31% / 786 W; H200 SM ~100% / HBM ~47% / ~688 W (H200's higher HBM engagement tracks its lower bandwidth, 4.8 vs 8 TB/s — but still compute-bound, not bandwidth-bound). The launch wall is gone; the box runs until genuinely compute-limited. Unloaded latency is identical across all three (~90–98 ms TTFT) — the win is purely the throughput ceiling.
+</div>
+<p><b>Capacity implication</b>: at ~20–22 RPS/replica, H200 and B200 each need <b>~4 replicas (half a node)</b> for the 70 RPS peak vs ~6 g7e GPUs. <b>Caveats</b>: (1) vLLM 0.22.1 has a CUTLASS-DSL compile crash on both H200 and B200 in the <i>vision-encoder</i> path — must serve text-only with <code>--limit-mm-per-prompt '{"image":0,"video":0}'</code>; (2) g7e's full-graph crash may be fixable on a newer vLLM, which would lift its ceiling toward the others — so this gap is a <i>software-maturity</i> gap, not a pure silicon gap. <b>Cost:</b> H200 is actually the cheapest per unit of SLO-safe capacity — see the Capacity &amp; cost table above.</p>
+
+<h2>FP8 vs BF16 — here the precision win is ~2× (and it matters)</h2>
+<p>Measured on <b>g7e</b> (bf16 was not run on B200). Unlike Nemotron-3-Super (where FP8 bought only ~1.25–1.4× throughput because that workload was also launch-bound at a different knee), on this model FP8 <b>roughly doubles the SLO-safe per-replica rate</b> (~10 vs ~5–6 RPS) and lifts saturation (~14 vs ~11 req/s). The binding constraint is the admission ceiling, and FP8's lighter per-token kernels push it up. FP8 also halves VRAM (32 vs 65 GiB) — both fit one 96 GB g7e GPU at TP1, so neither needs a collective. <b>Recommendation: FP8.</b></p>
+
+<h2>Stage 0 — all gates passed</h2>
+<ul>
+  <li><b>Thinking disable WORKS</b> (the headline risk): <code>chat_template_kwargs={"enable_thinking": False}</code> → output <code>negative</code>, <b>2 tokens, zero <code>&lt;think&gt;</code></b>. With thinking on: 64 tokens of deliberation that would blow the 1s SLO. A regression that re-enables it is the single biggest deployment risk.</li>
+  <li><b>Arch registers as <code>qwen3_5_moe</code></b> (same family as Qwen3.5) — vLLM 0.22.1 loads it on sm_120 cleanly; hybrid Gated-DeltaNet (3 of 4 layers) + full-attention MoE, 256 experts, 40 layers, ~72 GB bf16 / 32 GB FP8.</li>
+  <li><b>FP8 MoE TP-divisibility</b>: <code>512 / TP % 128 == 0</code> → TP1/2/4 OK, TP8 forbidden (moot at 2 GPU).</li>
+</ul>
+
+<h2>Engineering gotchas (g7e / vLLM 0.22.1 / qwen3_5_moe)</h2>
+<div class="panel amber">
+  <ul style="margin:0">
+    <li><b><code>max_num_seqs</code> default 1024 &gt; Mamba cache blocks (754)</b> → CUDA-graph capture refuses to start. Fix: <code>--max-num-seqs 256</code>.</li>
+    <li><b>FP8 + <code>--data-parallel-size 2</code> is BROKEN on 0.22.1 for this hybrid GDN MoE</b>: <code>AssertionError: 1 != &lt;ISL&gt;</code> in the all-reduce / sequence-parallel path → EngineCore dies on first real request. bf16 DP=2 worked. Workaround: independent single-GPU replicas (no DP coordinator). Consistent with the known 0.22-avoid flag.</li>
+    <li><b>First-batch JIT is brutal</b>: <code>fused_moe_kernel</code>, <code>_causal_conv1d_fwd_kernel</code> and the GDN kernels JIT-compile on first unseen shape → 32 s cold TTFT, then 93 ms warm. Always warm up before measuring; a cold server looks wedged.</li>
+    <li><b>g7e needs <code>--network host</code></b> (no CNI on bare metal); runtime is <code>nerdctl</code>; start <code>containerd</code> first.</li>
+    <li><b>No official FP8</b> — used vLLM online <code>--quantization fp8</code> (per-tensor dynamic). Quality vs a real extraction corpus is unverified (spec Stage 0 community-quant selection deferred).</li>
+  </ul>
+</div>
+<p style="margin-top:14px"><b>Datacenter GPU (B200 &amp; H200) / EKS additions:</b></p>
+<div class="panel amber">
+  <ul style="margin:0">
+    <li><b>vLLM 0.22.1 CUTLASS-DSL ICE on both B200 (sm_100) and H200 (sm_90) in the vision-encoder path</b> (<code>vit_flash_attn_wrapper</code> → <code>cute.compile</code> → <code>🧊 ICE 🧊</code>), fires during dummy-run profiling right after weight load. This model is multimodal; serve text-only with <code>--limit-mm-per-prompt '{"image":0,"video":0}'</code> to skip ViT profiling. g7e dodged it via a different ViT attention path.</li>
+    <li><b>GPU spot nodegroups on this cluster launch WITHOUT the node security group</b> (only the cluster SG) → all pod networking (cross-node, FSx, in-cluster DNS) silently broken. Hit on both the B200 and H200 nodegroups — root cause of a long failure cascade the first time. Fix: attach the node SG (<code>qwen3-next-bench-eks-cluster-node-*</code>) to the instance's primary ENI.</li>
+    <li><b>Node needs the <code>nvidia.com/gpu.present=true</code> label</b> or the device plugin won't schedule (0 GPUs allocatable) — bake it into the nodegroup's <code>--labels</code> (the H200 nodegroup did, so it attached automatically; the ad-hoc B200 node needed a manual label). Nodes have <b>no internet egress</b> + <b>FSx-Lustre CSI mount fails</b> (NID parse error) — stage weights to FSx from a CPU node, then fetch to the GPU node over the pod network (pure-Python, no apt/egress).</li>
+  </ul>
+</div>
+
+<footer>
+  <b>Method.</b> Three platforms, identical FP8/TP1/mnbt=8192 config. <b>g7e.12xlarge</b> in Tokyo (us-west-2 24xl was capacity-blocked even on restart), vLLM 0.22.1, <code>Qwen/Qwen3.6-35B-A3B</code> bf16 + online FP8. <b>p6-b200.48xlarge</b> and <b>p5en.48xlarge (H200)</b> spot, 1 GPU each, via the <code>qwen3-next-bench</code> EKS cluster (us-east-2). Workload <code>fin-attribute-extraction.yaml</code> (random 2500-in/22-out, QPS sweep). Latency via <code>vllm bench serve</code> streaming percentiles; bottleneck class via in-pod <code>nvidia-smi dmon</code> (continuous; DCGM-exporter PROF point-samples missed the bursty peaks). All curves are <b>single TP1 replica</b>; per-node figures are ×8 (independent replicas, no collective — not measured concurrently, so real per-node may dip slightly from host CPU/NIC contention). Costs are us-east-2 spot, 2026-06-16 (p5en spot is volatile). All instances stopped / nodegroups deleted and held ODCRs cancelled at end of run. Raw data &amp; per-GPU writeups (<code>b200-comparison.md</code>, <code>h200-comparison.md</code>): <code>domains/gpu-serving/blueprints/fin-attribute-extraction/results/</code>.
+</footer>
+</div>
+</body>
+</html>

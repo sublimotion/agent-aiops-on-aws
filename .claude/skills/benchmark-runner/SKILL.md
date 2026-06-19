@@ -58,6 +58,17 @@ Use `scripts/bench-standard.py` as the source of truth. It:
 
 If you find yourself writing a one-off bench script that parses client timing only, STOP. Invoke `bench-standard.py` instead.
 
+## Post-run validity gate
+
+After an artifact is produced, run `standards/benchmark-commons/runner/validate-run.py`
+with the workload card. The gate writes `artifact.validity.classification`:
+`valid_controlled_baseline`, `valid_production_representative`,
+`valid_smoke_only`, or `invalid_or_incomplete`.
+
+- Synthetic/random cards may be valid controlled baselines, but **must not** be reported as production-representative.
+- Production claims require `production-mix` / `sharegpt-production-mix` / trace-replay style workloads plus the card's required metrics.
+- Use `--claim production --strict-production` when publishing customer- or production-facing numbers so missing required metrics fail closed.
+
 ## Card → command is compiled, not interpreted
 
 **You do not decide what flags a workload runs with. `compile_card` does.** The

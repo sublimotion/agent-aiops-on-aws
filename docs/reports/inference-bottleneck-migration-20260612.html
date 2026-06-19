@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where the Bottleneck Went — Models, Hardware &amp; Software for LLM Inference · 2026-06-12</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2530; --border:#30363d;
+    --fg:#e6edf3; --muted:#8b949e; --accent:#58a6ff; --green:#3fb950;
+    --red:#f85149; --amber:#d29922; --violet:#bc8cff;
+    --compute:#f85149; --bw:#58a6ff; --cap:#bc8cff; --launch:#d29922; --net:#3fb950; --irr:#ff9bce;
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.58;font-size:15px}
+  .wrap{max-width:1080px;margin:0 auto;padding:40px 24px 80px}
+  header{border-bottom:1px solid var(--border);padding-bottom:24px;margin-bottom:32px}
+  h1{font-size:29px;margin:0 0 6px;letter-spacing:-.02em}
+  h2{font-size:21px;margin:46px 0 14px;padding-top:8px;letter-spacing:-.01em;border-top:1px solid var(--border)}
+  h3{font-size:16px;margin:26px 0 10px;color:var(--accent)}
+  .sub{color:var(--muted);font-size:14px}
+  p{margin:12px 0}
+  .lead{font-size:16px}
+  b,strong{color:#fff;font-weight:650}
+  .verdict{background:linear-gradient(135deg,#16241a,#161b22);border:1px solid var(--green);border-radius:10px;padding:20px 22px;margin:8px 0 4px}
+  .verdict .tag{display:inline-block;background:var(--green);color:#03100a;font-weight:700;font-size:12px;padding:2px 9px;border-radius:5px;letter-spacing:.03em;vertical-align:middle}
+  .verdict p{margin:10px 0 0}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13px}
+  th,td{padding:9px 10px;text-align:right;border-bottom:1px solid var(--border);vertical-align:top}
+  th:first-child,td:first-child{text-align:left}
+  thead th{color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em}
+  tbody tr:hover{background:var(--panel)}
+  td.num{font-family:var(--mono)}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:18px 20px;margin:16px 0}
+  .panel.amber{border-color:var(--amber)}
+  .panel.red{border-color:var(--red)}
+  .panel.accent{border-color:var(--accent)}
+  .panel.prac{border-color:var(--violet);border-left-width:4px;background:linear-gradient(135deg,#1c1726,#161b22)}
+  .panel.prac .ptag{display:inline-block;background:var(--violet);color:#160c22;font-weight:700;font-size:11px;padding:2px 9px;border-radius:5px;letter-spacing:.03em;margin-bottom:6px}
+  .panel.prac .pmeta{color:var(--muted);font-size:11.5px;font-style:italic;margin-left:8px}
+  .chart{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:14px;margin:18px 0}
+  .chart svg{width:100%;height:auto;display:block}
+  .note{color:var(--muted);font-size:12.5px;font-style:italic}
+  code,.mono{font-family:var(--mono);font-size:12.5px;background:var(--panel2);padding:1px 6px;border-radius:4px;color:var(--violet)}
+  a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+  .cite{font-size:11.5px;color:var(--muted);font-family:var(--mono)}
+  .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid var(--border);color:var(--muted);margin-left:4px}
+  .pill.ind{border-color:var(--green);color:var(--green)}
+  .pill.vendor{border-color:var(--amber);color:var(--amber)}
+  ul{padding-left:22px}li{margin:6px 0}
+  .legendrow{display:flex;flex-wrap:wrap;gap:14px;margin:8px 0 0;font-size:12px}
+  .legendrow span{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+  .sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+  footer{margin-top:54px;padding-top:20px;border-top:1px solid var(--border);color:var(--muted);font-size:12.5px}
+  .kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--border);border-radius:4px;padding:1px 5px;color:var(--fg);background:var(--panel2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Where the Bottleneck Went</h1>
+  <div class="sub">How model architecture, GPU hardware, and serving software co-evolved for LLM <i>inference</i> — and why disaggregation emerged but didn't go mainstream · 2026-06-12</div>
+  <p class="sub" style="margin-top:14px">An educational survey. Scope is <b>inference serving</b>, not training (whose optima differ — see the sidebar). Numbers are drawn from public literature and independent benchmarks; vendor-stated figures are labeled <span class="pill vendor">vendor</span> and independently-audited ones <span class="pill ind">independent</span>.</p>
+</header>
+
+<div class="verdict">
+  <span class="tag">THESIS</span>
+  <p><b>The binding constraint in LLM inference has migrated — not in a straight line "away from compute," but <i>toward whatever is scarce on the current hardware.</i></b> Through 2023–2026 that has increasingly meant <b>memory bandwidth, KV-cache capacity, and per-kernel launch/scheduling overhead</b> — while low-precision FLOPs became <i>abundant</i>. The twist the literature insists on: algorithms repeatedly <b>re-spend</b> those cheap FLOPs (speculative decoding, FP4, Mamba-2's matmul reformulation) to buy back the scarce bandwidth. So a FLOP-and-capacity-heavy GPU like Blackwell looks over-provisioned <i>for one specific regime</i> — low-to-mid-concurrency decode and prefill-dominated serving of hybrid/sparse models, <i>today</i>, before kernels are fully fused — yet converts its advantage cleanly (~3× audited) on reasoning, large-batch, and long-prefill workloads. The honest claim is narrow and falsifiable, and the rest of this page is the evidence for and against it.</p>
+</div>
+
+<h2>1 · The original sin: two rooflines in one model</h2>
+<p class="lead">Every efficiency story in inference descends from one fact, named cleanly by Pope et al. in 2022: a transformer's two phases live on <b>opposite sides of the roofline</b>.</p>
+<ul>
+  <li><b>Prefill</b> (processing the prompt) is <b>compute-bound</b> — it does a big matmul over all input tokens at once, reaching high arithmetic intensity (Pope et al. report ~76% MFU). FLOPs are the constraint.</li>
+  <li><b>Decode</b> (generating tokens one at a time) is <b>memory-bandwidth-bound</b> — each step reads the entire model + KV cache to produce a single token, arithmetic intensity ~1–2 FLOP/byte. Bandwidth and latency are the constraint; the tensor cores sit nearly idle.</li>
+</ul>
+<p>This split is the seed of everything below: KV caching, chunked prefill, speculative decoding, and ultimately <b>disaggregation</b> are all responses to the fact that the same silicon is wrong for one of the two phases at any given moment.</p>
+<p class="cite">Pope et al., <i>Efficiently Scaling Transformer Inference</i>, arXiv:2211.05102.</p>
+
+<h2>2 · The capacity era: KV cache becomes the constraint</h2>
+<p>Once you batch requests to keep the GPU busy during decode, the <b>KV cache</b> — the stored attention state for every token of every in-flight request — explodes. <b>PagedAttention / vLLM</b> (2023) showed that the real limit on serving throughput wasn't compute at all; it was <b>memory capacity</b> wasted to fragmentation and over-reservation. Paging the KV cache like virtual memory recovered 2–4× throughput and made "how many requests fit in HBM" the dominant serving question.</p>
+<p>This is the first decisive migration: <b>from compute to memory capacity</b>, and it turned inference into a <i>systems</i> problem as much as a kernel problem.</p>
+<p class="cite">Kwon et al., <i>Efficient Memory Management for LLM Serving with PagedAttention</i>, arXiv:2309.06180.</p>
+
+<div class="panel prac">
+  <span class="ptag">PRACTITIONER VERDICT</span><span class="pmeta">Nemotron-3-Super, 2026-06 — judgment, not literature</span>
+  <p style="margin-top:6px"><b>KV-cache reuse is not free across architectures — on Mamba-2 hybrids it's currently dead.</b> Prefix caching and PagedAttention assume an attention KV you can checkpoint and splice. An SSM's recurrent state can't be sliced at an arbitrary token boundary the same way. We measured it the hard way: with a verbatim ~3,050-token shared header and the flags accepted (<span class="mono">--enable-prefix-caching --mamba-cache-mode all</span>), <b><span class="mono">prefix_cache_hits_total = 0</span> against 4.2M queries</b> — at every TP we tried, including TP=1. The limitation is the hybrid arch, not the KV layout. <b>Don't budget for a prefix-cache speedup on a Mamba/SSM-hybrid until you've confirmed non-zero hits on your exact vLLM build</b> — the shared-prefix discount that makes RAG/multi-turn cheap on a pure-attention model may simply not exist.</p>
+</div>
+
+<h2>3 · The sparsity turn — and where the cost actually went</h2>
+<p>The 2024–2025 architecture wave attacked the two biggest costs — quadratic attention and dense FFN FLOPs — but, crucially, <b>relocated</b> cost rather than eliminating it. This is the heart of the story, and it's more subtle than "models stopped needing compute."</p>
+
+<table>
+  <thead><tr><th>Innovation</th><th>Cost it removed</th><th>New bottleneck it exposed</th><th>Citation</th></tr></thead>
+  <tbody>
+    <tr><td><b>GQA + sliding-window</b> (Mistral)</td><td>KV size, per-step bandwidth</td><td>Still attention-bound; quality/context tradeoffs</td><td class="cite">2310.16812</td></tr>
+    <tr><td><b>Mamba / selective SSM</b></td><td>Quadratic attention <i>and</i> the KV cache, entirely (linear scaling, ~5× decode throughput)</td><td><b>Kernel-launch &amp; scheduling</b> — recurrent state needs custom scan kernels ("prevents efficient convolutions"); breaks prefix caching</td><td class="cite">2312.00752</td></tr>
+    <tr><td><b>Mamba-2 (SSD)</b></td><td>Mamba-1's memory-bound scan inefficiency (2–8× faster)</td><td><b>Re-spends FLOPs</b>: reformulates the SSM as matmuls to put work <i>back</i> on tensor cores</td><td class="cite">2405.21060</td></tr>
+    <tr><td><b>MLA + fine-grained MoE</b> (DeepSeek-V2)</td><td>KV cache −93%; per-token dense FLOPs (sparse activation)</td><td><b>Interconnect</b> — expert parallelism needs all-to-all; routing imbalance</td><td class="cite">2405.04434</td></tr>
+    <tr><td><b>DeepSeek-V3 (671B/37B) + MTP</b></td><td>Activated-FLOP cost via sparsity</td><td><b>Interconnect-communication</b> (DualPipe overlap, EP all-to-all); capacity for full weights</td><td class="cite">2412.19437</td></tr>
+    <tr><td><b>Native Sparse Attention (NSA)</b></td><td>Long-context attention compute</td><td><b>Irregular memory access</b>; <i>adds</i> trainable compute to stay kernel-friendly</td><td class="cite">2502.11089</td></tr>
+    <tr><td><b>DeepSeek Sparse Attention (DSA)</b>, V3.2-Exp</td><td>Long-context attn via "lightning indexer" (~50% API price cut)</td><td>Indexer overhead; gather/scatter irregular access</td><td class="cite">V3.2-Exp report</td></tr>
+  </tbody>
+</table>
+
+<p class="note">A note on terminology: "CSA" (Compressed Sparse Attention), seen in DeepSeek-V4-era vendor writeups, is <b>not</b> a standalone citable paper. The verifiable mechanisms are <b>NSA</b> (arXiv:2502.11089) and <b>DSA</b> (DeepSeek-V3.2-Exp). We cite those and treat "CSA" as an informal umbrella term.</p>
+
+<div class="panel accent">
+  <b>The key correction to the naive story.</b> It is tempting to say "algorithms keep fleeing FLOPs." The record says otherwise. <b>Speculative decoding</b> and <b>NSA</b> deliberately <i>add</i> compute; <b>Mamba-2's SSD</b> explicitly routes work <i>back</i> onto matmuls to recover the GPU utilization Mamba-1 lost being memory-bound; <b>MoE</b> moves cost onto the <i>interconnect</i>, not away. The accurate through-line is <b>"spend the abundant resource (cheap low-precision FLOPs) to relieve the scarce one (bandwidth, capacity, latency)."</b> That single principle explains FP4, spec-decode, and SSD at once — and it explains why a GPU vendor would <i>build</i> a FLOP surplus in the first place: it's the currency these algorithms cash in.
+</div>
+
+<h2>4 · The hardware bet — lopsided, but only on specific axes</h2>
+<p>If algorithms spend cheap FLOPs to buy scarce bandwidth, the natural question is: <b>did GPU scaling actually make FLOPs cheap and bandwidth scarce?</b> The per-generation numbers say <i>yes — but narrowly.</i> The "arithmetic intensity" column below is dense TFLOPS ÷ HBM TB/s: the FLOP/byte a workload must hit to saturate compute. Higher = more bandwidth-starved.</p>
+
+<table>
+  <thead><tr><th>GPU (year)</th><th>FP16 TFLOPS</th><th>FP8</th><th>FP4</th><th>HBM GB</th><th>BW TB/s</th><th>FP16 : BW</th><th>FP8 : BW</th><th>NVLink GB/s</th></tr></thead>
+  <tbody>
+    <tr><td>V100 (2017)</td><td class="num">125</td><td class="num">—</td><td class="num">—</td><td class="num">16–32</td><td class="num">0.90</td><td class="num">139</td><td class="num">—</td><td class="num">300</td></tr>
+    <tr><td>A100-80GB (2020)</td><td class="num">312</td><td class="num">—</td><td class="num">—</td><td class="num">80</td><td class="num">2.04</td><td class="num">153</td><td class="num">—</td><td class="num">600</td></tr>
+    <tr><td>H100 SXM (2022)</td><td class="num">989</td><td class="num">1,979</td><td class="num">—</td><td class="num">80</td><td class="num">3.35</td><td class="num">295</td><td class="num">591</td><td class="num">900</td></tr>
+    <tr><td>H200 (2023)</td><td class="num">989</td><td class="num">1,979</td><td class="num">—</td><td class="num">141</td><td class="num">4.80</td><td class="num">206</td><td class="num">412</td><td class="num">900</td></tr>
+    <tr><td>B200 (2024)</td><td class="num">~1,125</td><td class="num">~4,500</td><td class="num">~9,000</td><td class="num">192</td><td class="num">8.0</td><td class="num">141</td><td class="num">563</td><td class="num">1,800</td></tr>
+    <tr><td>B300 / Ultra (2025)</td><td class="num">~1,250</td><td class="num">~5,000</td><td class="num">~10,000</td><td class="num">288</td><td class="num">8.0</td><td class="num">156</td><td class="num">625</td><td class="num">1,800</td></tr>
+  </tbody>
+</table>
+<p class="note">Per-GPU, dense. B200/B300 FP16/FP8 derived from datasheet sparse values (dense ≈ ½ sparse). Sources: NVIDIA product pages (H100/A100/H200/DGX-B200), GB300 NVL72 page, SemiAnalysis Blackwell analysis.</p>
+
+<p>Three findings, two of which <b>refute</b> a blanket "everything stalled" claim:</p>
+<ul>
+  <li><b>SUPPORTED — the FP8/FP4 frontier is lopsided.</b> At the low precisions inference actually runs, required arithmetic intensity climbs to <b>~560–625 FLOP/byte</b>, while decode delivers ~1–2. So &gt;99% of FP4 FLOPs are unreachable in decode. The cleanest proof is NVIDIA's own <b>B200→B300</b> step: +1.5× FP4 FLOPs and +1.5× capacity (192→288 GB) with <b>HBM bandwidth frozen at ~8 TB/s</b>. The one axis under pressure is the one that didn't move.</li>
+  <li><b>REFUTED — bandwidth doesn't "always" stall.</b> A100→H100 was a <i>bandwidth-rich</i> generation (2.04→3.35 TB/s); SemiAnalysis notes that jump exceeded Blackwell's. And H100→<b>H200</b> was a deliberate bandwidth-led refresh that <i>improved</i> the ratio (295→206). At plain <b>FP16</b>, the FLOP:BW ratio is essentially <b>flat</b> across the whole V100→B300 span (139→156). The lopsidedness is a <i>recent, low-precision</i> phenomenon, not a law.</li>
+  <li><b>REFUTED — interconnect is a bright spot, not a bottleneck.</b> NVLink went 300→1,800 GB/s and the non-blocking domain jumped 8→72 GPUs (NVL72). This is the silicon that <i>enables</i> wide-EP and disaggregation. We cannot call it a stalled axis and then celebrate the regimes it unlocks.</li>
+</ul>
+<p>And the overhead axis hardware <i>can't</i> fix by scaling: <b>kernel-launch latency is ~fixed</b> (~1–2 µs CPU cost, flat across generations). As kernels get faster, this fixed cost dominates — which is exactly why CUDA Graphs exist. It is <i>worked around</i> in software, not scaled away in silicon.</p>
+<p class="cite">SemiAnalysis Blackwell perf/TCO analysis; NVIDIA CUDA Graphs (developer.nvidia.com/blog/cuda-graphs); GB300 NVL72 (nvidia.com/en-us/data-center/gb300-nvl72).</p>
+
+<h2>5 · The bottleneck-migration map</h2>
+<p>Putting §§1–4 on one timeline. Each innovation is colored by the bottleneck it <i>exposed</i> — the picture is a migration across resource types, with compute (red) being deliberately re-loaded twice.</p>
+
+<div class="chart">
+<svg viewBox="0 0 980 360" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,Segoe UI,sans-serif">
+  <rect x="0" y="0" width="980" height="360" fill="#0d1117"/>
+  <!-- timeline axis -->
+  <line x1="40" y1="318" x2="940" y2="318" stroke="#30363d"/>
+  <text x="40" y="340" fill="#8b949e" font-size="11">2022</text>
+  <text x="265" y="340" fill="#8b949e" font-size="11">2023</text>
+  <text x="490" y="340" fill="#8b949e" font-size="11">2024</text>
+  <text x="715" y="340" fill="#8b949e" font-size="11">2025</text>
+  <text x="905" y="340" fill="#8b949e" font-size="11">2026</text>
+  <!-- y bands: resource types -->
+  <text x="40" y="28" fill="#8b949e" font-size="11">exposed bottleneck ↓</text>
+  <!-- nodes: x by date, y by bottleneck type -->
+  <!-- Prefill/decode split 2022 compute/bw -->
+  <g>
+    <circle cx="70" cy="120" r="8" fill="#f85149"/><circle cx="70" cy="150" r="8" fill="#58a6ff"/>
+    <text x="86" y="128" fill="#e6edf3" font-size="11.5">Prefill/decode rooflines named</text>
+    <text x="86" y="146" fill="#8b949e" font-size="10">2211.05102 — compute ∥ bandwidth</text>
+  </g>
+  <!-- PagedAttention 2023 capacity -->
+  <g>
+    <circle cx="300" cy="200" r="8" fill="#bc8cff"/>
+    <text x="316" y="196" fill="#e6edf3" font-size="11.5">PagedAttention / vLLM</text>
+    <text x="316" y="212" fill="#8b949e" font-size="10">2309.06180 — KV <b>capacity</b></text>
+  </g>
+  <!-- Mamba 2023 launch -->
+  <g>
+    <circle cx="345" cy="258" r="8" fill="#d29922"/>
+    <text x="361" y="254" fill="#e6edf3" font-size="11.5">Mamba (SSM)</text>
+    <text x="361" y="270" fill="#8b949e" font-size="10">2312.00752 — <b>kernel launch</b></text>
+  </g>
+  <!-- MLA+MoE 2024 net -->
+  <g>
+    <circle cx="500" cy="92" r="8" fill="#3fb950"/>
+    <text x="516" y="88" fill="#e6edf3" font-size="11.5">MLA + fine-grained MoE</text>
+    <text x="516" y="104" fill="#8b949e" font-size="10">2405.04434 — <b>interconnect</b></text>
+  </g>
+  <!-- Mamba-2 2024 compute re-load -->
+  <g>
+    <circle cx="540" cy="150" r="8" fill="#f85149" stroke="#fff" stroke-width="1.5"/>
+    <text x="556" y="146" fill="#e6edf3" font-size="11.5">Mamba-2 SSD ⟲</text>
+    <text x="556" y="162" fill="#8b949e" font-size="10">2405.21060 — re-spends <b>compute</b></text>
+  </g>
+  <!-- DeepSeek V3 2024 net -->
+  <g>
+    <circle cx="640" cy="116" r="8" fill="#3fb950"/>
+    <text x="656" y="112" fill="#e6edf3" font-size="11.5">DeepSeek-V3 + MTP</text>
+    <text x="656" y="128" fill="#8b949e" font-size="10">2412.19437 — <b>interconnect</b></text>
+  </g>
+  <!-- NSA 2025 irregular + compute re-load -->
+  <g>
+    <circle cx="720" cy="232" r="8" fill="#ff9bce"/>
+    <text x="736" y="228" fill="#e6edf3" font-size="11.5">NSA (trainable sparse attn) ⟲</text>
+    <text x="736" y="244" fill="#8b949e" font-size="10">2502.11089 — <b>irregular access</b>, adds compute</text>
+  </g>
+  <!-- DSA 2025 irregular -->
+  <g>
+    <circle cx="835" cy="280" r="8" fill="#ff9bce"/>
+    <text x="851" y="276" fill="#e6edf3" font-size="11.5">DSA (V3.2)</text>
+    <text x="724" y="300" fill="#8b949e" font-size="10">gather/scatter</text>
+  </g>
+  <!-- legend -->
+  <g transform="translate(40,12)">
+    <rect x="0" y="18" width="11" height="11" rx="2" fill="#f85149"/><text x="16" y="28" fill="#8b949e" font-size="10.5">compute</text>
+    <rect x="78" y="18" width="11" height="11" rx="2" fill="#58a6ff"/><text x="94" y="28" fill="#8b949e" font-size="10.5">bandwidth</text>
+    <rect x="170" y="18" width="11" height="11" rx="2" fill="#bc8cff"/><text x="186" y="28" fill="#8b949e" font-size="10.5">capacity</text>
+    <rect x="246" y="18" width="11" height="11" rx="2" fill="#d29922"/><text x="262" y="28" fill="#8b949e" font-size="10.5">kernel launch</text>
+    <rect x="356" y="18" width="11" height="11" rx="2" fill="#3fb950"/><text x="372" y="28" fill="#8b949e" font-size="10.5">interconnect</text>
+    <rect x="452" y="18" width="11" height="11" rx="2" fill="#ff9bce"/><text x="468" y="28" fill="#8b949e" font-size="10.5">irregular access</text>
+    <text x="566" y="28" fill="#8b949e" font-size="10.5">⟲ = deliberately re-loads compute</text>
+  </g>
+</svg>
+</div>
+<p class="note">The migration is real but not monotone: it sweeps from compute→capacity→launch→interconnect→irregular-access, with two deliberate returns to compute (Mamba-2 SSD, NSA). "Away from FLOPs" is the wrong summary; "toward the scarce resource, paying in cheap FLOPs" is the right one.</p>
+
+<h2>6 · Software's answer — and its ceiling</h2>
+<p>If the live bottlenecks are launch overhead and bandwidth, the near-term wins are <b>software</b>, and they're large:</p>
+<ul>
+  <li><b>Chunked prefill</b> (SARATHI / Sarathi-Serve) piggybacks decode steps onto prefill chunks, resolving the prefill/decode tension <i>inside one engine</i>: up to 10× decode throughput and <b>2.6× (Mistral-7B) to 5.6× (Falcon-180B)</b> serving capacity over vLLM — <i>no KV transfer, no second pool.</i> <span class="cite">2308.16369, 2403.02310</span></li>
+  <li><b>CUDA graphs</b> (piecewise → full capture) amortize the fixed ~1–2 µs launch cost; <b>kernel fusion</b> (grouped-expert GEMMs, fused SSM scans) collapses many small launches into few large ones.</li>
+  <li><b>Megakernels</b> are the frontier: Hazy Research's "No Bubbles" fuses the entire forward pass into one resident kernel — <b>2.5× (H100) / 3.5× (B200)</b> over vLLM, lifting bandwidth utilization from ~50% to <b>78%</b>. <span class="cite">hazyresearch.stanford.edu/blog/2025-05-27-no-bubbles</span></li>
+</ul>
+<div class="panel amber">
+  <b>But software has a hard ceiling — and the ceiling hands the regime back to hardware.</b> Two caveats keep this honest. (1) The megakernel result is measured at <b>batch 1 on Llama-3.2-1B</b> — a low-latency single-stream regime, not throughput serving; it's a research self-report, not yet third-party reproduced. (2) Even at its optimum it remains <b>"strongly memory bound"</b> at 78% bandwidth. Once software has extracted the available bandwidth, the <i>only</i> remaining lever is <b>more bandwidth</b> — i.e. new silicon (HBM4). Software is a one-time catch-up that erases the launch-bound deficit; it is not a perpetual substitute for hardware. This is the single most important reason the "FLOPs don't matter" framing is <b>transient, not structural</b>.
+</div>
+
+<div class="panel prac">
+  <span class="ptag">PRACTITIONER VERDICT</span><span class="pmeta">Nemotron-3-Super on B200, 2026-06 — judgment, not literature</span>
+  <p style="margin-top:6px"><b>Before you tune a kernel config, confirm which kernel is actually running.</b> Our hybrid-MoE box was launch/scheduling-bound at its SLO knee (DCGM at c192: SM ~50%, HBM ~15%, tensor ~11%, ~701 W) — textbook "software lever, not hardware lever" territory. So we built a tuned fused-MoE tile config and mounted it. <b>Zero delta</b> (c192 p50 6559/p90 10621 vs 6048/9051 — noise). Why: production auto-selected the <span class="mono">FLASHINFER_TRTLLM</span> FP8 MoE backend, whose vendor-autotuned GEMMs <i>never read the Triton tile JSON</i>. The "Using default MoE config — sub-optimal" warning we were chasing was for a different (Mamba SSU) kernel. <b>Rule: grep the serving log for the active <span class="mono">Fp8 MoE backend</span> before tuning — on modern Blackwell/Hopper vLLM with per-tensor FP8 the default is FlashInfer TRTLLM, not Triton, and the tile tuner is inert.</b></p>
+  <p style="margin:6px 0 0">And the corollary that saved us a GPU upgrade: a launch-bound knee means <b>a bigger chip is a no-op</b>. B300 over B200 adds only HBM <i>capacity</i> (113× over-provisioned here) and FP4 <i>FLOPs</i> (89% idle) — HBM <i>bandwidth</i> is identical at ~8 TB/s, the one axis under any pressure. We stayed on B200.</p>
+</div>
+
+<h2>7 · The payoff: why disaggregation emerged — and why it isn't mainstream</h2>
+<p>Disaggregation is the bottleneck-migration thesis made physical: if prefill and decode have <b>opposite rooflines</b>, put them on <b>separate GPU pools</b>, each provisioned and batched for its own constraint. The KV cache produced by prefill is shipped to the decode pool over the interconnect.</p>
+
+<h3>First, decompose what decode actually reads</h3>
+<p>The whole argument turns on one decomposition that's easy to get wrong. Per generated token, decode moves:</p>
+<div class="panel accent">
+  <div class="mono" style="font-size:13px;line-height:1.7">decode bytes/token = <b style="color:var(--bw)">active-weight read</b> (active_params × dtype) + <b style="color:var(--violet)">KV read</b> (cache_bytes × dtype)</div>
+  <p style="margin-top:12px"><b>Attention innovation (GQA, MLA, Mamba, sparse) only shrinks the second term.</b> It does nothing to the first. So which term dominates decides whether a model stays bandwidth-bound — and that, not "is it a frontier model," is what governs the disagg case. Worked from our own measured rooflines:</p>
+  <table style="margin-bottom:0">
+    <thead><tr><th>Model</th><th>Active wt read /tok</th><th>KV read /tok</th><th>Weight share</th><th>Decode is…</th></tr></thead>
+    <tbody>
+      <tr><td><b>Nemotron-3-Super</b> (12B act, Mamba-2 hybrid, FP8)</td><td class="num">~12 GB</td><td class="num">tiny (SSM state)</td><td class="num">—</td><td><b style="color:var(--launch)">launch-bound</b> (HBM ~15%)</td></tr>
+      <tr><td><b>Kimi K2.6</b> (32B act, MoE + MLA, INT4)</td><td class="num">16.0 GB</td><td class="num">0.8 GB</td><td class="num">95%</td><td><b style="color:var(--bw)">bandwidth-bound</b> (AI 7.6 ≪ 630)</td></tr>
+    </tbody>
+  </table>
+</div>
+<p>The Kimi number is the trap. MLA did its job — it crushed the KV term <b>20×</b>, to ~0.8 GB, which is why 1T-param K2.6 fits enormous batches in HBM. But that leaves the <b>16 GB active-weight read as 95% of decode bytes.</b> 32B active in FP8 is not "modest because it's sparse" — it <i>is</i> the bottleneck. So MLA shrinking the KV cache does <b>not</b> weaken the bandwidth case for a 32B-active MoE; the weight term keeps decode firmly bandwidth-bound (arithmetic intensity 7.6 vs the machine's 630 at batch 1). Sparse attention helps capacity and transfer-tax, not the decode roofline. <span class="cite">measured: B300 roofline, Kimi K2.6, 2026-05-13</span></p>
+
+<h3>Why it emerged — measured wins at frontier scale</h3>
+<table>
+  <thead><tr><th>System</th><th>Measured gain</th><th>Scale / model</th><th>Citation</th></tr></thead>
+  <tbody>
+    <tr><td><b>Splitwise</b> (Microsoft)</td><td class="num">1.4× throughput at −20% cost; 2.35× at iso-cost</td><td>phase-split, heterogeneous-friendly</td><td class="cite">2311.18677</td></tr>
+    <tr><td><b>DistServe</b></td><td class="num">7.4× more requests / 12.6× tighter SLO</td><td>introduces "goodput"; bandwidth-aware placement</td><td class="cite">2401.09670</td></tr>
+    <tr><td><b>Mooncake</b> (Kimi)</td><td class="num">up to 525% (sim); +75% requests in prod</td><td>KV-centric, pooled DRAM/SSD store</td><td class="cite">2407.00079</td></tr>
+    <tr><td><b>SGLang PD + wide-EP</b></td><td class="num">~5× over plain TP</td><td>DeepSeek-V3, 96×H100, 52.3k in/22.3k out tok/s·node</td><td class="cite">SGLang blog</td></tr>
+  </tbody>
+</table>
+
+<h3>The better heuristic: "multi-node-to-serve," not "frontier model"</h3>
+<p>"Frontier" is a vibe, not a measurement — and our own data contradicts the lazy version of it. We ran <b>Kimi K2.6 (1T params, sounds maximally frontier)</b> single-engine to <b>c=512 at 10,437 tok/s on one 8×B300 node, zero disaggregation.</b> By "frontier → disagg" it should have needed splitting. It didn't. So parameter count is the wrong axis. The screen that actually predicts disagg is:</p>
+<div class="panel accent" style="text-align:center">
+  <b style="font-size:16px">Does serving the SLO-target concurrency require <i>more than one node?</i></b>
+</div>
+<p>If the model + the KV for your target concurrency <b>fit and saturate one node</b>, intra-node NVLink hides prefill/decode interference cheaply, decode batches sit past the compute crossover (so there's no expert-parallelism pressure), and single-engine chunked prefill wins. You cross into disagg territory only when a second node is <i>forced</i> — by model size, by 100K+ context whose prefill alone exhausts a node, or by QPS beyond one box. At that point you're <i>already</i> paying cross-node interconnect for the model itself, so the KV-transfer tax is incremental rather than new.</p>
+
+<h3>Three measurable gates — disagg wins only if all three fire</h3>
+<p>The single screen above is the fast version. Underneath it are three independent conditions, each a number you can measure on existing kit rather than a category:</p>
+<table>
+  <thead><tr><th>Gate</th><th>What it tests</th><th>How to measure</th><th>Kimi K2.6 (1 node)</th></tr></thead>
+  <tbody>
+    <tr><td><b>1 · Different parallelism</b></td><td>Do prefill &amp; decode want different TP/EP? <i>(the one thing a single engine cannot fake)</i></td><td>Decode's BW→compute crossover batch B*. If KV budget holds batches ≫ B* on one node, no EP pressure.</td><td><b style="color:var(--red)">FAILS</b> — B*≈92, 1.6 TB KV holds ≫92 seqs → no EP128 need</td></tr>
+    <tr><td><b>2 · Real interference</b></td><td>Does co-located prefill actually inflate TPOT past SLO?</td><td>A/B: TPOT with chunked-prefill co-location vs decode-only, at target load.</td><td><b style="color:var(--red)">FAILS</b> — chunked prefill holds TPOT in SLO</td></tr>
+    <tr><td><b>3 · Saturation</b></td><td>Is one node actually full at peak QPS? (else splitting strands GPUs)</td><td>Single-node GPU util at peak QPS.</td><td><b style="color:var(--red)">FAILS</b> — c=512 = 16% of BW ceiling; headroom remains</td></tr>
+  </tbody>
+</table>
+<p>The governing inequality is a <b>net</b>, not the interconnect tax alone:</p>
+<div class="panel">
+  <div class="mono" style="font-size:12.5px;line-height:1.8">disagg wins  ⟺  gain(heterogeneous config)  &gt;  KV/state transfer tax  +  utilization loss(two pools)  +  ops complexity(ratio tuning, failure domains)</div>
+</div>
+<p>Three subtleties that the one-liner "useful when phases need different config, if interconnect isn't a penalty" drops — and each can independently kill the case:</p>
+<ul>
+  <li><b>Load is co-equal with config, not secondary.</b> Disagg splits one fleet into two pools that must <i>each</i> stay saturated, at a fixed prefill:decode ratio matching your ISL:OSL mix. At low or spiky QPS one pool idles while the other bottlenecks — co-location would have kept all GPUs busy. "Different config + cheap interconnect" can both be true and disagg still loses at 5 RPS. This is Gate 3, and it's the biggest single reason disagg is frontier-only.</li>
+  <li><b>The transfer tax is more than interconnect bandwidth.</b> It's <i>KV + state bytes per request</i>, and layout matters: MLA's latent KV shrinks it ~20× (which is exactly why frontier MoE has a <i>low</i> tax and cross-node disagg is viable), whereas Mamba conv/SSM state needed a dedicated layout fix just to be transferable. It also adds <i>latency</i> to the prefill→decode handoff — a TTFT cost even on a fast link, not just bandwidth pressure. In our prior testing a TCP fallback (no GPUDirect RDMA / NVLink) turned a 355 ms TTFT into 10+ s; EFA-class networking pays a CPU bounce.</li>
+  <li><b>A simpler substitute clears Gate 2 for most.</b> Chunked prefill (Sarathi, §6) resolves prefill/decode interference <i>inside one engine</i> at <b>2.6–5.6×</b> — no router, no second failure domain, no KV transfer. Only Gate 1 (genuinely different parallelism) is something one engine <i>cannot</i> do; interference alone (Gate 2) has this cheaper answer.</li>
+  <li><b>Operational cost is real.</b> Disagg adds a KV router, a transport layer (NIXL), pod gang-coordination, and a new failure mode (prefill pool dies → decode starves). Homogeneous replicas autoscale and recover trivially.</li>
+</ul>
+<h3>Where the named models actually land</h3>
+<p>Sorting four real models by the heuristic — and note that the deciding term <i>differs</i> per model. "Sounds frontier" predicts nothing; <b>"forced onto a second node"</b> predicts everything.</p>
+<table>
+  <thead><tr><th>Model</th><th>Sounds frontier?</th><th>Fits + saturates 1 node at SLO?</th><th>Deciding term</th><th>Disagg?</th></tr></thead>
+  <tbody>
+    <tr><td><b>Nemotron-3-Super</b> 12B-act hybrid</td><td>no</td><td><b style="color:var(--green)">yes</b></td><td>launch-bound; tiny weights &amp; KV</td><td><b style="color:var(--red)">No</b> — fails Gate 1 before tax matters</td></tr>
+    <tr><td><b>Kimi K2.6</b> 1T / 32B-act MoE+MLA</td><td><b>yes</b></td><td><b style="color:var(--green)">yes (measured)</b></td><td>BW-bound (95% weight read) but one node holds it</td><td><b style="color:var(--red)">No on 1 node</b> — only if context/QPS forces node #2</td></tr>
+    <tr><td><b>Nemotron Ultra</b> ~253B dense</td><td><b>yes</b></td><td>borderline (253 GB wts + KV)</td><td>weight-read bandwidth; long-context prefill</td><td><b style="color:var(--amber)">Maybe</b> — depends on context length</td></tr>
+    <tr><td><b>DeepSeek V4</b> wide-EP MoE</td><td><b>yes</b></td><td><b style="color:var(--red)">no</b> (designed multi-node EP)</td><td>different EP per phase + scale</td><td><b style="color:var(--green)">Yes</b> — all three gates fire</td></tr>
+  </tbody>
+</table>
+
+<div class="panel">
+  <b>Synthesis — emerged but not mainstream.</b> Disaggregation emerged because prefill and decode genuinely have opposite rooflines, and once a model is <b>forced onto multiple nodes</b> the goodput/cost wins (1.4–7.4×) decisively beat a KV-transfer cost that is now incremental (you're already paying cross-node interconnect for the model itself). It isn't mainstream because the real predictor is <b>"does serving the SLO require more than one node,"</b> not parameter count — and most production models, including a 1T-param one like K2.6 in our own benchmark, fit and saturate a single node, where intra-node NVLink hides interference and <b>chunked-prefill aggregation already clears Gate 2 at a fraction of the complexity</b>. Only Gate 1 — prefill and decode genuinely wanting <i>different parallelism</i> — is something a single engine cannot fake, and that only appears once you've spilled across nodes. The two techniques are <b>complementary, not rival</b>: chunked prefill keeps each disaggregated pool compute-saturated (TetriInfer, 2401.11181). Production systems (NVIDIA Dynamo GA, vLLM disagg, llm-d, SGLang PD) are maturing the orchestration; what would move the crossover down is cheap KV transfer (compressed MLA/NSA latents), ubiquitous RDMA, and a lower-QPS break-even.</p>
+</div>
+
+<div class="panel prac">
+  <span class="ptag">PRACTITIONER VERDICT</span><span class="pmeta">our deployments, 2026-06 — judgment, not literature</span>
+  <p style="margin-top:6px">Weighing the three forces as they actually stand — and all three are moving <i>against</i> disagg:</p>
+  <ul style="margin:6px 0">
+    <li><b>Models</b> shrink the problem: MLA/GQA cut KV, MoE means a "1T-param" model has 32B active and fits one node (we ran K2.6 to c=512 single-engine), hybrid/Mamba is launch- not bandwidth-bound. The models that <i>force</i> multi-node are a handful of frontier deployments, not the standard catalog.</li>
+    <li><b>Interconnect</b> is the practical killer on rented cloud: disagg needs near-free KV transfer (GPUDirect RDMA / NVLink between pools). On commodity AWS (EFA, CPU bounce) the cross-node handoff adds real TTFT — we watched a TCP fallback turn 355 ms into 10+ s. The moment you're forced cross-node is the moment you <i>lack</i> the fabric that makes disagg pay.</li>
+    <li><b>SLOs</b> for standard use cases (RAG, chat, copilots: few-K in / few-hundred out, 5–50 RPS) sit where <b>chunked prefill on replicas already meets SLO</b> — Gate 2 cleared with no router, no second failure domain.</li>
+  </ul>
+  <p style="margin:6px 0"><b>Decision rule:</b> single node holds model + target-concurrency KV → <b>replicas + chunked prefill</b> (~95% of deployments; disagg is over-engineering). Forced multi-node <i>and</i> RDMA/NVLink fabric <i>and</i> sustained high QPS → disagg earns its keep (frontier providers, largest internal platforms). In between → still replicas, because the ops tax (gang scheduling, KV router, prefill-dies-decode-starves failure mode, ratio tuning) outweighs the marginal goodput.</p>
+  <p style="margin:6px 0 0"><b>Bottom line:</b> realistically practical for maybe a dozen frontier operators; for everyone else a premature optimization on a normal RAG/chat workload. Its near-term home is <i>inside</i> managed serving frameworks — you'll consume it as a flag, not architect it yourself.</p>
+</div>
+
+<h2>8 · When the thesis flips: where FLOP-heavy silicon wins cleanly</h2>
+<p>A thesis is only useful if it states its own boundary. Here is the strongest evidence <i>against</i> the "FLOPs are over-provisioned" reading — and it's substantial. Note the gap between <b>independently audited</b> numbers and the <b>vendor multipliers</b> they're often quoted as.</p>
+
+<table>
+  <thead><tr><th>Counter-claim</th><th>Independent / audited number</th><th>The vendor framing</th><th>Verdict</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><b>Blackwell converts cleanly on LLM serving</b></td>
+      <td><b>~3.0–3.1×</b> B200 vs H200 on Llama-2-70B; <b>3.4× per-GPU</b> on Llama-405B <span class="pill ind">MLPerf v5.0</span></td>
+      <td>"&gt;3× on DeepSeek-R1" <span class="pill vendor">vendor</span></td>
+      <td>Counter holds. The premium <i>does</i> convert ~3× on MoE/large workloads.</td>
+    </tr>
+    <tr>
+      <td><b>Same-precision gain is modest</b></td>
+      <td><b>1.57–1.59×</b> B200 vs H200 at iso-precision (FP8/FP16) <span class="pill ind">arXiv:2512.02189</span></td>
+      <td>~2.5–2.7× (requires FP4-vs-FP16)</td>
+      <td>Supports thesis. Most of "3×" is the FP4 numeric, not raw silicon.</td>
+    </tr>
+    <tr>
+      <td><b>FP4 is free accuracy-wise</b></td>
+      <td><b>+7.7–9.1% perplexity</b> from FP4 <span class="pill ind">arXiv:2512.02189</span></td>
+      <td>"negligible accuracy loss" <span class="pill vendor">vendor</span></td>
+      <td>Refutes vendor claim. FP4 has a real, measurable cost.</td>
+    </tr>
+    <tr>
+      <td><b>NVL72 ~30× over Hopper</b></td>
+      <td><b>3.4× per-GPU</b>; 30× is per-<i>system</i> vs H200 driven by <b>9× more GPUs</b>; CoreWeave indep. <b>2.86×/chip</b> <span class="pill ind">MLPerf v5.0</span></td>
+      <td>"up to 30×" <span class="pill vendor">vendor</span></td>
+      <td>30× is a system aggregate, not per-GPU efficiency.</td>
+    </tr>
+    <tr>
+      <td><b>TCO: per-MW / per-token favors Blackwell</b></td>
+      <td><b>~4× cost/token, ~8× tokens/MW</b> peak (TDP-estimated, narrow conditions); ~3× same-model <span class="pill ind">SemiAnalysis InferenceMAX</span></td>
+      <td>"15× cost/token, 10× per-MW" <span class="pill vendor">vendor</span></td>
+      <td>Counter holds <i>at scale</i>; the multiple is ~½ the vendor figure.</td>
+    </tr>
+    <tr>
+      <td><b>Launch-bound is structural</b></td>
+      <td>Megakernel erases it: <b>3.5× on B200</b>, 50%→78% BW <span class="pill ind">Hazy Research</span></td>
+      <td>—</td>
+      <td>Refutes "structural." It's software immaturity, being fixed.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>So the regimes where FLOP-and-capacity silicon clearly pays off:</p>
+<ul>
+  <li><b>Reasoning / long-decode</b> (short prompt, thousands of output tokens) — decode-dominated, but <i>large-batch</i> decode is compute-engaging and spec-decode pays off; the direction of travel (test-time compute) inflates this.</li>
+  <li><b>Large-batch high-throughput serving</b> — big GEMMs saturate tensor cores; this is where FP4 and per-MW TCO win.</li>
+  <li><b>Long-context prefill</b> — compute-bound by construction; more FLOPs directly cut TTFT.</li>
+  <li><b>Capacity-bound models</b> — when the weights simply don't fit a smaller GPU, capacity is binding regardless of FLOP utilization.</li>
+</ul>
+
+<div class="panel prac">
+  <span class="ptag">PRACTITIONER VERDICT</span><span class="pmeta">spec-decode across engines, 2026-06 — judgment, not literature</span>
+  <p style="margin-top:6px"><b>"Spec-decode pays off" is engine- and config-specific — never assume cross-engine transfer.</b> On the <i>same</i> Nemotron-3-Super FP8 model: on B200/vLLM 0.18.1/TP2, <b>both</b> draft paths were dead — MTP OOM/SIGKilled, n-gram crashed in CUDA-graph capture. On g7e/SGLang/TP8, <b>EAGLE/MTP worked</b> (accept 0.81, length 3.2) — but <i>only</i> with <span class="mono">--speculative-moe-runner-backend triton</span> (the draft-worker MoE OOM-kills otherwise). Same algorithm class, opposite outcomes, and the deciding factor was the <i>engine's draft-MoE backend lever</i>, not the GPU. The B200 OOM looks like the same draft-MoE OOM SGLang's flag fixes — but vLLM 0.18.1 has no equivalent knob. <b>Re-measure spec-decode per engine and per checkpoint; a published "accept rate 0.8" on one stack tells you nothing about yours.</b> Also measure acceptance at the temperature the model actually wants (this one wants temp=1.0, which lowers acceptance).</p>
+</div>
+
+<div class="verdict" style="margin-top:24px">
+  <span class="tag">WHAT SURVIVES</span>
+  <p>Stated as a general law — "FLOP scaling is irrelevant for inference; Blackwell can't convert its premium" — the thesis is <b>contradicted</b> by audited evidence (MLPerf ~3×, ~4× TCO at scale). Stated precisely, it <b>survives and is useful</b>: <b>for low-to-mid-concurrency decode and prefill-dominated serving of hybrid/sparse models, before kernels are fused and graphs fully captured, inference is memory-bandwidth- and launch-bound, and a FLOP/capacity-heavy GPU's headline advantage is muted.</b> The bottleneck has migrated toward bandwidth, capacity, and scheduling — with deliberate compute re-loading (FP4, spec-decode, SSD) to trade abundant FLOPs for scarce bandwidth. Software (fusion, megakernels, graphs) is the near-term lever, but it has a ~bandwidth ceiling that ultimately hands the regime back to hardware (HBM4). And "Moore's law is irrelevant" is too glib: scaling didn't stop, it <b>migrated to precision (FP4, now reaching training — arXiv:2509.25149) and packaging (chiplets, NVL72)</b>. The part of the law still alive is the part these models stopped buying.</p>
+</div>
+
+<div class="panel">
+  <h3 style="margin-top:0">Sidebar — why training's optima differ (out of scope, for contrast)</h3>
+  <p>This survey is about inference. Training inverts most of the calculus: it is <b>throughput-over-latency</b> (no per-token SLO, so you batch enormously and stay compute-bound), it has <b>no autoregressive decode phase</b> (the memory-bound regime that drives KV caching, chunked prefill, and disaggregation simply doesn't exist), and its scarce resources are <b>aggregate FLOPs, gradient-sync interconnect bandwidth, and HBM capacity for optimizer state + activations</b>. So FLOP-heavy, high-NVLink silicon is a cleaner fit for training than for the inference regimes above — which is part of why a GPU optimized for training-style dense throughput can look over-provisioned when repurposed for low-concurrency hybrid-model serving.</p>
+</div>
+
+<footer>
+  <b>Method.</b> Built from four parallel literature/benchmark research passes plus a dedicated red-team pass chartered to disconfirm the thesis, and a final citation-verification pass that replaced vendor multipliers with independently-audited numbers wherever possible. Figures labeled <span class="pill ind">independent</span> are from MLPerf/MLCommons, SemiAnalysis InferenceMAX, or peer/arXiv sources; <span class="pill vendor">vendor</span> figures are NVIDIA-stated and shown only for contrast. Scope: inference serving, 2022–2026. Training is out of scope except the contrast sidebar.
+  <br><br>
+  <b>Primary sources.</b> arXiv: 2211.05102 · 2309.06180 · 2310.16812 · 2211.17192 · 2312.00752 · 2405.21060 · 2405.04434 · 2412.19437 · 2502.11089 · 2311.18677 · 2401.09670 · 2407.00079 · 2401.11181 · 2308.16369 · 2403.02310 · 2512.02189 · 2509.25149. Benchmarks/analyses: MLPerf Inference v5.0/v5.1 (MLCommons); SemiAnalysis InferenceMAX; Hazy Research "No Bubbles" megakernel. DeepSeek-V3.2-Exp report (DSA). "CSA" treated as an informal vendor-era umbrella term, not a citable mechanism.
+</footer>
+</div>
+</body>
+</html>

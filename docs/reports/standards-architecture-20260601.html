@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Standards / Commons Architecture — agent-aiops-on-aws</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --surface-2: #242740;
+      --border: #2e3151;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --accent: #6366f1;
+      --accent-2: #22d3ee;
+      --fail: #f87171;
+      --warn: #fbbf24;
+      --ok: #34d399;
+      --info: #60a5fa;
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-2: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --accent: #4f46e5;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.55;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 { font-size: 1.15rem; font-weight: 600; }
+    .meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .controls { display: flex; gap: 0.5rem; }
+    button {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+    button:hover { background: var(--border); }
+    main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    .lead {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 10px;
+      padding: 1.5rem 1.75rem;
+      margin-bottom: 2.5rem;
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+    .lead strong { color: var(--accent-2); }
+    section { margin-bottom: 3rem; }
+    h2 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    h2 .num {
+      background: var(--accent);
+      color: #fff;
+      width: 26px; height: 26px;
+      border-radius: 7px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .section-sub { color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.25rem; }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      overflow-x: auto;
+    }
+    .mermaid { display: flex; justify-content: center; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+    th, td { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--text-muted); text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.07em; font-weight: 600; }
+    td code, .inline-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      background: var(--surface-2);
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      color: var(--accent-2);
+    }
+    tr:last-child td { border-bottom: none; }
+    .codeblock {
+      background: #0b0d14;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      line-height: 1.6;
+      margin-top: 1rem;
+    }
+    [data-theme="light"] .codeblock { background: #0f172a; }
+    .codeblock .cmt { color: #6b7280; }
+    .codeblock .kw { color: #c084fc; }
+    .codeblock .str { color: #86efac; }
+    .codeblock .fn { color: #60a5fa; }
+    .codeblock .num2 { color: #fbbf24; }
+    .codeblock-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 1.25rem;
+      margin-bottom: -0.25rem;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.1rem 0.5rem;
+      border-radius: 5px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .b-fail { background: rgba(248,113,113,0.15); color: var(--fail); }
+    .b-warn { background: rgba(251,191,36,0.15); color: var(--warn); }
+    .b-ok   { background: rgba(52,211,153,0.15); color: var(--ok); }
+    .b-info { background: rgba(96,165,250,0.15); color: var(--info); }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+    @media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.4rem;
+    }
+    .card h3 { font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--accent-2); }
+    .card p { font-size: 0.82rem; color: var(--text-muted); }
+    .pillrow { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.75rem; }
+    .pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-muted);
+    }
+    .pill.codified { border-color: var(--ok); color: var(--ok); }
+    .legend { display: flex; gap: 1.25rem; flex-wrap: wrap; font-size: 0.78rem; color: var(--text-muted); margin-top: 1rem; }
+    .legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+    .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+    a { color: var(--accent-2); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Standards &amp; Commons — How It All Connects</h1>
+    <div class="meta">agent-aiops-on-aws &nbsp;·&nbsp; deterministic resolver tier &nbsp;·&nbsp; 2026-06-01</div>
+  </div>
+  <div class="controls">
+    <button onclick="toggleTheme()">Theme</button>
+  </div>
+</header>
+
+<main>
+
+  <div class="lead">
+    The repo has a shared <strong>“commons” tier</strong> under <span class="inline-code">standards/</span> that turns hard-won
+    operational knowledge into <strong>deterministic, fail-closed code</strong> an LLM cannot reinterpret. Two packages follow the
+    identical shape — <em>declarative input → pure compiler → registry of rules → raises on invalid → conformance test</em> — and
+    they are wired into the agents, skills, specs, and steering files that drive every deployment and benchmark. This report maps
+    those connections.
+  </div>
+
+  <!-- 1. The shared pattern -->
+  <section>
+    <h2><span class="num">1</span> The shared pattern: two commons, one shape</h2>
+    <div class="section-sub">
+      <span class="inline-code">benchmark-commons</span> compiles a workload card into benchmark argv;
+      <span class="inline-code">serving-commons</span> validates a serving config before deploy. Same architecture, different domain.
+    </div>
+    <div class="panel">
+      <div class="mermaid">
+flowchart LR
+  classDef input fill:#242740,stroke:#6366f1,color:#e2e8f0
+  classDef pure fill:#1a2e2a,stroke:#34d399,color:#e2e8f0
+  classDef gate fill:#2e1a2a,stroke:#f87171,color:#e2e8f0
+  classDef test fill:#1a2436,stroke:#60a5fa,color:#e2e8f0
+
+  subgraph BC["benchmark-commons"]
+    direction TB
+    BCin["workload card<br/>+ benchmark.yaml"]:::input --> BCcomp["compile_card()<br/>PURE"]:::pure
+    BCcomp --> BCout["benchmark argv"]:::gate
+    BCreg["registry.py<br/>DATASET_HANDLERS"]:::pure -.rules.-> BCcomp
+    BCtest["runner/tests<br/>unittest"]:::test -.gates.-> BCcomp
+  end
+
+  subgraph SC["serving-commons"]
+    direction TB
+    SCin["benchmark.yaml<br/>+ mdc card<br/>+ lessons corpus"]:::input --> SCcomp["compile_serving_config()<br/>PURE"]:::pure
+    SCcomp --> SCout["ValidationReport<br/>fail / warn / info"]:::gate
+    SCreg["registry.py<br/>CHECKS"]:::pure -.rules.-> SCcomp
+    SCtest["resolver/tests<br/>unittest"]:::test -.gates.-> SCcomp
+  end
+
+  BCout --> RAISE1{{"raises<br/>UnsupportedWorkload"}}:::gate
+  SCout --> RAISE2{{"raises<br/>InvalidServingConfig"}}:::gate
+      </div>
+      <div class="legend">
+        <span><span class="swatch" style="background:#6366f1"></span>declarative input</span>
+        <span><span class="swatch" style="background:#34d399"></span>pure function (no I/O)</span>
+        <span><span class="swatch" style="background:#f87171"></span>fail-closed boundary</span>
+        <span><span class="swatch" style="background:#60a5fa"></span>conformance test (the contract)</span>
+      </div>
+    </div>
+
+    <table style="margin-top:1.5rem">
+      <thead><tr><th>Package</th><th>Input</th><th>Pure entrypoint</th><th>Output</th><th>Raises on</th><th>Gates</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>benchmark-commons</code></td>
+          <td>workload card + <code>benchmark.yaml</code></td>
+          <td><code>compile_card()</code></td>
+          <td>benchmark argv</td>
+          <td><span class="badge b-fail">UnsupportedWorkload</span></td>
+          <td>benchmark-runner skill</td>
+        </tr>
+        <tr>
+          <td><code>serving-commons</code></td>
+          <td><code>benchmark.yaml</code> + mdc card + lessons corpus</td>
+          <td><code>compile_serving_config()</code></td>
+          <td><code>ValidationReport</code></td>
+          <td><span class="badge b-fail">InvalidServingConfig</span></td>
+          <td>infra-deployer <strong>Stage 0c</strong></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 2. serving-commons internals -->
+  <section>
+    <h2><span class="num">2</span> Inside serving-commons: module flow</h2>
+    <div class="section-sub">
+      Parsing is dumb, rules are a lookup table, the compiler is pure, and <span class="inline-code">corpus.py</span> is the only
+      thing that touches the filesystem — so the same config always yields the same report.
+    </div>
+    <div class="panel">
+      <div class="mermaid">
+flowchart TB
+  classDef io fill:#2e2a1a,stroke:#fbbf24,color:#e2e8f0
+  classDef pure fill:#1a2e2a,stroke:#34d399,color:#e2e8f0
+  classDef data fill:#242740,stroke:#6366f1,color:#e2e8f0
+  classDef cli fill:#2e1a2a,stroke:#f87171,color:#e2e8f0
+
+  sidecar["benchmark.yaml sidecar"]:::data
+  card["mdc card JSON<br/>(moe_intermediate_size…)"]:::data
+  lessons["domains/*/blueprints/*/lessons.md<br/>YAML field notes"]:::data
+
+  sidecar --> model["model.py<br/>from_sidecar() → ServingConfig<br/>PURE parse"]:::pure
+  card --> model
+  lessons --> corpus["corpus.py<br/>load_corpus() → LessonsCorpus<br/>I/O BOUNDARY"]:::io
+
+  model --> compiler["compiler.py<br/>compile_serving_config(cfg, corpus)<br/>PURE"]:::pure
+  corpus --> compiler
+  registry["registry.py — CHECKS[10]<br/>each (cfg) → Finding | None"]:::pure -.runs.-> compiler
+
+  compiler --> report["ValidationReport<br/>.failures / .warnings / .infos / .ok"]:::pure
+  report --> cli["validate-serving-config.py<br/>exit 2 on FAIL · exit 3 on --warnings-as-errors"]:::cli
+      </div>
+      <div class="legend">
+        <span><span class="swatch" style="background:#6366f1"></span>declarative data</span>
+        <span><span class="swatch" style="background:#34d399"></span>pure (no I/O)</span>
+        <span><span class="swatch" style="background:#fbbf24"></span>I/O boundary</span>
+        <span><span class="swatch" style="background:#f87171"></span>CLI gate</span>
+      </div>
+    </div>
+
+    <div class="codeblock-title">registry.py — a rule is a pure function returning Finding | None</div>
+    <div class="codeblock"><span class="kw">def</span> <span class="fn">_chk_fp8_moe_tp_divisibility</span>(cfg: ServingConfig) -&gt; Optional[Finding]:
+    m, e = cfg.model, cfg.engine
+    <span class="kw">if not</span> (m.is_moe <span class="kw">and</span> m.is_fp8): <span class="kw">return</span> <span class="kw">None</span>          <span class="cmt"># rule doesn't apply</span>
+    <span class="kw">if</span> m.moe_intermediate_size % (e.tensor_parallel * <span class="num2">128</span>) == <span class="num2">0</span>:
+        <span class="kw">return</span> <span class="kw">None</span>                                       <span class="cmt"># passes — silent</span>
+    <span class="kw">return</span> Finding(
+        rule=<span class="str">"fp8-moe-tp-divisibility"</span>, verdict=<span class="str">"fail"</span>,
+        reason=<span class="str">"…moe_intermediate_size / tensor_parallel_size must be divisible by 128…"</span>,
+        source=<span class="str">"tech-stack.md §'FP8 MoE…' (qwen3-235b-b300 lessons L1)"</span>,
+        fix=<span class="str">"Use TP in {2, 4} which satisfies moe_intermediate_size % (TP*128) == 0."</span>)</div>
+  </section>
+
+  <!-- 3. The 10 rules -->
+  <section>
+    <h2><span class="num">3</span> The rule registry: 10 codified rules</h2>
+    <div class="section-sub">Every rule's <span class="inline-code">reason</span> is lifted verbatim from <span class="inline-code">.claude/steering/tech-stack.md</span> — the report says exactly what steering says.</div>
+    <div class="panel" style="padding:0">
+      <table>
+        <thead><tr><th>Rule id</th><th>Verdict</th><th>Catches</th></tr></thead>
+        <tbody>
+          <tr><td><code>fp8-moe-tp-divisibility</code></td><td><span class="badge b-fail">FAIL</span></td><td>FP8 MoE: <code>moe_intermediate_size / TP</code> not divisible by block_n=128</td></tr>
+          <tr><td><code>max-model-len-vs-position</code></td><td><span class="badge b-fail">FAIL</span></td><td><code>max_model_len</code> exceeds the model's <code>max_position_embeddings</code></td></tr>
+          <tr><td><code>b200-requires-al2023</code></td><td><span class="badge b-fail">FAIL</span></td><td>B200/B300 NVL5+ on AL2 AMI — no <code>ib_umad</code>, CUDA error 802</td></tr>
+          <tr><td><code>lmcache-mla-incompat</code></td><td><span class="badge b-fail">FAIL</span></td><td>LMCache on MLA/NSA fused-KV models — <code>AttributeError: k_buffer</code></td></tr>
+          <tr><td><code>specdec-acceptance-gate</code></td><td><span class="badge b-fail">FAIL</span> / <span class="badge b-info">INFO</span></td><td>measured draft acceptance &lt; 60% → net throughput loss</td></tr>
+          <tr><td><code>hicache-size-vs-device-pool</code></td><td><span class="badge b-warn">WARN</span></td><td>HiCache enabled but <code>--hicache-size</code> unset → init assertion / OOM</td></tr>
+          <tr><td><code>specdec-on-pcie</code></td><td><span class="badge b-warn">WARN</span></td><td>spec-decode on PCIe GPUs → 2–41% throughput degradation</td></tr>
+          <tr><td><code>mamba-mtp-prefix-cache</code></td><td><span class="badge b-warn">WARN</span></td><td>MTP + mamba-hybrid conflicts with prefix caching</td></tr>
+          <tr><td><code>hybrid-hicache-cuda-graph</code></td><td><span class="badge b-warn">WARN</span></td><td>hybrid attention + HiCache needs <code>--disable-cuda-graph</code></td></tr>
+          <tr><td><code>blackwell-cuda-tag</code></td><td><span class="badge b-warn">WARN</span></td><td>Blackwell sm_120 needs cu130, not cu131 (tag may not exist)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 4. The spec-blueprint gap / corpus -->
+  <section>
+    <h2><span class="num">4</span> Closing the spec ↔ blueprint gap with the corpus</h2>
+    <div class="section-sub">
+      A spec says <em>what to deploy</em>; a blueprint's <span class="inline-code">lessons.md</span> records <em>what actually broke</em>.
+      The corpus harvests that delta and replays it as findings — even when a static rule can only WARN.
+    </div>
+    <div class="panel">
+      <div class="mermaid">
+flowchart LR
+  classDef spec fill:#242740,stroke:#6366f1,color:#e2e8f0
+  classDef bp fill:#2e2a1a,stroke:#fbbf24,color:#e2e8f0
+  classDef gap fill:#2e1a2a,stroke:#f87171,color:#e2e8f0
+  classDef out fill:#1a2e2a,stroke:#34d399,color:#e2e8f0
+
+  spec["SPEC<br/>'deploy Qwen3-235B FP8, TP8'"]:::spec
+  bp["BLUEPRINT lessons.md<br/>failure_categories:<br/>- fp8_block_size_mismatch<br/>- max_position_embeddings_mismatch"]:::bp
+
+  spec -->|"sidecar lacks<br/>moe_intermediate_size"| warn["static rule can only<br/>WARN (unverifiable)"]:::gap
+  bp -->|"corpus.recorded_categories()"| replay["prior-failure: findings<br/>cite source blueprint"]:::out
+  warn --> report["ValidationReport"]:::out
+  replay --> report
+  map["CATEGORY_TO_RULE<br/>fp8_block_size_mismatch →<br/>fp8-moe-tp-divisibility"]:::out -.links.-> replay
+      </div>
+    </div>
+
+    <div class="codeblock-title">Real output: a vllm Qwen3-235B config gated with --corpus-root</div>
+    <div class="codeblock"><span class="cmt">=== serving-config validation: Qwen3-235B-A22B-FP8 on p6-b300.48xlarge [vllm TP4] ===</span>
+  <span class="num2">!</span> WARN [fp8-moe-tp-divisibility] FP8 MoE but moe_intermediate_size is unknown — cannot verify…
+  <span class="num2">!</span> WARN [prior-failure:fp8_block_size_mismatch] A prior deployment of Qwen/Qwen3-235B-A22B-FP8
+        on vllm recorded failure_category=fp8_block_size_mismatch. A codified check exists (fp8-moe-tp-divisibility).
+        source: domains/gpu-serving/blueprints/qwen3-235b-b300/lessons.md
+  <span class="num2">!</span> WARN [prior-failure:max_position_embeddings_mismatch] …
+  <span class="num2">!</span> WARN [prior-failure:tool_call_parser_incompatibility] …</div>
+
+    <div class="codeblock-title">The single source of truth for the failure_categories vocabulary</div>
+    <div class="codeblock"><span class="cmt"># corpus.py — keys = closed vocabulary (docs/card-format.md mirrors it; a test enforces sync)</span>
+CATEGORY_TO_RULE = {
+    <span class="cmt"># codified: a deterministic rule catches this from config</span>
+    <span class="str">"fp8_block_size_mismatch"</span>:          <span class="str">"fp8-moe-tp-divisibility"</span>,
+    <span class="str">"max_position_embeddings_mismatch"</span>: <span class="str">"max-model-len-vs-position"</span>,
+    <span class="str">"ami"</span>:                             <span class="str">"b200-requires-al2023"</span>,
+    <span class="str">"kv_eviction"</span>:                     <span class="str">"hicache-size-vs-device-pool"</span>,
+    <span class="cmt"># not yet codified → surfaced as bare warnings (candidates for future rules)</span>
+    <span class="str">"nccl"</span>: <span class="kw">None</span>, <span class="str">"driver"</span>: <span class="kw">None</span>, <span class="str">"oom"</span>: <span class="kw">None</span>, <span class="str">"disk_pressure"</span>: <span class="kw">None</span>, …
+}</div>
+  </section>
+
+  <!-- 5. Wiring into the workflow -->
+  <section>
+    <h2><span class="num">5</span> Where the gate plugs into the deployment lifecycle</h2>
+    <div class="section-sub">The resolver isn't standalone — it runs at <strong>Stage 0c</strong>, before any capacity is reserved, and the artifacts that overlap with it now defer to the codified version.</div>
+    <div class="panel">
+      <div class="mermaid">
+flowchart TB
+  classDef stage fill:#242740,stroke:#6366f1,color:#e2e8f0
+  classDef gate fill:#2e1a2a,stroke:#f87171,color:#e2e8f0
+  classDef ok fill:#1a2e2a,stroke:#34d399,color:#e2e8f0
+
+  S0a["Stage 0a · blueprint-reviewer<br/>structural coherence"]:::stage
+  S0b["Stage 0b · mdc + gpu-infra cards"]:::stage
+  S0c["Stage 0c · SERVING-CONFIG GATE<br/>validate-serving-config.py"]:::gate
+  S1["Stage 1 · Terraform foundation"]:::stage
+  S3["Stage 3 · model staging"]:::stage
+  S4a["Stage 4a · GPU health (gpu-infra MCP)"]:::stage
+  S5["Stage 5 · serving stack up"]:::stage
+  S6["Stage 6 · benchmark (benchmark-commons)"]:::ok
+
+  S0a --> S0b --> S0c
+  S0c -->|"exit 0"| S1
+  S0c -->|"exit 2 — FAIL"| BLOCK["BLOCKED<br/>fix sidecar (TP / max_model_len / AMI)"]:::gate
+  BLOCK -.re-run.-> S0c
+  S1 --> S3 --> S4a --> S5 --> S6
+      </div>
+    </div>
+
+    <div class="codeblock-title">infra-deployer.md — Stage 0c command (now also in CLAUDE.md, the spec template & deployment-orchestrator skill)</div>
+    <div class="codeblock">python3 standards/serving-commons/resolver/validate-serving-config.py \
+  --sidecar domains/gpu-serving/blueprints/&lt;name&gt;/benchmark.yaml \
+  --card    &lt;model-deployment-card.json&gt; \   <span class="cmt"># optional: supplies moe_intermediate_size</span>
+  --corpus-root .                             <span class="cmt"># replays prior lessons.md failures</span>
+<span class="cmt"># exit 2 ⇒ hard-rule FAIL: apply the printed fix before deploying</span></div>
+  </section>
+
+  <!-- 6. Artifact connection map -->
+  <section>
+    <h2><span class="num">6</span> Full artifact connection map</h2>
+    <div class="section-sub">Every place that now references the resolver, and the role it plays.</div>
+    <div class="panel" style="padding:0">
+      <table>
+        <thead><tr><th>Artifact</th><th>Type</th><th>Connection to the resolver</th></tr></thead>
+        <tbody>
+          <tr><td><code>standards/serving-commons/resolver/</code></td><td>package</td><td>The resolver itself: <code>model.py</code>, <code>registry.py</code>, <code>compiler.py</code>, <code>corpus.py</code>, CLI, tests</td></tr>
+          <tr><td><code>.claude/agents/infra-deployer.md</code></td><td>agent</td><td><strong>Stage 0c</strong> runs the CLI, blocks on exit 2 — the primary gate</td></tr>
+          <tr><td><code>.claude/skills/deployment-orchestrator/SKILL.md</code></td><td>skill</td><td>Pre-flight checklist runs it; the manual FP8 recovery note now defers to <code>fp8-moe-tp-divisibility</code></td></tr>
+          <tr><td><code>.claude/skills/benchmark-runner/SKILL.md</code></td><td>skill</td><td>Cross-ref: same sidecar gates the benchmark (here) and the deploy (resolver)</td></tr>
+          <tr><td><code>.claude/steering/tech-stack.md</code></td><td>steering</td><td><strong>Source of truth</strong> — every rule's <code>reason</code> is lifted verbatim from here</td></tr>
+          <tr><td><code>.claude/steering/project-structure.md</code></td><td>steering</td><td>Documents the <code>standards/</code> tier and the commons pattern</td></tr>
+          <tr><td><code>docs/card-format.md</code></td><td>schema</td><td>Documents the <code>failure_categories</code> enum; kept in sync with <code>CATEGORY_TO_RULE</code> by a test</td></tr>
+          <tr><td><code>domains/*/blueprints/*/lessons.md</code></td><td>data</td><td>Field-note frontmatter harvested by <code>corpus.py</code> — the empirical knowledge base</td></tr>
+          <tr><td><code>domains/gpu-serving/specs/_template.md</code></td><td>template</td><td>Stage 0c verification checkbox in every new spec</td></tr>
+          <tr><td><code>CLAUDE.md</code></td><td>routing</td><td>Context-loading row pointing agents to the gate</td></tr>
+          <tr><td><code>benchmark.yaml</code> (per blueprint)</td><td>data</td><td>The shared declarative input — consumed by <em>both</em> commons packages</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 7. The contract -->
+  <section>
+    <h2><span class="num">7</span> The conformance test is the contract</h2>
+    <div class="grid-2">
+      <div class="card">
+        <h3>15 tests, green = correct by construction</h3>
+        <p>Every rule cites a source &amp; has passing + failing fixtures; the canonical Qwen3-235B
+        <span class="inline-code">TP8-fails / TP4-passes</span> case; all real sidecars validate; the corpus harvests
+        &amp; replays; and the three-way <code>failure_categories</code> vocabulary stays in sync.</p>
+        <div class="pillrow">
+          <span class="pill">TestRuleSourceCitations</span>
+          <span class="pill">TestEveryRuleHasFixtures</span>
+          <span class="pill">TestQwen235BCanonicalCase</span>
+          <span class="pill">TestRealSidecars</span>
+          <span class="pill">TestCorpusHarvest</span>
+          <span class="pill">TestFailureCategorySchemaSync</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>failure_categories vocabulary</h3>
+        <p>One closed set across <code>corpus.py</code>, <code>card-format.md</code>, and what blueprints emit. Codified = a rule guards it.</p>
+        <div class="pillrow">
+          <span class="pill codified">fp8_block_size_mismatch</span>
+          <span class="pill codified">max_position_embeddings_mismatch</span>
+          <span class="pill codified">ami</span>
+          <span class="pill codified">kv_eviction</span>
+          <span class="pill">nccl</span>
+          <span class="pill">driver</span>
+          <span class="pill">oom</span>
+          <span class="pill">disk_pressure</span>
+          <span class="pill">tool_call_parser_incompatibility</span>
+          <span class="pill">tls_incompatibility</span>
+          <span class="pill">other</span>
+        </div>
+      </div>
+    </div>
+    <div class="codeblock-title">Run it</div>
+    <div class="codeblock">$ python3 -m unittest discover -s standards/serving-commons/resolver/tests -v
+<span class="cmt">...............</span>
+Ran <span class="num2">15</span> tests <span class="kw">in</span> <span class="num2">0.149</span>s
+
+<span class="str">OK</span></div>
+  </section>
+
+</main>
+
+<footer>
+  Generated by visual-explainer · agent-aiops-on-aws · 2026-06-01
+</footer>
+
+<script>
+  function currentTheme() {
+    return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  }
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: currentTheme(),
+    flowchart: { curve: 'basis', useMaxWidth: true },
+    securityLevel: 'loose',
+  });
+  function toggleTheme() {
+    const html = document.documentElement;
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    // Re-render mermaid with the new theme
+    document.querySelectorAll('.mermaid').forEach((el, i) => {
+      el.removeAttribute('data-processed');
+      el.innerHTML = el.getAttribute('data-src') || el.textContent;
+    });
+    mermaid.initialize({ startOnLoad: false, theme: next === 'dark' ? 'dark' : 'default', flowchart: { curve: 'basis', useMaxWidth: true }, securityLevel: 'loose' });
+    mermaid.run();
+  }
+  // Cache original mermaid sources for re-render on theme switch
+  document.querySelectorAll('.mermaid').forEach(el => el.setAttribute('data-src', el.textContent));
+</script>
+</body>
+</html>

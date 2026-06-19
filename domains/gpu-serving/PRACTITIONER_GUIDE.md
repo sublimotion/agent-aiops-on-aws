@@ -6,6 +6,7 @@
 
 ## Table of Contents
 
+0. [First-Principles Preflight](#0-first-principles-preflight) — *the generating function behind §§1, 7, 11*
 1. [Hardware Selection](#1-hardware-selection)
 2. [Pre-Flight Validation](#2-pre-flight-validation)
 3. [Infrastructure Provisioning](#3-infrastructure-provisioning)
@@ -18,6 +19,95 @@
 10. [Troubleshooting](#10-troubleshooting)
 11. [Cost Optimization](#11-cost-optimization)
 12. [Quick Reference Commands](#12-quick-reference-commands)
+
+---
+
+## 0. First-Principles Preflight
+
+> **Read this before §1.** §§1–11 are *memorized answers* — "model size X → instance Y," tuned flags, hard-won gotchas. This section is the **generating function** that produces them. When a blueprint hits a model the tables didn't anticipate, reason from here. The whole section is ~6 equations; everything downstream is a special case.
+
+### How to read this guide: three knowledge tiers
+
+Every claim in this playbook has a **half-life**. Mistaking a short-lived fact for a durable one is the single most common way a spec goes wrong (it's the same defect class the `carryover-auditor` guards against). So each heuristic is tagged:
+
+| Tier | Half-life | Holds across… | Example |
+|------|-----------|---------------|---------|
+| **[T1]** universal | ~never | any cloud, any model, any year | `T = max(t_compute, t_mem)`; decode is bandwidth-bound |
+| **[T2]** environment | years | until the provider/platform changes | EFA is SRD, not true RDMA; g7e uses `nerdctl` |
+| **[T3]** release | weeks–months | one version window — **must carry a `validated:` date** | NCCL 2.25.1 broken on sm_120; vLLM 0.18.1 has no draft-MoE knob |
+
+T1 is asserted plainly. **T2/T3 always carry their qualifier** ("on AWS…", "as of vLLM 0.18.1…") so neither a human nor an agent mistakes a decaying fact for a law. T3 rules reuse the repo's version-stamp convention (`<!-- stack: … | validated: YYYY-MM-DD -->`, see `tech-stack.md`). **The reasoner below is pure T1.** It only *consults* T2/T3 to confirm the clean prediction survives contact with the stack — which is the whole point of the closing rule: **theory predicts the regime; measurement confirms it.** Measurement is exactly where T2/T3 reality intrudes on T1 math.
+
+### The two rooflines [T1]
+
+Every inference efficiency question descends from one fact: a transformer's two phases sit on **opposite sides of the roofline**.
+
+```
+forward-pass time   T = max( t_compute , t_mem )
+
+  t_compute = (B · N_active) / FLOPs            ← batch × active params, over chip FLOPs
+  t_mem     = (N_total + B · L_ctx · kv_bytes) / mem_bw
+              \________/   \__________________/
+              weight fetch   KV-cache fetch
+```
+
+- **Prefill** (process the prompt): compute-bound. One big matmul over all prompt tokens at once → high arithmetic intensity. **FLOPs are the constraint.**
+- **Decode** (generate one token at a time): memory-bandwidth-bound. Each step reads the *entire* model + KV cache to emit one token → arithmetic intensity ~1–2 FLOP/byte. **Bandwidth and latency are the constraint; tensor cores sit idle.**
+
+A **latency floor** exists for any hardware: you must read all params from HBM at least once, so `T ≥ N_total / mem_bw`. No batching or kernel trick beats it.
+
+*Origin: Pope et al., "Efficiently Scaling Transformer Inference" (arXiv:2211.05102). Re-derived first-principles in the Dwarkesh × Reiner Pope blackboard lecture — see vault note `Reiner Pope - How LLMs Are Trained and Served`.*
+
+### Optimal batch size [T1]
+
+Set `t_compute = t_mem` (weight term) and the model size cancels out:
+
+```
+B*  ≈  300 × sparsity          sparsity = N_total / N_active
+```
+
+- The **~300** is a dimensionless hardware constant (FLOP-per-byte at the precision used), remarkably stable across GPU generations because FLOPs and bandwidth scaled together. **[T1]**, but spot-check per precision: it's FP4 vs FP8 vs FP16 dependent, and the exact number drifts with hardware **[T3]**.
+- DeepSeek-V3 activates 32/256 experts → sparsity ≈ 8 → **B\* ≈ 2,400 sequences.** In practice run 2–3× higher (roofline overstates real efficiency).
+- **Batch optimum depends only on sparsity, not model scale.** More sparsity → less compute but bigger batches needed (more HBM for KV). "Keep increasing sparsity until you run out of users."
+
+### The decision procedure
+
+Given a model (`N_total`, `N_active`, `kv_bytes/token`) and target hardware (`FLOPs`, `mem_bw`, HBM/GPU, scale-up domain size), answer in order:
+
+**1 · Which roofline am I on?** Compute the arithmetic intensity of your target workload and compare to the machine balance (`FLOPs ÷ mem_bw`, ~300–630 FLOP/byte at low precision on modern GPUs **[T3]**).
+
+| Regime | Symptom | The lever (what to optimize) | Wrong lever (no-op) |
+|--------|---------|------------------------------|---------------------|
+| **bandwidth-bound** | decode; AI ≪ machine balance; HBM util high, tensor low | more HBM bandwidth (newer gen / HBM4), shrink bytes/token (quant, MLA/GQA), bigger batch to amortize weights | more FLOPs; bigger FP4 numbers |
+| **compute-bound** | prefill, large-batch decode; tensor cores hot | more FLOPs, FP4/FP8, better GEMM kernels | more bandwidth |
+| **capacity-bound** | model + KV won't fit; OOM at target concurrency | more HBM/GPU, more GPUs, quantize weights, pipeline across racks | faster kernels |
+| **launch/scheduling-bound** | small model; SM ~50%, HBM ~15%, tensor ~11% at SLO knee | kernel fusion, CUDA graphs, megakernels — **software, not silicon** | **a bigger chip** (B300 over B200 adds capacity + FP4, not the bandwidth you lack) |
+
+> **The decode-bytes decomposition that prevents the most common error [T1]:** `decode bytes/token = active-weight read (N_active × dtype) + KV read (kv_bytes × dtype)`. Attention innovations (GQA, MLA, Mamba, sparse) **only shrink the second term.** A 32B-active MoE in FP8 reads ~16 GB of weights/token — even with MLA crushing KV 20×, the **weight term is ~95% of decode bytes**, so it stays firmly bandwidth-bound. "It's sparse, so it's not the bottleneck" is the trap. Check which term dominates *before* concluding anything.
+
+**2 · What's my B\*, and does target concurrency reach it?** Below B\* you're wasting the GPU on un-amortized weight fetches; the cost/token curve is still falling. At/above B\* you've hit the compute floor. This sets your throughput target and tells you if "slow mode / low QPS" will ever be cost-efficient (it won't — compute and KV don't amortize).
+
+**3 · Does the model + KV for target concurrency fit and saturate ONE node?** This is the disagg test (full version in §7 and the inference-bottleneck report). The screen:
+
+```
+fits + saturates one node  →  replicas + chunked prefill   (≈95% of deployments; disagg is over-engineering)
+forced onto a 2nd node     →  only THEN consider disaggregation
+  (forced by: weights too big, 100K+ context whose prefill alone exhausts a node, or QPS beyond one box)
+```
+
+Parameter count is **not** the axis — a 1T-param MoE (32B active) fits one node and needs no disagg; "sounds frontier" predicts nothing. "Forced onto a second node" predicts everything. **[T1] in logic; the cross-node tax that makes disagg lose is [T2]:** on AWS, EFA is SRD not true RDMA — a TCP fallback turned a 355 ms TTFT into 10+ s in our testing. The moment you're forced cross-node is often the moment you *lack* the fabric that makes disagg pay.
+
+**4 · Is pipelining worth it? (almost never, for inference) [T1]** Pipeline parallelism solves weight **capacity** (each rack holds 1/P of weights) — but a Blackwell rack already has tens of TB and a 1T model needs ~1 TB, so the benefit is usually nil. Crucially it **does not shard the KV cache**: keeping P stages busy needs P micro-batches in flight, so concurrent sequences scale with P and the saving cancels. Inference recipe (matches DeepSeek's published setup): **max expert parallelism to the scale-up domain size, then little-to-no pipelining.**
+
+**5 · Why does scale-up domain size matter? Bandwidth, not capacity. [T1]** Weight-load bandwidth = scale-up size × per-GPU bandwidth. A bigger NVLink domain lets you load weights in parallel → lower decode latency and longer feasible context. This is *why* NVL72 matters, and why interconnect is a lever to exploit, not a bottleneck to fear.
+
+### The closing rule — theory predicts, measurement confirms
+
+Every heuristic above outputs a **predicted regime**, never a deploy command. The prediction is T1 physics; the stack is full of T2/T3 reality that can flip it (a kernel that ignores your tile config, an engine without the flag you need, an AMI that won't boot). So every preflight conclusion ends the same way:
+
+> *"This model should be `<regime>`-bound on `<hardware>`, so optimize `<lever>` — **now confirm with `nvidia-smi dmon` / a benchmark sweep before trusting it.**"*
+
+If measurement contradicts the prediction, you've found a T2/T3 quirk worth a lessons.md entry — not a reason to distrust the physics. See §2 (Pre-Flight Validation) for the measurement commands, §9 (Benchmarking) for the sweep, and §10 (Troubleshooting) for regime-confirmation queries.
 
 ---
 

@@ -1,0 +1,52 @@
+# Prometheus scrape config for benchmark GPU nodes.
+# Install at /etc/prometheus-bench/prometheus.yml before launching the compose stack.
+#
+# Engine endpoints must be reachable on localhost (containers run --network host).
+# The bench driver queries this Prometheus for histogram percentiles per run.
+
+global:
+  scrape_interval: 5s
+  scrape_timeout: 4s
+  evaluation_interval: 15s
+  external_labels:
+    node: "${NODE_NAME:-gpu-node}"
+    blueprint: "${BLUEPRINT:-unknown}"
+    session: "${SESSION_ID:-unknown}"
+
+scrape_configs:
+  # Engine — vLLM. Skipped silently if port 8000 is closed.
+  - job_name: vllm
+    static_configs:
+      - targets: ["localhost:8000"]
+        labels: {engine: vllm, role: serving}
+    metrics_path: /metrics
+    honor_labels: true
+
+  # Engine — SGLang.
+  - job_name: sglang
+    static_configs:
+      - targets: ["localhost:30000"]
+        labels: {engine: sglang, role: serving}
+    metrics_path: /metrics
+    honor_labels: true
+
+  # GPU — DCGM (util, HBM, power, temp, tensor-core, XID).
+  - job_name: dcgm
+    static_configs:
+      - targets: ["localhost:9400"]
+        labels: {role: gpu}
+    metrics_path: /metrics
+    scrape_interval: 5s
+
+  # Node — CPU, memory, disk, network.
+  - job_name: node
+    static_configs:
+      - targets: ["localhost:9100"]
+        labels: {role: host}
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  # Self — Prometheus health.
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

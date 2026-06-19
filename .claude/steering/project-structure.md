@@ -8,6 +8,7 @@ agent-aiops-on-aws/
 │   ├── steering/               # Context files (loaded on demand)
 │   │   ├── product.md          # Business context
 │   │   ├── tech-stack.md       # Technology preferences (all domains)
+│   │   ├── inference-first-principles.md # Roofline reasoner (config-selection time)
 │   │   └── project-structure.md # This file
 │   ├── agents/                 # Sub-agents
 │   │   ├── blueprint-reviewer.md  # Coherence auditor
@@ -216,6 +217,7 @@ What this does NOT need to do
 |------|---------|----------------|
 | `product.md` | Business context, quality standards | Rarely (foundational) |
 | `tech-stack.md` | Technology preferences (all domains) | When adopting new tools |
+| `inference-first-principles.md` | Roofline reasoner — predict bottleneck regime at config-selection time | Rarely (T1 physics); refresh the T3 balance constants per GPU gen |
 | `project-structure.md` | Layout and conventions | When adding domains/blueprints |
 
 ## File Naming Conventions

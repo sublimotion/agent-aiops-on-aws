@@ -6,6 +6,23 @@ Every blueprint's Stage 6 benchmark report should fill out the **Tier Stack Tabl
 
 > **Companion docs**: [inference-optimization-guide.md](inference-optimization-guide.md) has the theory (roofline, Pareto, cost-per-success). This file is the operator's checklist.
 
+## Where this doc sits in the loop
+
+This catalog is the **generalized-guideline** rung of the optimization knowledge ladder — read it at config-selection time, feed measured results back into it after benchmarking:
+
+- **Start of loop (spec Stage 0b):** predict the regime from [`.claude/steering/inference-first-principles.md`](../.claude/steering/inference-first-principles.md), then use the tier priorities + conflicts here to fill the spec's lever ledger. Account for every tier; defer with a reason, never skip silently.
+- **End of loop (`compound-learner`):** the Stage 6 Tier Stack Table's measured deltas are fed back into this doc's typical-Δ cells, and any high-priority tier skipped without justification is flagged. See `.claude/agents/compound-learner.md` § "Optimization coverage refresh".
+
+**Which rung absorbs a lesson** (invariance test — "still true after a framework version bump?"):
+
+| Lesson kind | Home |
+|-------------|------|
+| Physics, rederivable from the roofline | `.claude/steering/inference-first-principles.md` (T1) |
+| Technique-class, true across ≥2 models/frameworks | **this doc** (generalized lever) |
+| Specific model/engine/version/instance | blueprint `lessons.md` + `mdc`/`gpu-infra` cards (T2/T3) |
+
+A single datapoint is a card fact; promote to this doc only on the *second* occurrence across models.
+
 ## The six tiers
 
 | T | Name | Character | Default recommendation (2026-05) |
@@ -92,9 +109,11 @@ engine:
 
 **Canonical config**: enable L1 prefix cache unconditionally. Add HiCache or LMCache when a baseline run shows KV hit rate > 20% **or** context P95 > 16K tokens.
 
-**Conflicts**:
-- **Hybrid KV (Qwen3-Next, Nemotron Mamba)**: HMA auto-disables when KV transfer connectors engage → HiCache/LMCache/disagg all blocked on vLLM 0.16.
-- **MLA + LMCache**: blocked until LMCache PR #2951 (vLLM) and #2629 (SGLang) land.
+**Conflicts** — *every blocker below is a point-in-time upstream claim and decays. Before deferring a lever on one, re-verify against the live tracker (`gh pr view <N> --repo <repo>`, `gh issue list`). A merged PR lifts the blocker silently — nothing here will error.*
+- **Hybrid KV (Qwen3-Next, Nemotron Mamba)**: HMA auto-disables when KV transfer connectors engage → HiCache/LMCache/disagg all blocked. <!-- stack: vllm=0.16 | validated: 2026-05-16 — RE-CHECK before use -->
+- **MLA + LMCache** — *re-checked against LMCache tracker 2026-06-17; the old "blocked until #2951/#2629 land" framing was wrong:* <!-- stack: lmcache=dev | validated: 2026-06-17 -->
+  - **vLLM path: MERGED, not blocked** — core MLA support landed via #1801 (Layerwise), #2032 (P2P), #2697 (multi-TP), #2935/#2941. PR #2951 is a *follow-up* multi-group bugfix (GLM-5/DeepSeek V3), still OPEN — not a gate on the feature. **Try it.** Expect GLM-5-specific rough edges: OPEN bugs #2774 (GLM-5 FP8 tensor-shape mismatch), #2977 (GLM-5 cache hit rate 0), #2881 (DeepSeek V3.2 shape mismatch), #3388 (degenerate output under load). Smoke-test cache-hit-rate and output quality before trusting it on GLM-5.
+  - **SGLang path: genuinely still blocked** — issue #3192 (2026-05-28) confirms LMCache doesn't support MLA on SGLang; PR #2629 ("Add MLA to SGLangLayerwise") is the open fix, stale since 2026-05-07. Use SGLang **HiCache** for MLA models, not LMCache.
 - **NSA + HiCache**: works on SGLang; NSA fused `kv_buffer` handled natively since mid-2026.
 
 ---

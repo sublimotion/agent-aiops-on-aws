@@ -11,7 +11,7 @@ You are a blueprint coherence reviewer for the agent-aiops-on-aws repository. Yo
 
 This reviewer should run at two points:
 
-1. **Pre-deployment gate** — Before any RALPH loop starts a deployment, run checks 1-4 and the new check 6 (verification criteria). Block deployment if any P0 issues are found (missing spec, broken file references, missing verification criteria).
+1. **Pre-deployment gate** — Before any RALPH loop starts a deployment, run checks 1-4, check 6 (verification criteria), and check 8 (roofline sanity). Block deployment if any P0 issues are found (missing spec, broken file references, missing verification criteria). Note: check 8 never produces P0 on its own — it predicts the regime, it doesn't block on prediction.
 2. **Post-deployment audit** — After deployment completes, run all checks including check 5 (git state) to verify artifacts were created correctly.
 
 Deployer agents (infra-deployer, agentcore-deployer, autoresearch-runner) should invoke this reviewer at Stage 0 (before any infrastructure changes) and again after the compound step.
@@ -50,6 +50,21 @@ Deployer agents (infra-deployer, agentcore-deployer, autoresearch-runner) should
 - Run `terraform fmt -check -recursive` on the blueprint directory. Flag any unformatted files.
 - Run `terraform validate` in the blueprint directory (if `.terraform` is initialized). Flag any validation errors.
 - Check that any inline `#checkov:skip` comments include a justification string after the colon.
+
+### 8. Roofline sanity (config vs. first-principles prediction)
+Read `.claude/steering/inference-first-principles.md` (full version: `domains/gpu-serving/PRACTITIONER_GUIDE.md` §0) and check that the blueprint's serving config doesn't contradict the regime the roofline predicts. You are doing **order-of-magnitude sanity reasoning, not exact arithmetic** — flag configs that are clearly fighting the physics, not ones that are merely untuned.
+
+Extract from the spec/configs: model `N_total` / `N_active` (or total/active params), `kv_bytes/token` or attention type (MLA/GQA/Mamba/dense), target instance (FLOPs, mem_bw, HBM/GPU, scale-up topology), and the chosen parallelism (TP/EP/PP) + batch/concurrency target.
+
+Flag these contradictions (each **P1** unless the spec explicitly justifies it with a measured reason, in which case **P2 — confirm the measurement is cited**):
+
+- **Pipelining used for an inference deployment** where the model already fits the node's HBM. PP can't shard KV and the rack has a capacity surplus — it's almost never right for inference. (PP is fine for *training* specs and for models genuinely too big for one scale-up domain — check which case this is.)
+- **A bigger/more-expensive chip chosen for a launch-bound profile.** If the model is small and the symptom is low utilization (SM~50/HBM~15/tensor~11 at the SLO knee), B300-over-B200 adds capacity + FP4 FLOPs but identical HBM bandwidth — it's a no-op for the actual constraint. The lever is software (fusion/CUDA graphs/megakernels).
+- **Disaggregation (PD-split) on a model that fits + saturates one node.** Per the one-node screen, disagg is over-engineering unless the model is *forced* onto a second node (big weights / 100K+ context prefill / QPS beyond one box). Flag PD-disagg blueprints whose model+KV demonstrably fit one node with no second-node forcing condition stated.
+- **Batch/concurrency target wildly off B\* ≈ 300 × sparsity.** Order-of-magnitude only: a sparse MoE configured for tiny batches (far below B\*) is leaving the cost/token curve in its falling region; flag as "likely under-batched, verify."
+- **"More FLOPs" framed as the fix for a decode/bandwidth-bound model**, or **"more bandwidth" for a compute-bound prefill workload** — lever/regime mismatch.
+
+**Severity discipline (mirror the carryover-auditor's stance):** this check predicts; it never blocks on prediction alone. The roofline says what *should* be true; the stack (T2/T3 quirks — an engine without a flag, a kernel ignoring a config) can legitimately flip it. So: raise **P1** for an unexplained contradiction, **P2** if the spec cites a measurement that justifies the apparent contradiction. **Never raise P0 on roofline grounds** — a benchmark result always outranks the prediction. If the spec's Verification Criteria already include a regime-confirmation step (`nvidia-smi dmon` / sweep), note that the loop is correctly closed.
 
 ## Output format
 
