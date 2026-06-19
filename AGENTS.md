@@ -36,6 +36,7 @@ Read these files **on demand** based on what you're doing:
 | Running the compound step after deployment | `domains/<domain>/blueprints/<name>/lessons.md` + `.claude/steering/*.md`; compound-learner must generate YAML frontmatter (see `docs/card-format.md`) as its final step, then run `scripts/fe.sh learn <path>` |
 | Fixing lint, checkov, tflint, or pre-commit failures | `.claude/steering/lint-remediation.md` |
 | Running pre-flight or post-deploy checks | Use the `deployment-orchestrator` skill |
+| Launching or managing a detached agent run on EKS (agent-runner CLI) | Use the `agent-runtime` skill |
 | Selecting a serving config / filling the Stage 0b lever ledger | `.claude/steering/inference-first-principles.md` (predict the regime) → `docs/optimization-stack.md` (T0–T5 lever catalog: priority per regime, typical Δ, conflicts). Account for every tier; defer with a reason, don't skip silently |
 | Gating a serving config before deploy (Stage 0c) | `python3 standards/serving-commons/resolver/validate-serving-config.py --sidecar <benchmark.yaml> --corpus-root .` — fail-closed; exit 2 blocks. See `standards/serving-commons/README.md` |
 | Validating GPU hardware before serving (Stage 4a) | Use `gpu-infra` MCP tools: `discover_cluster`, `check_gpu_health`, `run_nccl_test` |
