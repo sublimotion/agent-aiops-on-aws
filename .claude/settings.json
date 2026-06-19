@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // empty' | { read -r f; case \"$f\" in */domains/*/specs/*.md) [ \"$(basename \"$f\")\" = \"_template.md\" ] || printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"A spec under domains/*/specs/ was just written or edited (%s). Before treating this spec as ready, run the carryover-auditor agent against it to catch any prior-blueprint lesson it failed to carry over.\"}}' \"$f\" ;; esac; }",
+            "statusMessage": "Checking spec for carryover audit"
+          }
+        ]
+      }
+    ]
+  }
+}
