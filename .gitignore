@@ -28,6 +28,12 @@ __pycache__/
 # Packaged build artifacts (source lives unzipped in the blueprint tree)
 *.zip
 
+# Training data + model weights (multi-GB artifacts — belong in S3, not git)
+*.parquet
+*.safetensors
+domains/autoresearch/blueprints/*/data/
+domains/autoresearch/blueprints/*/models/
+
 # Ralph drift-guard runtime state (per-session telemetry + verdicts, not source)
 .claude/ralph-metrics.local.jsonl
 .claude/ralph-metrics.local.coherence.jsonl

@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Why MoE Tile Tuning Needs a Search — Visual Explainer</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --card: #1a1d27;
+  --border: #2a2d3a;
+  --text: #e1e4eb;
+  --muted: #8b90a0;
+  --accent: #6c63ff;
+  --green: #4ade80;
+  --red: #f87171;
+  --orange: #fb923c;
+  --blue: #60a5fa;
+  --cyan: #22d3ee;
+  --yellow: #fbbf24;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+.container { max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
+h1 { font-size: 2.2rem; margin-bottom: 8px; background: linear-gradient(135deg, var(--accent), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+h2 { font-size: 1.4rem; margin: 48px 0 16px; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+h3 { font-size: 1.05rem; margin: 24px 0 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+.subtitle { color: var(--muted); font-size: 1.1rem; margin-bottom: 12px; }
+.meta { color: var(--muted); font-size: 0.8rem; margin-bottom: 32px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 16px 0; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+@media (max-width: 768px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+p { margin: 10px 0; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; background: #11131b; padding: 1px 6px; border-radius: 4px; color: var(--cyan); }
+pre { background: #0b0d13; border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; line-height: 1.5; margin: 12px 0; }
+pre code { background: none; padding: 0; color: var(--text); }
+.muted { color: var(--muted); }
+
+/* Hero stats */
+.hero-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 24px 0; }
+@media (max-width: 768px) { .hero-stats { grid-template-columns: 1fr 1fr; } }
+.hero-stat { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; text-align: center; }
+.hero-stat .value { font-size: 2.0rem; font-weight: 700; }
+.hero-stat .label { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
+.hero-stat.green .value { color: var(--green); }
+.hero-stat.blue .value { color: var(--blue); }
+.hero-stat.orange .value { color: var(--orange); }
+.hero-stat.cyan .value { color: var(--cyan); }
+
+/* knob chips */
+.knobs { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.knob { padding: 8px 14px; border-radius: 8px; font-size: 0.85rem; font-family: ui-monospace, monospace; border: 1px solid var(--border); background: #11131b; }
+.knob b { color: var(--cyan); font-weight: 600; }
+
+/* tension diagram */
+.tension { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; margin: 20px 0; }
+@media (max-width: 768px) { .tension { grid-template-columns: 1fr; } }
+.tension-side { padding: 16px; border-radius: 10px; }
+.tension-side.up { background: rgba(96,165,250,0.08); border: 1px solid rgba(96,165,250,0.3); }
+.tension-side.down { background: rgba(251,146,60,0.08); border: 1px solid rgba(251,146,60,0.3); }
+.tension-side .h { font-weight: 700; margin-bottom: 6px; }
+.tension-side.up .h { color: var(--blue); }
+.tension-side.down .h { color: var(--orange); }
+.tension-vs { font-size: 1.4rem; color: var(--muted); text-align: center; }
+
+/* cliff chart */
+.cliff { display: flex; align-items: flex-end; gap: 6px; height: 180px; padding: 16px; background: #0b0d13; border: 1px solid var(--border); border-radius: 8px; margin: 12px 0; }
+.cliff-bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+.cliff-bar .b { width: 100%; border-radius: 4px 4px 0 0; }
+.cliff-bar .t { font-size: 0.7rem; color: var(--muted); margin-top: 6px; white-space: nowrap; }
+.cliff-bar .v { font-size: 0.7rem; color: var(--text); margin-bottom: 4px; }
+
+/* comparison table */
+.comp-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.88rem; }
+.comp-table th { padding: 10px 12px; text-align: left; border-bottom: 2px solid var(--border); color: var(--muted); font-weight: 600; }
+.comp-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.comp-table tr:hover { background: rgba(108, 99, 255, 0.05); }
+.comp-table code { white-space: nowrap; }
+
+/* insight boxes */
+.insight { border-left: 3px solid var(--accent); padding: 14px 18px; margin: 16px 0; background: rgba(108, 99, 255, 0.05); border-radius: 0 8px 8px 0; }
+.insight.warn { border-left-color: var(--orange); background: rgba(251, 146, 60, 0.05); }
+.insight.success { border-left-color: var(--green); background: rgba(74, 222, 128, 0.05); }
+.insight .title { font-weight: 600; margin-bottom: 4px; }
+
+/* badge */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
+.badge-green { background: rgba(74, 222, 128, 0.15); color: var(--green); }
+.badge-red { background: rgba(248, 113, 113, 0.15); color: var(--red); }
+.badge-orange { background: rgba(251, 146, 60, 0.15); color: var(--orange); }
+.badge-blue { background: rgba(96, 165, 250, 0.15); color: var(--blue); }
+.badge-cyan { background: rgba(34, 211, 238, 0.15); color: var(--cyan); }
+
+/* flow */
+.flow { display: flex; align-items: center; justify-content: center; gap: 4px; margin: 16px 0; flex-wrap: wrap; }
+.flow-step { padding: 10px 14px; border-radius: 8px; font-size: 0.78rem; font-weight: 500; text-align: center; min-width: 90px; background: #11131b; border: 1px solid var(--border); }
+.flow-step.hl { border-color: var(--accent); background: rgba(108,99,255,0.1); color: var(--text); }
+.flow-arrow { color: var(--muted); font-size: 1.3rem; }
+
+footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.8rem; }
+ul { margin: 8px 0 8px 22px; }
+li { margin: 5px 0; }
+.tag { font-size: 0.7rem; font-family: ui-monospace, monospace; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Why MoE Tile Tuning Needs a Search</h1>
+  <p class="subtitle">Autotuning an existing kernel is the highest ROI-per-effort GPU optimization — and Mixture-of-Experts is where it pays off most. The universal thing isn't a kernel; it's the search loop itself.</p>
+  <p class="meta">kernel-optimization-agent · educational explainer · 2026-06-05 · no custom kernel required</p>
+
+  <div class="hero-stats">
+    <div class="hero-stat cyan">
+      <div class="value">6+1</div>
+      <div class="label">tile knobs to search (incl. split-K)</div>
+    </div>
+    <div class="hero-stat orange">
+      <div class="value">1.5–3×</div>
+      <div class="label">typical gap from a default tile to the tuned one</div>
+    </div>
+    <div class="hero-stat green">
+      <div class="value">+23%</div>
+      <div class="label">measured here: one missing K2.6 MoE config</div>
+    </div>
+    <div class="hero-stat blue">
+      <div class="value">0</div>
+      <div class="label">lines of new kernel code</div>
+    </div>
+  </div>
+
+  <div class="insight">
+    <div class="title">The one-sentence thesis</div>
+    The kernel is fine. The <em>configuration point</em> chosen for it on <em>your</em> shape and <em>your</em> GPU is often 1.5–3× off peak — and because the cost surface has discrete cliffs that no formula models, the only way to find the good point is to measure a grid of candidates.
+  </div>
+
+  <h2>1 · A tile config is a point in a discrete space</h2>
+  <p>A tiled GEMM (the matmul at the heart of every FFN and MoE expert) is parameterized by a handful of integers. The kernel author writes the algorithm once; the <em>config</em> picks how it tiles the problem:</p>
+  <div class="knobs">
+    <span class="knob"><b>BLOCK_M</b> · output rows per tile</span>
+    <span class="knob"><b>BLOCK_N</b> · output cols per tile</span>
+    <span class="knob"><b>BLOCK_K</b> · reduction depth per step</span>
+    <span class="knob"><b>GROUP_M</b> · L2-locality scheduling</span>
+    <span class="knob"><b>num_stages</b> · software-pipeline depth</span>
+    <span class="knob"><b>num_warps</b> · threads per CTA</span>
+    <span class="knob"><b>split_K</b> · partition the reduction</span>
+  </div>
+  <p class="muted">In vLLM/SGLang this is literally a JSON file. Below is the exact artifact this blueprint had to create — it did not exist for the H200 + 384-expert combination, and its absence cost 23% throughput:</p>
+<pre><code>// E=384,N=256,device_name=NVIDIA_H200,dtype=fp8_w8a8,block_shape=[128,128].json
+{
+  "1":  {"BLOCK_SIZE_M": 16, "BLOCK_SIZE_N": 128, "BLOCK_SIZE_K": 128,
+         "GROUP_SIZE_M": 1, "num_warps": 4, "num_stages": 3},
+  "8":  {"BLOCK_SIZE_M": 16, ...},      // a different tile per token-count bucket
+  "128":{"BLOCK_SIZE_M": 64, ...}
+}</code></pre>
+
+  <h2>2 · Why there is no closed-form "best tile"</h2>
+  <p>The optimum is the point that satisfies four objectives <em>at once</em>, and the first two pull in opposite directions:</p>
+
+  <div class="tension">
+    <div class="tension-side up">
+      <div class="h">↑ Bigger tiles</div>
+      Higher arithmetic intensity per tile → tensor cores stay fed → saturate compute. More data reuse per byte loaded.
+    </div>
+    <div class="tension-vs">⚔︎</div>
+    <div class="tension-side down">
+      <div class="h">↓ Smaller tiles</div>
+      Working set + <code>num_stages</code> pipeline buffers must fit in ~228 KB SRAM and the register file. Spill → occupancy collapse.
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h3>Objective 3 · Occupancy</h3>
+      <p>Enough concurrent CTAs must be resident to hide memory latency. <code>num_warps</code>, <code>num_stages</code>, and register pressure all gate this. One extra stage can spill registers and <strong>halve</strong> the warps the SM can hold.</p>
+    </div>
+    <div class="card">
+      <h3>Objective 4 · Even tiling</h3>
+      <p>If <code>M % BLOCK_M ≠ 0</code> the last "remainder wave" runs partly-empty tiles. With small M (MoE decode!) a single wasted wave can be a large fraction of total work.</p>
+    </div>
+  </div>
+
+  <div class="insight warn">
+    <div class="title">The cost surface is cliffed, not smooth</div>
+    You cannot interpolate. Adding one pipeline stage doesn't make things "a little slower" — it can trip a register-spill threshold and drop throughput off a cliff. Because the cliffs depend on the compiler's register allocation and the scheduler's behavior (not analytically modelable), the only reliable signal is a measured benchmark.
+  </div>
+
+  <h3>Illustrative: the same kernel, same shape, six configs</h3>
+  <div class="cliff">
+    <div class="cliff-bar"><span class="v">100%</span><div class="b" style="height:88%;background:var(--green)"></div><span class="t">tuned</span></div>
+    <div class="cliff-bar"><span class="v">71%</span><div class="b" style="height:63%;background:var(--blue)"></div><span class="t">+1 stage</span></div>
+    <div class="cliff-bar"><span class="v">68%</span><div class="b" style="height:60%;background:var(--blue)"></div><span class="t">BLOCK_N½</span></div>
+    <div class="cliff-bar"><span class="v">44%</span><div class="b" style="height:39%;background:var(--orange)"></div><span class="t">8 warps</span></div>
+    <div class="cliff-bar"><span class="v">41%</span><div class="b" style="height:36%;background:var(--orange)"></div><span class="t">spill cliff</span></div>
+    <div class="cliff-bar"><span class="v">33%</span><div class="b" style="height:29%;background:var(--red)"></div><span class="t">default</span></div>
+  </div>
+  <p class="tag">Illustrative shape of a real autotune sweep — neighboring configs are not neighboring in performance. The "default" fallback is the rightmost bar; this is the 1.5–3× gap.</p>
+
+  <h2>3 · Why MoE breaks every shortcut a dense GEMM enjoys</h2>
+  <p>A dense LLM tunes <strong>one</strong> GEMM shape and reuses it forever. MoE violates each assumption that makes "tune once" work:</p>
+
+  <table class="comp-table">
+    <thead>
+      <tr><th>Property</th><th>Dense GEMM</th><th>MoE — why tuning is harder</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>Effective M</b></td>
+        <td>Huge (8K+ at prefill), insensitive to tile choice</td>
+        <td><span class="badge badge-orange">tiny</span> Each expert sees only <code>tokens·top_k / n_experts</code> rows — tens to low hundreds. Small-M is exactly where tile choice dominates.</td>
+      </tr>
+      <tr>
+        <td><b>M stability</b></td>
+        <td>Static, known ahead of time</td>
+        <td><span class="badge badge-red">data-dependent</span> Routing is dynamic; per-expert counts shift every batch and are load-imbalanced (hot vs cold experts). One static tile can't be optimal across the range.</td>
+      </tr>
+      <tr>
+        <td><b>Regime spread</b></td>
+        <td>One operating point</td>
+        <td><span class="badge badge-orange">two+</span> Decode (M≈batch, memory-bound) wants a different tile than prefill (M in thousands, compute-bound). Hence per-M-bucket configs in the JSON.</td>
+      </tr>
+      <tr>
+        <td><b>Launch shape</b></td>
+        <td>One big GEMM</td>
+        <td><span class="badge badge-blue">grouped</span> Grouped/segmented GEMM packs variable-sized expert segments into one launch; <code>GROUP_M</code>↔CTA mapping interacts with tile shape in ways that don't transfer from the dense case.</td>
+      </tr>
+      <tr>
+        <td><b>GEMMs per layer</b></td>
+        <td>Effectively one shape</td>
+        <td><span class="badge badge-cyan">two shapes</span> gate/up and down projections have different N/K → want different tiles, and the SiLU·mul fusion between them changes the SRAM budget.</td>
+      </tr>
+      <tr>
+        <td><b>FP8 block scaling</b></td>
+        <td>Often FP16, no constraint</td>
+        <td><span class="badge badge-red">coupled</span> Fine-grained FP8 needs <code>block_n=128</code>; the scale-block granularity couples to <code>BLOCK_N</code> and shrinks the valid search space to non-obvious survivors.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="insight">
+    <div class="title">The FP8 constraint you already hit</div>
+    The rule <code>moe_intermediate_size / TP % 128 == 0</code> from the B200/B300 deployments is exactly a tiling constraint surfacing at the config level — the FP8 block boundary (<code>block_n=128</code>) dictating which tile widths are even legal. Tile tuning and FP8 layout are the same problem viewed from two angles.
+  </div>
+
+  <h2>4 · What this means operationally</h2>
+  <p>vLLM and SGLang ship tuned MoE configs as JSON keyed by <code>(num_experts, N, K, dtype, M-bucket)</code> <em>per GPU SKU</em> — files like <code>E=256,N=...,device_name=NVIDIA_B200.json</code>. When your shape or hardware isn't in the shipped table:</p>
+  <div class="flow">
+    <div class="flow-step">your shape misses the table</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">falls back to a generic default tile</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step hl">1.5–3× off peak</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">sweep the config grid</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step hl">recover it · same kernel</div>
+  </div>
+
+  <div class="insight success">
+    <div class="title">Where this sits in this agent's loop</div>
+    This is <strong>State 0 — Triton autotuning</strong> in the generate-candidate state vector: sweep tile sizes / warps / stages on the existing kernel before any algorithmic rewrite (State 1+). It's deliberately first because it is the cheapest, highest-yield move. The K2.6 run confirmed it: the +23% came from <em>config</em>, while the entire custom-kernel investigation that followed yielded &lt;5%.
+  </div>
+
+  <h2>5 · The universal thing isn't a kernel — it's the loop</h2>
+  <p>If every shape, dtype, GPU, and attention variant needs its own tuned config, is there <em>anything</em> universal left? Yes — but it moved up a level. The durable artifact is the <strong>method</strong>, not any single kernel.</p>
+
+  <h3>FlashAttention is the proof, not the counterexample</h3>
+  <p>FlashAttention feels like the universal kernel that beat tuning. It isn't. What generalized was the <em>algorithm</em> — IO-awareness: tile the attention, keep the softmax online, never materialize the N×N matrix in HBM. What did <em>not</em> generalize was the implementation:</p>
+  <table class="comp-table">
+    <thead>
+      <tr><th>Generation</th><th>Why a rewrite was forced</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><b>FA2 → FA3</b></td><td>Near-total rewrite for Hopper: TMA, warp specialization, FP8 via <code>wgmma</code></td></tr>
+      <tr><td><b>FA3 → Blackwell</b></td><td>Re-specialize again for SM103 (TCGEN5, new SRAM/register budget)</td></tr>
+      <tr><td><b>Full attn → MLA</b></td><td><span class="badge badge-cyan">FlashMLA</span> — KV is a 576-dim latent, not full heads; different kernel entirely</td></tr>
+    </tbody>
+  </table>
+  <div class="insight">
+    <div class="title">The real axis isn't "universal vs not"</div>
+    It's <em>which layer generalizes</em>. The <strong>algorithm</strong> (IO-aware tiling, grouped GEMM, online softmax) is durable and transfers everywhere. The <strong>kernel</strong> is disposable — it re-specializes per hardware generation and per attention variant. MoE just sits further toward the disposable end, because its problem shape is dynamic and tiny, so even the per-shape config doesn't hold still.
+  </div>
+
+  <h3>Hybrid architectures push everything toward per-layer search</h3>
+  <p>A modern model is no longer one attention type. A single layer stack now mixes primitives with <em>different roofline positions</em>, each wanting a different kernel:</p>
+  <div class="knobs">
+    <span class="knob"><b>GLM-5</b> · DeepSeek sparse attention (NSA)</span>
+    <span class="knob"><b>Qwen3.5</b> · linear + full attention interleaved</span>
+    <span class="knob"><b>Gemma</b> · sliding-window + full per-layer</span>
+    <span class="knob"><b>SSM hybrids</b> · Mamba blocks in the stack</span>
+  </div>
+  <p>There is no single fused megakernel optimal across a stack mixing NSA + full + linear attention. You need a <strong>portfolio</strong> of specialized kernels plus a scheduler that dispatches the right one per layer — and the autotuning surface grows combinatorially with every new primitive. "One universal optimization" is gone for good.</p>
+
+  <h3>So the universal artifact is the procedure</h3>
+  <div class="flow">
+    <div class="flow-step hl">profile</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">find roofline-limiting layer</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step hl">autotune / swap that kernel</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">verify (correct + faster)</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step hl">keep the winner</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">stop when at ceiling</div>
+  </div>
+  <p>This procedure is shape-, model-, and hardware-agnostic — it <em>is</em> the loop this blueprint runs (it maps directly onto States 0→5 of <code>generate-candidate</code> plus the freeze manager). The K2.6 run is the proof in both directions:</p>
+  <div class="grid-2">
+    <div class="insight success">
+      <div class="title">The search finds wins formulas can't</div>
+      The +23% wasn't a clever kernel — it was the search finding a config (<code>E=384,N=256,H200</code>) that simply <em>didn't exist yet</em>. The procedure surfaced it; no formula would have.
+    </div>
+    <div class="insight warn">
+      <div class="title">Knowing when to STOP is half the method</div>
+      MLA decode profiled at &gt;100% BW util (L2-amplified) — already at the hardware ceiling. A "negative" result is just as valuable: the loop tells you to stop searching that layer and redirect (here, to CUDA-graph capture: <span class="badge badge-green">+14.9×</span>, a scheduling win, not a kernel at all).
+    </div>
+  </div>
+  <div class="insight">
+    <div class="title">Why this is built as an agent, not a kernel</div>
+    Optimization is fragmenting — per-layer, per-architecture, per-SKU — faster than any human can hand-tune. The response isn't a better kernel; it's making the <em>search itself</em> cheap and automatic. That's the entire bet behind this blueprint, and behind commercial plays (Wafer.ai) running the same profile→diagnose→patch→verify loop as a service.
+  </div>
+
+  <h2>6 · Adjacent, but a different layer: the Synthesia G7e case</h2>
+  <p>AWS's <a class="muted">Synthesia / Wan 2.2 video-inference write-up</a> is in the same <em>family</em> of "improve utilization without touching weights or accuracy," but it operates one level up from tile tuning. Useful contrast:</p>
+
+  <table class="comp-table">
+    <thead>
+      <tr><th></th><th>MoE tile tuning (this page)</th><th>Synthesia async pipeline</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><b>Layer</b></td><td>Inside the kernel — GEMM tile geometry</td><td>Around the kernel — host/device scheduling</td></tr>
+      <tr><td><b>Bottleneck attacked</b></td><td>Tensor-core / bandwidth underutilization per launch</td><td>GPU stalls waiting on D2H copy + post-processing of decoded frames</td></tr>
+      <tr><td><b>Technique</b></td><td>Search <code>BLOCK_*</code> / warps / stages grid; pick the measured best</td><td>Dual CUDA streams, double-buffering, pinned host memory, a worker CPU thread, CUDA events</td></tr>
+      <tr><td><b>Reported result</b></td><td><span class="badge badge-green">+23%</span> here; 1.5–3× typical</td><td><span class="badge badge-blue">82% → 99.9%</span> kernel utilization; 8.2% lower decode latency (21.99s → 20.17s)</td></tr>
+      <tr><td><b>Touches weights/accuracy?</b></td><td>No</td><td>No</td></tr>
+      <tr><td><b>Needs per-shape/per-SKU search?</b></td><td><span class="badge badge-orange">Yes</span> — that's the whole point</td><td>No — it's a structural pipeline change, tune-once</td></tr>
+    </tbody>
+  </table>
+
+  <div class="insight">
+    <div class="title">So: is it "along the same lines"?</div>
+    Yes in spirit — both are pure utilization wins that leave the model untouched, and both exploit hardware concurrency the naïve path leaves idle. But they're complementary, not the same lever. Synthesia overlaps <em>compute with data movement</em> (a Real-Time-Factor / pipeline problem, and notably their kernel was the <em>unoptimized</em> Diffusers model — they explicitly note compilation would stack on top). Tile tuning makes the <em>compute itself</em> denser. On a generative-video stack you'd want both; on K2.6 serving, tile tuning is the in-kernel half and CUDA-graph capture (the +14.9× decode win in this blueprint) is the scheduling half — the direct analogue of Synthesia's contribution.
+  </div>
+
+  <footer>
+    Sources: this blueprint's <code>results/report.md</code> (measured K2.6 numbers); vLLM/SGLang fused-MoE tuning configs; AWS Architecture Blog — "How Synthesia optimizes generative AI video inference on EC2 G7e." Illustrative bars are labeled as such. Generated for the kernel-optimization-agent blueprint.
+  </footer>
+
+</div>
+</body>
+</html>
