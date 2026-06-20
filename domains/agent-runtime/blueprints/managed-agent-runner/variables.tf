@@ -49,6 +49,18 @@ variable "max_session_duration" {
   default     = 43200 # 12h — covers >8h interactive runs
 }
 
+variable "agent_runner_repo_url" {
+  description = "GitHub URL of the agent-runner CLI repo (CodeBuild source for the runtime image)"
+  type        = string
+  default     = "https://github.com/sublimotion/agent-runner.git"
+}
+
+variable "agent_runner_ref" {
+  description = "Git ref (branch/tag/SHA) of agent-runner to build the image from"
+  type        = string
+  default     = "main"
+}
+
 variable "tags" {
   type = map(string)
   default = {
