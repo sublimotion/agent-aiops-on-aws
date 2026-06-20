@@ -51,6 +51,27 @@ the session running; reattach from any laptop; `stop` kills it (verified).
   interleave with prompt-dismissal keystrokes. For real operator use this is moot (you type into
   the live `❯`); only matters for automated pane-driving.
 
+## Credential vending — harness/compute separation (added 2026-06-20, verified live)
+
+The driver holds the pod's live IRSA identity; it vends a **frozen, time-boxed STS session**
+to the harness and runs the harness with only those keys. Verified live on us-east-2: run.log
+showed `vend: harness session harness-<run-id> valid until <+12h>`, harness ran under it.
+
+- **Use `assume-role-with-web-identity`, NOT role-chaining.** Chaining caps at 1h and would kill
+  the harness's AWS access mid-run. Web-identity assume (re-presenting the projected SA token)
+  honors the role's `MaxSessionDuration` — set it to 43200 (12h) to cover >8h runs.
+- **Unset `AWS_WEB_IDENTITY_TOKEN_FILE` / `AWS_ROLE_ARN` in the harness env** so a prompt-injected
+  harness can't refresh the session or fall back to the driver's live identity.
+- **Driver keeps its own identity**: batch runs the harness in a `( . creds; harness_invoke )`
+  subshell; interactive sources the vended env inside the tmux session before the REPL. The
+  driver's push/state/S3 calls still use the live IRSA identity.
+- **Distinct session name `harness-<run-id>`** → CloudTrail attributes harness API calls
+  separately from the driver. Free audit boundary.
+- Graceful fallback: if no web-identity token is present (e.g. laptop driver), the harness
+  inherits the single identity — logged, not fatal.
+- **Deferred** (per operator, trusted single-operator runtime): per-project/per-run role
+  scoping (shared role for now), and revoke-on-stop (pod deletion + STS expiry suffices).
+
 ## Still open
 
 - Image is stock `python:3.12-slim` + install-deps at startup (~2-4 min cold start). Bake
