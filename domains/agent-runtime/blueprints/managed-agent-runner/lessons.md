@@ -72,6 +72,29 @@ showed `vend: harness session harness-<run-id> valid until <+12h>`, harness ran 
 - **Deferred** (per operator, trusted single-operator runtime): per-project/per-run role
   scoping (shared role for now), and revoke-on-stop (pod deletion + STS expiry suffices).
 
+## Baked image — CodeBuild, not EBS snapshot (added 2026-06-20, verified live)
+
+Cold start dropped **~3min → 42s** by baking the toolbelt into the image instead of
+installing at startup. Container build, not EBS snapshot: we cache ~250MB of *static CPU
+binaries* (terraform/kubectl/aws/claude/codex), which is exactly what image layers are for.
+EBS snapshots earn their place for GPU work (100s of GB of model weights), not here.
+
+- **Build mechanism: CodeBuild (arm64 project), not a local laptop build** — managed, no
+  instance lifecycle, repeatable for future profiles. Private repo → one-time
+  `aws codebuild import-source-credentials` with a `gh auth token` PAT.
+- **Build MULTI-ARCH (arm64+amd64), not arm64-only.** First build was arm64-only and the
+  cluster's CPU nodes are amd64 (m6i) → `ImagePullBackOff: no match for platform in manifest`.
+  Drop hardcoded `FROM --platform=`, use buildx `TARGETARCH`, map it to aarch64/x86_64 for
+  awscli, `--platform linux/arm64,linux/amd64` + binfmt/qemu.
+- **ECR repo is IMMUTABLE — bump the tag, don't overwrite.** Re-pushing `v1` was rejected
+  ("tag is immutable and cannot be overwritten"). Made `image_tag` a var; immutability is a
+  feature (a deployed tag never silently changes) — bump to `v2` to rebuild.
+- **install-deps stays in the image as a no-op** (idempotent skip-if-present) — so the stock
+  base path still works, and the ConfigMap still ships `lib/` for fast CLI/adapter iteration
+  without rebuilding the image. Only the heavy toolbelt is baked.
+- Set `AGENT_RUNNER_BASE_IMAGE=<ecr>/agent-runner-full-deploy:v2` to use the baked image; the
+  Stage 0 `pf_image_tag` check then validates the ECR tag exists before scheduling.
+
 ## Still open
 
 - Image is stock `python:3.12-slim` + install-deps at startup (~2-4 min cold start). Bake
