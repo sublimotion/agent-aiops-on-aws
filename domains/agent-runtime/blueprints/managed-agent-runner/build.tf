@@ -30,6 +30,7 @@ data "aws_iam_policy_document" "build" {
       "ecr:GetAuthorizationToken", "ecr:BatchCheckLayerAvailability",
       "ecr:GetDownloadUrlForLayer", "ecr:BatchGetImage", "ecr:PutImage",
       "ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload",
+      "ecr:DescribeImages",
     ]
     resources = ["*"]
   }
@@ -66,7 +67,7 @@ resource "aws_codebuild_project" "runtime" {
     }
     environment_variable {
       name  = "IMAGE_TAG"
-      value = "v1"
+      value = var.image_tag
     }
   }
 

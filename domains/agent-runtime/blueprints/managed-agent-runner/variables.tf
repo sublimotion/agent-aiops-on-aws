@@ -61,6 +61,12 @@ variable "agent_runner_ref" {
   default     = "main"
 }
 
+variable "image_tag" {
+  description = "Tag for the baked runtime image (ECR repo is IMMUTABLE — bump to rebuild)"
+  type        = string
+  default     = "v2"
+}
+
 variable "tags" {
   type = map(string)
   default = {
