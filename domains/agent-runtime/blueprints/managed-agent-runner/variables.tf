@@ -43,6 +43,12 @@ variable "extra_policy_arns" {
   default     = []
 }
 
+variable "max_session_duration" {
+  description = "Max session duration (s) for the run role; vended harness sessions span up to this. 3600-43200."
+  type        = number
+  default     = 43200 # 12h — covers >8h interactive runs
+}
+
 variable "tags" {
   type = map(string)
   default = {

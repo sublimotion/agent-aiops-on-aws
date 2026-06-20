@@ -139,7 +139,11 @@ data "aws_iam_policy_document" "run_trust" {
 resource "aws_iam_role" "run" {
   name               = "${local.name}-run-role"
   assume_role_policy = data.aws_iam_policy_document.run_trust.json
-  tags               = var.tags
+  # Allow vended harness sessions (re-assumed via web-identity by the driver) to
+  # span a long run. Web-identity assume honors this up to 12h; role-chaining would
+  # cap at 1h and kill the harness's AWS access mid-run.
+  max_session_duration = var.max_session_duration
+  tags                 = var.tags
 }
 
 data "aws_iam_policy_document" "run_perms" {
