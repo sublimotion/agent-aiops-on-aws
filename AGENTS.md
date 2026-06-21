@@ -110,6 +110,9 @@ Read these files **on demand** based on what you're doing:
 | `domains/autoresearch/blueprints/rl-conductor/` | `domains/autoresearch/specs/rl-conductor-repro.md` |
 | `domains/autoresearch/blueprints/cost-aware-routing/` | `domains/autoresearch/specs/cost-aware-routing.md` |
 | `domains/autoresearch/blueprints/epd-disaggregation/` | `domains/autoresearch/specs/epd-disaggregation.md` |
+| `domains/autoresearch/blueprints/e-fin1-finqa-skill-verifier/` | `domains/autoresearch/specs/e-fin1-finqa-skill-verifier.md` |
+| `domains/autoresearch/blueprints/e-fin2-finqa-behavioral-features/` | `domains/autoresearch/specs/e-fin2-finqa-behavioral-features.md` |
+| `domains/autoresearch/blueprints/e-harness1-harness-behavioral-interaction/` | `domains/autoresearch/specs/e-harness1-harness-behavioral-interaction.md` |
 
 **Blueprint-local context** — for operational details (lessons, results, plans), look inside the blueprint directory itself rather than in specs.
 
