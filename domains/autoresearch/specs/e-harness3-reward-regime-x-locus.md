@@ -1,6 +1,14 @@
 # Autoresearch Spec: E_harness3 — Reward-Regime × Authoring-Locus Matrix
 
-## Status: DRAFT
+## Status: COMPLETE (2026-06-21)
+
+> **Result**: monotonic hypothesis **REFUTED** — locus gap is inert across all three
+> regimes (verifiable −0.025/−0.008, withheld +0.000/+0.000, consensus −0.047 sig/+0.013),
+> the one significant gap *reversed*. Both Stage-0 hard gates passed (leak audit AUC 0.547;
+> judge AUC 1.00, near-miss rejection 1.00). The active asymmetry is the one available to the
+> *authoring act*, not the one the reward *regime* supplies — weakening the reward does not
+> move the E_harness2/E_fin1 boundary. See
+> `domains/autoresearch/blueprints/e-harness3-reward-regime-x-locus/results/report.md`.
 
 ## Overview
 
@@ -91,9 +99,9 @@ If that monotonic pattern holds, it nails the law: **external authoring pays exa
 
 ## Carryover Audit (spec-design gate)
 
-- [ ] Ran `carryover-auditor` — scan `e-harness2-.../`, `e-fin1-.../`, `verifier-reward/lessons.md`, `verification-primitives*/lessons.md`.
-- [ ] Carry priors explicitly: **E_harness2 — locus inert under verifiable reward (A≈C)** is the result this extends; **E_fin1 — FinanceBench is free-text/human-judged + scoring artifacts faked 11/29 failures** is why the Stage-0 judge gate exists; **T4 — LLM-judge calibration is model-specific, doesn't transfer** is RQ4; **T5 — self-critique hurts** is the self-author ceiling B/E approach. **python3.13 (not 3.14)** for any local sklearn/analysis.
-- [ ] Confirm both Stage-0 hard gates (reward-leak audit, FinanceBench judge stability) are reflected as blocking success criteria (they are).
+- [x] Ran `carryover-auditor` (Stage 0, pre-run) — scanned `e-harness2-.../`, `e-fin1-.../`, `verifier-reward`, `verification-primitives*`. 6 gaps (2 P0, 3 P1, 1 P2); both P0s designed out before any cell ran (see `blueprints/.../results/report.md` §Carryover audit outcome).
+- [x] Carry priors explicitly: E_harness2 A≈C is the extended result; E_fin1 FinanceBench-is-messy drove the judge gate; T4 → RQ4 (judge confound excluded: AUC 1.00); T5 → self-author ceiling. (Ran on python3.12; no sklearn in the run/analysis path — pure-Python bootstrap.)
+- [x] Both Stage-0 hard gates implemented as blocking and **PASSED**: reward-leak audit (`leak_audit.py`, strongest channel AUC 0.547 ≪ 0.90) + FinanceBench judge gate (`judge_gate.py`, AUC 1.00, near-miss rejection 1.00, strengthened beyond stability per carryover P0-2).
 
 ---
 
