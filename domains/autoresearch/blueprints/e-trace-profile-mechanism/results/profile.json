@@ -1,0 +1,400 @@
+{
+  "_meta": {
+    "spec": "E_trace-profile (mechanism test, profile-first)",
+    "env": "python3.13 sklearn-stack",
+    "claim_under_test": "behavioral RF (coding 0.756) is a trace-richness / thrash detector; discriminates iff traces are long and variable enough to carry a process signal",
+    "richness_scalar_def": "output_tokens CV (coefficient of variation) as the primary trace-richness scalar; output_tokens mean as secondary. Higher = richer/more-variable trace.",
+    "caveat": "FinanceBench (e-harness3) traces are SINGLE-CALL graded Q&A, NOT full agentic 10-K retrieval. No edit/loop/revision substrate. They may UNDERSTATE FinanceBench's true trace richness \u2014 if nearly as sparse as FinQA, the mechanism test is INCONCLUSIVE, not negative."
+  },
+  "coding_reference": {
+    "auc": 0.756,
+    "n": 300,
+    "top3_importance_sum": 0.948,
+    "top_features": {
+      "beh_total_cost_usd": 0.4201,
+      "beh_tokens_per_edit": 0.3272,
+      "beh_loop_count": 0.2007
+    },
+    "note": "Coding traces are multi-edit agentic SWE-bench runs: the top-3 features (cost, tokens-per-EDIT, loop-count) require an edit/loop substrate that single-call Q&A lacks entirely."
+  },
+  "finqa": {
+    "n": 100,
+    "n_pass": 71,
+    "n_fail": 29,
+    "base_rate": 0.71,
+    "label": "gold_pass (E_fin1 exact-match)",
+    "richness": {
+      "output_tokens": {
+        "mean": 147.9,
+        "sd": 43.17,
+        "cv": 0.2919,
+        "min": 87.0,
+        "max": 317.0
+      },
+      "input_tokens": {
+        "mean": 366.41,
+        "sd": 113.45,
+        "cv": 0.3096,
+        "min": 205.0,
+        "max": 754.0
+      },
+      "cost_usd": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "cv": 0.2516,
+        "min": 0.0,
+        "max": 0.0
+      }
+    },
+    "separation": {
+      "beh_output_tokens": {
+        "pass_mean": 141.338,
+        "fail_mean": 163.9655,
+        "cohens_d": -0.537,
+        "frac_nonzero": 1.0
+      },
+      "beh_input_tokens": {
+        "pass_mean": 357.5352,
+        "fail_mean": 388.1379,
+        "cohens_d": -0.2704,
+        "frac_nonzero": 1.0
+      },
+      "beh_cost_usd": {
+        "pass_mean": 0.0011,
+        "fail_mean": 0.0012,
+        "cohens_d": -0.5289,
+        "frac_nonzero": 1.0
+      },
+      "beh_reasoning_words": {
+        "pass_mean": 58.2394,
+        "fail_mean": 71.0,
+        "cohens_d": -0.5707,
+        "frac_nonzero": 1.0
+      },
+      "beh_tokens_per_word": {
+        "pass_mean": 2.4954,
+        "fail_mean": 2.3852,
+        "cohens_d": 0.3396,
+        "frac_nonzero": 1.0
+      },
+      "beh_revision_count": {
+        "pass_mean": 0.0,
+        "fail_mean": 0.1034,
+        "cohens_d": -0.4729,
+        "frac_nonzero": 0.02
+      },
+      "beh_num_mentions": {
+        "pass_mean": 13.507,
+        "fail_mean": 15.931,
+        "cohens_d": -0.4274,
+        "frac_nonzero": 1.0
+      },
+      "beh_abstain": {
+        "pass_mean": 0.0,
+        "fail_mean": 0.0345,
+        "cohens_d": -0.3474,
+        "frac_nonzero": 0.01
+      },
+      "beh_latency_ms": {
+        "pass_mean": 1921.7887,
+        "fail_mean": 2093.7241,
+        "cohens_d": -0.476,
+        "frac_nonzero": 1.0
+      }
+    }
+  },
+  "financebench": {
+    "E_haiku": {
+      "n": 150,
+      "n_pass": 124,
+      "n_fail": 26,
+      "base_rate": 0.8267,
+      "model": "haiku",
+      "cell_meta": {
+        "cell": "E",
+        "locus": "self",
+        "regime": "consensus"
+      },
+      "richness": {
+        "output_tokens": {
+          "mean": 332.57,
+          "sd": 120.03,
+          "cv": 0.3609,
+          "min": 143.0,
+          "max": 682.0
+        },
+        "input_tokens": {
+          "mean": 1265.54,
+          "sd": 528.02,
+          "cv": 0.4172,
+          "min": 375.0,
+          "max": 3164.0
+        },
+        "cost_usd": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "cv": 0.2933,
+          "min": 0.0,
+          "max": 0.01
+        }
+      },
+      "separation": {
+        "input_tokens": {
+          "pass_mean": 1280.4355,
+          "fail_mean": 1194.5,
+          "cohens_d": 0.1625,
+          "frac_nonzero": 1.0
+        },
+        "output_tokens": {
+          "pass_mean": 319.2581,
+          "fail_mean": 396.0385,
+          "cohens_d": -0.6572,
+          "frac_nonzero": 1.0
+        },
+        "cost_usd": {
+          "pass_mean": 0.0029,
+          "fail_mean": 0.0032,
+          "cohens_d": -0.3488,
+          "frac_nonzero": 1.0
+        },
+        "tokens_ratio": {
+          "pass_mean": 0.2862,
+          "fail_mean": 0.377,
+          "cohens_d": -0.6258,
+          "frac_nonzero": 1.0
+        },
+        "jit_state_chars": {
+          "pass_mean": 902.6532,
+          "fail_mean": 908.2308,
+          "cohens_d": -0.0127,
+          "frac_nonzero": 0.9267
+        },
+        "jit_notes_total": {
+          "pass_mean": 13.4919,
+          "fail_mean": 13.5,
+          "cohens_d": -0.0011,
+          "frac_nonzero": 0.9867
+        }
+      }
+    },
+    "E_sonnet": {
+      "n": 150,
+      "n_pass": 130,
+      "n_fail": 20,
+      "base_rate": 0.8667,
+      "model": "sonnet",
+      "cell_meta": {
+        "cell": "E",
+        "locus": "self",
+        "regime": "consensus"
+      },
+      "richness": {
+        "output_tokens": {
+          "mean": 271.7,
+          "sd": 156.99,
+          "cv": 0.5778,
+          "min": 90.0,
+          "max": 784.0
+        },
+        "input_tokens": {
+          "mean": 1174.63,
+          "sd": 505.24,
+          "cv": 0.4301,
+          "min": 377.0,
+          "max": 2955.0
+        },
+        "cost_usd": {
+          "mean": 0.01,
+          "sd": 0.0,
+          "cv": 0.4567,
+          "min": 0.0,
+          "max": 0.02
+        }
+      },
+      "separation": {
+        "input_tokens": {
+          "pass_mean": 1180.3385,
+          "fail_mean": 1137.55,
+          "cohens_d": 0.0844,
+          "frac_nonzero": 1.0
+        },
+        "output_tokens": {
+          "pass_mean": 253.2154,
+          "fail_mean": 391.85,
+          "cohens_d": -0.923,
+          "frac_nonzero": 1.0
+        },
+        "cost_usd": {
+          "pass_mean": 0.0061,
+          "fail_mean": 0.0077,
+          "cohens_d": -0.5978,
+          "frac_nonzero": 1.0
+        },
+        "tokens_ratio": {
+          "pass_mean": 0.2465,
+          "fail_mean": 0.3635,
+          "cohens_d": -0.7785,
+          "frac_nonzero": 1.0
+        },
+        "jit_state_chars": {
+          "pass_mean": 476.3923,
+          "fail_mean": 601.2,
+          "cohens_d": -0.3518,
+          "frac_nonzero": 0.9
+        },
+        "jit_notes_total": {
+          "pass_mean": 10.6385,
+          "fail_mean": 10.5,
+          "cohens_d": 0.0285,
+          "frac_nonzero": 0.9867
+        }
+      }
+    },
+    "F_haiku_v-haiku": {
+      "n": 150,
+      "n_pass": 117,
+      "n_fail": 33,
+      "base_rate": 0.78,
+      "model": "haiku",
+      "cell_meta": {
+        "cell": "F",
+        "locus": "external",
+        "regime": "consensus"
+      },
+      "richness": {
+        "output_tokens": {
+          "mean": 336.01,
+          "sd": 123.24,
+          "cv": 0.3668,
+          "min": 141.0,
+          "max": 669.0
+        },
+        "input_tokens": {
+          "mean": 1294.33,
+          "sd": 522.48,
+          "cv": 0.4037,
+          "min": 375.0,
+          "max": 3171.0
+        },
+        "cost_usd": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "cv": 0.2946,
+          "min": 0.0,
+          "max": 0.01
+        }
+      },
+      "separation": {
+        "input_tokens": {
+          "pass_mean": 1315.1624,
+          "fail_mean": 1220.4848,
+          "cohens_d": 0.1811,
+          "frac_nonzero": 1.0
+        },
+        "output_tokens": {
+          "pass_mean": 315.6667,
+          "fail_mean": 408.1212,
+          "cohens_d": -0.7869,
+          "frac_nonzero": 1.0
+        },
+        "cost_usd": {
+          "pass_mean": 0.0029,
+          "fail_mean": 0.0033,
+          "cohens_d": -0.4245,
+          "frac_nonzero": 1.0
+        },
+        "tokens_ratio": {
+          "pass_mean": 0.2712,
+          "fail_mean": 0.3766,
+          "cohens_d": -0.7889,
+          "frac_nonzero": 1.0
+        },
+        "jit_state_chars": {
+          "pass_mean": 1009.188,
+          "fail_mean": 1054.7576,
+          "cohens_d": -0.1007,
+          "frac_nonzero": 0.9267
+        },
+        "jit_notes_total": {
+          "pass_mean": 16.8803,
+          "fail_mean": 17.0,
+          "cohens_d": -0.013,
+          "frac_nonzero": 0.9867
+        }
+      }
+    },
+    "F_sonnet_v-haiku": {
+      "n": 150,
+      "n_pass": 132,
+      "n_fail": 18,
+      "base_rate": 0.88,
+      "model": "sonnet",
+      "cell_meta": {
+        "cell": "F",
+        "locus": "external",
+        "regime": "consensus"
+      },
+      "richness": {
+        "output_tokens": {
+          "mean": 268.32,
+          "sd": 151.9,
+          "cv": 0.5661,
+          "min": 90.0,
+          "max": 791.0
+        },
+        "input_tokens": {
+          "mean": 1239.34,
+          "sd": 520.96,
+          "cv": 0.4204,
+          "min": 377.0,
+          "max": 3084.0
+        },
+        "cost_usd": {
+          "mean": 0.01,
+          "sd": 0.0,
+          "cv": 0.4343,
+          "min": 0.0,
+          "max": 0.02
+        }
+      },
+      "separation": {
+        "input_tokens": {
+          "pass_mean": 1244.3485,
+          "fail_mean": 1202.6111,
+          "cohens_d": 0.0799,
+          "frac_nonzero": 1.0
+        },
+        "output_tokens": {
+          "pass_mean": 250.3788,
+          "fail_mean": 399.8889,
+          "cohens_d": -1.0357,
+          "frac_nonzero": 1.0
+        },
+        "cost_usd": {
+          "pass_mean": 0.0062,
+          "fail_mean": 0.0081,
+          "cohens_d": -0.6867,
+          "frac_nonzero": 1.0
+        },
+        "tokens_ratio": {
+          "pass_mean": 0.2321,
+          "fail_mean": 0.3566,
+          "cohens_d": -0.866,
+          "frac_nonzero": 1.0
+        },
+        "jit_state_chars": {
+          "pass_mean": 703.5985,
+          "fail_mean": 759.4444,
+          "cohens_d": -0.1434,
+          "frac_nonzero": 0.9
+        },
+        "jit_notes_total": {
+          "pass_mean": 8.7045,
+          "fail_mean": 9.5,
+          "cohens_d": -0.172,
+          "frac_nonzero": 0.9867
+        }
+      }
+    }
+  }
+}
