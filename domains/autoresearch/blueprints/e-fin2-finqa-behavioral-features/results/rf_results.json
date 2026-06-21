@@ -1,0 +1,565 @@
+{
+  "_meta": {
+    "spec": "E_fin2",
+    "corpus": "FinQA czyssrs/FinQA dev (n=100, E_fin1 sample, seed=42)",
+    "rf_recipe": "RF(n_estimators=200, max_depth=7, class_weight=balanced, seed=42); nan->-999; 5-fold stratified pooled OOF",
+    "phase3_baseline": {
+      "selected_4_rf_auc": 0.756,
+      "behavioral_only_rf_auc": 0.73,
+      "v009_only_auc": 0.682,
+      "debate_only_auc": 0.682,
+      "importances": {
+        "beh_total_cost_usd": 0.42,
+        "beh_tokens_per_edit": 0.327,
+        "beh_loop_count": 0.201,
+        "svg_accepted": 0.052
+      },
+      "difficulty_conditioning_regressed_to": 0.743,
+      "source": "learned-verifier/results/phase3_report.md + enew_report.md (repo-verified)"
+    },
+    "n": 100,
+    "base_rate": 0.71,
+    "n_pass": 71,
+    "n_fail": 29,
+    "env": "python3.13 sklearn 1.8.0 (python3.14 sklearn broken)",
+    "feature_family_note": "beh_* = agent-trajectory process signal (direct Phase-3 analog); prog_* = gold-program structure (task-side difficulty proxy, NOT agent behavior)."
+  },
+  "rf_auc": {
+    "behavioral_all": {
+      "auc": 0.5687,
+      "ci95": [
+        0.4302,
+        0.7086
+      ],
+      "n_boot_valid": 2000,
+      "name": "behavioral_all (9 agent-trajectory feats)",
+      "features": [
+        "beh_output_tokens",
+        "beh_input_tokens",
+        "beh_cost_usd",
+        "beh_reasoning_words",
+        "beh_tokens_per_word",
+        "beh_revision_count",
+        "beh_num_mentions",
+        "beh_abstain",
+        "beh_latency_ms"
+      ],
+      "p_at_r30": 0.7667,
+      "importances": {
+        "beh_output_tokens": 0.2048,
+        "beh_cost_usd": 0.1497,
+        "beh_input_tokens": 0.1428,
+        "beh_tokens_per_word": 0.1391,
+        "beh_latency_ms": 0.1312,
+        "beh_reasoning_words": 0.1287,
+        "beh_num_mentions": 0.1037,
+        "beh_revision_count": 0.0,
+        "beh_abstain": 0.0
+      },
+      "n": 100,
+      "cv_splits": 5
+    },
+    "behavioral_4": {
+      "auc": 0.4624,
+      "ci95": [
+        0.3275,
+        0.6124
+      ],
+      "n_boot_valid": 2000,
+      "name": "behavioral_4 (cost/tok-per-word/revision/abstain)",
+      "features": [
+        "beh_cost_usd",
+        "beh_tokens_per_word",
+        "beh_revision_count",
+        "beh_abstain"
+      ],
+      "p_at_r30": 0.75,
+      "importances": {
+        "beh_tokens_per_word": 0.5065,
+        "beh_cost_usd": 0.4935,
+        "beh_revision_count": 0.0,
+        "beh_abstain": 0.0
+      },
+      "n": 100,
+      "cv_splits": 5
+    },
+    "program_structural": {
+      "auc": 0.4075,
+      "ci95": [
+        0.2817,
+        0.5265
+      ],
+      "n_boot_valid": 2000,
+      "name": "program_structural (8 gold-program feats)",
+      "features": [
+        "prog_op_count",
+        "prog_op_diversity",
+        "prog_has_chain",
+        "prog_uses_const",
+        "prog_uses_table_op",
+        "prog_sign_flip",
+        "prog_magnitude_blowup",
+        "prog_max_abs_interm"
+      ],
+      "p_at_r30": 0.7216,
+      "importances": {
+        "prog_max_abs_interm": 0.5918,
+        "prog_magnitude_blowup": 0.201,
+        "prog_op_count": 0.0804,
+        "prog_uses_const": 0.0413,
+        "prog_uses_table_op": 0.0266,
+        "prog_has_chain": 0.0228,
+        "prog_op_diversity": 0.0207,
+        "prog_sign_flip": 0.0153
+      },
+      "n": 100,
+      "cv_splits": 5
+    },
+    "program_plus_behavioral": {
+      "auc": 0.561,
+      "ci95": [
+        0.4251,
+        0.7017
+      ],
+      "n_boot_valid": 2000,
+      "name": "program+behavioral",
+      "features": [
+        "prog_op_count",
+        "prog_op_diversity",
+        "prog_has_chain",
+        "prog_uses_const",
+        "prog_uses_table_op",
+        "prog_sign_flip",
+        "prog_magnitude_blowup",
+        "prog_max_abs_interm",
+        "beh_output_tokens",
+        "beh_input_tokens",
+        "beh_cost_usd",
+        "beh_reasoning_words",
+        "beh_tokens_per_word",
+        "beh_revision_count",
+        "beh_num_mentions",
+        "beh_abstain",
+        "beh_latency_ms"
+      ],
+      "p_at_r30": 0.7705,
+      "importances": {
+        "beh_output_tokens": 0.1593,
+        "beh_cost_usd": 0.1186,
+        "beh_tokens_per_word": 0.109,
+        "beh_input_tokens": 0.1076,
+        "beh_latency_ms": 0.1016,
+        "beh_reasoning_words": 0.1008,
+        "prog_max_abs_interm": 0.0942,
+        "beh_num_mentions": 0.0895,
+        "prog_magnitude_blowup": 0.0549,
+        "prog_op_count": 0.0298,
+        "prog_uses_const": 0.0125,
+        "prog_has_chain": 0.011,
+        "prog_op_diversity": 0.0068,
+        "prog_uses_table_op": 0.0033,
+        "prog_sign_flip": 0.0012,
+        "beh_revision_count": 0.0,
+        "beh_abstain": 0.0
+      },
+      "n": 100,
+      "cv_splits": 5
+    }
+  },
+  "univariate": {
+    "prog_op_count": {
+      "pass_mean": 1.5352,
+      "fail_mean": 1.5517,
+      "auc_single": 0.5624
+    },
+    "prog_op_diversity": {
+      "pass_mean": 1.4507,
+      "fail_mean": 1.3103,
+      "auc_single": 0.5653
+    },
+    "prog_has_chain": {
+      "pass_mean": 0.493,
+      "fail_mean": 0.3103,
+      "auc_single": 0.5913
+    },
+    "prog_uses_const": {
+      "pass_mean": 0.1408,
+      "fail_mean": 0.1379,
+      "auc_single": 0.5015
+    },
+    "prog_uses_table_op": {
+      "pass_mean": 0.0563,
+      "fail_mean": 0.069,
+      "auc_single": 0.4937
+    },
+    "prog_sign_flip": {
+      "pass_mean": 0.0141,
+      "fail_mean": 0.0345,
+      "auc_single": 0.4898
+    },
+    "prog_magnitude_blowup": {
+      "pass_mean": 7244.2897,
+      "fail_mean": 352.6227,
+      "auc_single": 0.5954
+    },
+    "prog_max_abs_interm": {
+      "pass_mean": 340762.1566,
+      "fail_mean": 777814456.6044,
+      "auc_single": 0.4951
+    },
+    "beh_output_tokens": {
+      "pass_mean": 141.338,
+      "fail_mean": 163.9655,
+      "auc_single": 0.414
+    },
+    "beh_input_tokens": {
+      "pass_mean": 357.5352,
+      "fail_mean": 388.1379,
+      "auc_single": 0.414
+    },
+    "beh_cost_usd": {
+      "pass_mean": 0.0011,
+      "fail_mean": 0.0012,
+      "auc_single": 0.3919
+    },
+    "beh_reasoning_words": {
+      "pass_mean": 58.2394,
+      "fail_mean": 71.0,
+      "auc_single": 0.4082
+    },
+    "beh_tokens_per_word": {
+      "pass_mean": 2.4954,
+      "fail_mean": 2.3852,
+      "auc_single": 0.6032
+    },
+    "beh_revision_count": {
+      "pass_mean": 0.0,
+      "fail_mean": 0.1034,
+      "auc_single": 0.4655
+    },
+    "beh_num_mentions": {
+      "pass_mean": 13.507,
+      "fail_mean": 15.931,
+      "auc_single": 0.4133
+    },
+    "beh_abstain": {
+      "pass_mean": 0.0,
+      "fail_mean": 0.0345,
+      "auc_single": 0.4828
+    },
+    "beh_latency_ms": {
+      "pass_mean": 1921.7887,
+      "fail_mean": 2093.7241,
+      "auc_single": 0.3664
+    }
+  },
+  "forward_selection": {
+    "selected": [
+      "beh_output_tokens",
+      "prog_op_count",
+      "prog_op_diversity"
+    ],
+    "history": [
+      {
+        "step": 1,
+        "added": "beh_output_tokens",
+        "auc": 0.7266
+      },
+      {
+        "step": 2,
+        "added": "prog_op_count",
+        "auc": 0.7746
+      },
+      {
+        "step": 3,
+        "added": "prog_op_diversity",
+        "auc": 0.7902
+      }
+    ],
+    "n": 100
+  },
+  "head_to_head": {
+    "behavioral_only": {
+      "auc": 0.5687,
+      "ci95": [
+        0.4302,
+        0.7086
+      ],
+      "n_boot_valid": 2000,
+      "name": "behavioral_only",
+      "features": [
+        "beh_output_tokens",
+        "beh_input_tokens",
+        "beh_cost_usd",
+        "beh_reasoning_words",
+        "beh_tokens_per_word",
+        "beh_revision_count",
+        "beh_num_mentions",
+        "beh_abstain",
+        "beh_latency_ms"
+      ],
+      "p_at_r30": 0.7667,
+      "importances": {
+        "beh_output_tokens": 0.2048,
+        "beh_cost_usd": 0.1497,
+        "beh_input_tokens": 0.1428,
+        "beh_tokens_per_word": 0.1391,
+        "beh_latency_ms": 0.1312,
+        "beh_reasoning_words": 0.1287,
+        "beh_num_mentions": 0.1037,
+        "beh_revision_count": 0.0,
+        "beh_abstain": 0.0
+      },
+      "n": 100,
+      "cv_splits": 5
+    },
+    "program_only": {
+      "auc": 0.4075,
+      "ci95": [
+        0.2817,
+        0.5265
+      ],
+      "n_boot_valid": 2000,
+      "name": "program_only",
+      "features": [
+        "prog_op_count",
+        "prog_op_diversity",
+        "prog_has_chain",
+        "prog_uses_const",
+        "prog_uses_table_op",
+        "prog_sign_flip",
+        "prog_magnitude_blowup",
+        "prog_max_abs_interm"
+      ],
+      "p_at_r30": 0.7216,
+      "importances": {
+        "prog_max_abs_interm": 0.5918,
+        "prog_magnitude_blowup": 0.201,
+        "prog_op_count": 0.0804,
+        "prog_uses_const": 0.0413,
+        "prog_uses_table_op": 0.0266,
+        "prog_has_chain": 0.0228,
+        "prog_op_diversity": 0.0207,
+        "prog_sign_flip": 0.0153
+      },
+      "n": 100,
+      "cv_splits": 5
+    },
+    "skill_verifier_only": {
+      "auc": 0.5566,
+      "ci95": [
+        0.4259,
+        0.6843
+      ],
+      "n_boot_valid": 2000,
+      "name": "skill_verifier_only (E_fin1 conf+adv)",
+      "features": [
+        "skill_conf_rating",
+        "skill_adv_lc_count",
+        "skill_adv_li_count",
+        "skill_adv_unc_count",
+        "skill_adv_confident"
+      ],
+      "p_at_r30": 0.7528,
+      "importances": {
+        "skill_adv_unc_count": 0.32,
+        "skill_conf_rating": 0.2575,
+        "skill_adv_li_count": 0.1958,
+        "skill_adv_lc_count": 0.1647,
+        "skill_adv_confident": 0.062
+      },
+      "n": 100,
+      "cv_splits": 5
+    },
+    "behavioral_plus_skill": {
+      "auc": 0.5469,
+      "ci95": [
+        0.4128,
+        0.6848
+      ],
+      "n_boot_valid": 2000,
+      "name": "behavioral+skill",
+      "features": [
+        "beh_output_tokens",
+        "beh_input_tokens",
+        "beh_cost_usd",
+        "beh_reasoning_words",
+        "beh_tokens_per_word",
+        "beh_revision_count",
+        "beh_num_mentions",
+        "beh_abstain",
+        "beh_latency_ms",
+        "skill_conf_rating",
+        "skill_adv_lc_count",
+        "skill_adv_li_count",
+        "skill_adv_unc_count",
+        "skill_adv_confident"
+      ],
+      "p_at_r30": 0.76,
+      "importances": {
+        "beh_output_tokens": 0.1717,
+        "beh_input_tokens": 0.1454,
+        "beh_tokens_per_word": 0.1284,
+        "beh_cost_usd": 0.1283,
+        "beh_latency_ms": 0.1253,
+        "beh_reasoning_words": 0.1019,
+        "beh_num_mentions": 0.0968,
+        "skill_adv_unc_count": 0.0332,
+        "skill_conf_rating": 0.0266,
+        "skill_adv_lc_count": 0.022,
+        "skill_adv_li_count": 0.011,
+        "skill_adv_confident": 0.0094,
+        "beh_revision_count": 0.0,
+        "beh_abstain": 0.0
+      },
+      "n": 100,
+      "cv_splits": 5
+    },
+    "all_combined": {
+      "auc": 0.5454,
+      "ci95": [
+        0.4052,
+        0.6827
+      ],
+      "n_boot_valid": 2000,
+      "name": "all_combined",
+      "features": [
+        "prog_op_count",
+        "prog_op_diversity",
+        "prog_has_chain",
+        "prog_uses_const",
+        "prog_uses_table_op",
+        "prog_sign_flip",
+        "prog_magnitude_blowup",
+        "prog_max_abs_interm",
+        "beh_output_tokens",
+        "beh_input_tokens",
+        "beh_cost_usd",
+        "beh_reasoning_words",
+        "beh_tokens_per_word",
+        "beh_revision_count",
+        "beh_num_mentions",
+        "beh_abstain",
+        "beh_latency_ms",
+        "skill_conf_rating",
+        "skill_adv_lc_count",
+        "skill_adv_li_count",
+        "skill_adv_unc_count",
+        "skill_adv_confident"
+      ],
+      "p_at_r30": 0.7606,
+      "importances": {
+        "beh_output_tokens": 0.1352,
+        "beh_cost_usd": 0.1068,
+        "beh_latency_ms": 0.1053,
+        "beh_tokens_per_word": 0.1029,
+        "prog_max_abs_interm": 0.0997,
+        "beh_input_tokens": 0.0977,
+        "beh_reasoning_words": 0.0916,
+        "beh_num_mentions": 0.075,
+        "prog_magnitude_blowup": 0.049,
+        "skill_adv_unc_count": 0.0209,
+        "prog_op_count": 0.0207,
+        "skill_adv_lc_count": 0.0173,
+        "skill_conf_rating": 0.0171,
+        "prog_has_chain": 0.0159,
+        "prog_uses_const": 0.0138,
+        "skill_adv_li_count": 0.0122,
+        "skill_adv_confident": 0.0076,
+        "prog_op_diversity": 0.0058,
+        "prog_uses_table_op": 0.0035,
+        "prog_sign_flip": 0.002,
+        "beh_revision_count": 0.0,
+        "beh_abstain": 0.0
+      },
+      "n": 100,
+      "cv_splits": 5
+    },
+    "raw_signal_auc": {
+      "adv_lc_count_auc": 0.5648,
+      "conf_rating_auc": 0.6289,
+      "note": "single-signal AUC of the E_fin1 verifier outputs (no RF)"
+    }
+  },
+  "difficulty_paradox": {
+    "buckets": {
+      "easy_1op": {
+        "n": 56,
+        "pass_rate": 0.6429,
+        "n_pass": 36,
+        "n_fail": 20
+      },
+      "hard_2plus": {
+        "n": 44,
+        "pass_rate": 0.7955,
+        "n_pass": 35,
+        "n_fail": 9
+      }
+    },
+    "method": "stratify by gold-program op-count (<=1 vs >=2); DOCUMENT sign reversals only, no conditioned RF (regressed in coding)",
+    "sign_reversal_check": {
+      "beh_cost_usd": {
+        "pooled_pass_minus_fail": -0.0001,
+        "per_bucket_pass_minus_fail": {
+          "easy_1op": -0.0001,
+          "hard_2plus": -0.0003
+        },
+        "sign_reversal": false
+      },
+      "beh_tokens_per_word": {
+        "pooled_pass_minus_fail": 0.1102,
+        "per_bucket_pass_minus_fail": {
+          "easy_1op": 0.0806,
+          "hard_2plus": 0.1252
+        },
+        "sign_reversal": false
+      },
+      "beh_revision_count": {
+        "pooled_pass_minus_fail": -0.1034,
+        "per_bucket_pass_minus_fail": {
+          "easy_1op": -0.1,
+          "hard_2plus": -0.1111
+        },
+        "sign_reversal": false
+      },
+      "beh_abstain": {
+        "pooled_pass_minus_fail": -0.0345,
+        "per_bucket_pass_minus_fail": {
+          "easy_1op": -0.05,
+          "hard_2plus": 0.0
+        },
+        "sign_reversal": false
+      },
+      "prog_op_count": {
+        "pooled_pass_minus_fail": -0.0165,
+        "per_bucket_pass_minus_fail": {
+          "easy_1op": 0.0,
+          "hard_2plus": -0.6921
+        },
+        "sign_reversal": false
+      },
+      "beh_output_tokens": {
+        "pooled_pass_minus_fail": -22.6275,
+        "per_bucket_pass_minus_fail": {
+          "easy_1op": -17.8444,
+          "hard_2plus": -46.4254
+        },
+        "sign_reversal": false
+      }
+    },
+    "paradox_detected": false
+  },
+  "verdict": {
+    "behavioral_all_auc": 0.5687,
+    "behavioral_all_ci95": [
+      0.4302,
+      0.7086
+    ],
+    "program_structural_auc": 0.4075,
+    "skill_verifier_auc": 0.5566,
+    "coding_baseline_auc": 0.756,
+    "gap_vs_coding_baseline": 0.1873,
+    "expected_band_055_065": "behavioral_all",
+    "scoping": null
+  }
+}
