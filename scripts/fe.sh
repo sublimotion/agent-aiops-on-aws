@@ -8,7 +8,15 @@ set -euo pipefail
 FE_VERSION="0.1.0"
 CARD_FORMAT_DOC="docs/card-format.md"
 COMMUNITY_REPO="https://github.com/field-engineer-ai/cards"
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Resolve through symlinks (fe is typically symlinked onto PATH, e.g. ~/.local/bin/fe)
+# so REPO_ROOT points at the real repo, not the symlink's directory.
+_fe_src="${BASH_SOURCE[0]}"
+while [[ -L "$_fe_src" ]]; do
+  _fe_dir="$(cd -P "$(dirname "$_fe_src")" && pwd)"
+  _fe_src="$(readlink "$_fe_src")"
+  [[ "$_fe_src" != /* ]] && _fe_src="$_fe_dir/$_fe_src"
+done
+REPO_ROOT="$(cd -P "$(dirname "$_fe_src")/.." && pwd)"
 
 usage() {
   cat <<EOF
