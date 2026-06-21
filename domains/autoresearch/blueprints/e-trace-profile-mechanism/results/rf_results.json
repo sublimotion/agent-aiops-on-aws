@@ -1,0 +1,190 @@
+{
+  "_meta": {
+    "spec": "E_trace-profile STEP 3 (RF fit on FinanceBench)",
+    "gate": "prediction.md committed at 5e63a3f BEFORE this fit",
+    "rf_recipe": "RF(n_estimators=200, max_depth=7, class_weight=balanced, seed=42); nan->-999; 5-fold stratified pooled OOF; bootstrap 95% CI (2000)",
+    "features": [
+      "input_tokens",
+      "output_tokens",
+      "cost_usd",
+      "tokens_ratio",
+      "jit_state_chars",
+      "jit_notes_total"
+    ],
+    "leakage_excluded": [
+      "judge_conf",
+      "judge_verdict",
+      "judge_reason"
+    ],
+    "fit_unit": "per cell (single model), to mirror FinQA single-model design and avoid cost_usd model-detector confound on pooling",
+    "env": "python3.13 sklearn-stack",
+    "reference_points": {
+      "coding": 0.756,
+      "finqa": 0.569,
+      "finqa_ci95": [
+        0.43,
+        0.709
+      ]
+    }
+  },
+  "per_cell": {
+    "E_haiku": {
+      "auc": 0.4547,
+      "ci95": [
+        0.3331,
+        0.5721
+      ],
+      "ci_width": 0.239,
+      "n_boot_valid": 2000,
+      "name": "financebench_E_haiku",
+      "n": 150,
+      "n_pass": 124,
+      "n_fail": 26,
+      "cv_splits": 5,
+      "importances": {
+        "tokens_ratio": 0.2029,
+        "output_tokens": 0.2021,
+        "cost_usd": 0.1757,
+        "input_tokens": 0.1598,
+        "jit_state_chars": 0.1484,
+        "jit_notes_total": 0.1112
+      }
+    },
+    "E_sonnet": {
+      "auc": 0.6113,
+      "ci95": [
+        0.4851,
+        0.7375
+      ],
+      "ci_width": 0.2524,
+      "n_boot_valid": 2000,
+      "name": "financebench_E_sonnet",
+      "n": 150,
+      "n_pass": 130,
+      "n_fail": 20,
+      "cv_splits": 5,
+      "importances": {
+        "tokens_ratio": 0.2374,
+        "output_tokens": 0.2019,
+        "cost_usd": 0.1953,
+        "input_tokens": 0.1615,
+        "jit_state_chars": 0.1106,
+        "jit_notes_total": 0.0932
+      }
+    },
+    "F_haiku_v-haiku": {
+      "auc": 0.6545,
+      "ci95": [
+        0.5465,
+        0.7545
+      ],
+      "ci_width": 0.208,
+      "n_boot_valid": 2000,
+      "name": "financebench_F_haiku_v-haiku",
+      "n": 150,
+      "n_pass": 117,
+      "n_fail": 33,
+      "cv_splits": 5,
+      "importances": {
+        "tokens_ratio": 0.2251,
+        "output_tokens": 0.2065,
+        "cost_usd": 0.1853,
+        "input_tokens": 0.152,
+        "jit_state_chars": 0.1233,
+        "jit_notes_total": 0.1078
+      }
+    },
+    "F_sonnet_v-haiku": {
+      "auc": 0.6035,
+      "ci95": [
+        0.4447,
+        0.7597
+      ],
+      "ci_width": 0.315,
+      "n_boot_valid": 2000,
+      "name": "financebench_F_sonnet_v-haiku",
+      "n": 150,
+      "n_pass": 132,
+      "n_fail": 18,
+      "cv_splits": 5,
+      "importances": {
+        "cost_usd": 0.2444,
+        "output_tokens": 0.2066,
+        "tokens_ratio": 0.201,
+        "input_tokens": 0.148,
+        "jit_state_chars": 0.108,
+        "jit_notes_total": 0.0921
+      }
+    }
+  },
+  "pooled_all_CONFOUNDED": {
+    "auc": 0.7677,
+    "ci95": [
+      0.7148,
+      0.8175
+    ],
+    "ci_width": 0.1028,
+    "n_boot_valid": 2000,
+    "name": "financebench_pooled_all",
+    "n": 600,
+    "n_pass": 503,
+    "n_fail": 97,
+    "cv_splits": 5,
+    "importances": {
+      "output_tokens": 0.2318,
+      "tokens_ratio": 0.227,
+      "cost_usd": 0.1803,
+      "input_tokens": 0.1476,
+      "jit_state_chars": 0.1248,
+      "jit_notes_total": 0.0885
+    },
+    "warning": "cost_usd separates Haiku (~$0.003) vs Sonnet (~$0.007) by model pricing; a pooled fit can detect MODEL, not process quality. Per-cell is the honest unit. Reported for completeness only."
+  },
+  "pooled_within_model": {
+    "haiku_n300": {
+      "auc": 0.7432,
+      "ci95": [
+        0.6766,
+        0.8081
+      ],
+      "ci_width": 0.1315,
+      "n_boot_valid": 2000,
+      "name": "financebench_haiku_pooled",
+      "n": 300,
+      "n_pass": 241,
+      "n_fail": 59,
+      "cv_splits": 5,
+      "importances": {
+        "tokens_ratio": 0.2085,
+        "output_tokens": 0.2027,
+        "cost_usd": 0.1944,
+        "input_tokens": 0.1578,
+        "jit_state_chars": 0.1304,
+        "jit_notes_total": 0.1062
+      }
+    },
+    "sonnet_n300": {
+      "auc": 0.7291,
+      "ci95": [
+        0.6422,
+        0.8099
+      ],
+      "ci_width": 0.1677,
+      "n_boot_valid": 2000,
+      "name": "financebench_sonnet_pooled",
+      "n": 300,
+      "n_pass": 262,
+      "n_fail": 38,
+      "cv_splits": 5,
+      "importances": {
+        "tokens_ratio": 0.2357,
+        "cost_usd": 0.2356,
+        "output_tokens": 0.1888,
+        "input_tokens": 0.1604,
+        "jit_state_chars": 0.099,
+        "jit_notes_total": 0.0806
+      }
+    },
+    "note": "same pricing within model => cost_usd not a model tag; n=300 each, tighter CI than per-cell n=150."
+  }
+}
