@@ -312,8 +312,12 @@ cmd_agent() {
       role="$(cd "$bp" && terraform output -raw run_role_arn 2>/dev/null)" || role=""
       [[ -n "$role" ]] && export AGENT_RUNNER_RUN_ROLE_ARN="$role"
       mkdir -p "$(dirname "$env_file")"
-      { echo "$cli_env"; [[ -n "$role" ]] && echo "export AGENT_RUNNER_RUN_ROLE_ARN=$role"; } > "$env_file"
-      echo "fe agent: cached env → $env_file" >&2
+      # Preserve operator-set extras (cluster default, base image) across a regen —
+      # carry forward any line for a var the terraform output doesn't provide.
+      local extras=""
+      [[ -f "$env_file" ]] && extras="$(grep -E '^export (AGENT_RUNNER_DEFAULT_CLUSTER|AGENT_RUNNER_BASE_IMAGE|AGENT_RUNNER_NODE_POOL)=' "$env_file" 2>/dev/null || true)"
+      { echo "$cli_env"; [[ -n "$role" ]] && echo "export AGENT_RUNNER_RUN_ROLE_ARN=$role"; [[ -n "$extras" ]] && echo "$extras"; } > "$env_file"
+      echo "fe agent: cached env → $env_file (preserved operator extras)" >&2
     fi
   fi
 
