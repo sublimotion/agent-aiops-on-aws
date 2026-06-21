@@ -114,6 +114,7 @@ Read these files **on demand** based on what you're doing:
 | `domains/autoresearch/blueprints/e-fin2-finqa-behavioral-features/` | `domains/autoresearch/specs/e-fin2-finqa-behavioral-features.md` |
 | `domains/autoresearch/blueprints/e-harness1-harness-behavioral-interaction/` | `domains/autoresearch/specs/e-harness1-harness-behavioral-interaction.md` |
 | `domains/autoresearch/blueprints/e-harness2-jit-vs-offline-authoring/` | `domains/autoresearch/specs/e-harness2-jit-vs-offline-authoring.md` |
+| `domains/autoresearch/blueprints/e-harness3-reward-regime-x-locus/` | `domains/autoresearch/specs/e-harness3-reward-regime-x-locus.md` |
 
 **Blueprint-local context** — for operational details (lessons, results, plans), look inside the blueprint directory itself rather than in specs.
 
