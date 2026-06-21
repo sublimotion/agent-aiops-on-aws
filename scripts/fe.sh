@@ -19,6 +19,8 @@ Commands:
   fe card --hardware <instance>         Look up GPU infrastructure card
   fe learn <blueprint-path>             Run learn commands from lessons.md frontmatter
   fe contribute <blueprint-path>        Generate community contribution PR template
+  fe agent <launch|status|logs|attach|stop|ls> [args]
+                                        Drive the agent-runner runtime (auto-resolves AGENT_RUNNER_* env)
   fe help                               Show this help
 
 Examples:
@@ -273,11 +275,50 @@ ISSUE
   echo "  $COMMUNITY_REPO/issues/new"
 }
 
+# fe agent — thin wrapper over the agent-runner CLI (sibling repo).
+# Resolves AGENT_RUNNER_* env once (so you don't re-export 5 vars per shell), then
+# passes the verb through unchanged. Env resolution order:
+#   1. already-exported AGENT_RUNNER_* vars win (no override)
+#   2. else source the saved env file if present
+#   3. else derive from `terraform output -raw cli_env` in the blueprint (+ run_role_arn), and cache it
+# Locates the agent-runner CLI at ../agent-runner/bin/agent-runner relative to this repo.
+cmd_agent() {
+  local ar_bin="$REPO_ROOT/../agent-runner/bin/agent-runner"
+  [[ -x "$ar_bin" ]] || { echo "agent-runner CLI not found at $ar_bin (clone github.com/sublimotion/agent-runner alongside this repo)" >&2; exit 1; }
+
+  local bp="$REPO_ROOT/domains/agent-runtime/blueprints/managed-agent-runner"
+  local env_file="${AGENT_RUNNER_ENV_FILE:-$HOME/.config/agent-runner/env}"
+
+  # (2) saved env file — fills vars; already-exported ones still win because the file uses plain exports
+  if [[ -f "$env_file" ]]; then
+    set -a; source "$env_file"; set +a
+  fi
+
+  # (3) derive from terraform if core vars still unset and a state exists
+  if [[ -z "${AGENT_RUNNER_STATE_TABLE:-}" || -z "${AGENT_RUNNER_ARTIFACT_BUCKET:-}" ]] \
+     && { [[ -d "$bp/.terraform" ]] || [[ -f "$bp/terraform.tfstate" ]]; } && command -v terraform >/dev/null 2>&1; then
+    local cli_env role
+    cli_env="$(cd "$bp" && terraform output -raw cli_env 2>/dev/null)" || cli_env=""
+    if [[ -n "$cli_env" ]]; then
+      eval "$cli_env"
+      role="$(cd "$bp" && terraform output -raw run_role_arn 2>/dev/null)" || role=""
+      [[ -n "$role" ]] && export AGENT_RUNNER_RUN_ROLE_ARN="$role"
+      mkdir -p "$(dirname "$env_file")"
+      { echo "$cli_env"; [[ -n "$role" ]] && echo "export AGENT_RUNNER_RUN_ROLE_ARN=$role"; } > "$env_file"
+      echo "fe agent: cached env → $env_file" >&2
+    fi
+  fi
+
+  : "${AGENT_RUNNER_NAMESPACE:=agent-runner}"; export AGENT_RUNNER_NAMESPACE
+  exec "$ar_bin" "$@"
+}
+
 # Main dispatch
 case "${1:-help}" in
   card)        shift; cmd_card "$@" ;;
   learn)       shift; cmd_learn "$@" ;;
   contribute)  shift; cmd_contribute "$@" ;;
+  agent)       shift; cmd_agent "$@" ;;
   version)     echo "fe $FE_VERSION" ;;
   help|--help|-h) usage ;;
   *) echo "Unknown command: $1" >&2; usage; exit 1 ;;
