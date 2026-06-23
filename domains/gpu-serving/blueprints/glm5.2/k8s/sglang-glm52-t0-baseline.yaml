@@ -1,0 +1,49 @@
+# GLM-5.2-FP8 — T0 BASELINE (SGLang, TP8). FP8-floor reference: NO prefix cache, NO spec decode,
+# NO HiCache. Establishes the honest baseline before layering T1-T5. (BF16 doesn't fit — FP8 is the floor.)
+# Node: ai-infra-use2-b200-spot (us-east-2), labeled blueprint=glm5.2 after scale-up.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sglang-glm52-t0-baseline
+  namespace: default
+  labels: {app: sglang-glm52, tier: t0-baseline}
+spec:
+  restartPolicy: Never
+  nodeSelector: {blueprint: glm5.2}
+  tolerations:
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}   # the ACTUAL node taint (kimi L2)
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+  hostNetwork: true
+  containers:
+    - name: sglang
+      image: lmsysorg/sglang:latest   # require >=0.5.13.post1 (glm_moe_dsa); PIN exact tag at deploy
+      command:
+        - bash
+        - -c
+        - |
+          # FlashInfer cubin symlink race fires on EVERY cold start (qwen3-235b-spec L16)
+          find /usr/local/lib/python*/dist-packages/flashinfer_cubin/cubins -name trtllmGen_bmm_export -exec rm -rf {} + 2>/dev/null || true
+          exec python3 -m sglang.launch_server \
+            --model-path /mnt/nvme/models/glm5.2-fp8 \
+            --served-model-name GLM-5.2-FP8 \
+            --tp 8 \
+            --tool-call-parser glm47 \
+            --reasoning-parser glm45 \
+            --context-length 65536 \
+            --mem-fraction-static 0.85 \
+            --disable-radix-cache \
+            --enable-metrics \
+            --host 0.0.0.0 --port 30000
+      env:
+        - {name: HF_HOME, value: /mnt/nvme/hf-cache}
+        - {name: SGL_DG_CACHE_DIR, value: /mnt/nvme/deepgemm-cache}   # persist DeepGEMM JIT (~15min) across restarts
+      resources:
+        requests: {nvidia.com/gpu: "8", cpu: "48", memory: 512Gi}
+        limits:   {nvidia.com/gpu: "8", cpu: "96", memory: 1024Gi}   # T0 has no HiCache tier
+      securityContext: {capabilities: {add: ["IPC_LOCK"]}}
+      volumeMounts:
+        - {name: nvme, mountPath: /mnt/nvme, mountPropagation: HostToContainer}
+        - {name: shm, mountPath: /dev/shm}
+  volumes:
+    - {name: nvme, hostPath: {path: /mnt/nvme, type: Directory}}
+    - {name: shm, emptyDir: {medium: Memory, sizeLimit: 64Gi}}

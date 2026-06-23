@@ -60,6 +60,7 @@ Read these files **on demand** based on what you're doing:
 | `domains/gpu-serving/blueprints/qwen3-next-sglang/` | `domains/gpu-serving/specs/qwen3-next-sglang.md` |
 | `domains/gpu-serving/blueprints/devstral-sera/` | `domains/gpu-serving/specs/devstral-sera.md` |
 | `domains/gpu-serving/blueprints/glm5/` | `domains/gpu-serving/specs/glm5.md` |
+| `domains/gpu-serving/blueprints/glm5.2/` | `domains/gpu-serving/specs/glm5.2.md` |
 | `domains/gpu-serving/blueprints/glm5-hyperpod/` | `domains/gpu-serving/specs/glm5-hyperpod.md` |
 | `domains/gpu-serving/blueprints/glm5-lmcache/` | `domains/gpu-serving/specs/glm5-lmcache.md` |
 | `domains/gpu-serving/blueprints/glm5-llmd/` | `domains/gpu-serving/specs/glm5-llmd.md` |

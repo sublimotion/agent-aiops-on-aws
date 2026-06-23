@@ -1,0 +1,144 @@
+# GLM-5.2-FP8 on B200 — Full Optimization-Sweep Benchmark Sidecar
+# Spec: domains/gpu-serving/specs/glm5.2.md
+# Engine is the PRIMARY axis: SGLang vs vLLM at matched FP8 + workload; pick the winner, sweep T0-T5 on it.
+# Workloads: coding-agent (primary) + long-input-31k (from kimi customer profile) + production-mix (T3 grounding).
+
+model:
+  name: GLM-5.2-FP8
+  id: zai-org/GLM-5.2-FP8
+  architecture: glm_moe_dsa            # MLA + DeepSeek Sparse Attention; GlmMoeDsaForCausalLM
+  parameters_total: "753B"
+  parameters_active: "40B"
+  quantization: fp8                    # official block-FP8 (weight_block_size [128,128], e4m3, dynamic act)
+  max_model_len: 65536                 # capped from 1M to widen KV pool for the sweep
+  moe_intermediate_size: 2048          # /TP8=256, /128=2 → fp8-moe-tp-divisibility OK
+  num_hidden_layers: 78
+  num_experts: 256                     # + 1 shared, top-8
+  multimodal: false
+
+# ── Engine: PRIMARY AXIS — run BOTH at matched FP8 + workload, pick winner ──
+engine:
+  comparison: [sglang, vllm]
+  tensor_parallel: 8                   # B200 forced to TP8 (~750GB FP8 doesn't fit TP4); TP4+DP2 is B300-only
+  pipeline_parallel: 1
+  replicas: 1
+  reasoning: true
+
+  sglang:
+    container_image: "lmsysorg/sglang:latest"   # require >=0.5.13.post1; PIN at deploy
+    min_version: "0.5.13.post1"
+    launch: sglang.launch_server
+    kv_cache_dtype: auto
+    extra_args:
+      model-path: /mnt/nvme/models/glm5.2-fp8
+      tp: 8
+      tool-call-parser: glm47
+      reasoning-parser: glm45
+      context-length: 65536
+      enable-metrics: true             # REQUIRED or /metrics 404s → TTFT data lost (qwen3-235b-spec L8)
+      max-running-requests: 256        # set explicitly — MTP/EAGLE auto-resets to 48 if unset
+
+  vllm:
+    container_image: "vllm/vllm-openai:latest"   # require >=0.23.0 (glm_moe_dsa native); PIN at deploy
+    attention_backend: flashinfer
+    kv_cache_dtype: fp8_e4m3
+    extra_args:
+      model: /mnt/nvme/models/glm5.2-fp8
+      tensor-parallel-size: 8
+      tool-call-parser: glm47
+      reasoning-parser: glm45
+      enable-auto-tool-choice: true
+      enable-prefix-caching: true
+      max-model-len: 65536
+      max-num-seqs: 32
+
+# ── T0-T5 optimization sweep (run on the winning engine; see spec Stage 0b ledger) ──
+optimization:
+  t0_baseline: "FP8, TP8, --disable-radix-cache, no spec decode, eager"   # FP8 floor (BF16 doesn't fit)
+  t1_quantization:
+    kv_cache_dtype_sweep: [auto, fp8_e4m3]   # NVFP4 deferred — only REAP-pruned community ckpts exist
+  t2_kv_cache:
+    prefix_cache: [off, on]
+    hicache: "--enable-hierarchical-cache --hicache-ratio 2"   # SGLANG ONLY; pod mem 1600Gi (TP8)
+    vllm_lmcache: "DEFERRED — re-verify PR #2629/#2774/#2977 before attempting; smoke-test cache-hit+quality"
+  t3_speculative:
+    sglang: "--speculative-algorithm EAGLE --speculative-num-steps 5 --speculative-eagle-topk 1 --speculative-num-draft-tokens 6"
+    vllm: '--speculative-config {"method":"mtp","num_speculative_tokens":5}'
+    grounding: "report accept length on production-mix AND coding-agent (synthetic inflates 3-5x, qwen3-235b-spec L15)"
+  t4_parallelism:
+    b200: [tp8, "tp8 + --enable-dp-attention + --moe-a2a-backend deepep"]
+    b300: [tp8, tp4dp2]                # TP4+DP2 ONLY fits on B300 (275GB/GPU); the +19-25% kimi arm
+  t5_kernel:
+    flags: "torch.compile + FLASHINFER_MLA + --cuda-graph-max-bs 32; DeepGEMM JIT cached to /mnt/nvme/deepgemm-cache"
+
+framework:
+  name: head-to-head
+  config: {mode: aggregated}           # single-node aggregated; disagg out of scope
+
+infrastructure:
+  substrate: eks
+  cluster_name: qwen3-next-bench-eks-cluster
+  nodegroup: ai-infra-use2-b200-spot
+  instance_type: p6-b200.48xlarge
+  region: us-east-2
+  az: us-east-2b
+  node_selector: { blueprint: glm5.2 }
+  gpu: {name: B200, arch: sm_100, count: 8, vram_gb: 180, interconnect: nvswitch}
+  pod_memory_limit_gi: 1600            # HiCache TP8 host alloc ~1360GB + headroom (qwen3-235b-spec L9)
+  # B300 second arm (unlocks TP4+DP2): cluster qn-sglang-eks-cluster, nodegroup ai-infra-b300-spot,
+  # us-west-2b, taint ai-infra/b300, sm_103. Run if B200 TP8 is KV-capacity-bound OR to measure TP4+DP2.
+  fallback_instance_type: p6-b300.48xlarge
+
+workloads:
+  - catalog_id: coding-agent           # PRIMARY — headline use case
+    override:
+      load: {concurrent_sessions: 4, num_sessions: 25}   # sweep concurrent_sessions in the runner
+  - catalog_id: concurrency-sweep      # find SLO-max knee at coding-agent shape
+    override:
+      load: {levels: [1, 4, 16, 32, 64, 128, 256], num_prompts_per_level: 200}
+  - catalog_id: long-input-31k         # secondary — long-context + DSA test (from kimi profile)
+    override:
+      dataset:
+        input_tokens: {mean: 31404, std_dev: 8000}
+        output_tokens: {mean: 1024, std_dev: 256}
+        shared_system_prompt_tokens: 23250     # ~74% → target hit rate
+        prefix_byte_identical: true            # RadixAttention exact-match (kimi cache scar)
+      load: {levels: [64, 128, 256, 512, 1024], num_prompts_per_level: 200}
+  - catalog_id: production-mix          # ground MTP/EAGLE accept rate (mandatory when T3 on)
+    override:
+      load: {num_sessions: 200}
+
+slo:
+  ttft_p99_ms: 500           # coding-agent cold (card)
+  ttft_warm_p99_ms: 100      # warm w/ cached prefix
+  tpot_p99_ms: 30
+  e2e_p99_ms: 60000
+  error_rate_max: 0.001
+  long_input_ttft_p99_ms: 15000   # 31k knee crossing (kimi customer ceiling)
+
+observability:
+  required: true
+  prometheus: {port: 9090, retention: 7d, s3_sync: true}
+  engine_metrics:
+    cache_hit_definition: "sum(cached_input_tokens) / sum(prompt_tokens)"
+    sglang:
+      endpoint: "http://localhost:30000/metrics"
+      required_histograms: ["sglang:time_to_first_token_seconds_bucket", "sglang:inter_token_latency_seconds_bucket", "sglang:e2e_request_latency_seconds_bucket"]
+      required_gauges: ["sglang:token_usage", "sglang:num_running_reqs", "sglang:num_queue_reqs", "sglang:cache_hit_rate"]
+      per_request_cache_field: "meta_info.cached_tokens"
+    vllm:
+      endpoint: "http://localhost:8000/metrics"
+      required_histograms: ["vllm:time_to_first_token_seconds_bucket", "vllm:time_per_output_token_seconds_bucket", "vllm:e2e_request_latency_seconds_bucket"]
+      required_gauges: ["vllm:gpu_cache_usage_perc", "vllm:num_requests_running", "vllm:num_requests_waiting", "vllm:gpu_prefix_cache_hit_rate"]
+      per_request_cache_field: "prompt_tokens_details.cached_tokens"
+  dcgm:
+    endpoint: "http://localhost:9400/metrics"
+    profiler: on
+    required_metrics: [DCGM_FI_PROF_DRAM_ACTIVE, DCGM_FI_PROF_PIPE_TENSOR_ACTIVE, DCGM_FI_PROF_SM_ACTIVE, DCGM_FI_DEV_POWER_USAGE, DCGM_FI_DEV_XID_ERRORS, DCGM_FI_DEV_GPU_TEMP, DCGM_FI_PROF_NVLINK_TX_BYTES]
+  node_exporter: {port: 9100}
+
+cost:
+  instance_type: p6-b200.48xlarge
+  spot_price_per_hr: 18.00             # B200 us-east-2; B300 fallback ~15.00 us-west-2
+  utilization_target: 0.70
+  upstream_blended_per_mtok: 0.338     # reference comparison point (from kimi customer profile)

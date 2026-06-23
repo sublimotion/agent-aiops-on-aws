@@ -1,0 +1,54 @@
+# GLM-5.2-FP8 — TP4+DP2 on B300 (the layout B200 CANNOT fit: ~187GB weights/GPU > 180).
+# B300 = 275GB/GPU unlocks this arm (won +19-25% over TP8 on kimi-k2.6-nvfp4). Full stack (T1/T2/T3/T5).
+# Node: ai-infra-b300-spot (us-west-2, cluster qn-sglang-eks-cluster), labeled blueprint=glm5.2.
+# SWITCH kubectl context + region first; copy HF token cross-cluster.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sglang-glm52-tp4dp2-b300
+  namespace: default
+  labels: {app: sglang-glm52, tier: t4-tp4dp2-b300}
+spec:
+  restartPolicy: Never
+  nodeSelector: {blueprint: glm5.2}
+  tolerations:
+    - {key: ai-infra/b300, operator: Exists, effect: NoSchedule}   # B300 taint (NOT b200/nvidia.com/gpu)
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+  hostNetwork: true
+  containers:
+    - name: sglang
+      image: lmsysorg/sglang:latest   # sm_103; -cu130 native here. PIN at deploy.
+      command:
+        - bash
+        - -c
+        - |
+          find /usr/local/lib/python*/dist-packages/flashinfer_cubin/cubins -name trtllmGen_bmm_export -exec rm -rf {} + 2>/dev/null || true
+          exec python3 -m sglang.launch_server \
+            --model-path /mnt/nvme/models/glm5.2-fp8 \
+            --served-model-name GLM-5.2-FP8 \
+            --tp 4 \
+            --dp 2 \
+            --tool-call-parser glm47 \
+            --reasoning-parser glm45 \
+            --context-length 65536 \
+            --mem-fraction-static 0.85 \
+            --kv-cache-dtype fp8_e4m3 \
+            --enable-hierarchical-cache \
+            --hicache-ratio 2 \
+            --max-running-requests 256 \
+            --enable-metrics \
+            --host 0.0.0.0 --port 30000
+      env:
+        - {name: HF_HOME, value: /mnt/nvme/hf-cache}
+        - {name: SGL_DG_CACHE_DIR, value: /mnt/nvme/deepgemm-cache}
+      resources:
+        requests: {nvidia.com/gpu: "8", cpu: "48", memory: 512Gi}
+        # TP4 replica: 4 x ~170GB host/rank = ~680GB; set 900Gi (p6-b300 has 4TB).
+        limits:   {nvidia.com/gpu: "8", cpu: "96", memory: 900Gi}
+      securityContext: {capabilities: {add: ["IPC_LOCK"]}}
+      volumeMounts:
+        - {name: nvme, mountPath: /mnt/nvme, mountPropagation: HostToContainer}
+        - {name: shm, mountPath: /dev/shm}
+  volumes:
+    - {name: nvme, hostPath: {path: /mnt/nvme, type: Directory}}
+    - {name: shm, emptyDir: {medium: Memory, sizeLimit: 64Gi}}

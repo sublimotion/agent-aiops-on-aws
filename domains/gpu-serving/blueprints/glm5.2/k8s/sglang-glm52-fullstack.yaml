@@ -1,0 +1,58 @@
+# GLM-5.2-FP8 — FULL STACK (SGLang, TP8): T1 fp8-KV + T2 prefix cache + HiCache + T3 EAGLE + T5 compile.
+# The tier-stacked operating config. Add/remove flags to isolate a single tier per run (see README sweep order).
+# Node: ai-infra-use2-b200-spot (us-east-2), labeled blueprint=glm5.2.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sglang-glm52-fullstack
+  namespace: default
+  labels: {app: sglang-glm52, tier: t5-fullstack}
+spec:
+  restartPolicy: Never
+  nodeSelector: {blueprint: glm5.2}
+  tolerations:
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+  hostNetwork: true
+  containers:
+    - name: sglang
+      image: lmsysorg/sglang:latest   # >=0.5.13.post1; PIN at deploy
+      command:
+        - bash
+        - -c
+        - |
+          find /usr/local/lib/python*/dist-packages/flashinfer_cubin/cubins -name trtllmGen_bmm_export -exec rm -rf {} + 2>/dev/null || true
+          exec python3 -m sglang.launch_server \
+            --model-path /mnt/nvme/models/glm5.2-fp8 \
+            --served-model-name GLM-5.2-FP8 \
+            --tp 8 \
+            --tool-call-parser glm47 \
+            --reasoning-parser glm45 \
+            --context-length 65536 \
+            --mem-fraction-static 0.85 \
+            --kv-cache-dtype fp8_e4m3 \
+            --enable-hierarchical-cache \
+            --hicache-ratio 2 \
+            --speculative-algorithm EAGLE \
+            --speculative-num-steps 5 \
+            --speculative-eagle-topk 1 \
+            --speculative-num-draft-tokens 6 \
+            --cuda-graph-max-bs 32 \
+            --max-running-requests 256 \
+            --enable-metrics \
+            --host 0.0.0.0 --port 30000
+      env:
+        - {name: HF_HOME, value: /mnt/nvme/hf-cache}
+        - {name: SGL_DG_CACHE_DIR, value: /mnt/nvme/deepgemm-cache}
+      resources:
+        requests: {nvidia.com/gpu: "8", cpu: "48", memory: 512Gi}
+        # HiCache --hicache-ratio 2 on TP8 ~85GB device KV/rank => ~170GB host/rank x8 = ~1360GB.
+        # Pod limit MUST cover it or HiCache silently hangs/OOMs (qwen3-235b-spec L9). p6-b200 has 2TB.
+        limits:   {nvidia.com/gpu: "8", cpu: "96", memory: 1600Gi}
+      securityContext: {capabilities: {add: ["IPC_LOCK"]}}
+      volumeMounts:
+        - {name: nvme, mountPath: /mnt/nvme, mountPropagation: HostToContainer}
+        - {name: shm, mountPath: /dev/shm}
+  volumes:
+    - {name: nvme, hostPath: {path: /mnt/nvme, type: Directory}}
+    - {name: shm, emptyDir: {medium: Memory, sizeLimit: 64Gi}}

@@ -1,0 +1,51 @@
+# GLM-5.2-FP8 — vLLM head-to-head (TP8). FP8 + prefix cache + MTP. The vLLM arm of the engine
+# comparison. glm_moe_dsa is native in vLLM >=0.23.0 (deepseek_v2.py) — trust-remote-code likely unneeded.
+# Node: ai-infra-use2-b200-spot (us-east-2), labeled blueprint=glm5.2.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vllm-glm52-baseline
+  namespace: default
+  labels: {app: vllm-glm52, tier: engine-compare}
+spec:
+  restartPolicy: Never
+  nodeSelector: {blueprint: glm5.2}
+  tolerations:
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+  hostNetwork: true
+  containers:
+    - name: vllm
+      image: vllm/vllm-openai:latest   # require >=0.23.0 (glm_moe_dsa); PIN exact tag at deploy
+      command:
+        - bash
+        - -c
+        - |
+          find /usr/local/lib/python*/dist-packages/flashinfer_cubin/cubins -name trtllmGen_bmm_export -exec rm -rf {} + 2>/dev/null || true
+          exec python3 -m vllm.entrypoints.openai.api_server \
+            --model /mnt/nvme/models/glm5.2-fp8 \
+            --served-model-name GLM-5.2-FP8 \
+            --tensor-parallel-size 8 \
+            --tool-call-parser glm47 \
+            --reasoning-parser glm45 \
+            --enable-auto-tool-choice \
+            --enable-prefix-caching \
+            --kv-cache-dtype fp8_e4m3 \
+            --max-model-len 65536 \
+            --max-num-seqs 32 \
+            --speculative-config '{"method":"mtp","num_speculative_tokens":5}' \
+            --host 0.0.0.0 --port 8000
+      env:
+        - {name: HF_HOME, value: /mnt/nvme/hf-cache}
+        - {name: VLLM_DEEP_GEMM_WARMUP, value: skip}   # trade cold-start for first-request latency
+        - {name: DG_JIT_CACHE_DIR, value: /mnt/nvme/deepgemm-cache}
+      resources:
+        requests: {nvidia.com/gpu: "8", cpu: "48", memory: 512Gi}
+        limits:   {nvidia.com/gpu: "8", cpu: "96", memory: 1024Gi}   # vLLM has no HiCache tier
+      securityContext: {capabilities: {add: ["IPC_LOCK"]}}
+      volumeMounts:
+        - {name: nvme, mountPath: /mnt/nvme, mountPropagation: HostToContainer}
+        - {name: shm, mountPath: /dev/shm}
+  volumes:
+    - {name: nvme, hostPath: {path: /mnt/nvme, type: Directory}}
+    - {name: shm, emptyDir: {medium: Memory, sizeLimit: 64Gi}}
