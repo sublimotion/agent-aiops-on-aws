@@ -1,0 +1,166 @@
+# Kimi K2.6 NVFP4 — CuTe-DSL MoE Kernel A/B Sidecar
+# Single variable: the MoE GEMM backend. Everything else is held identical to the
+# parent kimi-k2.6-nvfp4 blueprint (model, TP layout, workload, context, cache, SLOs).
+#   Arm A — flashinfer_trtllm (the parent's control; reproduce 3,138 tok/s @ c512 TP4+DP2 first)
+#   Arm B — FlashInfer CuTe-DSL NVFP4 MoE (FlashInfer #3448 + #3645; SGLang #28354)
+# Motivation: SemiAnalysis "CUDA moat" claim of 2.5x Kimi serving-cost drop on GB200 NVL72.
+# This A/B measures the KERNEL half only (wide-EP/NVL72 half is out of scope — see spec).
+# Headline deliverable: GEMM-level speedup (Stage 6a) vs serving-level speedup (Stage 6) RATIO.
+
+model:
+  name: Kimi-K2.6-NVFP4
+  id: nvidia/Kimi-K2.6-NVFP4
+  architecture: deepseek-v3-mla-moe
+  parameters_total: "1T"
+  parameters_active: "32B"
+  quantization: nvfp4               # modelopt v0.44.0; group_size=16 (NOT block_n=128)
+  max_model_len: 65536
+  moe_intermediate_size: 2048        # /TP8 = 256; group_size=16 divides → fp8-moe-tp-divisibility N/A
+  num_hidden_layers: 61
+  num_attention_heads: 64
+  n_routed_experts: 384
+
+# ── Engine: SGLang only (the CuTe-DSL kernel lands in SGLang via FlashInfer #28354) ──
+engine:
+  comparison: [sglang]
+  tensor_parallel: 4                 # operating layout TP4+DP2; TP8x1 is the control point
+  pipeline_parallel: 1
+  replicas: 2
+  reasoning: true
+
+  sglang:
+    container_image: "lmsysorg/sglang:v0.5.13.post1-cu130"   # PIN AT DEPLOY: Arm B may need a newer build carrying #28354
+    min_version: "0.5.13"
+    launch: sglang.launch_server
+    kv_cache_dtype: auto
+    extra_args:
+      model-path: /mnt/nvme/models/kimi-k26-nvfp4   # reuse staged weights (NOT RedHatAI ckpt, #25331)
+      quantization: modelopt_fp4
+      tp: 4
+      dp: 2
+      tool-call-parser: kimi_k2
+      reasoning-parser: kimi_k2
+      context-length: 65536
+      mem-fraction-static: 0.90
+      enable-metrics: true           # REQUIRED or /metrics 404s → TTFT data lost (parent L8)
+      trust-remote-code: true
+
+# ── THE SINGLE VARIABLE — MoE kernel backend (held against everything else) ──────────
+ab_test:
+  variable: moe_kernel_backend
+  hold_constant: [model, tp_layout, workload, context_length, cache_config, slo, spec_decode_off, hicache_off]
+  layouts: [tp4dp2, tp8]             # full A/B on tp4dp2 (operating); confirm layout-independence on tp8
+  arms:
+    arm_a_baseline:
+      manifest_tp4dp2: k8s/sglang-cutedsl-armA-tp4dp2.yaml
+      manifest_tp8: k8s/sglang-cutedsl-armA-tp8.yaml
+      backend: flashinfer_trtllm     # vendor-precompiled TRT-LLM-gen NVFP4 MoE (parent's control)
+      reproduce_target: "3138 tok/s @ c512 TP4+DP2 (parent kimi-k2.6-nvfp4) — confirm BEFORE trusting any delta"
+    arm_b_cutedsl:
+      manifest_tp4dp2: k8s/sglang-cutedsl-armB-tp4dp2.yaml
+      manifest_tp8: k8s/sglang-cutedsl-armB-tp8.yaml
+      backend: cute-dsl              # FlashInfer #3448 (4over6 FP16 scoring) + #3645 (per-token NVFP4 MoE)
+      # DEPLOY-TIME GATE (spec Stage 5-pre): #28354 is DRAFT as of 2026-06-23 with a known post-reload
+      # divergence. Determine the exact activation toggle (likely backend="cute-dsl" selector +
+      # NVFP44Over6Config env vars) via `mdc prs kimi-k2.6` + FlashInfer/SGLang PR status. Prove the
+      # backend is actually CuTe-DSL (log line), not a silent trtllm fallback, or the A/B is invalid.
+      correctness_gate: "50 prompts @ t=0 vs Arm A; PASS <=3/50 divergent (>2% token mismatch); FAIL >10/50"
+
+# ── GEMM microbenchmark (Stage 6a, REQUIRED — the headline numerator) ────────────────
+microbenchmark:
+  required: true
+  what: "FlashInfer #3448 harness OR minimal MoE GEMM on Kimi shapes (K=hidden, N=2048, 384 experts, top_k=8, M≈16K-32K)"
+  record: "Arm A vs Arm B GEMM-level speedup (TFLOPS/tok-s); cross-check vs #3448's 2.24-4.12x geomean band"
+
+# ── Workloads — reuse parent verbatim (canonical cards, override operating point) ────
+workloads:
+  - catalog_id: concurrency-sweep
+    override:
+      load:
+        levels: [128, 256, 512, 1024]
+        num_prompts_per_level: 200
+      dataset:
+        input_tokens: {mean: 31404, std_dev: 8000}
+        output_tokens: {mean: 1024, std_dev: 256}
+  - catalog_id: coding-agent
+    override:
+      dataset:
+        input_tokens: {mean: 31404, std_dev: 8000}
+        output_tokens: {mean: 1024, std_dev: 256}
+      load:
+        type: constant
+        request_rate: 32.0
+        duration_s: 300
+  - catalog_id: shared-prefix-multitenant
+    override:
+      dataset:
+        shared_system_prompt_tokens: 23250    # ~74% of 31,404 → reproduce observed hit rate
+        per_user_query_tokens: {mean: 8154, std_dev: 2000}
+        prefix_reuse: cross-session
+        prefix_byte_identical: true            # RadixAttention exact-match (parent cache scar)
+        output_tokens: {mean: 1024, std_dev: 256}
+      load:
+        concurrent_sessions: 1024
+        num_sessions: 4000
+
+slo:
+  ttft_p50_ms: 2400
+  ttft_p99_ms: 15000
+  tpot_p99_ms: 50
+  e2e_p99_ms: 45000
+  error_rate_max: 0.001
+  throughput_floor_toks: 32500
+
+infrastructure:
+  substrate: eks
+  cluster_name: qwen3-next-bench-eks-cluster
+  nodegroup: ai-infra-use2-b200-spot
+  instance_type: p6-b200.48xlarge
+  region: us-east-2
+  az: us-east-2b
+  node_selector: { blueprint: kimi-k2.6-cutedsl-moe }
+  gpu:
+    name: B200
+    arch: sm_100                     # -cu130 image STILL required (NVFP4 cutlass DSL, not arch-driven)
+    count: 8
+    vram_gb: 180
+    interconnect: nvswitch
+  fallback_instance_type: p6-b300.48xlarge   # only if B200 result is KV-capacity-masked (spec Stage 6)
+
+observability:
+  required: true
+  prometheus: { port: 9090, retention: 7d, s3_sync: true }
+  engine_metrics:
+    cache_hit_definition: "sum(cached_input_tokens) / sum(prompt_tokens)"   # token fraction
+    sglang:
+      endpoint: "http://localhost:30000/metrics"
+      required_histograms:
+        - "sglang:time_to_first_token_seconds_bucket"
+        - "sglang:inter_token_latency_seconds_bucket"
+        - "sglang:e2e_request_latency_seconds_bucket"
+      required_gauges:
+        - "sglang:token_usage"
+        - "sglang:num_running_reqs"
+        - "sglang:num_queue_reqs"
+        - "sglang:cache_hit_rate"
+      per_request_cache_field: "meta_info.cached_tokens"
+  dcgm:
+    endpoint: "http://localhost:9400/metrics"
+    profiler: on
+    required_metrics:
+      - DCGM_FI_PROF_DRAM_ACTIVE           # HBM BW — roofline
+      - DCGM_FI_PROF_PIPE_TENSOR_ACTIVE    # tensor-core — prefill-compute-bound (where MoE GEMM lives)
+      - DCGM_FI_PROF_SM_ACTIVE
+      - DCGM_FI_DEV_POWER_USAGE
+      - DCGM_FI_DEV_XID_ERRORS
+      - DCGM_FI_DEV_GPU_TEMP
+  node_exporter: { port: 9100 }
+
+cost:
+  instance_type: p6-b200.48xlarge
+  spot_price_per_hr: 18.00
+  on_demand_price_per_hr: null
+  utilization_target: 0.70
+  upstream_blended_per_mtok: 0.338
+  upstream_input_per_mtok: 0.363
+  upstream_output_per_mtok: 3.76

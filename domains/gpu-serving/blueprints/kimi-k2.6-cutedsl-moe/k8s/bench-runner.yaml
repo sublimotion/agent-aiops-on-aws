@@ -1,0 +1,108 @@
+# Bench-runner for kimi-k2.6-cutedsl-moe. hostNetwork + dnsPolicy Default (parent L4) so it reaches
+# the serving pod on localhost and can pip-install. Same byte-identical-prefix driver as the parent
+# (RadixAttention exact-match), plus a correctness-diff helper for the Arm A vs Arm B gate.
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: cutedsl-bench-scripts, namespace: default}
+data:
+  bench.py: |
+    #!/usr/bin/env python3
+    # Concurrency driver. Cache-hit headline = Σ cached_input_tokens / Σ prompt_tokens (engine-agnostic).
+    # BYTE-IDENTICAL shared prefix (RadixAttention exact-match) + unique suffix per request.
+    import asyncio, aiohttp, time, json, argparse, random, string
+    p = argparse.ArgumentParser()
+    p.add_argument("--port", type=int, default=30000)
+    p.add_argument("--conc", type=int, required=True)
+    p.add_argument("--total", type=int, default=200)
+    p.add_argument("--prefix-tokens", type=int, default=23250)
+    p.add_argument("--suffix-tokens", type=int, default=8154)
+    p.add_argument("--out-tokens", type=int, default=1024)
+    p.add_argument("--out", required=True)
+    a = p.parse_args()
+    SHARED_PREFIX = ("You are a coding agent. " + ("context " * a.prefix_tokens))
+    def unique_suffix():
+        rid = "".join(random.choices(string.ascii_lowercase, k=8))
+        return f"\nRequest {rid}: " + " ".join(random.choices(["fix","refactor","explain","test","trace"], k=a.suffix_tokens))
+    async def one(session):
+        prompt = SHARED_PREFIX + unique_suffix()
+        url=f"http://localhost:{a.port}/generate"
+        body={"text":prompt,"sampling_params":{"max_new_tokens":a.out_tokens,"temperature":0.0},"stream":True}
+        t0=time.time(); ttft=None; comp=0; cached=0; prompt_toks=0
+        async with session.post(url,json=body,timeout=aiohttp.ClientTimeout(total=900)) as r:
+            async for raw in r.content:
+                line=raw.decode("utf-8","ignore").strip()
+                if not line or not line.startswith("data:"): continue
+                payload=line[5:].strip()
+                if payload=="[DONE]": continue
+                if ttft is None: ttft=time.time()-t0
+                try: chunk=json.loads(payload)
+                except: continue
+                meta=chunk.get("meta_info") or {}
+                if meta.get("completion_tokens"): comp=meta["completion_tokens"]
+                if meta.get("cached_tokens") is not None: cached=meta["cached_tokens"]
+                if meta.get("prompt_tokens"): prompt_toks=meta["prompt_tokens"]
+        dt=time.time()-t0
+        if not comp: comp=a.out_tokens
+        return {"dt":dt,"ttft":ttft,"comp":comp,"cached":cached or 0,"prompt":prompt_toks}
+    async def main():
+        conn=aiohttp.TCPConnector(limit=a.conc*2)
+        async with aiohttp.ClientSession(connector=conn) as s:
+            sem=asyncio.Semaphore(a.conc)
+            async def g():
+                async with sem:
+                    try: return await one(s)
+                    except Exception as e: return {"err":str(e)}
+            t0=time.time(); res=await asyncio.gather(*[g() for _ in range(a.total)]); t1=time.time()
+        ok=[r for r in res if "err" not in r]
+        comp=sum(r["comp"] for r in ok); cached=sum(r["cached"] for r in ok); pt=sum(r["prompt"] for r in ok)
+        def pct(xs,q):
+            xs=sorted(x for x in xs if x is not None)
+            return round(xs[min(len(xs)-1,int(len(xs)*q))],3) if xs else None
+        e2e=[r["dt"] for r in ok]; ttfts=[r["ttft"] for r in ok if r.get("ttft") is not None]
+        out={"concurrency":a.conc,"requests_ok":len(ok),"requests_err":len(res)-len(ok),
+             "duration_s":round(t1-t0,3),"agg_decode_tok_s":round(comp/(t1-t0),1) if t1>t0 else 0,
+             "cache_hit_token_fraction":round(cached/pt,4) if pt else None,
+             "ttft_p50_s":pct(ttfts,0.50),"ttft_p95_s":pct(ttfts,0.95),"ttft_p99_s":pct(ttfts,0.99),
+             "e2e_p50_s":pct(e2e,0.50),"e2e_p99_s":pct(e2e,0.99),"t_start":t0,"t_end":t1}
+        json.dump(out,open(a.out,"w"),indent=2); print(json.dumps(out,indent=2))
+    asyncio.run(main())
+  correctness_diff.py: |
+    #!/usr/bin/env python3
+    # Arm A vs Arm B correctness gate (spec Stage 5). Run the SAME 50 prompts @ t=0 against each arm
+    # (point --port at each in turn, save two output files), then diff. PASS <=3/50 divergent (>2%
+    # token mismatch); FAIL >10/50. Flags cosmetic vs semantic divergence for manual triage.
+    import json, sys, difflib
+    a=json.load(open(sys.argv[1])); b=json.load(open(sys.argv[2]))   # {prompt_id: text}
+    div=0; report=[]
+    for k in a:
+        ta,tb=a[k],b.get(k,"")
+        toks_a,toks_b=ta.split(),tb.split()
+        sm=difflib.SequenceMatcher(None,toks_a,toks_b)
+        mismatch=1-sm.ratio()
+        if mismatch>0.02:
+            div+=1; report.append({"id":k,"mismatch":round(mismatch,3),"len_a":len(toks_a),"len_b":len(toks_b)})
+    verdict="PASS" if div<=3 else ("BORDERLINE" if div<=10 else "FAIL")
+    print(json.dumps({"n":len(a),"divergent":div,"verdict":verdict,"details":report},indent=2))
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: bench-runner, namespace: default, labels: {app: bench-runner}}
+spec:
+  restartPolicy: Always
+  hostNetwork: true
+  dnsPolicy: Default
+  nodeSelector: {blueprint: kimi-k2.6-cutedsl-moe}
+  tolerations:
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+  containers:
+    - name: runner
+      image: python:3.12-slim
+      command: ["bash","-c","pip install -q aiohttp && while true; do sleep 3600; done"]
+      volumeMounts:
+        - {name: scripts, mountPath: /scripts}
+        - {name: nvme, mountPath: /mnt/nvme, mountPropagation: HostToContainer}
+      resources: {requests: {cpu: "4", memory: 4Gi}}
+  volumes:
+    - {name: scripts, configMap: {name: cutedsl-bench-scripts}}
+    - {name: nvme, hostPath: {path: /mnt/nvme, type: Directory}}

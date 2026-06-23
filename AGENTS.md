@@ -82,6 +82,7 @@ Read these files **on demand** based on what you're doing:
 | `domains/gpu-serving/blueprints/qwen3-235b-speculative/` | `domains/gpu-serving/specs/qwen3-235b-speculative.md` |
 | `domains/gpu-serving/blueprints/kimi-k2.6/` | `domains/gpu-serving/specs/kimi-k2.6.md` |
 | `domains/gpu-serving/blueprints/kimi-k2.6-nvfp4/` | `domains/gpu-serving/specs/kimi-k2.6-nvfp4.md` |
+| `domains/gpu-serving/blueprints/kimi-k2.6-cutedsl-moe/` | `domains/gpu-serving/specs/kimi-k2.6-cutedsl-moe.md` |
 | `domains/gpu-serving/blueprints/deepseek-v4-flash/` | `domains/gpu-serving/specs/deepseek-v4-flash.md` |
 | `domains/gpu-serving/blueprints/deepseek-ocr-2-eks/` | `domains/gpu-serving/specs/deepseek-ocr-2-eks.md` |
 | `domains/gpu-serving/blueprints/fin-attribute-extraction/` | `domains/gpu-serving/specs/fin-attribute-extraction.md` |

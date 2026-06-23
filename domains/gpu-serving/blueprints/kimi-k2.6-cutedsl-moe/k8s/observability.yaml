@@ -1,0 +1,116 @@
+---
+# DCGM PROF metrics — REQUIRED to classify the bottleneck regime (the whole point of this A/B:
+# a kernel that wins the GEMM but not the serving run because the run is KV-capacity- or BW-bound
+# is the expected honest outcome — but we can ONLY say that if PROF fields are actually scraped).
+#
+# !!! FIX vs parent kimi-k2.6-nvfp4/observability.yaml !!!
+# The parent mounted this PROF CSV at /etc/dcgm-prof but the exporter `args` loaded the DEFAULT
+# /etc/dcgm-exporter/dcp-metrics-included.csv (no PROF fields) → PROF was never loaded → the parent's
+# bottleneck class came back [inferred], not [measured] (parent L8/L8b). Here the exporter args point
+# AT the mounted PROF CSV. Smoke-test before the sweep:
+#   curl -s localhost:9400/metrics | grep DCGM_FI_PROF_DRAM_ACTIVE   # MUST be non-empty
+# If PROF is empty on this driver-580 + DCGM combo (parent L8 warns it may be), FALL BACK to engine
+# gauges (sglang:token_usage for KV residency, num_queue_reqs for queue buildup) — but record which
+# classifier was used so the regime verdict is honestly labeled [measured] vs [gauge-inferred].
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dcgm-metrics-prof
+  namespace: default
+data:
+  metrics.csv: |
+    DCGM_FI_PROF_GR_ENGINE_ACTIVE,  gauge, gpu graphics/compute engine active ratio
+    DCGM_FI_PROF_SM_ACTIVE,         gauge, SM active ratio
+    DCGM_FI_PROF_SM_OCCUPANCY,      gauge, SM occupancy ratio
+    DCGM_FI_PROF_PIPE_TENSOR_ACTIVE,gauge, tensor pipe active ratio (compute-bound signal — MoE GEMM lives here)
+    DCGM_FI_PROF_DRAM_ACTIVE,       gauge, HBM memory active ratio (BW-bound signal)
+    DCGM_FI_PROF_PCIE_TX_BYTES,     gauge, PCIe tx bytes
+    DCGM_FI_PROF_PCIE_RX_BYTES,     gauge, PCIe rx bytes
+    DCGM_FI_PROF_NVLINK_TX_BYTES,   gauge, NVLink tx bytes
+    DCGM_FI_PROF_NVLINK_RX_BYTES,   gauge, NVLink rx bytes
+    DCGM_FI_DEV_POWER_USAGE,        gauge, power draw W
+    DCGM_FI_DEV_GPU_TEMP,           gauge, gpu temp C
+    DCGM_FI_DEV_GPU_UTIL,           gauge, gpu utilization
+    DCGM_FI_DEV_FB_USED,            gauge, framebuffer used MiB
+    DCGM_FI_DEV_XID_ERRORS,         gauge, xid errors
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-bench-config
+  namespace: default
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s
+      scrape_timeout: 4s
+      evaluation_interval: 15s
+      external_labels:
+        blueprint: kimi-k2.6-cutedsl-moe
+        session: cutedsl-ab
+    scrape_configs:
+      - job_name: sglang
+        static_configs:
+          - targets: ["localhost:30000"]
+            labels: {engine: sglang, role: serving}
+        metrics_path: /metrics
+      - job_name: dcgm
+        static_configs:
+          - targets: ["localhost:9400"]
+            labels: {role: gpu}
+      - job_name: node
+        static_configs:
+          - targets: ["localhost:9100"]
+            labels: {role: host}
+      - job_name: prometheus
+        static_configs:
+          - targets: ["localhost:9090"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: observability-bench
+  namespace: default
+  labels: {app: observability-bench}
+spec:
+  restartPolicy: Always
+  nodeSelector: {blueprint: kimi-k2.6-cutedsl-moe}
+  tolerations:
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+  hostNetwork: true
+  hostPID: true
+  containers:
+    - name: dcgm-exporter
+      image: nvcr.io/nvidia/k8s/dcgm-exporter:3.3.9-3.6.1-ubuntu22.04
+      # FIX: load the MOUNTED PROF CSV, not the image's default (which omits DCGM_FI_PROF_*).
+      args: ["-f", "/etc/dcgm-prof/metrics.csv", "--address", ":9400"]
+      env:
+        - {name: DCGM_EXPORTER_KUBERNETES, value: "false"}
+      securityContext:
+        privileged: true            # PROF profiling counters need privileged (parent L8b)
+      resources:
+        requests: {cpu: "500m", memory: 512Mi}
+      volumeMounts:
+        - {name: dcgm-prof, mountPath: /etc/dcgm-prof}
+    # node-exporter omitted — cluster already runs one on :9100; scrape that (avoid bind conflict, parent L6).
+    - name: prometheus
+      image: prom/prometheus:v2.54.1
+      args:
+        - --config.file=/etc/prometheus/prometheus.yml
+        - --storage.tsdb.path=/prometheus
+        - --storage.tsdb.retention.time=7d
+        - --web.enable-admin-api
+        - --web.enable-lifecycle
+        - --web.listen-address=:9090
+      volumeMounts:
+        - {name: prom-config, mountPath: /etc/prometheus}
+        - {name: prom-data, mountPath: /prometheus}
+      resources:
+        requests: {cpu: "500m", memory: 1Gi}
+        limits: {memory: 4Gi}
+      securityContext: {runAsUser: 65534, runAsGroup: 65534}   # pre-chown /mnt/nvme/prom-data (parent L6)
+  volumes:
+    - {name: dcgm-prof, configMap: {name: dcgm-metrics-prof}}
+    - {name: prom-config, configMap: {name: prometheus-bench-config}}
+    - {name: prom-data, hostPath: {path: /mnt/nvme/prom-data, type: DirectoryOrCreate}}

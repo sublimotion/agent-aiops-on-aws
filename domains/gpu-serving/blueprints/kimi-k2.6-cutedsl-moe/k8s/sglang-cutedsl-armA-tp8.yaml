@@ -1,0 +1,47 @@
+# ARM A (control) — flashinfer_trtllm MoE, TP8x1 (layout-independence control point).
+# Confirms the kernel A/B delta is the same shape regardless of parallelism layout.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sglang-cutedsl-armA-tp8
+  namespace: default
+  labels: {app: sglang-cutedsl, arm: a-baseline, layout: tp8, backend: trtllm}
+spec:
+  restartPolicy: Never
+  nodeSelector: {blueprint: kimi-k2.6-cutedsl-moe}
+  tolerations:
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+  hostNetwork: true
+  containers:
+    - name: sglang
+      image: lmsysorg/sglang:v0.5.13.post1-cu130
+      command:
+        - bash
+        - -c
+        - |
+          find /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins -name trtllmGen_bmm_export -exec rm -rf {} + 2>/dev/null || true
+          exec python3 -m sglang.launch_server \
+            --model-path /mnt/nvme/models/kimi-k26-nvfp4 \
+            --served-model-name Kimi-K2.6-NVFP4 \
+            --quantization modelopt_fp4 \
+            --tp 8 \
+            --tool-call-parser kimi_k2 \
+            --reasoning-parser kimi_k2 \
+            --context-length 65536 \
+            --mem-fraction-static 0.90 \
+            --enable-metrics \
+            --trust-remote-code \
+            --host 0.0.0.0 --port 30000
+      env:
+        - {name: HF_HOME, value: /mnt/nvme/hf-cache}
+      resources:
+        requests: {nvidia.com/gpu: "8", cpu: "48", memory: 512Gi}
+        limits:   {nvidia.com/gpu: "8", cpu: "96", memory: 1024Gi}
+      securityContext: {capabilities: {add: ["IPC_LOCK"]}}
+      volumeMounts:
+        - {name: nvme, mountPath: /mnt/nvme, mountPropagation: HostToContainer}
+        - {name: shm, mountPath: /dev/shm}
+  volumes:
+    - {name: nvme, hostPath: {path: /mnt/nvme, type: Directory}}
+    - {name: shm, emptyDir: {medium: Memory, sizeLimit: 64Gi}}

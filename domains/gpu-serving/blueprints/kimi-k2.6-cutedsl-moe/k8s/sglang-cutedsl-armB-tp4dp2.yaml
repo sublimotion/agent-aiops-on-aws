@@ -1,0 +1,64 @@
+# ARM B (treatment) — FlashInfer CuTe-DSL NVFP4 MoE, TP4+DP2 (operating layout).
+# FlashInfer #3448 (CuTe-DSL NVFP4 + 4over6 FP16 scoring) + #3645 (per-token NVFP4 MoE),
+# surfaced in SGLang via #28354. The ONLY difference vs Arm A is the MoE kernel backend.
+#
+# !!! DEPLOY-TIME GATE (spec Stage 5-pre) — the exact CuTe-DSL toggle is NOT yet pinned !!!
+# As of 2026-06-23 SGLang #28354 is DRAFT with a known post-reload output divergence and
+# depends on FlashInfer #3645. BEFORE running this manifest:
+#   1. `mdc prs kimi-k2.6` + check FlashInfer #3448/#3645 + SGLang #28354 merge status.
+#   2. Pin the image to a build that ACTUALLY carries the CuTe-DSL MoE path (may be newer
+#      than v0.5.13.post1-cu130, or a branch/nightly — update `image:` below).
+#   3. Set the real activation toggle. Current best guess (CONFIRM against the merged PR):
+#      env SGLANG_NVFP4_MOE_BACKEND=cute-dsl (or a --moe-runner-backend flag), plus the
+#      NVFP44Over6Config env vars from #3448 (scoring mode + MAE/MSE metric).
+#   4. PROVE it is running CuTe-DSL (grep the startup log for the backend), not a silent
+#      trtllm fallback — otherwise the A/B is invalid (Arm B == Arm A).
+#   5. Pass the correctness gate (50 prompts @ t=0 vs Arm A) before trusting throughput.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sglang-cutedsl-armB-tp4dp2
+  namespace: default
+  labels: {app: sglang-cutedsl, arm: b-cutedsl, layout: tp4dp2, backend: cute-dsl}
+spec:
+  restartPolicy: Never
+  nodeSelector: {blueprint: kimi-k2.6-cutedsl-moe}
+  tolerations:
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+  hostNetwork: true
+  containers:
+    - name: sglang
+      image: lmsysorg/sglang:v0.5.13.post1-cu130   # DEPLOY-TIME: repin to a build carrying #28354 (see header)
+      command:
+        - bash
+        - -c
+        - |
+          find /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins -name trtllmGen_bmm_export -exec rm -rf {} + 2>/dev/null || true
+          exec python3 -m sglang.launch_server \
+            --model-path /mnt/nvme/models/kimi-k26-nvfp4 \
+            --served-model-name Kimi-K2.6-NVFP4 \
+            --quantization modelopt_fp4 \
+            --tp 4 \
+            --dp 2 \
+            --tool-call-parser kimi_k2 \
+            --reasoning-parser kimi_k2 \
+            --context-length 65536 \
+            --mem-fraction-static 0.90 \
+            --enable-metrics \
+            --trust-remote-code \
+            --host 0.0.0.0 --port 30000
+      env:
+        - {name: HF_HOME, value: /mnt/nvme/hf-cache}
+        # DEPLOY-TIME: set the REAL CuTe-DSL activation toggle here (confirm against merged #28354).
+        - {name: SGLANG_NVFP4_MOE_BACKEND, value: "cute-dsl"}   # PLACEHOLDER name — verify the actual env/flag
+      resources:
+        requests: {nvidia.com/gpu: "8", cpu: "48", memory: 512Gi}
+        limits:   {nvidia.com/gpu: "8", cpu: "96", memory: 1024Gi}
+      securityContext: {capabilities: {add: ["IPC_LOCK"]}}
+      volumeMounts:
+        - {name: nvme, mountPath: /mnt/nvme, mountPropagation: HostToContainer}
+        - {name: shm, mountPath: /dev/shm}
+  volumes:
+    - {name: nvme, hostPath: {path: /mnt/nvme, type: Directory}}
+    - {name: shm, emptyDir: {medium: Memory, sizeLimit: 64Gi}}
