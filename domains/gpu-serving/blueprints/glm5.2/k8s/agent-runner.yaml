@@ -1,0 +1,98 @@
+# Node-side agent-harness runner for the GLM-5.2 46-issue comparison.
+# Runs ON the B200 node so harnesses hit the SGLang endpoint via localhost:30000 (hostNetwork) —
+# NO laptop port-forward (which destabilized under streaming-proxy SSE traffic).
+# LiteLLM runs IN-POD (localhost:4000) translating: Codex /v1/responses + Claude Code /v1/messages
+# → SGLang /v1/chat/completions (glm47 tools). OpenCode talks chat-completions directly.
+# Driver: run_agent_compare.py (forked from verifier-reward/run_baseline.py — identical trace schema).
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: glm52-agent-cfg, namespace: default}
+data:
+  litellm-glm52.yaml: |
+    model_list:
+      - model_name: glm-5.2
+        litellm_params:
+          model: hosted_vllm/GLM-5.2-FP8
+          api_base: http://127.0.0.1:30000/v1
+          api_key: dummy
+          max_tokens: 8192
+      - model_name: "*"
+        litellm_params:
+          model: hosted_vllm/GLM-5.2-FP8
+          api_base: http://127.0.0.1:30000/v1
+          api_key: dummy
+          max_tokens: 8192
+    litellm_settings:
+      drop_params: true
+    general_settings:
+      master_key: dummy
+  opencode.json: |
+    {
+      "$schema": "https://opencode.ai/config.json",
+      "model": "vllm/GLM-5.2-FP8",
+      "provider": {
+        "vllm": {
+          "name": "GLM-5.2 SGLang",
+          "npm": "@ai-sdk/openai-compatible",
+          "options": { "baseURL": "http://127.0.0.1:30000/v1" },
+          "models": { "GLM-5.2-FP8": { "name": "GLM-5.2-FP8", "limit": {"context": 131072, "output": 8192} } }
+        }
+      }
+    }
+  bootstrap.sh: |
+    #!/bin/bash
+    # NOTE: no `set -e` — health checks against the (separate) serving pod may transiently fail;
+    # the script MUST reach `sleep infinity` so the pod stays up for kubectl-exec-driven runs.
+    echo "[bootstrap] installing harnesses + deps..."
+    apt-get update -qq && apt-get install -y -qq git curl nodejs npm python3-pip >/dev/null 2>&1
+    pip install -q "litellm[proxy]" datasets requests huggingface_hub 2>&1 | tail -1
+    # OpenCode (try official installer, then npm fallback; verify)
+    curl -fsSL https://opencode.ai/install | bash >/dev/null 2>&1 || true
+    [ -x ~/.opencode/bin/opencode ] || npm i -g opencode-ai >/dev/null 2>&1 || true
+    export PATH="$HOME/.opencode/bin:$PATH"
+    npm i -g @openai/codex @anthropic-ai/claude-code >/dev/null 2>&1 || true
+    mkdir -p ~/.config/opencode ~/.codex
+    cp /cfg/opencode.json ~/.config/opencode/opencode.json
+    cat > ~/.codex/config.toml <<'TOML'
+    [model_providers.glm52]
+    name = "GLM-5.2"
+    base_url = "http://127.0.0.1:4000/v1"
+    wire_api = "responses"
+    env_key = "OPENAI_API_KEY"
+    TOML
+    echo "[bootstrap] harness check:"; (which opencode || ls ~/.opencode/bin/opencode) 2>&1; which codex claude 2>&1
+    echo "[bootstrap] starting LiteLLM proxy on :4000..."
+    nohup litellm --config /cfg/litellm-glm52.yaml --port 4000 >/work/litellm.log 2>&1 &
+    sleep 12
+    curl -s -o /dev/null -w "litellm=%{http_code}\n" http://127.0.0.1:4000/health/liveliness || true
+    curl -s -o /dev/null -w "sglang=%{http_code}\n" http://127.0.0.1:30000/health || true
+    echo "[bootstrap] ready. Sleeping for exec-driven runs."
+    sleep infinity
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: glm52-agent-runner, namespace: default, labels: {app: glm52-agent-runner}}
+spec:
+  restartPolicy: Never
+  hostNetwork: true            # reach SGLang on localhost:30000 directly (no tunnel)
+  dnsPolicy: Default           # external DNS for git clone / npm / pip (kimi L4)
+  nodeSelector: {blueprint: glm5.2}
+  tolerations:
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+  containers:
+    - name: runner
+      image: python:3.12-slim
+      command: ["bash","/cfg/bootstrap.sh"]
+      env:
+        - {name: OPENAI_API_KEY, value: dummy}
+        - {name: HOME, value: /root}
+      volumeMounts:
+        - {name: cfg, mountPath: /cfg}
+        - {name: work, mountPath: /work}
+        - {name: nvme, mountPath: /mnt/nvme, mountPropagation: HostToContainer}
+      resources: {requests: {cpu: "8", memory: 16Gi}, limits: {cpu: "16", memory: 32Gi}}
+  volumes:
+    - {name: cfg, configMap: {name: glm52-agent-cfg}}
+    - {name: work, emptyDir: {}}
+    - {name: nvme, hostPath: {path: /mnt/nvme, type: Directory}}

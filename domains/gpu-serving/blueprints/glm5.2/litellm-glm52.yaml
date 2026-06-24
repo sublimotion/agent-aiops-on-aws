@@ -1,0 +1,26 @@
+# LiteLLM proxy: exposes GLM-5.2 (SGLang OpenAI API at :30000) under BOTH the Anthropic
+# Messages API (/v1/messages, for Claude Code) and OpenAI (/v1/chat/completions, for fallback).
+# Start: litellm --config litellm-glm52.yaml --port 4000
+# Claude Code:  ANTHROPIC_BASE_URL=http://localhost:4000  ANTHROPIC_API_KEY=dummy
+#               ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL=glm-5.2
+model_list:
+  - model_name: glm-5.2
+    litellm_params:
+      # hosted_vllm/ prefix → LiteLLM treats it as an OpenAI-compatible (vLLM/SGLang) backend
+      model: hosted_vllm/GLM-5.2-FP8
+      api_base: http://127.0.0.1:30000/v1
+      api_key: dummy
+      max_tokens: 8192            # GLM-5.2 reasoning-first: generous budget so content/tool_calls emerge
+  # Wildcard: Claude Code sends its own internal model strings (claude-*); route ALL to GLM-5.2.
+  - model_name: "*"
+    litellm_params:
+      model: hosted_vllm/GLM-5.2-FP8
+      api_base: http://127.0.0.1:30000/v1
+      api_key: dummy
+      max_tokens: 8192
+
+litellm_settings:
+  drop_params: true              # tolerate Anthropic-only params SGLang doesn't accept
+
+general_settings:
+  master_key: dummy

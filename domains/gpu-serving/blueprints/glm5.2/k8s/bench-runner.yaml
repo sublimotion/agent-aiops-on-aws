@@ -15,13 +15,16 @@ data:
     p.add_argument("--port", type=int, required=True)
     p.add_argument("--conc", type=int, required=True)
     p.add_argument("--total", type=int, default=200)
-    p.add_argument("--mode", choices=["coding-agent","long-input"], default="coding-agent")
+    p.add_argument("--mode", choices=["coding-agent","long-input","long-input-16k"], default="coding-agent")
     p.add_argument("--out", required=True)
     a = p.parse_args()
     # coding-agent: 12K cacheable system prompt + ~1K turn suffix, 2K out.
     # long-input: ~23K byte-identical shared prefix (~74% of 31K) + ~8K suffix, 1K out.
+    # long-input-16k: kimi 16k peak-traffic tier — ~11.8K shared prefix (~74%) + ~4.2K suffix, 1K out.
     if a.mode == "coding-agent":
         PREFIX_TOK, SUFFIX_TOK, OUT_TOK = 12000, 1024, 2048
+    elif a.mode == "long-input-16k":
+        PREFIX_TOK, SUFFIX_TOK, OUT_TOK = 11840, 4160, 1024
     else:
         PREFIX_TOK, SUFFIX_TOK, OUT_TOK = 23250, 8154, 1024
     SHARED_PREFIX = ("You are a coding agent. " + ("context " * PREFIX_TOK))
