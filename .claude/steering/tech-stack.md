@@ -22,6 +22,16 @@ Example:
 
 **When to refresh**: When you learn a stack component has a new version (e.g., "vLLM 0.19 is out"), grep this file for rules tagged with the old version and validate each one still holds. See the refresh protocol in `compound-learner.md`.
 
+## Re-verify framework facts in interactive work, not just at spec gates
+
+The version-decay discipline (re-verify engine-blocker claims against the live tracker) is **structurally enforced in the batch/RALPH path** — the spec Stage 0b lever ledger forces a `validated: YYYY-MM-DD` re-check on every "BLOCKED by …"/"not supported"/"needs a patch" deferral before the loop runs. **It is NOT enforced in interactive/ad-hoc work** (live serving plumbing, debugging, one-off runs), where there is no gate — so a stale framework fact flows straight into action.
+
+**Rule (interactive path):** before acting on any framework-version-specific memory/lesson — especially a claim that something *"needs a shim/proxy/patch"*, *"isn't supported"*, or *"only works with model X"* — **re-verify against current engine docs first** (≈30s: the project doc, `mdc prs`, `gh pr view`, or the engine's docs site). Treat such a memory as a *trigger to verify*, not a fact to build on. The same "point-in-time claim that decays" caveat from `docs/optimization-stack.md` applies, but in interactive mode YOU are the gate.
+
+**Why:** 2026-06-24, on the glm5.2 agent comparison, a stale vLLM-0.16/Mistral-era memory ("Claude Code only works with Mistral via vLLM; SGLang has no `/v1/messages`") was acted on directly — built an unnecessary LiteLLM translation shim and burned multiple turns debugging it. **SGLang serves `/v1/messages` natively** (auto-registered; docs example is literally GLM-5.2-FP8 + glm47/glm45), and vLLM does too. A 30-second docs check would have skipped the entire detour. The discipline existed (Stage 0b); the interactive path just had no gate to fire it.
+
+**Tells that you're in this trap:** about to add a translation/proxy layer (LiteLLM, a custom SSE proxy) to bridge an API; about to patch an engine; citing a memory with a model name or version in the "it doesn't work" clause. Stop and check native support first.
+
 ## GPU Serving Conventions
 
 ### Infrastructure
