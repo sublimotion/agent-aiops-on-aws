@@ -78,18 +78,21 @@ POOL: list[WorkerConfig] = [
               "Nova Premier was provider-marked Legacy/access-denied on-demand "
               "2026-06-24, so Nova Pro is the live Amazon substitute.",
     ),
+    # ord 3/4 MUST match the checkpoint's semantic positions (es_log llm_names):
+    # ord 3 = DeepSeek-R1-class (reasoning-distill), ord 4 = Gemma. The head learned
+    # per-position capability, so the eval is only faithful if these align.
     WorkerConfig(
-        3, "gemma-3-27b", "open-mid",
-        "google.gemma-3-27b-it",
-        concurrency=10,
-        notes="Mid open generalist (matches upstream Gemma-3-27B).",
-    ),
-    WorkerConfig(
-        4, "deepseek-r1", "open-reasoning",
+        3, "deepseek-r1", "open-reasoning",
         "us.deepseek.r1-v1:0",
         reasoning=True, concurrency=8,
-        notes="Reasoning open model (replaces upstream DeepSeek-R1-Distill-Qwen-32B). "
-              "Bare id rejects on-demand; us. inference profile required.",
+        notes="ord 3 = upstream DeepSeek-R1-Distill-Qwen-32B position. "
+              "Bare id rejects on-demand; us. inference profile required; reasons natively (no reasoning_effort flag).",
+    ),
+    WorkerConfig(
+        4, "gemma-3-27b", "open-mid",
+        "google.gemma-3-27b-it",
+        concurrency=10,
+        notes="ord 4 = upstream Gemma-3-27B position. Mid open generalist.",
     ),
     WorkerConfig(
         5, "qwen3-32b-reasoning", "open-reasoning",
