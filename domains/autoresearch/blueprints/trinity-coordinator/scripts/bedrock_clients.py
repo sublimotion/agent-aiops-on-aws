@@ -162,13 +162,21 @@ def _query_converse(
     max_tokens: int,
     temperature: float,
     max_attempts: int = 8,
+    no_temperature: bool = False,
 ) -> str:
     system_blocks, converted = _to_converse(messages)
+
+    # Some Anthropic frontier reasoning models (e.g. Opus 4.8) DEPRECATE the
+    # `temperature` inference param and reject it with a ValidationException.
+    # Drop it for those workers (api_quirks: "no-temperature").
+    infer_cfg: dict = {"maxTokens": max_tokens}
+    if not no_temperature:
+        infer_cfg["temperature"] = temperature
 
     base_params: dict = {
         "modelId": model_id,
         "messages": converted,
-        "inferenceConfig": {"maxTokens": max_tokens, "temperature": temperature},
+        "inferenceConfig": infer_cfg,
     }
     if system_blocks is not None:
         base_params["system"] = system_blocks
@@ -323,12 +331,14 @@ def query_bedrock_dispatch(
 
     w = by_friendly_name.get(model)
     concurrency = w.concurrency if w else 10
+    no_temperature = bool(w and "no-temperature" in getattr(w, "api_quirks", ()))
 
     if transport == "openai_compat":
         return _query_openai_compat(model_id, messages, max_tokens, temperature)
     return _query_converse(
         model_id, model, concurrency, reasoning_effort,
         messages, max_tokens, temperature,
+        no_temperature=no_temperature,
     )
 
 
@@ -380,6 +390,7 @@ if __name__ == "__main__":
             w.model_id, w.friendly_name, w.concurrency, reasoning_effort_for(w),
             [{"role": "user", "content": "Reply with the single word: ok"}],
             max_tokens=16, temperature=0.0,
+            no_temperature="no-temperature" in getattr(w, "api_quirks", ()),
         )
         ok = "ok" in txt.lower()
         print(f"  ord {w.ord} {w.friendly_name:24s} -> {'✅' if ok else '❌'} {txt[:40]!r}")

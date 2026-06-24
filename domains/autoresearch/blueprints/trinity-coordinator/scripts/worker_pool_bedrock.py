@@ -58,7 +58,9 @@ POOL: list[WorkerConfig] = [
         0, "claude-opus-4-8", "closed-frontier",
         "us.anthropic.claude-opus-4-8",
         concurrency=6,
+        api_quirks=("no-temperature",),  # Opus 4.8 deprecates `temperature` (verified live 2026-06-24)
         notes="Frontier anchor (replaces upstream GPT-5). IAM-invokable via Converse. "
+              "Rejects `temperature` (reasoning model) → api_quirks no-temperature. "
               "GPT-5.5 is an optional ord-0 swap (transport=openai_compat) gated on the "
               "operator bearer token — see bedrock_clients.py GPT-5.5 path.",
     ),
@@ -111,16 +113,22 @@ by_ord: dict[int, WorkerConfig] = {w.ord: w for w in POOL}
 
 
 def reasoning_effort_for(w: WorkerConfig) -> Optional[str]:
-    """Reasoning knob per worker, or None for direct mode.
+    """Reasoning knob per worker, or None.
 
-    Qwen3-32B on Bedrock takes OpenAI-style reasoning_effort (high|medium|low|
-    minimal|none), NOT the Anthropic reasoning_config schema (confirmed live
-    2026-06-24). DeepSeek-R1 reasons by default; we still pass the flag for
-    parity and to keep the thinking budget explicit.
+    Live-verified 2026-06-24:
+    - **Qwen3-32B** accepts OpenAI-style `reasoning_effort` (high|medium|low|
+      minimal|none); the flag is what distinguishes ord-5 (reasoning) from
+      ord-6 (direct). NOT the Anthropic reasoning_config schema.
+    - **DeepSeek-R1 REJECTS `reasoning_effort`** (ValidationException) — it
+      reasons by default with no flag, emitting both a reasoningContent and a
+      text block. So we must NOT send the flag to it.
+    Only emit the flag for models that accept it (currently: Qwen3 family).
     """
     if not w.reasoning:
         return None
-    return "high"
+    if "qwen" in w.model_id.lower():
+        return "high"
+    return None  # DeepSeek-R1 et al. reason natively; no flag (rejects it)
 
 
 # AGENT_CONFIGS: fugu.utils._resolve_agent_complete_info reads this registry. We
