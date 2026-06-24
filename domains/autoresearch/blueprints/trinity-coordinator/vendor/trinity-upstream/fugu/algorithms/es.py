@@ -439,6 +439,42 @@ class CMAEvolutionTrainer:
 
         return model_config, num_learnable_params, svd_weights_cpu
 
+    def _calculate_episode_diversity_metrics(self, episodes: list) -> dict:
+        """Episode-level agent-diversity metrics.
+
+        NOTE: this method is referenced by the vendored es.py (run_test) and
+        evaluate_trinity_livecodebench.py but was absent from the OpenReview code
+        submission. Reconstructed faithfully from the module-level
+        `_calculate_diversity_metrics` contract: `episodes` is a list where each
+        item is one episode's list of agent IDs. We report the mean of per-episode
+        diversity (entropy / gini / unique-ratio) plus mean episode length, all
+        diagnostic-only (not used in the reward or score path).
+        """
+        n_agents = len(self.infra.llm_names)
+        valid = [ep for ep in episodes if ep]
+        if not valid:
+            return {
+                "episode_mean_entropy": 0.0,
+                "episode_mean_gini_diversity": 0.0,
+                "episode_mean_unique_ratio": 0.0,
+                "episode_mean_length": 0.0,
+                "num_episodes": 0,
+            }
+        ents, ginis, uniqs, lengths = [], [], [], []
+        for ep in valid:
+            m = _calculate_diversity_metrics(list(ep), n_agents)
+            ents.append(m["entropy"])
+            ginis.append(m["gini_diversity"])
+            uniqs.append(m["unique_ratio"])
+            lengths.append(len(ep))
+        return {
+            "episode_mean_entropy": float(np.mean(ents)),
+            "episode_mean_gini_diversity": float(np.mean(ginis)),
+            "episode_mean_unique_ratio": float(np.mean(uniqs)),
+            "episode_mean_length": float(np.mean(lengths)),
+            "num_episodes": len(valid),
+        }
+
     def run_test(self, solution=None):
         """
         Run evaluation on the test set using the existing unified job manager.

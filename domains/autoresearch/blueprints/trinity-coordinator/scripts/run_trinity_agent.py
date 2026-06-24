@@ -52,6 +52,20 @@ def _log(msg: str) -> None:
 # ---------------------------------------------------------------------------
 def install_bedrock_adaptation(vendor_root: Path) -> None:
     sys.path.insert(0, str(vendor_root))  # make `fugu` importable
+
+    # CRITICAL (live-verified 2026-06-24): fugu's JobManager spawns Pool workers via
+    # mp.set_start_method("spawn"); those workers re-import fugu.utils FRESH and do NOT
+    # inherit a main-process-only monkeypatch — they fall back to the original
+    # OpenAI/Together/Gemini clients, fail (CLOSE-WAIT), and stall the run. We export
+    # the env that scripts/sitecustomize.py reads, so EVERY spawned interpreter
+    # re-installs the Bedrock dispatch at startup. (sitecustomize is on PYTHONPATH
+    # because this scripts dir is.) See lessons.md finding #8.
+    os.environ["CAR_TRINITY_BEDROCK_PATCH"] = "1"
+    os.environ["CAR_TRINITY_VENDOR_ROOT"] = str(vendor_root)
+    scripts_dir = str(Path(__file__).resolve().parent)
+    if scripts_dir not in os.environ.get("PYTHONPATH", ""):
+        os.environ["PYTHONPATH"] = scripts_dir + os.pathsep + os.environ.get("PYTHONPATH", "")
+
     import fugu.utils  # noqa: F401  (ensure module objects exist to rebind)
     import fugu.cost   # noqa: F401
 
@@ -60,7 +74,7 @@ def install_bedrock_adaptation(vendor_root: Path) -> None:
 
     bedrock_clients.install()
     cost_bedrock.install()
-    _log("installed Bedrock Converse dispatch + pricing over fugu")
+    _log("installed Bedrock Converse dispatch + pricing over fugu (main + spawn-worker via sitecustomize)")
 
 
 def bedrock_agent_configs() -> dict:

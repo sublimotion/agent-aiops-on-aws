@@ -131,3 +131,54 @@ By static read of the vendored fugu (no training compute spent):
 - Hard cost cap enforced in `run_trinity_agent.py` (`--cost-cap-usd`, halts at cap).
 - Best-static-worker is the bar Trinity must beat by ≥3pp (the bar GRPO failed).
 - `cost_bonus_weight=0.0` reproduces upstream; the sweep is the OQ3 extension.
+
+## Phase 0 LIVE-RUN integration findings (g6e.2xlarge L40S, us-east-2, 2026-06-24)
+
+First actual GPU run of the bundled checkpoint on the Bedrock pool. The $0-gate
+agent build was correct in architecture but several issues only surface when the
+vendored fugu code actually executes against torch + boto3 + a spawn Pool:
+
+1. **Bundled `model_iter_60.npy` IS present + valid** (contrary to the agent's
+   authoring-env note — it only had the lean vendored copy). 19,456 params
+   (SVD 9,216 + head 10,240), loads clean. Confirms the paper's "<20K trainable".
+   Trinity mode active: 7 agents + 3 roles = 10 output dims, layer-26 SVD.
+2. **Opus 4.8 deprecates `temperature`** → ValidationException. Fixed: wire the
+   `api_quirks=("no-temperature",)` field (defined but never consumed by the agent)
+   through `_query_converse` to drop temp from inferenceConfig. Set on ord 0.
+3. **DeepSeek-R1 REJECTS `reasoning_effort`** (Qwen3 REQUIRES it). The agent's
+   `reasoning_effort_for` sent "high" to both. Fixed: emit the flag only for the
+   Qwen3 family; DeepSeek-R1 reasons natively, no flag. Both verified live.
+4. **fugu import chain needs deps even though calls are monkeypatched**: `openai`,
+   `google-genai`, `tiktoken`, `scipy`, `accelerate` must be installed for the
+   module imports to resolve before the rebind. Add them to the env build.
+5. **LiveCodeBench needs `HF_DATASETS_TRUST_REMOTE_CODE=1`** (custom loader; newer
+   `datasets` refuses without it). Same lesson as cost-aware-routing.
+6. **SVD path is cwd-relative** (`decomposed_models/...`). Run from the vendor root
+   or the loader can't find `svd_weights.pt`.
+7. **`_calculate_episode_diversity_metrics` is MISSING from the OpenReview submission**
+   — called in es.py:540 + eval:628, defined nowhere. Reconstructed faithfully as a
+   diagnostic-only method (mean per-episode entropy/gini/unique/length) from the
+   module-level `_calculate_diversity_metrics` contract. **Upstream code gap.**
+8. **THE BIG ONE — spawn-Pool monkeypatch gap**: fugu's JobManager does
+   `mp.set_start_method("spawn")` + `mp.Pool(initializer=_init_unified_worker)`.
+   Spawned workers re-import `fugu.utils` FRESH, so a main-process-only patch never
+   reaches them → workers call the original OpenAI/Together/Gemini clients → fail
+   (CLOSE-WAIT) → spin in backoff → run stalls with GPU at 0%. **Fix: a
+   `sitecustomize.py` on PYTHONPATH** (runs at every interpreter startup incl spawn)
+   that installs the Bedrock patch when `CAR_TRINITY_BEDROCK_PATCH=1`. Verified the
+   patch reaches spawned workers (`_query_llm` = bedrock-routed wrapper in the pool).
+   Touches no vendored file (job_manager.py / es.py contract preserved). This is the
+   generalizable lesson: **any monkeypatch over a fugu/spawn-Pool codebase MUST be
+   installed via sitecustomize or a Pool initializer, not just in __main__.**
+9. **Wall-clock**: ~600s per LiveCodeBench task (multi-turn × 32B reasoning workers
+   on Bedrock). 10-task sanity eval ≈ 90 min; full 80 ≈ 8h. GPU is near-idle (0%) —
+   the bottleneck is Bedrock latency, not the 0.6B coordinator. A bigger worker pool
+   (more processes) helps throughput but not per-task latency.
+
+**Launch run env (for reproducibility)**, from vendor root:
+```
+export PYTHONPATH=<scripts-dir>:$PYTHONPATH
+export CAR_TRINITY_BEDROCK_PATCH=1 CAR_TRINITY_VENDOR_ROOT=<vendor-root>
+export AWS_DEFAULT_REGION=us-east-1 HF_DATASETS_TRUST_REMOTE_CODE=1
+python3 <scripts>/run_trinity_agent.py --phase eval --model-file .../model_iter_60.npy --test-size N ...
+```
