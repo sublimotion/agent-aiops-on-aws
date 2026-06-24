@@ -106,6 +106,7 @@ Read these files **on demand** based on what you're doing:
 | `domains/autoresearch/blueprints/tiny-judge/` | `domains/autoresearch/specs/tiny-judge.md` |
 | `domains/autoresearch/blueprints/verification-flywheel/` | `domains/autoresearch/specs/verification-flywheel.md` |
 | `domains/autoresearch/blueprints/rejection-sampling-sft/` | `domains/autoresearch/specs/rejection-sampling-sft.md` |
+| `domains/autoresearch/blueprints/trinity-coordinator/` | `domains/autoresearch/specs/trinity-coordinator.md` |
 | `domains/autoresearch/blueprints/vla-cv-distillation/` | `domains/autoresearch/specs/vla-cv-distillation.md` |
 | `domains/autoresearch/blueprints/kernel-optimization-agent/` | `domains/autoresearch/specs/kernel-optimization-agent.md` |
 | `domains/autoresearch/blueprints/mooncake-kv-tiering/` | `domains/autoresearch/specs/mooncake-kv-tiering.md` |
