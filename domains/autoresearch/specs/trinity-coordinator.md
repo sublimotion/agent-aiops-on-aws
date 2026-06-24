@@ -45,9 +45,9 @@ Upstream pool (7 workers): GPT-5, Gemini-2.5-pro, Claude-4-Sonnet (closed, direc
 |-----|-----------|----------|---------------------|------------------|--------------------|
 | 0 | closed-frontier | GPT-5 | **Claude Opus 4.8** (newest frontier) | `anthropic.claude-opus-4-8` (`us.` profile) | ✅ confirmed (`us.`+`global.`) |
 | 1 | closed-frontier | Claude-4-Sonnet | **Claude Sonnet 4.6** | `anthropic.claude-sonnet-4-6` | ✅ confirmed |
-| 2 | closed-frontier | Gemini-2.5-pro | **Nova Premier** (Amazon frontier; distinct provider) | `amazon.nova-premier-v1:0` | ✅ confirmed |
-| 3 | open-mid | Gemma-3-27B | **Gemma 3 27B** | `google.gemma-3-27b-it` | ✅ confirmed |
-| 4 | open-reasoning | DeepSeek-R1-32B | **DeepSeek-R1** | `deepseek.r1-v1:0` | ✅ confirmed |
+| 2 | closed-frontier | Gemini-2.5-pro | **Nova Pro** (Amazon frontier; distinct provider) | `us.amazon.nova-pro-v1:0` | ⚠️ corrected 2026-06-24 — Nova **Premier** is provider-Legacy/access-denied on-demand for this IAM principal; **Nova Pro** substituted (see `blueprints/trinity-coordinator/lessons.md`) |
+| 3 | open-mid | Gemma-3-27B | **Gemma 3 27B** | `google.gemma-3-27b-it` | ✅ confirmed (Converse ping) |
+| 4 | open-reasoning | DeepSeek-R1-32B | **DeepSeek-R1** | `us.deepseek.r1-v1:0` | ⚠️ corrected 2026-06-24 — bare `deepseek.r1-v1:0` rejects on-demand; **`us.` inference profile required** |
 | 5 | open-reasoning | Qwen3-32B (reasoning) | **Qwen3-32B** (reasoning mode) | `qwen.qwen3-32b-v1:0` | ✅ confirmed |
 | 6 | open-direct | Qwen3-32B (direct) | **Qwen3-32B** (direct mode) | `qwen.qwen3-32b-v1:0` (`direct` payload flag) | ✅ confirmed |
 
@@ -123,6 +123,8 @@ This replaces upstream's `server.sh` (local vLLM serving) + bare `python evaluat
 
 **Goal**: Before committing the $1K-5K full run, validate the *training* path at 2-5% of budget. Carryover from cost-aware-routing, whose hardest lesson was a $200 spot-reclaim loss and whose iter-0 diagnostic gate ("brand bias > 25% → halt") cost ~$5 but prevented wasting $1,500. Phase 0 only tests the *eval* path (bundled checkpoint); this tests the *training* path.
 
+**Step 0 — Gate 0.2b role-audit (BLOCKING prerequisite).** Before spending any CMA-ES smoke budget, run `scripts/gate_0_2b_role_audit.py` (7 workers × 3 roles = 21 cells) inside the Job and confirm every cell parses cleanly ≥90%. A 1-token ping (Gate 0.2) does NOT catch output-format drift, and multi-turn episodes compound it across roles — this ~$2 check blocks the $150-250 smoke (cost-aware-routing caught 24/33 cell failures here). Do not start the CMA-ES iters until this passes.
+
 Run **3 CMA-ES iters** at the full config (λ=32, mCMA=16, same worker pool + reward) — i.e. ~3 × 32 × 16 ≈ 1,500 candidate-evaluations. Budget ~$150-250.
 
 **Exit criteria (all must pass before Phase 1):**
@@ -130,6 +132,7 @@ Run **3 CMA-ES iters** at the full config (λ=32, mCMA=16, same worker pool + re
 2. **Role non-degeneracy**: Thinker, Worker, AND Verifier all used; verifier triggers at least one early halt.
 3. **Throttle survival**: λ=32 × mCMA=16 = 512 candidates/iter is a bursty Bedrock load — confirm the Converse client's cross-region rotation + backoff handles it with zero dropped episodes.
 4. **Question-conditioning signal**: worker-selection entropy > 1.5 nats AND different question types yield different worker distributions (the diagnostic our shared-policy GRPO collapse failed). If entropy ≈ 0, the linear head isn't learning — halt and run the separability probe (OQ2) before spending more.
+5. **Checkpoint-at-iter-0 validated**: CMA-ES solver state + `es_log.json` synced to S3 **after iter 0, before iter 1 begins** (cost-aware-routing lost an entire run to a reclaim between iter 0 and the first checkpoint). `run_trinity_agent.py`'s per-iter hook does this; confirm the iter-0 S3 object exists before letting the smoke proceed.
 
 If any criterion fails, halt before the full run. Cheap insurance against the expensive phase.
 
@@ -152,6 +155,7 @@ If any criterion fails, halt before the full run. Cheap insurance against the ex
 1. CMA-ES validation score (held-out) improves monotonically and beats best-static-worker by ≥3pp (the bar our GRPO router failed to clear — it went *below* best-static).
 2. Role usage is non-degenerate (Thinker/Worker/Verifier all used; verifier actually triggers early halts).
 3. Worker selection is question-conditioned (entropy > 0; different question types → different worker distributions) — the diagnostic our GRPO collapse failed.
+4. **Artifact exfiltration gate (post-run, before any node scale-to-0)**: enumerate the Job's results dir, confirm S3 holds every `model_iter_*.npy` + `es_log.json` + all per-iter rollouts, pull a tarball locally and verify, commit the keep-set to git (steering `tech-stack.md` §artifact-durability — glm5.2 lost raw traces by pulling only the summary).
 
 **Estimated cost**: This is the expensive phase. Rough order: 60 × 32 × 16 ≈ 30K candidate-evaluations, each a multi-turn episode of ~2-5 Bedrock calls. At ~$0.01-0.05/episode (depends on worker mix; frontier workers are pricey) → **$1K-5K Bedrock**. Pre-register a hard cost cap and a cheaper-pool fast-follow (drop GPT-class workers for the first full run; add them only for the final eval). Mirror cost-aware-routing's lesson: **smoke at tiny scale (2-3 CMA-ES iters) before committing the full run.**
 

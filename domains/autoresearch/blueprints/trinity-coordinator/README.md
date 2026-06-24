@@ -27,10 +27,15 @@ Direct successor to the **GRPO router negative result** (`domains/autoresearch/s
   - `fugu/llm_clients.py` — provider clients (`query_anthropic` already uses Bedrock Converse).
   - `decompose_model.py` — SVD of Qwen3-0.6B.
   - `evaluate_trinity_livecodebench.py` — eval harness.
-  - `logs/ckpt/models/model_iter_60.npy` — a trained coordinator checkpoint (Phase 0 eval target).
+  - `logs/ckpt/es_log.json` — the run config (60 iters, layer 26, 7-worker pool). **Config block only — no training history, and the `model_iter_60.npy` checkpoint it references is NOT vendored** (see `lessons.md` Blocker 1).
   - `.data_splits/livecodebenchv6_42_v0.2_t0.2.json` — eval split.
-- `scripts/` (to be written during Phase 0) — the Bedrock + agent-runtime adaptation layer:
-  - `bedrock_clients.py`, `worker_pool_bedrock.py`, `cost_bedrock.py`, `run_trinity_agent.py`.
+- `scripts/` — the Bedrock + agent-runtime adaptation layer (built, self-tested):
+  - `worker_pool_bedrock.py` — 7-worker Bedrock pool (corrected IDs, head order).
+  - `bedrock_clients.py` — Converse dispatch (per-worker semaphores, cross-region rotation, backoff, thinking-strip, optional GPT-5.5 path); `install()` rebinds fugu's dispatch seam.
+  - `cost_bedrock.py` — verified Bedrock pricing, drop-in for `fugu.cost`.
+  - `run_trinity_agent.py` — in-Job entry point (monkeypatch install, per-iter S3 sync incl iter 0, cost cap, Phase-0.5 gates).
+  - `gate_0_2b_role_audit.py` — the BLOCKING 21-cell worker×role parser audit.
+- `terraform/` — blueprint-local IRSA run-role + artifact bucket (validated).
 
 ## Adaptations from upstream
 
@@ -47,4 +52,4 @@ Direct successor to the **GRPO router negative result** (`domains/autoresearch/s
 
 ## Status
 
-DRAFT spec, code vendored. Not yet run. Phase 0 (eval-only with bundled checkpoint) is the cheapest first validation (~$50-150 Bedrock, no training).
+Stage 0 complete (2026-06-24): all $0 gates passed, adaptation layer + Terraform built and validated. **Two launch blockers** (see `lessons.md`): the Phase-0 eval checkpoint `model_iter_60.npy` is absent (fetch from OpenReview, or start at Phase 0.5 which trains from scratch and needs no checkpoint), and launch needs operator-provided EKS OIDC inputs + the `agent-runner` CLI. Pool corrected live: ord 2 Nova Premier (Legacy/denied) → Nova Pro; ord 4 DeepSeek-R1 needs the `us.` inference profile.
