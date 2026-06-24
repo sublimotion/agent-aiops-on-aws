@@ -3,9 +3,17 @@
 Same harness (OpenCode), same 46 SWE-bench Lite issues. GLM-5.2 from the run summary (per-issue
 metrics); Claude tiers from the full event JSONLs (verifier-reward/results/events/, matched-46 only).
 
-> **Data caveat**: GLM-5.2's per-issue **event JSONLs released with the spot node** — only the summary
-> survived (turns, tool_calls, tokens, has_edit, tests_pass, latency). So GLM-5.2 effort/token/outcome
-> metrics are clean, but its **tool-type mix (bash/read/edit/grep) is unavailable** (needs trace re-capture).
+> **Data caveat (operator error, not a capture gap)**: the driver DID write per-issue event JSONLs
+> (`_save_trace()` → `opencode_glm52_<id>.jsonl` on the node's NVMe, with OpenCode `tool_use` events
+> carrying `part.tool` = the bash/read/edit/grep type). But at teardown I pulled only `summary_glm52.json`
+> and committed that as if it were the complete artifact set — the raw JSONLs were **never exfiltrated by
+> ANY path**: not committed to git, no local copy on the laptop, and not in S3 (the node's IAM role lacked
+> S3 write — kimi L10 — and the runner had no S3-sync step). Scaling the node to 0 wiped the instance-store
+> NVMe. **Verified dead: git ✗, laptop fs ✗, all bench S3 buckets ✗.** So the summary metrics
+> (effort/token/outcome) are clean, but **tool-type mix, turns-to-first-edit, exploration-vs-edit sequencing,
+> and error-recovery patterns are permanently lost — re-runnable only, not recoverable.** Root cause: no
+> durable sink existed for this run (ephemeral NVMe + no S3 write + raw traces never committed). See the
+> teardown-artifact-durability rule added to `.claude/steering/tech-stack.md`.
 
 ## 1. Effort efficiency — GLM-5.2 ≈ Opus, more efficient than Haiku
 | model | median turns | median tool calls | edit rate |

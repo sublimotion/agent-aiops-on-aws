@@ -32,6 +32,20 @@ The version-decay discipline (re-verify engine-blocker claims against the live t
 
 **Tells that you're in this trap:** about to add a translation/proxy layer (LiteLLM, a custom SSE proxy) to bridge an API; about to patch an engine; citing a memory with a model name or version in the "it doesn't work" clause. Stop and check native support first.
 
+## Artifact durability before destructive teardown (scale-to-0 / terminate)
+
+**Spot/benchmark node local storage (NVMe instance-store, emptyDir, `/mnt/nvme`) is ephemeral — it is WIPED on scale-to-0 or spot reclaim.** Anything not exfiltrated to a durable sink (git **committed + pushed**, or S3) before teardown is permanently lost. "I `kubectl cp`'d a file" is NOT durable until it's committed/pushed.
+
+**Rule — before ANY `aws eks update-nodegroup-config ... desiredSize=0` / instance terminate:**
+1. **Enumerate the full results dir** on the node (`find /mnt/nvme/results -type f`), not just the summary you happened to look at. Raw traces / per-issue event JSONLs / diffs are usually the highest-value, hardest-to-regenerate artifacts.
+2. **`tar` the whole dir → pull → verify the tarball locally** (extract + spot-check) — exfiltrate everything, decide what to keep afterward.
+3. **`git add/commit/push` the artifacts you intend to keep, and confirm they're in the remote** — committing a *summary* is not committing the *traces*. A run is not "done" until its keep-set is pushed.
+4. Only then scale to 0.
+
+**Prefer a durable sink DURING the run, not a manual pull at teardown:** give bench/runner nodes an S3-writable IAM role (or an artifact-sync step) so traces land in a bucket as they're produced. Several of our bench nodes' roles **lack S3 write** (kimi L10 — we `kubectl cp` as a workaround); on those, the manual pull-and-commit gate above is the only safety net, so it's mandatory.
+
+**Why:** 2026-06-24, on the glm5.2 agent run, the driver correctly wrote per-issue event JSONLs (tool-type mix, the data needed for the richest trace analysis) to NVMe — but at teardown I pulled only `summary_glm52.json`, committed that as if complete, and scaled the node to 0. The raw traces were never exfiltrated by ANY path (git ✗, laptop ✗, S3 ✗ — role lacked write) and were wiped with the instance. Permanently lost, re-runnable only. The summary survived; the higher-value raw data did not, because I treated "pulled something" as "preserved everything."
+
 ## GPU Serving Conventions
 
 ### Infrastructure
