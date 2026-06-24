@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GLM-5.2-FP8 on B200 — Benchmark Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{--bg:#0d1117;--card:#161b22;--border:#30363d;--fg:#e6edf3;--mut:#8b949e;--accent:#58a6ff;--good:#3fb950;--warn:#d29922;--bad:#f85149;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--fg);font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:32px;max-width:1180px;margin:0 auto}
+  h1{font-size:26px;margin-bottom:4px}h2{font-size:19px;margin:34px 0 14px;border-bottom:1px solid var(--border);padding-bottom:6px}
+  .meta{color:var(--mut);margin-bottom:8px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:18px 0}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px}
+  .card .k{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  .card .v{font-size:21px;font-weight:600;margin-top:4px}
+  .card .s{color:var(--mut);font-size:12px;margin-top:2px}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border)}
+  th{color:var(--mut);font-weight:600;cursor:pointer;user-select:none}
+  th:hover{color:var(--accent)}
+  tr:hover{background:#1c2128}
+  .good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}.mut{color:var(--mut)}
+  .chartbox{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;margin:14px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:820px){.grid2{grid-template-columns:1fr}}
+  .tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600}
+  .tag.win{background:#132e1a;color:var(--good)}.tag.lose{background:#3a1518;color:var(--bad)}.tag.block{background:#3a2e14;color:var(--warn)}
+  .note{background:var(--card);border-left:3px solid var(--accent);padding:10px 14px;margin:12px 0;border-radius:0 6px 6px 0;color:var(--mut);font-size:13px}
+  .note b{color:var(--fg)}
+</style>
+</head>
+<body>
+  <h1>GLM-5.2-FP8 on B200 — Benchmark Report</h1>
+  <div class="meta">zai-org/GLM-5.2-FP8 (glm_moe_dsa, 753B MoE / ~40B active, MLA+DSA, native MTP) · SGLang v0.5.13.post1-cu130 · 8× B200 TP8 · 2026-06-23/24</div>
+
+  <div class="cards">
+    <div class="card"><div class="k">Peak throughput</div><div class="v">3,004 <span class="s">tok/s</span></div><div class="s">T1 (prefix+fp8KV) @ c=64</div></div>
+    <div class="card"><div class="k">Dominant lever</div><div class="v good">+73%</div><div class="s">prefix cache (T2), 8.5× TTFT</div></div>
+    <div class="card"><div class="k">Agent fix rate</div><div class="v">89%</div><div class="s">OpenCode, 46 SWE-bench Lite</div></div>
+    <div class="card"><div class="k">NVFP4 vs FP8</div><div class="v bad">−59%</div><div class="s">batched throughput (c=64)</div></div>
+    <div class="card"><div class="k">Long-ctx regime</div><div class="v">prefill-bound</div><div class="s">→ B300 won't help the knee</div></div>
+  </div>
+
+  <h2>1. Optimization tier stack — coding-agent (c=64)</h2>
+  <div class="chartbox"><canvas id="tierChart" height="110"></canvas></div>
+  <table id="tierTable">
+    <thead><tr><th>Tier</th><th>Config (cumulative)</th><th>tok/s @ c64</th><th>TTFT p99</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>T0</td><td>FP8 floor, no cache</td><td>1708</td><td>29.7s</td><td class="mut">reference (BF16 doesn't fit)</td></tr>
+      <tr><td>T2</td><td>+ prefix cache</td><td>2950</td><td>3.50s</td><td><span class="tag win">+73% / 8.5× TTFT — dominant</span></td></tr>
+      <tr><td>T1</td><td>+ fp8 KV</td><td>3004</td><td>3.33s</td><td class="good">best throughput</td></tr>
+      <tr><td>T3</td><td>+ EAGLE/MTP</td><td>2331 <span class="mut">(139 @ c1, +40%)</span></td><td>3.78s</td><td><span class="tag win">latency lever</span> +40% @ c1, −22% @ c64</td></tr>
+      <tr><td>T5</td><td>+ torch.compile</td><td class="bad">—</td><td>—</td><td><span class="tag block">BLOCKED</span> cuda-graph capture fails</td></tr>
+    </tbody>
+  </table>
+  <div class="note"><b>Prefix cache is the headline lever</b> — the 12K shared system prompt caches at 92%, collapsing TTFT 8.5× and lifting throughput 73%. CUDA graphs run default-ON. HiCache <span class="bad">−12%</span> (compute-bound), MoE tile tuning N/A (flashinfer_trtllm backend).</div>
+
+  <h2>2. Quantization — NVFP4 regresses batched throughput vs FP8</h2>
+  <div class="grid2">
+    <div class="chartbox"><canvas id="quantChart" height="180"></canvas></div>
+    <div>
+      <table>
+        <thead><tr><th>workload</th><th>FP8</th><th>NVFP4</th><th>Δ</th></tr></thead>
+        <tbody>
+          <tr><td>coding c1</td><td>99</td><td>114</td><td class="good">+15%</td></tr>
+          <tr><td>coding c64</td><td>3004</td><td>1219</td><td class="bad">−59%</td></tr>
+          <tr><td>16k c64</td><td>2200</td><td>1624</td><td class="bad">−26%</td></tr>
+          <tr><td>31k c32</td><td>831</td><td>779</td><td class="warn">−6%</td></tr>
+        </tbody>
+      </table>
+      <div class="note"><b>NVFP4 ≠ free win.</b> Quality-gate PASSED (fixes bugs, tool-calls work; not a fallback — same trtllm runner). Wins only single-stream (+15% c1, less weight BW) and VRAM (56 vs 94 GB/GPU). Batched decode is compute-bound on the NVFP4 MoE kernel here. Gap narrows with context (−59% → −6%). <b>Use FP8 for throughput.</b></div>
+    </div>
+  </div>
+
+  <h2>3. Long-context — prefill-compute-bound (16k vs 31k)</h2>
+  <div class="chartbox"><canvas id="ctxChart" height="120"></canvas></div>
+  <div class="note"><b>Regime: prefill-compute-bound, NOT KV-capacity-bound</b> [gauge-inferred — DCGM PROF unavailable on driver-580]. Throughput plateaus while TTFT explodes; 0 errors/OOM to c=256. SLO-safe (15s TTFT) to ~c64 (16k) / ~c32 (31k). MNBT=8192 best at the knee (5.5s vs 7.9s default @ c16). <b>B300 would NOT relieve the knee</b> (its edge is KV capacity; this workload is compute-bound) — B300 only worth it to unlock the TP4+DP2 layout that 753GB FP8 can't fit on 180GB B200.</div>
+
+  <h2>4. Agent capability — SWE-bench Lite (46 issues, OpenCode harness)</h2>
+  <div class="grid2">
+    <div class="chartbox"><canvas id="effortChart" height="180"></canvas></div>
+    <div>
+      <table>
+        <thead><tr><th>model × OpenCode</th><th>median turns</th><th>median tools</th><th>edit/fix rate</th></tr></thead>
+        <tbody>
+          <tr><td>Sonnet</td><td>16</td><td>15</td><td>100%</td></tr>
+          <tr><td>Opus</td><td>21</td><td>21</td><td>100%</td></tr>
+          <tr><td><b>GLM-5.2</b></td><td><b>22</b></td><td><b>22</b></td><td><b>89%</b></td></tr>
+          <tr><td>Haiku</td><td>25</td><td>24</td><td>67%</td></tr>
+        </tbody>
+      </table>
+      <div class="note"><b>GLM-5.2 drives the tool loop like a frontier model</b> — Opus-class turn count (22 vs 21), well clear of Haiku. <b>Fails fast</b>: fixed issues = 23 median turns, NOT-fixed = 13 — early bailout, not thrashing. Token tax: ~404K tokens/issue (reasoning-first); served economically via 92% prefix-cache hit.</div>
+    </div>
+  </div>
+  <div class="note" style="border-color:var(--warn)"><b>Caveats:</b> Fix rate (89%) is the reliable signal; gold-pass 13% is a <b>lower bound</b> (in-pod test-env-limited — needs full Docker harness). Comparison is OpenCode-only: Codex + Claude Code arms were NOT genuinely blocked — that was operator error introducing an unnecessary LiteLLM shim. <b>SGLang serves /v1/messages natively</b>; correct retry points Claude Code straight at the engine (no proxy). Per-issue event JSONLs released with the node, so tool-type mix isn't reconstructable.</div>
+
+  <h2>5. Published-card context (z.ai GLM-5.2 card)</h2>
+  <div class="note">Card positions GLM-5.2 as <b>#1 open-weight</b>, closing on closed frontier. Highlights: AIME 2026 <b>99.2</b> (leads all incl. Opus 4.8 95.7), IMOAnswerBench 91.0 (#1), Terminal-Bench 2.1 81.0 (Opus 4.8 85.0), SWE-bench Pro 62.1 (Opus 4.8 69.2, beats GPT-5.5 58.6), FrontierSWE 74.4 (within 1pt of Opus 4.8). Weakest: SWE-Marathon 13.0 (Opus 4.8 26.0) — ultra-long-horizon is the remaining gap. <b>Not directly comparable to our run</b> (card uses SWE-bench Pro/Verified + OpenHands/Claude-Code/Terminus scaffolds at 400K ctx; our run is SWE-bench Lite + OpenCode fix-rate).</div>
+
+<script>
+const C={fg:'#e6edf3',mut:'#8b949e',grid:'#30363d',blue:'#58a6ff',green:'#3fb950',amber:'#d29922',red:'#f85149',purple:'#bc8cff'};
+Chart.defaults.color=C.mut;Chart.defaults.borderColor=C.grid;Chart.defaults.font.family='-apple-system,sans-serif';
+const conc=['c1','c4','c16','c32','c64'];
+new Chart(tierChart,{type:'line',data:{labels:conc,datasets:[
+ {label:'T0 floor',data:[99,315,883,1305,1708],borderColor:C.mut,tension:.2},
+ {label:'T2 +prefix',data:[99,318,1102,1885,2950],borderColor:C.green,tension:.2},
+ {label:'T1 +fp8KV',data:[99,364,1135,1931,3004],borderColor:C.blue,tension:.2},
+ {label:'T3 +EAGLE',data:[139,481,1239,1651,2331],borderColor:C.amber,tension:.2}]},
+ options:{plugins:{title:{display:true,text:'Aggregate throughput (tok/s) vs concurrency',color:C.fg}},scales:{y:{title:{display:true,text:'tok/s'}}}}});
+new Chart(quantChart,{type:'bar',data:{labels:['c1','c16','c32','c64'],datasets:[
+ {label:'FP8',data:[99,1135,1931,3004],backgroundColor:C.blue},
+ {label:'NVFP4',data:[114,451,915,1219],backgroundColor:C.red}]},
+ options:{plugins:{title:{display:true,text:'FP8 vs NVFP4 — coding-agent tok/s',color:C.fg}},scales:{y:{title:{display:true,text:'tok/s'}}}}});
+new Chart(ctxChart,{type:'line',data:{labels:['c16','c32','c64','c128','c256'],datasets:[
+ {label:'16k TTFT p99 (s)',data:[3.1,5.5,11.0,21.9,162],borderColor:C.green,tension:.2,yAxisID:'y'},
+ {label:'31k TTFT p99 (s)',data:[5.5,11.0,21.8,44.6,110],borderColor:C.red,tension:.2,yAxisID:'y'},
+ {label:'15s SLO',data:[15,15,15,15,15],borderColor:C.amber,borderDash:[6,4],pointRadius:0,yAxisID:'y'}]},
+ options:{plugins:{title:{display:true,text:'TTFT p99 vs concurrency — SLO knee ~c64(16k)/c32(31k)',color:C.fg}},scales:{y:{title:{display:true,text:'TTFT p99 (s)'},max:60}}}});
+new Chart(effortChart,{type:'bar',data:{labels:['Sonnet','Opus','GLM-5.2','Haiku'],datasets:[
+ {label:'median turns',data:[16,21,22,25],backgroundColor:[C.purple,C.blue,C.green,C.amber]}]},
+ options:{indexAxis:'y',plugins:{title:{display:true,text:'Agent effort — median turns/issue (lower=more efficient)',color:C.fg},legend:{display:false}},scales:{x:{title:{display:true,text:'turns'}}}}});
+// sortable tables
+document.querySelectorAll('th').forEach((th,i)=>th.addEventListener('click',()=>{
+ const tb=th.closest('table').querySelector('tbody'),rows=[...tb.rows],idx=[...th.parentNode.children].indexOf(th);
+ const num=r=>parseFloat(r.cells[idx].textContent.replace(/[^0-9.\-]/g,''))||r.cells[idx].textContent;
+ const asc=th.dataset.asc=th.dataset.asc==='1'?'':'1';
+ rows.sort((a,b)=>{const x=num(a),y=num(b);return (x>y?1:x<y?-1:0)*(asc?1:-1)});rows.forEach(r=>tb.appendChild(r));
+}));
+</script>
+</body>
+</html>
