@@ -69,9 +69,27 @@ Runner pod on B200 node (hostNetwork → localhost:30000 direct, NO tunnel). All
 
 **ROOT CAUSE (both proxy harnesses):** LiteLLM's Anthropic-messages + OpenAI-responses adapters can't
 translate GLM-5.2's `thinking`/reasoning content blocks into SGLang's OpenAI chat schema on multi-turn
-→ 400/500. This is a LiteLLM adapter limitation × GLM-5.2 reasoning-first behavior, not a harness or model
-capability issue. Fixing needs patching LiteLLM's adapter or a custom thinking-block-stripping proxy (rabbit hole).
+→ 400/500.
 
-**DECISION:** Run the 46-issue capability comparison on **OpenCode** — it works, AND it's the SAME harness
-that produced the Opus/Sonnet/Haiku baseline traces (verifier-reward/events/), so it's the cleanest
-apples-to-apples comparison. Codex + Claude Code documented as LiteLLM-blocked; revisit with an adapter fix.
+### CORRECTION (2026-06-24) — the LiteLLM shim was UNNECESSARY; operator error, not a real block
+The Codex/Claude-Code "block" above was a CONSEQUENCE OF INTRODUCING LiteLLM, not a genuine limitation.
+SGLang serves the **Anthropic Messages API `/v1/messages` natively** (auto-registered, no flag —
+docs.sglang.io/docs/basic_usage/anthropic_api), and the docs' own example is literally GLM-5.2-FP8 with
+`--tool-call-parser glm47 --reasoning-parser glm45`. Claude Code should have pointed straight at SGLang:
+- `ANTHROPIC_BASE_URL=http://127.0.0.1:30000` (server root, **NO `/v1`** — the Anthropic SDK appends
+  `/v1/messages` itself). I wrongly pointed it at the LiteLLM proxy on :4000.
+- No LiteLLM, no thinking-block translation layer, no shim. The 400/500s were LiteLLM's adapter, not SGLang
+  or GLM-5.2.
+- Codex `/v1/responses`: SGLang returned 200 directly earlier but rejected Codex's `function`-type tools
+  (schema wants web_search_preview/code_interpreter) — that one may still need work, but is separate from
+  the LiteLLM red herring. (vLLM also serves `/v1/messages` + `/v1/responses` natively as an alternative.)
+- **Why the mistake:** anchored on a stale memory ("Claude Code needs the vLLM Anthropic patch; SGLang has
+  no messages endpoint") from the Mistral/Qwen era; did NOT re-verify against current SGLang docs before
+  building a shim — violating the project's own "re-verify blockers against the live tracker" rule.
+- **Correct retry (node down, not re-run):** drop LiteLLM entirely; point Claude Code at SGLang
+  `:30000` (no `/v1`); re-test Codex against SGLang `/v1/responses` directly. Likely both work native,
+  making a clean 3-harness comparison achievable without any proxy.
+
+**DECISION (still valid):** the 46-issue capability comparison ran on **OpenCode** — it works AND it's the
+SAME harness as the Opus/Sonnet/Haiku baseline traces, so it's the cleanest apples-to-apples comparison.
+The Codex/Claude-Code arms are a documented follow-up via NATIVE SGLang endpoints (not LiteLLM).

@@ -60,8 +60,11 @@ forced-TP8 on B200 is a real structural disadvantage. A B300 TP4+DP2 run would m
 ## Agent capability — SWE-bench Lite (46 issues, OpenCode harness)
 - **Fix rate 89%** (41/46) — capable agent, just under frontier Claude tiers (100% edit-attempt on same issues).
 - Gold pass 13% (lower bound — in-pod gold-eval test-env-limited; needs full Docker harness for clean number).
-- Median 404K tokens/issue (reasoning-first). Codex + Claude Code arms blocked by LiteLLM thinking-block
-  translation (OpenCode-only comparison, which is the cleanest match to the baseline traces).
+- Median 404K tokens/issue (reasoning-first). OpenCode-only comparison (cleanest match to baseline traces).
+- **CORRECTION**: Codex/Claude-Code were NOT genuinely blocked — that was operator error. I introduced an
+  unnecessary LiteLLM shim; the failures were LiteLLM's translation, not SGLang/GLM-5.2. SGLang serves
+  `/v1/messages` **natively** (docs example is literally GLM-5.2-FP8 + glm47/glm45). Correct retry: point
+  Claude Code at `ANTHROPIC_BASE_URL=http://SGLANG:30000` (no `/v1`), drop LiteLLM. See harness-wiring-smoke.md.
 
 ## GLM-5.2 operational traits (for the deployment card)
 - **Reasoning-first**: emits reasoning_content before content/tool_calls. NEVER use small max_tokens
@@ -79,5 +82,7 @@ forced-TP8 on B200 is a real structural disadvantage. A B300 TP4+DP2 run would m
 ## Deferred / follow-up
 - vLLM/MTP engine arm (SGLang well-characterized; vLLM head-to-head not run).
 - B300 TP4+DP2 layout (unlocks the kimi-comparable config).
-- Codex + Claude Code agent arms (need a LiteLLM thinking-block-stripping adapter).
+- Codex + Claude Code agent arms via **native SGLang `/v1/messages` + `/v1/responses`** (NO LiteLLM —
+  point Claude Code at `ANTHROPIC_BASE_URL=http://SGLANG:30000` without `/v1`). The earlier LiteLLM
+  "block" was operator error, not a real limitation.
 - Full Docker gold-eval for a clean SWE-bench pass-rate number.
