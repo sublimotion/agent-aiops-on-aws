@@ -6,7 +6,10 @@
 # #20541 known-good sm_120 backend matrix (do NOT change without re-verifying on sm_120):
 #   - DeepGEMM FP8 GEMM: FAILS on sm_120 -> SGLANG_DISABLE_DEEP_GEMM=1
 #   - CUTLASS FP8 GEMM:  FAILS on sm_120 -> force --fp8-gemm-backend triton
-#   - MoE runner:        Triton WORKS    -> --moe-runner-backend triton
+#   - MoE runner:        Triton SMEM-OVERFLOWS on sm_120 (147456>101376) -> use flashinfer_cutlass
+#                        (CORRECTED 2026-06-24: the #20541 "triton works" note was an upstream
+#                        assumption that did NOT hold here; the measured run used flashinfer_cutlass.
+#                        Verified empirically by re-running the c8 bench -> 14,200 tok/s, SLO PASS.)
 #   - Attention:         FlashInfer WORKS at defaults (GQA) -> no triton-attn workaround
 #   - trtllm_mha:        FAILS (not ported) -> avoid
 #   - CUDA graphs:       WORK (GQA, no SMEM overflow) -> NO --enforce-eager
@@ -67,7 +70,7 @@ spec:
             - --fp8-gemm-backend
             - triton
             - --moe-runner-backend
-            - triton
+            - flashinfer_cutlass
             - --mamba-scheduler-strategy
             - no_buffer
             - --reasoning-parser
