@@ -182,3 +182,28 @@ export CAR_TRINITY_BEDROCK_PATCH=1 CAR_TRINITY_VENDOR_ROOT=<vendor-root>
 export AWS_DEFAULT_REGION=us-east-1 HF_DATASETS_TRUST_REMOTE_CODE=1
 python3 <scripts>/run_trinity_agent.py --phase eval --model-file .../model_iter_60.npy --test-size N ...
 ```
+
+## Phase 0 routing fixes (the eval actually evaluates now)
+
+10. **Worker routing was silently calling `gpt-4.1` (OpenAI), not Bedrock** — the
+    first "10/10 complete" run was 10 FAILURES (missing OPENAI_API_KEY), not evals.
+    Cause: the eval's `build_eval_config` looks up the CHECKPOINT's llm_names
+    (gpt-5, claude-sonnet, gemini-pro, deepseek-r1, gemma, qwen-reason, qwen-direct)
+    against AVAILABLE_OPEN_AGENTS; the agent keyed that override by OUR friendly
+    names → no match → fell back to a closed `gpt-4.1`. **Fix: positional remap** —
+    the trained head is positional (ord 0..6), so map checkpoint-name[i] →
+    Bedrock-pool[i] by index. 0 infra failures after the fix.
+    NOTE: our pool order has gemma@3/deepseek@4 while the checkpoint has
+    deepseek@3/gemma@4 — semantically swapped. For a faithful headline number,
+    reorder worker_pool_bedrock POOL to match the checkpoint's semantic positions
+    (deepseek-class at ord 3, gemma at ord 4). Index-mapping works mechanically but
+    the head learned per-position capability, so semantic alignment matters for the
+    eval result (not for proving the pipeline).
+11. **Vendored eval assumes every open agent has a `port`** (vLLM serving model):
+    `build_evaluation_config` does `cfg["port"]` → KeyError on our portless Bedrock
+    configs. Fix: inject dummy `port=0`/`server="bedrock"`; the monkeypatched
+    dispatch ignores them (routes to Converse).
+
+**Status 2026-06-24**: Phase 0 eval runs end-to-end on the Bedrock pool, 0 infra
+failures, real multi-turn episodes (~600s/task). Pipeline fully validated. Headline
+pass@1 pending a clean run with semantically-aligned worker order (finding #10 note).

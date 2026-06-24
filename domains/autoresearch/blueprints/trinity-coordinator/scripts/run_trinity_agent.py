@@ -204,11 +204,41 @@ def run_eval(args) -> int:
     # then delegate. We import it after the monkeypatch so its fugu calls route to
     # Bedrock.
     import evaluate_trinity_livecodebench as ev
-    ev.AVAILABLE_OPEN_AGENTS = {name: cfgs[name] for name in llm_names}
+    import json as _json
+
+    # The trained head is POSITIONAL: output dim = ord 0..6. The checkpoint's
+    # es_log.json llm_names give that order (gpt-5, claude-sonnet, gemini-pro,
+    # deepseek-r1, gemma, qwen-reason, qwen-direct). We must map each of THOSE
+    # names — the ones the eval's build_eval_config will look up — to our Bedrock
+    # worker by INDEX, so ord i routes to Bedrock pool[i]. Keying by our own
+    # friendly-names (previous bug) left the checkpoint names unresolved → the eval
+    # fell back to a closed `gpt-4.1` OpenAI call → "missing credentials" on every
+    # episode. (lessons.md finding #10.)
+    es_log = _json.loads((vendor / "logs" / "ckpt" / "es_log.json").read_text())
+    ckpt_names = es_log[0]["configs"]["llm_names"]
+    if len(ckpt_names) != len(llm_names):
+        _log(f"FATAL: checkpoint has {len(ckpt_names)} workers but Bedrock pool has "
+             f"{len(llm_names)} — head output dim mismatch, cannot map positionally.")
+        return 2
+    # Build AVAILABLE_OPEN_AGENTS keyed by the CHECKPOINT names → our Bedrock cfg by index.
+    # The vendored eval's build_evaluation_config assumes every open agent has a
+    # `port` (it builds a vLLM server/port map). Our Bedrock dispatch ignores
+    # server/port (routes to Converse), but the config builder still reads cfg["port"]
+    # → KeyError. Inject a harmless dummy port so the builder is satisfied; the
+    # monkeypatched query_locally_hosted_model never uses it. (lessons.md finding #11.)
+    remapped = {}
+    for i in range(len(ckpt_names)):
+        c = dict(cfgs[llm_names[i]])
+        c.setdefault("port", 0)            # dummy; dispatch routes to Bedrock regardless
+        c.setdefault("server", "bedrock")  # dummy; satisfies server_map construction
+        remapped[ckpt_names[i]] = c
+    ev.AVAILABLE_OPEN_AGENTS = remapped
     ev.CLOSED_LLM_NAMES = []          # every worker is "open" (Bedrock) now
     ev.TOGETHER_FLAGS = {}
     ev.DEFAULT_OPEN_SERVERS = ""      # no vLLM servers
-    _log(f"eval delegating to vendored harness with {len(llm_names)} Bedrock workers")
+    _log(f"eval: positional remap of {len(ckpt_names)} checkpoint workers → Bedrock pool")
+    for i, cn in enumerate(ckpt_names):
+        _log(f"  ord {i}: {cn}  →  {cfgs[llm_names[i]]['model_name']}")
     # The harness owns argv parsing; build a minimal argv for it.
     sys.argv = ["evaluate_trinity_livecodebench.py", str(vendor / "logs" / "ckpt"),
                 "--model-file", str(model_file), "--test-size", str(args.test_size)]
