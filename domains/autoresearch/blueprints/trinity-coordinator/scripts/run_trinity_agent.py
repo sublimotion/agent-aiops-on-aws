@@ -226,17 +226,37 @@ def run_eval(args) -> int:
     # server/port (routes to Converse), but the config builder still reads cfg["port"]
     # → KeyError. Inject a harmless dummy port so the builder is satisfied; the
     # monkeypatched query_locally_hosted_model never uses it. (lessons.md finding #11.)
+    # CRITICAL (lessons #12): the rollout env resolves the head's output index via
+    # `core.py: agent_name = self.llm_names[agent_id]`, and self.llm_names comes from
+    # the eval's selected_agents (= the checkpoint's es_log llm_names, e.g. 'gpt-4.1').
+    # If we leave those names, the head index → 'gpt-4.1' → fugu routes by model-name
+    # substring to the OpenAI client → no creds → every episode fails (test_score 0.0,
+    # agent_distribution shows gpt-4.1:5). The positional-config remap alone is NOT
+    # enough — the NAMES the env carries must BE our Bedrock friendly-names so
+    # query_bedrock_dispatch resolves them via by_friendly_name.
+    #
+    # Fix: force the env's llm_names to OUR Bedrock pool order (LLM_NAMES) by
+    # monkeypatching parse_selected_agents. The head is positional, so ord i → our
+    # worker i. AVAILABLE_OPEN_AGENTS is then keyed by our names (with dummy port).
     remapped = {}
-    for i in range(len(ckpt_names)):
+    for i in range(len(llm_names)):
         c = dict(cfgs[llm_names[i]])
         c.setdefault("port", 0)            # dummy; dispatch routes to Bedrock regardless
         c.setdefault("server", "bedrock")  # dummy; satisfies server_map construction
-        remapped[ckpt_names[i]] = c
+        remapped[llm_names[i]] = c
     ev.AVAILABLE_OPEN_AGENTS = remapped
     ev.CLOSED_LLM_NAMES = []          # every worker is "open" (Bedrock) now
     ev.TOGETHER_FLAGS = {}
     ev.DEFAULT_OPEN_SERVERS = ""      # no vLLM servers
-    _log(f"eval: positional remap of {len(ckpt_names)} checkpoint workers → Bedrock pool")
+
+    # Force selected_agents → our Bedrock names (positional). This sets core.py's
+    # self.llm_names so head index i resolves to our worker i.
+    _orig_parse = ev.parse_selected_agents
+    def _patched_parse(config, *a, **kw):
+        _sel, mtypes = _orig_parse(config, *a, **kw)
+        return list(llm_names), mtypes
+    ev.parse_selected_agents = _patched_parse
+    _log(f"eval: env llm_names forced to Bedrock pool order: {llm_names}")
     for i, cn in enumerate(ckpt_names):
         _log(f"  ord {i}: {cn}  →  {cfgs[llm_names[i]]['model_name']}")
     # The harness owns argv parsing; build a minimal argv for it.

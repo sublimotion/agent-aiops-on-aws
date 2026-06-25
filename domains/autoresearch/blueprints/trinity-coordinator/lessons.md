@@ -207,3 +207,26 @@ python3 <scripts>/run_trinity_agent.py --phase eval --model-file .../model_iter_
 **Status 2026-06-24**: Phase 0 eval runs end-to-end on the Bedrock pool, 0 infra
 failures, real multi-turn episodes (~600s/task). Pipeline fully validated. Headline
 pass@1 pending a clean run with semantically-aligned worker order (finding #10 note).
+
+## Finding #12 — the env's llm_names must BE the Bedrock names (routing fixed)
+
+Even after the positional config remap (#10) + dummy port (#11), the first clean-ish
+run still routed every head decision to `gpt-4.1` (agent_distribution gpt-4.1:5,
+test_score 0.0, 15 cred failures). Root cause: `core.py:752
+agent_name = self.llm_names[agent_id]` — the env resolves the head's output index
+through `self.llm_names`, which the eval sets from the CHECKPOINT's es_log names
+(`gpt-4.1`...). fugu then routes by model-name substring → OpenAI client → no creds.
+Keying AVAILABLE_OPEN_AGENTS by checkpoint names wasn't enough; the NAMES the env
+carries had to be ours.
+
+**Fix**: monkeypatch `ev.parse_selected_agents` to return our Bedrock `LLM_NAMES`
+(positional). Head index i → our worker i → `query_bedrock_dispatch` resolves via
+`by_friendly_name` → Converse. Result: **3/3 clean episodes, 0 infra failures,
+pass@1=1.0 on a 3-task sanity eval, 89s** (was 27min of failures). Pipeline correct.
+
+Caveat: `agent_distribution` telemetry is empty (a separate stats path still keys on
+old names) — score is real but per-worker routing visibility is TODO. 3 tasks is a
+sanity check, not a headline; run the full 80 for a real pass@1.
+
+**PHASE 0 = VALIDATED.** The shared rollout path now routes to Bedrock correctly,
+which also unblocks Phase 0.5 (CMA-ES train-from-scratch uses the same path).
