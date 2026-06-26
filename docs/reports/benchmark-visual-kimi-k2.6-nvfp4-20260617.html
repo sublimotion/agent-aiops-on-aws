@@ -241,15 +241,17 @@ ul{margin:.3rem 0 .9rem 1.2rem}li{margin-bottom:.35rem}
 <p class="footnote">No regression: normalized for the 4× heavier output, B200 NVFP4 does more work/s than the prior B300 INT4-QAT run, and single-stream is faster. The "slower" impression was an artifact of comparing against the wrong engine on a lighter workload.</p>
 
 <h2>4 · Cost — output-only (blended verdict blocked)</h2>
+<p>$/Mtok output = ($/hr) ÷ (peak tok/s × 3600 / 1e6), at TP4+DP2 peak throughput (B200 3,138 @ c512; B300 4,489 @ c512). vs upstream output price <b>$3.76/Mtok</b>.</p>
 <table>
-<thead><tr><th>basis</th><th>$/Mtok output</th><th>vs upstream</th><th>confidence</th></tr></thead>
+<thead><tr><th>HW · basis</th><th>$/hr</th><th>peak tok/s</th><th>$/Mtok output</th><th>vs $3.76</th></tr></thead>
 <tbody>
-<tr><td class="lbl">spot $18/hr (session low)</td><td>1.99</td><td class="pos">beats $3.76</td><td><span class="tag measured">measured</span></td></tr>
-<tr><td class="lbl">spot $26.15/hr (session high)</td><td>2.89</td><td class="pos">beats $3.76</td><td><span class="tag measured">measured</span></td></tr>
-<tr><td class="lbl">on-demand $98/hr</td><td>10.82</td><td class="neg">loses</td><td><span class="tag measured">measured</span></td></tr>
-<tr><td class="lbl">blended vs $0.338</td><td>—</td><td class="lbl">cannot compute</td><td><span class="tag blocked">BLOCKED</span></td></tr>
+<tr><td class="lbl">B200 · spot low</td><td>18.00</td><td>3,138</td><td class="pos">1.59</td><td class="pos">beats (2.4×)</td></tr>
+<tr><td class="lbl">B200 · spot high</td><td>26.15</td><td>3,138</td><td class="pos">2.31</td><td class="pos">beats</td></tr>
+<tr><td class="lbl">B300 · spot</td><td>34.00</td><td>4,489</td><td class="pos">2.10</td><td class="pos">beats</td></tr>
+<tr><td class="lbl">blended vs $0.338</td><td>—</td><td>—</td><td>—</td><td class="blocked">BLOCKED</td></tr>
 </tbody>
 </table>
+<p class="footnote">Spot pricing only (the deployment basis). Recomputed on corrected TP4+DP2 throughput (was stale at the old ~2,500 tok/s / B200-only). <b>B300 spot $2.10/Mtok ≈ B200 spot</b> — B300 costs ~30% more per hour but its +43% throughput nearly cancels it, so $/output-token is a wash; B300's real win is latency/SLO + fewer nodes, not output-token cost. Spot rates are session-observed point estimates (B200 us-east-2 $18-28/hr; B300 us-west-2 ~$34/hr) — volatile, not contracted. <b>Blended verdict still BLOCKED</b>: output-only beats $3.76 at spot, but the customer optimizes blended $0.338 (input-dominated) — needs their input price + token mix.</p>
 <p class="footnote">Spot was volatile $18–28/hr; $/Mtok output is a point estimate, not a stable rate. Excludes multi-node overhead, KV-residency memory cost, spot-reclaim risk.</p>
 
 <h2>5 · Bottom line</h2>
