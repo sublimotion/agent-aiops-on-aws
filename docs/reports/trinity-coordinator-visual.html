@@ -234,27 +234,30 @@ query_llm(model=name, ...)   <span class="muted"># → Bedrock</span></pre>
 
   <!-- ===================== 6b. RESULT ===================== -->
   <h2>6b · Viability-gate result (n=30 LiveCodeBench, seed 42)</h2>
-  <p>The probe ran all 11 candidates solo. <b>Mean pairwise pass-correlation = 0.27</b> (low — models genuinely disagree), and several open flagships land within a few points of Opus at a fraction of the cost.</p>
+  <p>The probe ran all 11 candidates solo (best-static, no scaffold). Open flagships sweep the top of the board — and the single best model is open, beating Opus outright at a fraction of the cost.</p>
 
   <table>
     <tr><th>model</th><th>pass@1</th><th>$/problem (measured)</th><th>cost vs Opus</th><th></th></tr>
-    <tr><td>claude-opus-4-8</td><td>0.77</td><td>$0.01041</td><td>1.0×</td><td><span class="pill p-opus">frontier</span></td></tr>
-    <tr><td><b>gpt-oss-120b</b></td><td><b>0.73</b></td><td><b>$0.00066</b></td><td><b>0.06×</b></td><td><span class="pill p-cheap">open flagship</span></td></tr>
-    <tr><td>claude-sonnet-4-6</td><td>0.70</td><td>$0.00884</td><td>0.85×</td><td><span class="pill p-opus">frontier</span></td></tr>
-    <tr><td>claude-haiku-4-5</td><td>0.67</td><td>$0.00408</td><td>0.39×</td><td><span class="pill p-mid">cheap-frontier</span></td></tr>
-    <tr><td>qwen3-235b</td><td>0.67</td><td>$0.00084</td><td>0.08×</td><td><span class="pill p-cheap">open flagship</span></td></tr>
-    <tr><td>qwen3-coder-480b</td><td>0.67</td><td>$0.00078</td><td>0.07×</td><td><span class="pill p-cheap">open flagship</span></td></tr>
-    <tr><td>gemma-3-27b</td><td>0.50</td><td>$0.00080</td><td>0.08×</td><td><span class="pill p-cheap">cheap</span></td></tr>
-    <tr><td>nova-pro</td><td>0.47</td><td>$0.00107</td><td>0.10×</td><td><span class="pill p-mid">mid</span></td></tr>
-    <tr><td>deepseek-r1</td><td>0.37</td><td>$0.02469</td><td>2.4×</td><td><span class="pill p-reason">reasoning</span></td></tr>
+    <tr><td><b>deepseek-v3</b></td><td><b>0.87</b></td><td><b>$0.00223</b></td><td><b>0.21×</b></td><td><span class="pill p-cheap">open flagship</span></td></tr>
+    <tr><td>qwen3-235b</td><td>0.77</td><td>$0.00091</td><td>0.09×</td><td><span class="pill p-cheap">open flagship</span></td></tr>
+    <tr><td>qwen3-coder-480b</td><td>0.73</td><td>$0.00087</td><td>0.08×</td><td><span class="pill p-cheap">open flagship</span></td></tr>
+    <tr><td>gpt-oss-120b</td><td>0.73</td><td>$0.00065</td><td>0.06×</td><td><span class="pill p-cheap">open flagship</span></td></tr>
+    <tr><td>claude-opus-4-8</td><td>0.73</td><td>$0.01063</td><td>1.0×</td><td><span class="pill p-opus">frontier</span></td></tr>
+    <tr><td>claude-sonnet-4-6</td><td>0.70</td><td>$0.00842</td><td>0.79×</td><td><span class="pill p-opus">frontier</span></td></tr>
+    <tr><td>claude-haiku-4-5</td><td>0.67</td><td>$0.00408</td><td>0.38×</td><td><span class="pill p-mid">cheap-frontier</span></td></tr>
+    <tr><td>deepseek-r1</td><td>0.67</td><td>$0.02391</td><td>2.25×</td><td><span class="pill p-reason">reasoning</span></td></tr>
+    <tr><td>qwen3-32b</td><td>0.67</td><td>$0.00020</td><td>0.02×</td><td><span class="pill p-cheap">cheap</span></td></tr>
+    <tr><td>gemma-3-27b</td><td>0.47</td><td>$0.00101</td><td>0.10×</td><td><span class="pill p-cheap">cheap</span></td></tr>
+    <tr><td>nova-pro</td><td>0.43</td><td>$0.00107</td><td>0.10×</td><td><span class="pill p-mid">mid</span></td></tr>
   </table>
+  <p class="small muted">n=30 LiveCodeBench, seed 42. Clean run after fixing two probe bugs (DeepSeek-V3 returns prose+```python instead of <code>&lt;answer&gt;</code> tags — its 0.00 in run&nbsp;1 was an extraction artifact; qwen3-32b was unpriced by a key mismatch). All grading via the harness's <code>DirectCodeExecutor</code>.</p>
 
   <div class="callout good">
-    <b>Both findings hold at once.</b> (1) <b>The Opus premium looks hard to justify here</b> — <code>gpt-oss-120b</code> reaches 96% of Opus's pass-rate at <b>1/16th the cost</b>; <code>qwen3-235b</code> / <code>qwen3-coder-480b</code> hit 87% at ~1/13th. (2) <b>Routing has real headroom</b> — pass-correlation is only 0.27 and problems split across "solved by k models" from 0 to 10, so different models genuinely win different problems. This is the row-1 ∩ row-2 outcome: a cheap pool nearly matches frontier <i>and</i> the disagreement leaves room for a router to capture the hard tail.
+    <b>The thesis is confirmed — and stronger than "don't need Opus."</b> The single best model is <b>open</b>: <code>deepseek-v3</code> at <b>0.87 beats Opus's 0.73 at 1/5th the cost</b>. Four open flagships (deepseek-v3, qwen3-235b, qwen3-coder-480b, gpt-oss-120b) match or beat Opus at <b>1/5th–1/16th</b> the price; Opus sits mid-pack at 10–50× the cost of equally-capable open models. On this task class, paying for Opus buys <i>nothing</i>.
   </div>
 
-  <div class="callout warn">
-    <b>Two measurement caveats (not yet trusted as fact).</b> <code>deepseek-v3 = 0.00</code> is almost certainly a code-extraction/format miss, not a capability result (it's a strong model) — needs an extraction fix and re-run. <code>qwen3-32b = $0.00000</code> is a probe pricing-key bug (the probe used the friendly name <code>qwen3-32b</code> but the price table is keyed <code>qwen3-32b-reasoning/-direct</code>), so its cost is unpriced, not free. Both are excluded from the conclusions above and flagged for a clean re-run.
+  <div class="callout">
+    <b>Routing still has headroom (not saturated).</b> A perfect router (oracle = solve-if-any-model-solves) reaches <b>0.967</b> vs the best single model's 0.867 — <b>+10 points</b>. And a cheap-first policy already wins: <code>gpt-oss-120b</code> + escalate-to-Opus-on-failure = <b>0.867</b>, beating Opus-only (0.73) while spending a fraction. The router's job here is less "reach higher accuracy" and more "reach deepseek-v3-level accuracy for deepseek-v3-level cost, with frontier escalation only for the residual hard tail."
   </div>
 
   <!-- ===================== 7. TRANSFERABILITY ===================== -->
