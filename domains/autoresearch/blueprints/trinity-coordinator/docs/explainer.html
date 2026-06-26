@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trinity Coordinator — Visual Explainer</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --ink:#e6edf3; --muted:#9da7b3;
+    --line:#30363d; --accent:#58a6ff; --good:#3fb950; --warn:#d29922; --bad:#f85149;
+    --opus:#d2a8ff; --mid:#58a6ff; --cheap:#3fb950; --reason:#f0883e;
+    --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 24px 80px}
+  h1{font-size:30px;margin:0 0 6px;letter-spacing:-.4px}
+  h2{font-size:21px;margin:44px 0 14px;padding-top:18px;border-top:1px solid var(--line);letter-spacing:-.2px}
+  h3{font-size:16px;margin:22px 0 8px;color:var(--accent)}
+  p{margin:10px 0}
+  .sub{color:var(--muted);font-size:15px;margin-top:0}
+  .tag{display:inline-block;font:600 11px/1 var(--mono);padding:4px 8px;border-radius:5px;background:var(--panel2);
+       color:var(--muted);border:1px solid var(--line);margin-right:6px}
+  code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px;color:#cdd9e5}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin:14px 0}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr 1fr}
+  @media(max-width:760px){.g2,.g3{grid-template-columns:1fr}}
+  .muted{color:var(--muted)}
+  .small{font-size:13px}
+  .kbd{font-family:var(--mono);font-size:12.5px;color:#cdd9e5}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font:600 12px var(--mono)}
+  .p-opus{background:rgba(210,168,255,.14);color:var(--opus);border:1px solid rgba(210,168,255,.35)}
+  .p-mid{background:rgba(88,166,255,.12);color:var(--mid);border:1px solid rgba(88,166,255,.35)}
+  .p-cheap{background:rgba(63,185,80,.12);color:var(--cheap);border:1px solid rgba(63,185,80,.35)}
+  .p-reason{background:rgba(240,136,62,.12);color:var(--reason);border:1px solid rgba(240,136,62,.35)}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+  th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--muted);font-weight:600}
+  .center{text-align:center}
+  .flow{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:8px 0}
+  .node{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 14px;text-align:center;min-width:96px}
+  .node .t{font:600 13px var(--mono)}
+  .node .d{font-size:11px;color:var(--muted);margin-top:3px}
+  .arrow{color:var(--muted);font-size:20px}
+  .callout{border-left:3px solid var(--accent);background:var(--panel2);padding:12px 16px;border-radius:0 8px 8px 0;margin:14px 0}
+  .callout.good{border-color:var(--good)} .callout.warn{border-color:var(--warn)} .callout.bad{border-color:var(--bad)}
+  .lab{font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+  ul{margin:8px 0 8px 0;padding-left:22px} li{margin:4px 0}
+  .bar{height:14px;border-radius:3px;background:var(--accent);display:inline-block;vertical-align:middle}
+  .legend{font-size:12px;color:var(--muted);margin-top:4px}
+  .foot{margin-top:50px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);padding-top:16px}
+  svg{max-width:100%}
+  .stepnum{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#06101f;
+           font:700 12px var(--mono);align-items:center;justify-content:center;margin-right:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Trinity Coordinator</h1>
+  <p class="sub">An evolved (CMA-ES) LLM router over a Bedrock model pool — reproduction, what broke, and the pivot to a cost-aware experiment.</p>
+  <div>
+    <span class="tag">arXiv 2512.04695</span>
+    <span class="tag">Bedrock Converse</span>
+    <span class="tag">CMA-ES (gradient-free)</span>
+    <span class="tag">domains/autoresearch</span>
+  </div>
+
+  <!-- ===================== 1. THE BIG IDEA ===================== -->
+  <h2>1 · The one-sentence idea</h2>
+  <div class="card">
+    <p>A <b>tiny coordinator</b> (Qwen3-0.6B + a ~19K-parameter head) reads the hidden state of a conversation and decides, each turn, <b>which model from a pool</b> should act and <b>in which role</b> (Solver / Thinker / Verifier). It is trained not with reinforcement learning but with <b>evolution (CMA-ES)</b> over its tiny parameter vector.</p>
+    <p class="muted small">Why this matters here: our own prior <b>GRPO router</b> experiment was a negative result — a single-policy RL router collapsed <i>below</i> best-static on a multi-modal cost-aware reward. Trinity is the gradient-free alternative our write-up named. The paper's own bake-off agrees: <code>sep-CMA-ES 0.615 &gt; SFT 0.592 &gt; RS 0.374 &gt; REINFORCE 0.253</code> — REINFORCE (≈ our GRPO) is dead last.</p>
+  </div>
+
+  <!-- ===================== 2. THE MAPPING ===================== -->
+  <h2>2 · How the head maps to (model, role)</h2>
+  <p>This is the part everyone asks about. There is <b>one learned tensor</b> and <b>two index lookups</b> — no semantic "role→model" table. The head learns everything as logits over <em>positions</em>.</p>
+
+  <div class="card">
+    <div class="lab">forward pass, every turn</div>
+    <div class="flow">
+      <div class="node"><div class="t">conversation</div><div class="d">messages so far</div></div>
+      <span class="arrow">→</span>
+      <div class="node" style="border-color:#3b5bdb"><div class="t">Qwen3-0.6B</div><div class="d">frozen backbone · layer-26 hidden state</div></div>
+      <span class="arrow">→</span>
+      <div class="node" style="border-color:#3b5bdb"><div class="t">linear head</div><div class="d">~19K params (SVD scales + 10.2K head)</div></div>
+      <span class="arrow">→</span>
+      <div class="node"><div class="t">logits[10]</div><div class="d">7 agents + 3 roles</div></div>
+    </div>
+
+    <div class="grid g2" style="margin-top:16px">
+      <div>
+        <div class="lab">split &amp; sample (core.py: step_trinity)</div>
+        <pre class="kbd" style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;font-size:12.5px;margin:6px 0">agent_logits = logits[:-3]   <span class="muted"># first 7</span>
+role_logits  = logits[-3:]   <span class="muted"># last 3</span>
+
+agent_id = softmax_sample(agent_logits)
+role_id  = softmax_sample(role_logits)
+
+name = llm_names[agent_id]   <span class="muted"># positional!</span>
+query_llm(model=name, ...)   <span class="muted"># → Bedrock</span></pre>
+        <p class="small muted">Agent and role are sampled <b>independently</b> from the same forward pass. Any model can play any role. <code>role_id</code> never touches the model — it only selects which <b>prompt template</b> to build.</p>
+      </div>
+      <div>
+        <div class="lab">the chain, top to bottom</div>
+        <table>
+          <tr><th>layer</th><th>what it is</th></tr>
+          <tr><td><code>agent_id</code> 0–6</td><td>positional index</td></tr>
+          <tr><td><code>llm_names[i]</code></td><td>ordered name list — <b>the contract</b></td></tr>
+          <tr><td>friendly name</td><td>e.g. <code>qwen3-32b-reasoning</code></td></tr>
+          <tr><td>Bedrock adapter</td><td>name → modelId → Converse API</td></tr>
+        </table>
+        <div class="callout warn small" style="margin-top:10px">
+          <b>Positional ⇒ the pool is baked into the head.</b> Neuron <code>i</code> means "output 3", not a model name. Swap a model at a position → logits transfer but the policy is mis-calibrated. Add a model → must widen the output layer + warm-start + re-evolve.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>The pool (7 workers, ordinal = head output index)</h3>
+  <table>
+    <tr><th>ord</th><th>worker</th><th>tier</th><th>blended $/Mtok</th><th>role on Bedrock</th></tr>
+    <tr><td>0</td><td>claude-opus-4-8 <span class="pill p-opus">frontier</span></td><td>anchor</td><td>$15.00</td><td>Converse / IAM · no-temperature quirk</td></tr>
+    <tr><td>1</td><td>claude-sonnet-4-6 <span class="pill p-opus">frontier</span></td><td>frontier</td><td>$9.00</td><td>Converse / IAM</td></tr>
+    <tr><td>2</td><td>nova-pro <span class="pill p-mid">mid</span></td><td>Amazon</td><td>$2.00</td><td>Converse / IAM</td></tr>
+    <tr><td>3</td><td>deepseek-r1 <span class="pill p-reason">reasoning</span></td><td>open-reasoning</td><td>$3.38</td><td>us. inference profile</td></tr>
+    <tr><td>4</td><td>gemma-3-27b <span class="pill p-cheap">cheap</span></td><td>open-mid</td><td>$0.30</td><td>Converse / IAM</td></tr>
+    <tr><td>5</td><td>qwen3-32b-reasoning <span class="pill p-reason">reasoning</span></td><td>open-reasoning</td><td>$0.39</td><td>reasoning_effort flag</td></tr>
+    <tr><td>6</td><td>qwen3-32b-direct <span class="pill p-cheap">cheap</span></td><td>open-direct</td><td>$0.39</td><td>same weights, no thinking</td></tr>
+  </table>
+  <p class="small muted">Frontier (Opus) is <b>38×</b> the blended price of the cheapest worker. That spread is the headroom the cost experiment exploits.</p>
+
+  <!-- ===================== 3. THE SCAFFOLD ===================== -->
+  <h2>3 · The three-role scaffold (multi-turn)</h2>
+  <div class="card">
+    <div class="flow">
+      <div class="node"><div class="t">Solver</div><div class="d">role 0 · produces an answer</div></div>
+      <span class="arrow">⇄</span>
+      <div class="node"><div class="t">Thinker</div><div class="d">role 1 · suggests next step + role</div></div>
+      <span class="arrow">⇄</span>
+      <div class="node"><div class="t">Verifier</div><div class="d">role 2 · ACCEPT / REJECT</div></div>
+    </div>
+    <p class="small">Each episode runs up to <b>5 turns</b>. A Verifier <b>ACCEPT halts early</b>. The head picks (model, role) each turn from the conversation state. This scaffold is the second thing Trinity bundles — and the experiment must separate its effect from the routing effect (see §6).</p>
+  </div>
+
+  <!-- ===================== 4. EXPERIMENT ARC ===================== -->
+  <h2>4 · The experiment arc (what actually happened)</h2>
+
+  <div class="card">
+    <div style="margin-bottom:6px"><span class="stepnum">0</span><b>Reproduce</b> — eval the bundled checkpoint, then evolve from scratch on Bedrock.</div>
+    <div style="margin:14px 0 6px"><span class="stepnum">1</span><b>Full CMA-ES run → SATURATION.</b> On LiveCodeBench + the strong pool, reward was already <b>0.933 at iter 0</b> (random head) and stayed flat for 17 iters — no learning curve, just noise.</div>
+
+    <div class="callout bad">
+      <b>The verifier "didn't help" — but that's not a verifier failure.</b> Frontier models one-shot LiveCodeBench, so there are no errors to catch and no accuracy to climb. CMA-ES rationally <b>pruned the scaffold</b>: Thinker 314→0, Verifier 185→~5. Role collapse is the <i>symptom</i> of saturation. (Contrast our verifier-reward result, which wins on SWE-bench — bug-prone patches + real test execution. Verifiers help where there are bugs to find.)
+    </div>
+
+    <div class="lab" style="margin-top:14px">role usage collapses as evolution prunes the scaffold</div>
+    <svg viewBox="0 0 720 150" width="720" height="150" role="img" aria-label="role usage over iterations">
+      <!-- axes -->
+      <line x1="40" y1="120" x2="700" y2="120" stroke="#30363d"/>
+      <line x1="40" y1="10" x2="40" y2="120" stroke="#30363d"/>
+      <text x="6" y="20" fill="#9da7b3" font-size="10">use</text>
+      <text x="360" y="142" fill="#9da7b3" font-size="10">CMA-ES iteration →</text>
+      <!-- solver (flat high) -->
+      <polyline fill="none" stroke="#3fb950" stroke-width="2"
+        points="40,55 95,40 150,34 205,30 260,32 315,28 370,27 425,28 480,26 535,30 590,28 645,29 700,28"/>
+      <text x="705" y="30" fill="#3fb950" font-size="10" text-anchor="end" dx="-2">solver</text>
+      <!-- thinker (collapses) -->
+      <polyline fill="none" stroke="#f0883e" stroke-width="2"
+        points="40,80 95,76 150,98 205,104 260,112 315,116 370,119 425,116 480,118 535,115 590,118 645,119 700,118"/>
+      <text x="705" y="112" fill="#f0883e" font-size="10" text-anchor="end" dx="-2">thinker</text>
+      <!-- verifier (collapses) -->
+      <polyline fill="none" stroke="#58a6ff" stroke-width="2"
+        points="40,92 95,98 150,110 205,108 260,114 315,116 370,118 425,117 480,119 535,116 590,117 645,119 700,118"/>
+      <text x="705" y="105" fill="#58a6ff" font-size="10" text-anchor="end" dx="-2">verifier</text>
+    </svg>
+    <p class="legend">Banked as a boundary result: <i>strong pool + easy task → scaffold collapse, no routing signal.</i></p>
+  </div>
+
+  <!-- ===================== 5. THE PIVOT ===================== -->
+  <h2>5 · The pivot — make COST the optimized axis</h2>
+  <div class="card">
+    <p>When accuracy is at the ceiling, raw pass-rate has no headroom — but <b>cost does</b>. The question becomes: <i>"hit 0.93 as cheaply as possible."</i> Reward is reshaped as a budget-constrained Pareto objective:</p>
+    <pre class="kbd center" style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:14px;font-size:15px;color:#cdd9e5">reward = raw_passrate − λ · max(0, episode_cost − budget)</pre>
+    <div class="grid g3" style="margin-top:12px">
+      <div class="card" style="margin:0">
+        <div class="lab">cost is measured, not guessed</div>
+        <p class="small">A provider-agnostic token counter reads Bedrock Converse <code>usage.{inputTokens,outputTokens}</code> — identical schema across Anthropic / Amazon / Qwen / DeepSeek / Gemma. Pricing is applied <b>separately</b> so counts stay reconcilable if prices change.</p>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="lab">sweep λ → Pareto frontier</div>
+        <p class="small">λ ∈ {0,1,10,100}. <code>λ=0</code> = accuracy-only baseline (frontier-heavy). Higher λ pushes routing toward cheap-but-adequate. <b>The frontier is the result.</b></p>
+      </div>
+      <div class="card" style="margin:0">
+        <div class="lab">free role binding</div>
+        <p class="small">The head may assign any model to any role. We <i>observe</i> whether evolution discovers the economically-rational stratification: cheap Solver, frontier model reserved for the high-leverage Verifier turn.</p>
+      </div>
+    </div>
+    <div class="callout good">
+      <b>Validated end-to-end.</b> Pre-check iter 0: <code>shaped = 1.0 − 100·(0.0103 − 0.0005) = 0.0182</code> — the reward math is exact and the per-episode cost is real measured tokens.
+    </div>
+  </div>
+
+  <!-- ===================== 6. VIABILITY GATE ===================== -->
+  <h2>6 · The viability gate — does routing even help?</h2>
+  <p>Routing only earns its keep if the pool has a genuine cost/capability <b>trade-off</b>. If every model passes the same problems (low capability variance), routing is pointless no matter the price spread. We measure this <b>before</b> training, with a per-model solo pass matrix.</p>
+
+  <table>
+    <tr><th>outcome</th><th>signature</th><th>the finding</th></tr>
+    <tr><td><span class="pill p-cheap">row&nbsp;1</span> low capability variance</td><td>models pass the same problems; one cheap model is good enough</td><td><b>"Opus premium is wasted here"</b> — quantify the $ saved at iso-accuracy. Pareto = a vertical line. The <i>stronger</i> cost-aware claim.</td></tr>
+    <tr><td><span class="pill p-mid">row&nbsp;2</span> decorrelated + priced differently</td><td>cheap wins easy problems, frontier wins a distinct hard tail</td><td><b>Genuine cost-aware routing policy.</b> → proceed to the λ-sweep on an expanded pool.</td></tr>
+    <tr><td><span class="pill p-opus">edge</span> one model dominates</td><td>a single cheap model passes ~everything</td><td>"just use it" — no router needed.</td></tr>
+  </table>
+
+  <div class="callout">
+    <b>Why this answers "what if we saturate on a cheap flagship too?"</b> — the pass matrix <i>measures</i> capability variance directly instead of assuming it. Either outcome is a publishable result; the row-1 case ("you don't need Opus at all here") is arguably the most provocative for the cost-aware-routing thesis.
+  </div>
+
+  <h3>Expanded candidate pool (Gate 0.0 — live-verified on Bedrock)</h3>
+  <p class="small">The original 7 lacked a <b>near-frontier-capability, mid-price</b> tier — exactly where the interesting trade-offs live. Reachable open flagships fill it:</p>
+  <table>
+    <tr><th>added candidate</th><th>why it matters</th></tr>
+    <tr><td><code>qwen.qwen3-coder-480b-a35b</code></td><td>near-frontier coding, open, cheap — the key mid-tier challenger</td></tr>
+    <tr><td><code>qwen.qwen3-235b-a22b-2507</code></td><td>open flagship, cheap</td></tr>
+    <tr><td><code>deepseek.v3-v1:0</code></td><td>open flagship (non-reasoning)</td></tr>
+    <tr><td><code>openai.gpt-oss-120b</code></td><td>OpenAI open-weight flagship</td></tr>
+    <tr><td><code>claude-haiku-4-5</code></td><td>fills the Anthropic cheap tier</td></tr>
+  </table>
+  <p class="small muted">(Kimi K2, GLM-5, MiniMax, Mistral-Large-3 were not in this account's catalog.)</p>
+
+  <!-- ===================== 6b. RESULT ===================== -->
+  <h2>6b · Viability-gate result (n=30 LiveCodeBench, seed 42)</h2>
+  <p>The probe ran all 11 candidates solo. <b>Mean pairwise pass-correlation = 0.27</b> (low — models genuinely disagree), and several open flagships land within a few points of Opus at a fraction of the cost.</p>
+
+  <table>
+    <tr><th>model</th><th>pass@1</th><th>$/problem (measured)</th><th>cost vs Opus</th><th></th></tr>
+    <tr><td>claude-opus-4-8</td><td>0.77</td><td>$0.01041</td><td>1.0×</td><td><span class="pill p-opus">frontier</span></td></tr>
+    <tr><td><b>gpt-oss-120b</b></td><td><b>0.73</b></td><td><b>$0.00066</b></td><td><b>0.06×</b></td><td><span class="pill p-cheap">open flagship</span></td></tr>
+    <tr><td>claude-sonnet-4-6</td><td>0.70</td><td>$0.00884</td><td>0.85×</td><td><span class="pill p-opus">frontier</span></td></tr>
+    <tr><td>claude-haiku-4-5</td><td>0.67</td><td>$0.00408</td><td>0.39×</td><td><span class="pill p-mid">cheap-frontier</span></td></tr>
+    <tr><td>qwen3-235b</td><td>0.67</td><td>$0.00084</td><td>0.08×</td><td><span class="pill p-cheap">open flagship</span></td></tr>
+    <tr><td>qwen3-coder-480b</td><td>0.67</td><td>$0.00078</td><td>0.07×</td><td><span class="pill p-cheap">open flagship</span></td></tr>
+    <tr><td>gemma-3-27b</td><td>0.50</td><td>$0.00080</td><td>0.08×</td><td><span class="pill p-cheap">cheap</span></td></tr>
+    <tr><td>nova-pro</td><td>0.47</td><td>$0.00107</td><td>0.10×</td><td><span class="pill p-mid">mid</span></td></tr>
+    <tr><td>deepseek-r1</td><td>0.37</td><td>$0.02469</td><td>2.4×</td><td><span class="pill p-reason">reasoning</span></td></tr>
+  </table>
+
+  <div class="callout good">
+    <b>Both findings hold at once.</b> (1) <b>The Opus premium looks hard to justify here</b> — <code>gpt-oss-120b</code> reaches 96% of Opus's pass-rate at <b>1/16th the cost</b>; <code>qwen3-235b</code> / <code>qwen3-coder-480b</code> hit 87% at ~1/13th. (2) <b>Routing has real headroom</b> — pass-correlation is only 0.27 and problems split across "solved by k models" from 0 to 10, so different models genuinely win different problems. This is the row-1 ∩ row-2 outcome: a cheap pool nearly matches frontier <i>and</i> the disagreement leaves room for a router to capture the hard tail.
+  </div>
+
+  <div class="callout warn">
+    <b>Two measurement caveats (not yet trusted as fact).</b> <code>deepseek-v3 = 0.00</code> is almost certainly a code-extraction/format miss, not a capability result (it's a strong model) — needs an extraction fix and re-run. <code>qwen3-32b = $0.00000</code> is a probe pricing-key bug (the probe used the friendly name <code>qwen3-32b</code> but the price table is keyed <code>qwen3-32b-reasoning/-direct</code>), so its cost is unpriced, not free. Both are excluded from the conclusions above and flagged for a clean re-run.
+  </div>
+
+  <!-- ===================== 7. TRANSFERABILITY ===================== -->
+  <h2>7 · What "transferable / generalizable" means</h2>
+  <div class="grid g2">
+    <div class="card" style="margin:0">
+      <h3 style="margin-top:0">Transfers freely</h3>
+      <ul class="small">
+        <li><b>Across tasks, fixed pool.</b> The head reads a semantic hidden-state embedding, not model IDs — a head trained on LiveCodeBench transfers to MATH/MMLU without retraining.</li>
+        <li>The cost-aware <i>policy</i> ("escalate to expensive only when the embedding signals hard") is itself a model-agnostic strategy that should carry over.</li>
+      </ul>
+    </div>
+    <div class="card" style="margin:0">
+      <h3 style="margin-top:0">Does not transfer freely</h3>
+      <ul class="small">
+        <li><b>Changing the pool.</b> The positional head bakes pool composition into its output geometry.</li>
+        <li><b>Swap</b> a model at an ord → logits transfer, economics mis-calibrated.</li>
+        <li><b>Add</b> a model → widen the output layer, warm-start the known neurons, run a short top-up evolution.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout">
+    <b>Research extension — a content-addressed head.</b> Condition each model's logit on a <b>descriptor</b> (<code>$/Mtok</code>, capability embedding, context window, reasoning?) instead of a bare position. Then adding a model = appending a descriptor row — no architecture change — and one trained coordinator can route <i>any</i> pool by reading model cards. Price lives in the descriptor, so it fits the cost-aware framing directly. A materially stronger "generalizable" claim than the paper's.
+  </div>
+
+  <!-- ===================== 8. WHY CMA-ES ===================== -->
+  <h2>8 · Why CMA-ES, not RL</h2>
+  <div class="card">
+    <p>The trainable vector is tiny (~19K params) and the reward is <b>multi-modal and non-differentiable</b> (cost penalties, discrete routing, early-halts). Single-policy gradient RL collapsed below best-static on exactly this shape (our GRPO negative result). Evolution strategies — population-based, gradient-free — handle rugged reward landscapes without a value function or policy-gradient variance. The paper's bake-off and our own result both rank REINFORCE last.</p>
+  </div>
+
+  <!-- ===================== ENGINEERING ===================== -->
+  <h2>9 · Hard-won engineering lessons (selected)</h2>
+  <div class="grid g2">
+    <div class="card small" style="margin:0">
+      <div class="lab">the vendored code is eval-only</div>
+      The training loop, <code>_calculate_closed_source_costs</code>, and every <code>*_bonus_weight</code> knob were missing or dead. All reward shaping had to be built, not configured.
+    </div>
+    <div class="card small" style="margin:0">
+      <div class="lab">spawn-Pool isolation</div>
+      Monkeypatches, cost, and token counters live per-worker-interpreter. Bridged via <code>sitecustomize.py</code> + per-PID telemetry sink files the main process aggregates.
+    </div>
+    <div class="card small" style="margin:0">
+      <div class="lab">reasoning-token clip</div>
+      Bedrock clips the first answer token at the reasoning→text boundary (qwen reasoning) — silently flipping Verifier ACCEPT→REJECT. Caught by the 21-cell role-audit gate, repaired in extraction.
+    </div>
+    <div class="card small" style="margin:0">
+      <div class="lab">executor hang</div>
+      Grading generated code with <code>using_closed_models=True</code> skips the signal alarm → an infinite-loop solution hangs forever. Arm the alarm.
+    </div>
+    <div class="card small" style="margin:0">
+      <div class="lab">resume safety</div>
+      CMA-ES state pickled + S3-synced every iter; iter-0 durability is a hard gate. A reclaim costs one iter, not the run.
+    </div>
+    <div class="card small" style="margin:0">
+      <div class="lab">degeneracy gates</div>
+      Worker non-degeneracy, role usage, entropy &gt; 1.5, and a brand-concentration &lt; 40% check (the rl-conductor 52%-Opus-skew failure mode).
+    </div>
+  </div>
+
+  <div class="foot">
+    Source of truth: <code>domains/autoresearch/specs/trinity-coordinator.md</code> + blueprint <code>lessons.md</code> (#1–30).
+    This explainer is a static HTML summary — open it in a browser; it has no external dependencies.
+    Numbers (role-collapse trajectory, pre-check reward) are from the 2026-06-25/26 Phase-1 run on a g6e.2xlarge (L40S).
+  </div>
+
+</div>
+</body>
+</html>
