@@ -48,6 +48,7 @@ copy_report "domains/gpu-serving/blueprints/kimi-k2.5/results/benchmark-visual-2
 copy_report "domains/gpu-serving/blueprints/nemotron-super/results/benchmark-report.html" "benchmark-report-nemotron-super.html"
 copy_report "domains/gpu-serving/blueprints/ray-serve-video/results/benchmark-visual-report.html" "benchmark-visual-ray-serve-video-20260327.html"
 copy_report "domains/gpu-serving/blueprints/qwen3-235b-b300/results/benchmark-visual-report.html" "benchmark-visual-qwen3-235b-b300-20260422.html"
+copy_report "domains/gpu-serving/blueprints/kimi-k2.6-speculative/docs/roofline-explainer.html" "roofline-explainer-kimi-k2.6.html"
 copy_report "domains/gpu-serving/blueprints/qwen3-235b-speculative/docs/benchmark-report.html" "benchmark-visual-qwen3-235b-speculative.html"
 
 # GPU Serving — HyperPod & EKS
