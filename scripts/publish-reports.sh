@@ -15,7 +15,7 @@ echo "==> Collecting reports into $REPORTS"
 BACKUP="$DOCS/reports.bak"
 rm -rf "$BACKUP"
 mkdir -p "$BACKUP"
-for f in compatibility-matrix.html model-comparison.html provider-comparison.html site-benchmark-report.html pareto-frontier.html pareto-mockups.html benchmark-visual-deepseek-v4-flash-20260519.html; do
+for f in pareto-frontier.html benchmark-visual-deepseek-v4-flash-20260519.html benchmark-visual-kimi-k2.6-nvfp4-20260617.html inference-bottleneck-migration-20260612.html; do
   [[ -f "$REPORTS/$f" ]] && cp "$REPORTS/$f" "$BACKUP/$f"
 done
 rm -rf "$REPORTS"
@@ -39,8 +39,7 @@ copy_report() {
 
 # GPU Serving
 copy_report "domains/gpu-serving/blueprints/ray-serve-ft/results/ray-ft-visual-20260323.html" "ray-ft-visual-20260323.html"
-copy_report "domains/gpu-serving/blueprints/glm5-lmcache/results/benchmark-visual-20260307.html" "benchmark-visual-glm5-lmcache-20260307.html"
-copy_report "domains/gpu-serving/blueprints/glm5-llmd/results/benchmark-visual-20260307.html" "benchmark-visual-glm5-llmd-20260307.html"
+copy_report "domains/gpu-serving/blueprints/glm5.2/results/benchmark-visual-report.html" "benchmark-visual-glm5.2-20260623.html"
 copy_report "domains/gpu-serving/blueprints/qwen3-next-sglang/results/benchmark-visual-20260303.html" "benchmark-visual-qwen3-next-sglang-20260303.html"
 copy_report "domains/gpu-serving/blueprints/qwen3-next-custbench/results/session-20260226/benchmark-visual-report.html" "benchmark-visual-report-custbench-20260226.html"
 copy_report "domains/gpu-serving/blueprints/qwen3-next-g7e/results/benchmark-visual-20260225.html" "benchmark-visual-qwen3-next-g7e-20260225.html"
@@ -49,9 +48,6 @@ copy_report "domains/gpu-serving/blueprints/kimi-k2.5/results/benchmark-visual-2
 copy_report "domains/gpu-serving/blueprints/nemotron-super/results/benchmark-report.html" "benchmark-report-nemotron-super.html"
 copy_report "domains/gpu-serving/blueprints/ray-serve-video/results/benchmark-visual-report.html" "benchmark-visual-ray-serve-video-20260327.html"
 copy_report "domains/gpu-serving/blueprints/qwen3-235b-b300/results/benchmark-visual-report.html" "benchmark-visual-qwen3-235b-b300-20260422.html"
-copy_report "domains/gpu-serving/blueprints/kimi-k2.6/results/benchmark-visual-report.html" "benchmark-visual-kimi-k2.6-20260422.html"
-copy_report "domains/gpu-serving/blueprints/kimi-k2.6-speculative/docs/benchmark-report.html" "benchmark-visual-kimi-k2.6-speculative.html"
-copy_report "domains/gpu-serving/blueprints/kimi-k2.6-speculative/docs/roofline-explainer.html" "roofline-explainer-kimi-k2.6.html"
 copy_report "domains/gpu-serving/blueprints/qwen3-235b-speculative/docs/benchmark-report.html" "benchmark-visual-qwen3-235b-speculative.html"
 
 # GPU Serving — HyperPod & EKS
@@ -67,19 +63,18 @@ copy_report "domains/autoresearch/blueprints/agent-harness/results/sera32b-coali
 copy_report "domains/autoresearch/blueprints/agent-harness/results/thunderagent-phase2b-20260320.html" "thunderagent-phase2b-20260320.html"
 copy_report "domains/autoresearch/blueprints/agent-harness/results/agent-swarm-20260319.html" "agent-swarm-20260319.html"
 copy_report "domains/autoresearch/blueprints/agent-harness/results/visual-explainer-20260318.html" "visual-explainer-harness-20260318.html"
-copy_report "domains/autoresearch/blueprints/agent-harness/results/visual-explainer-20260315.html" "visual-explainer-harness-20260315.html"
 copy_report "domains/autoresearch/blueprints/training-recipes/results/benchmark-report.html" "benchmark-report-training-recipes.html"
 copy_report "domains/autoresearch/blueprints/finetuning-recipes/results/benchmark-report.html" "benchmark-report-finetuning-recipes.html"
 copy_report "domains/autoresearch/blueprints/verification-primitives/results/verification-primitives-consolidated.html" "verification-primitives-consolidated.html"
 copy_report "domains/autoresearch/blueprints/verification-flywheel/results/flywheel-visual-20260426.html" "flywheel-visual-20260426.html"
 copy_report "domains/autoresearch/blueprints/learned-verifier/results/verification-visual-explainer.html" "learned-verifier-visual.html"
-copy_report "domains/autoresearch/blueprints/kernel-optimization-agent/results/report-visual.html" "kernel-optimization-visual.html"
 copy_report "domains/autoresearch/blueprints/tiny-judge/results/judge-visual.html" "tiny-judge-visual.html"
 copy_report "domains/autoresearch/blueprints/pivot-analysis/results/pivot-visual.html" "pivot-analysis-visual.html"
 copy_report "domains/autoresearch/blueprints/self-coding-agent-loop/spec-explainer.html" "self-coding-agent-loop-visual.html"
+copy_report "domains/autoresearch/blueprints/trinity-coordinator/docs/explainer.html" "trinity-coordinator-visual.html"
 
 # Cross-domain (existing files in docs/reports/ — preserved across rebuilds)
-for f in compatibility-matrix.html model-comparison.html provider-comparison.html site-benchmark-report.html pareto-frontier.html pareto-mockups.html benchmark-visual-deepseek-v4-flash-20260519.html; do
+for f in pareto-frontier.html benchmark-visual-deepseek-v4-flash-20260519.html benchmark-visual-kimi-k2.6-nvfp4-20260617.html inference-bottleneck-migration-20260612.html; do
   if [[ -f "$DOCS/reports.bak/$f" ]]; then cp "$DOCS/reports.bak/$f" "$REPORTS/$f"; copied=$((copied+1)); echo "  + $f (preserved)"; fi
 done
 
