@@ -82,6 +82,30 @@ done
 
 echo "==> Collected $copied reports ($skipped skipped)"
 
+# Auto-sync config.json visibility allow-list from the index's cards.
+# index.html's JS hides any card whose data-id is NOT in config.json "visible".
+# Regenerating it from the index here makes the index the single source of truth,
+# so a new card can never be silently hidden by a stale config (the 2026-06-26 bug).
+echo "==> Syncing config.json visibility from index.html cards"
+python3 - "$DOCS/index.html" "$DOCS/config.json" <<'PYSYNC'
+import json, re, sys
+index_path, config_path = sys.argv[1], sys.argv[2]
+ids = re.findall(r'data-id="([^"]+)"', open(index_path).read())
+try:
+    cfg = json.load(open(config_path))
+except Exception:
+    cfg = {}
+before = set(cfg.get("visible", []))
+cfg["visible"] = ids  # exact index card set, in document order
+json.dump(cfg, open(config_path, "w"), indent=2)
+after = set(ids)
+added, removed = sorted(after - before), sorted(before - after)
+print(f"  config.visible: {len(ids)} ids"
+      + (f" | +{len(added)} added" if added else "")
+      + (f" | -{len(removed)} removed" if removed else "")
+      + (" | in sync" if not added and not removed else ""))
+PYSYNC
+
 if $DRY_RUN; then
   echo "==> Dry run — not pushing. Files are in $REPORTS"
   exit 0
