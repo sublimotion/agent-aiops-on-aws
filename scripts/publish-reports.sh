@@ -46,6 +46,7 @@ copy_report "domains/gpu-serving/blueprints/qwen3-next-g7e/results/benchmark-vis
 copy_report "domains/gpu-serving/blueprints/qwen3-next/results/benchmark-visual-20260224.html" "benchmark-visual-qwen3-next-20260224.html"
 copy_report "domains/gpu-serving/blueprints/kimi-k2.5/results/benchmark-visual-20260221.html" "benchmark-visual-kimi-k2.5-20260221.html"
 copy_report "domains/gpu-serving/blueprints/nemotron-super/results/benchmark-report.html" "benchmark-report-nemotron-super.html"
+copy_report "domains/gpu-serving/blueprints/nemotron-ultra/results/benchmark-visual-report.html" "benchmark-visual-nemotron-ultra-20260606.html"
 copy_report "domains/gpu-serving/blueprints/ray-serve-video/results/benchmark-visual-report.html" "benchmark-visual-ray-serve-video-20260327.html"
 copy_report "domains/gpu-serving/blueprints/qwen3-235b-b300/results/benchmark-visual-report.html" "benchmark-visual-qwen3-235b-b300-20260422.html"
 copy_report "domains/gpu-serving/blueprints/kimi-k2.6-speculative/docs/roofline-explainer.html" "roofline-explainer-kimi-k2.6.html"
