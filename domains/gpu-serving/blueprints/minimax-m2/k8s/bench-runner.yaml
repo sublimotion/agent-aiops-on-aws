@@ -1,0 +1,307 @@
+# Bench-runner for minimax-m2 (B200, vLLM 0.19.1rc1). hostNetwork + dnsPolicy:Default
+# (L4b — same DNS lesson as the staging Job) so it reaches the serving pod on localhost
+# AND can pip-install aiohttp. Drives a concurrency sweep; streaming TTFT/ITL captured
+# client-side, percentiles + KV/preempt/prefix-hit harvested from Prometheus by run-sweep.sh.
+#
+# bench.py emits BOTH scenarios:
+#   - cold            : large ISL (force_isl), no shared prefix (unique per request) — the floor
+#   - shared-prefix   : BYTE-IDENTICAL 90k prefix + small unique suffix, APC on — the reuse claim
+# A cheap garbage screen runs on ~10 sampled outputs (repetition loop / empty / tool-parse).
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: minimax-bench-scripts, namespace: default}
+data:
+  bench.py: |
+    #!/usr/bin/env python3
+    # Concurrency driver for MiniMax-M2 on vLLM /v1/completions (streaming).
+    # Two prompt regimes (--scenario cold|shared-prefix). Shared-prefix builds a
+    # BYTE-IDENTICAL prefix string for every request so APC/radix exact-matches it.
+    # TTFT = time to FIRST streamed token (the customer's prefill-bound SLO).
+    # Per-request usage gives cache_hit fraction; aggregate decode tok/s = Σcomp / wall.
+    import asyncio, aiohttp, time, sys, json, random, string, argparse, re, urllib.request
+
+    # ---- engine /metrics snapshot (KV-TIER breakdown: GPU-HBM vs offload vs recompute) ----
+    # vLLM 0.19.1rc1 exposes the full tier set on this build (verified live 2026-06-27):
+    #   prefix_cache_{hits,queries}_total            -> GPU-HBM (local APC) tier
+    #   external_prefix_cache_{hits,queries}_total   -> offload tier (CPU/NVMe via KVConnector)
+    #   prompt_tokens_by_source_total{source=...}    -> local_compute / local_cache_hit / external_kv_transfer
+    #   prompt_tokens_cached_total                   -> local+external cached
+    #   prompt_tokens_recomputed_total               -> cached tokens RECOMPUTED (offload-miss/evict COST)
+    #   kv_cache_usage_perc                          -> KV residency gauge (instantaneous)
+    # NOTE: this build exposes NO kv_transfer bytes/latency gauge — that absence is recorded
+    #       in the output as kv_transfer_bytes_latency_exposed=False (a finding, not silently omitted).
+    _METRIC_KEYS = ("prefix_cache_hits_total", "prefix_cache_queries_total",
+                    "external_prefix_cache_hits_total", "external_prefix_cache_queries_total",
+                    "prompt_tokens_cached_total", "prompt_tokens_recomputed_total",
+                    "kv_cache_usage_perc")
+    _SOURCE_RE = re.compile(r'prompt_tokens_by_source_total\{[^}]*source="([^"]+)"[^}]*\}\s+([0-9.eE+-]+)')
+
+    def engine_metrics(port):
+        try:
+            d = urllib.request.urlopen(f"http://localhost:{port}/metrics", timeout=8).read().decode()
+        except Exception as e:
+            return {"_err": str(e)[:120]}
+        snap = {}
+        kv_transfer_seen = False
+        for l in d.splitlines():
+            if l.startswith("#"):
+                continue
+            if "kv_transfer" in l or "kv_connector_transfer" in l:
+                kv_transfer_seen = True
+            for k in _METRIC_KEYS:
+                # match "vllm:<k>{...} <val>"  (single-series counters/gauges)
+                if l.startswith(f"vllm:{k}") and "source=" not in l:
+                    try:
+                        snap[k] = float(l.rsplit(None, 1)[1])
+                    except Exception:
+                        pass
+        for m in _SOURCE_RE.finditer(d):
+            snap[f"prompt_tokens_src::{m.group(1)}"] = float(m.group(2))
+        snap["_kv_transfer_bytes_latency_exposed"] = kv_transfer_seen
+        return snap
+
+    def kv_tier_breakdown(before, after):
+        # delta of cumulative counters over the run window -> per-config tier attribution.
+        if not before or not after or "_err" in before or "_err" in after:
+            return {"available": False, "note": "engine /metrics unreachable at snapshot time"}
+        def dl(k):
+            b = before.get(k); a = after.get(k)
+            return (a - b) if (a is not None and b is not None) else None
+        gpu_hit = dl("prefix_cache_hits_total")
+        gpu_q = dl("prefix_cache_queries_total")
+        ext_hit = dl("external_prefix_cache_hits_total")
+        ext_q = dl("external_prefix_cache_queries_total")
+        src_local = dl("prompt_tokens_src::local_compute")
+        src_gpu = dl("prompt_tokens_src::local_cache_hit")
+        src_ext = dl("prompt_tokens_src::external_kv_transfer")
+        recomp = dl("prompt_tokens_recomputed_total")
+        served = [x for x in (src_local, src_gpu, src_ext) if x is not None]
+        total_src = sum(served) if served else None
+        def frac(x):
+            return round(x / total_src, 4) if (x is not None and total_src) else None
+        return {
+            "available": True,
+            # tokens served by source over the window (THE GPU-HBM vs offload-tier vs fresh-prefill split)
+            "tokens_fresh_prefill": src_local,         # local_compute = brand-new KV computed
+            "tokens_gpu_hbm_hit": src_gpu,             # local_cache_hit = served from GPU HBM APC
+            "tokens_offload_tier_hit": src_ext,        # external_kv_transfer = served from CPU/NVMe offload tier
+            "tokens_recomputed": recomp,               # cached-then-recomputed = offload miss/evict COST
+            "frac_fresh_prefill": frac(src_local),
+            "frac_gpu_hbm_hit": frac(src_gpu),
+            "frac_offload_tier_hit": frac(src_ext),
+            "gpu_prefix_hit_rate": round(gpu_hit / gpu_q, 4) if (gpu_hit is not None and gpu_q) else None,
+            "external_prefix_hit_rate": round(ext_hit / ext_q, 4) if (ext_hit is not None and ext_q) else None,
+            "kv_utilization_end": after.get("kv_cache_usage_perc"),
+            # transfer bytes/latency: NOT exposed by this connector/build -> explicit finding, not omitted
+            "kv_transfer_bytes_latency_exposed": bool(after.get("_kv_transfer_bytes_latency_exposed")),
+        }
+
+    p = argparse.ArgumentParser()
+    p.add_argument("--port", type=int, default=8000)
+    p.add_argument("--model", default="MiniMax-M2")
+    # cold: large ISL, no reuse (floor). shared-prefix: 90k prefix + small suffix (~350).
+    # 100k-90pct-reuse: THE HEADLINE production claim — total ISL≈100k = 90k byte-identical
+    #   shared prefix + ~10k unique suffix → 90% of every prompt cacheable. We MEASURE whether
+    #   the observed cached/prompt fraction actually reaches 0.90 (reuse_fraction_target).
+    p.add_argument("--scenario", required=True,
+                   choices=["cold", "shared-prefix", "100k-90pct-reuse"])
+    p.add_argument("--conc", type=int, required=True)
+    p.add_argument("--total", type=int, default=None)         # default = max(conc*2, 16)
+    # cold: ISL target (no reuse). shared-prefix / 100k-90pct-reuse: prefix + suffix tokens.
+    p.add_argument("--isl-tokens", type=int, default=59000)   # cold scenario ISL (~59k floor)
+    p.add_argument("--prefix-tokens", type=int, default=90000)  # shared-prefix scenario
+    p.add_argument("--suffix-tokens", type=int, default=350)
+    # reuse-fraction target for the high-reuse scenario — the customer's stated >90% claim.
+    p.add_argument("--reuse-target", type=float, default=0.0)  # >0 => assert measured hit-rate vs it
+    p.add_argument("--out-tokens", type=int, default=512)     # cap; thinking model runs toward EOS but we cap for sweep determinism
+    p.add_argument("--temperature", type=float, default=0.0)
+    p.add_argument("--sample-outputs", type=int, default=10)  # keep N full texts for the garbage screen
+    p.add_argument("--out", required=True)
+    a = p.parse_args()
+    if a.total is None:
+        a.total = max(a.conc * 2, 16)
+
+    # ~0.75 word/token heuristic; "word " ~= 1 token for this tokenizer family. Good enough
+    # to FORCE approximate ISL — exact token count is read back from usage.prompt_tokens.
+    def words(n):
+        return " ".join(random.choices(
+            ["fix", "refactor", "explain", "trace", "test", "patch", "review", "build",
+             "module", "function", "import", "return", "assert", "error", "value", "config"],
+            k=max(1, n)))
+
+    # Shared prefix is the SAME string for EVERY request (byte-identical → APC exact match).
+    SHARED_PREFIX = "You are a coding agent working in a large shared repository.\n" + words(a.prefix_tokens)
+
+    def make_prompt():
+        rid = "".join(random.choices(string.ascii_lowercase, k=8))
+        # shared-prefix AND 100k-90pct-reuse share the same byte-identical 90k prefix; they
+        # differ only in suffix size (350 vs ~10k), set by the runner via --suffix-tokens.
+        # The prefix MUST stay byte-identical across requests (rid goes AFTER it) or APC/radix
+        # exact-match collapses and the reuse fraction never approaches 0.90.
+        if a.scenario in ("shared-prefix", "100k-90pct-reuse"):
+            return SHARED_PREFIX + f"\n\nRequest {rid}: " + words(a.suffix_tokens)
+        # cold: unique large context per request (no cross-request reuse)
+        return f"Request {rid}. " + words(a.isl_tokens)
+
+    _REPEAT = re.compile(r"(\b\w+\b)(?:\s+\1){5,}")   # same token >5x in a row = loop
+
+    async def one(session, keep_text):
+        prompt = make_prompt()
+        url = f"http://localhost:{a.port}/v1/completions"
+        body = {"model": a.model, "prompt": prompt, "max_tokens": a.out_tokens,
+                "temperature": a.temperature, "stream": True,
+                "stream_options": {"include_usage": True}}
+        t0 = time.time(); ttft = None; toks = []; comp = 0; cached = 0; ptok = 0; text = []
+        last = t0; itls = []
+        async with session.post(url, json=body, timeout=aiohttp.ClientTimeout(total=900)) as r:
+            if r.status != 200:
+                return {"err": f"http{r.status}"}
+            async for raw in r.content:
+                line = raw.decode("utf-8", "ignore").strip()
+                if not line or not line.startswith("data:"):
+                    continue
+                payload = line[5:].strip()
+                if payload == "[DONE]":
+                    continue
+                try:
+                    chunk = json.loads(payload)
+                except Exception:
+                    continue
+                ch = chunk.get("choices") or []
+                if ch and ch[0].get("text"):
+                    now = time.time()
+                    if ttft is None:
+                        ttft = now - t0
+                    else:
+                        itls.append(now - last)
+                    last = now
+                    if keep_text:
+                        text.append(ch[0]["text"])
+                u = chunk.get("usage") or {}
+                if u.get("completion_tokens"):
+                    comp = u["completion_tokens"]
+                if u.get("prompt_tokens"):
+                    ptok = u["prompt_tokens"]
+                d = (u.get("prompt_tokens_details") or {})
+                if d.get("cached_tokens") is not None:
+                    cached = d["cached_tokens"]
+        dt = time.time() - t0
+        if not comp:
+            comp = a.out_tokens
+        # cold vs warm classification (Req 4): a request whose prompt was largely served
+        # from cache (cached/prompt high) is WARM; the prefix-populating request(s) are COLD.
+        warm = (ptok > 0 and (cached / ptok) >= 0.5)
+        out = {"dt": dt, "ttft": ttft, "comp": comp, "cached": cached, "prompt": ptok,
+               "warm": warm, "itl_mean": (sum(itls) / len(itls)) if itls else None}
+        if keep_text:
+            out["text"] = "".join(text)
+        return out
+
+    async def main():
+        conn = aiohttp.TCPConnector(limit=a.conc * 2 + 4)
+        async with aiohttp.ClientSession(connector=conn) as s:
+            sem = asyncio.Semaphore(a.conc)
+            kept = {"n": 0}
+            async def g(i):
+                async with sem:
+                    keep = kept["n"] < a.sample_outputs
+                    if keep:
+                        kept["n"] += 1
+                    try:
+                        return await one(s, keep)
+                    except Exception as e:
+                        return {"err": str(e)[:120]}
+            # snapshot engine KV-tier counters immediately before/after the batch -> deltas
+            m_before = engine_metrics(a.port)
+            t0 = time.time()
+            res = await asyncio.gather(*[g(i) for i in range(a.total)])
+            t1 = time.time()
+            m_after = engine_metrics(a.port)
+        kv_tier = kv_tier_breakdown(m_before, m_after)
+
+    # ----- garbage / quality screen (fail-closed structural checks) -----
+        ok = [r for r in res if "err" not in r]
+        texts = [r["text"] for r in res if r.get("text")]
+        empty = sum(1 for t in texts if not t.strip())
+        loops = sum(1 for t in texts if _REPEAT.search(t))
+        quality_pass = (empty == 0 and loops == 0 and len(ok) > 0)
+
+        def pct(xs, q):
+            xs = sorted(x for x in xs if x is not None)
+            return round(xs[min(len(xs) - 1, int(len(xs) * q))], 4) if xs else None
+
+        comp = sum(r["comp"] for r in ok)
+        cached = sum(r["cached"] for r in ok)
+        ptok = sum(r["prompt"] for r in ok)
+        e2e = [r["dt"] for r in ok]
+        ttfts = [r["ttft"] for r in ok if r.get("ttft") is not None]
+        itls = [r["itl_mean"] for r in ok if r.get("itl_mean") is not None]
+        # cold vs warm TTFT split (Req 4): quantify the caching benefit per config arm.
+        ttft_cold = [r["ttft"] for r in ok if r.get("ttft") is not None and not r.get("warm")]
+        ttft_warm = [r["ttft"] for r in ok if r.get("ttft") is not None and r.get("warm")]
+        cold_avg = (sum(ttft_cold) / len(ttft_cold)) if ttft_cold else None
+        warm_avg = (sum(ttft_warm) / len(ttft_warm)) if ttft_warm else None
+        cold_warm_ratio = round(cold_avg / warm_avg, 3) if (cold_avg and warm_avg) else None
+        out = {
+            "scenario": a.scenario, "concurrency": a.conc, "model": a.model,
+            "requests_ok": len(ok), "requests_err": len(res) - len(ok),
+            "error_rate": round((len(res) - len(ok)) / len(res), 4) if res else None,
+            "duration_s": round(t1 - t0, 3),
+            "agg_decode_tok_s": round(comp / (t1 - t0), 1) if t1 > t0 else 0,
+            "prompt_tokens_total": ptok, "cached_tokens_total": cached,
+            # HEADLINE cache-hit = engine-agnostic TOKEN FRACTION Σcached/Σprompt (compare to customer's >90%)
+            "client_cache_hit_fraction": round(cached / ptok, 4) if ptok else None,
+            # reuse-fraction CLAIM CHECK (Req 1): does the observed cached/prompt fraction actually
+            # reach the customer's stated 0.90 for the high-reuse scenario? Measured, not assumed.
+            "reuse_fraction_target": a.reuse_target if a.reuse_target > 0 else None,
+            "reuse_target_met": (bool(ptok) and (cached / ptok) >= a.reuse_target)
+                                if a.reuse_target > 0 else None,
+            # KV-TIER breakdown (GPU-HBM vs offload-tier vs recompute) — engine /metrics deltas.
+            # THE number that proves whether offload serves from the CPU/NVMe tier under reuse.
+            "kv_tier": kv_tier,
+            # TTFT (client-streamed) — prefill-bound interactivity SLO
+            "ttft_avg_s": round(sum(ttfts) / len(ttfts), 4) if ttfts else None,
+            "ttft_p50_s": pct(ttfts, 0.50), "ttft_p95_s": pct(ttfts, 0.95),
+            "ttft_p99_s": pct(ttfts, 0.99), "ttft_samples": len(ttfts),
+            # cold vs warm TTFT (Req 4): caching benefit per arm. ratio>1 => warm is faster.
+            "ttft_cold_avg_s": round(cold_avg, 4) if cold_avg else None,
+            "ttft_warm_avg_s": round(warm_avg, 4) if warm_avg else None,
+            "ttft_cold_warm_ratio": cold_warm_ratio,
+            "ttft_cold_samples": len(ttft_cold), "ttft_warm_samples": len(ttft_warm),
+            # client-side ITL mean-of-means (Prometheus inter_token_latency is the authority)
+            "itl_client_mean_s": round(sum(itls) / len(itls), 4) if itls else None,
+            "e2e_p50_s": pct(e2e, 0.50), "e2e_p95_s": pct(e2e, 0.95), "e2e_p99_s": pct(e2e, 0.99),
+            # quality screen
+            "quality_pass": quality_pass, "quality_empty": empty,
+            "quality_repetition_loops": loops, "quality_sampled": len(texts),
+            "t_start": t0, "t_end": t1,
+        }
+        json.dump(out, open(a.out, "w"), indent=2)
+        print(json.dumps(out, indent=2))
+        # exit non-zero on hard quality breach so the driver can mark the arm
+        sys.exit(0 if quality_pass else 3)
+
+    asyncio.run(main())
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: bench-runner, namespace: default, labels: {app: bench-runner}}
+spec:
+  restartPolicy: Always
+  hostNetwork: true
+  dnsPolicy: Default          # L4b — external DNS for pip on this CNI-less B200 node
+  nodeSelector: {blueprint: minimax-m2}
+  tolerations:
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+  containers:
+    - name: runner
+      image: python:3.12-slim
+      command: ["bash", "-c", "pip install -q aiohttp && while true; do sleep 3600; done"]
+      volumeMounts:
+        - {name: scripts, mountPath: /scripts}
+        - {name: nvme, mountPath: /mnt/nvme, mountPropagation: HostToContainer}
+      resources: {requests: {cpu: "4", memory: 4Gi}}
+  volumes:
+    - {name: scripts, configMap: {name: minimax-bench-scripts}}
+    - {name: nvme, hostPath: {path: /mnt/nvme, type: Directory}}

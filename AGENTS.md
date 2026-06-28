@@ -37,7 +37,8 @@ Read these files **on demand** based on what you're doing:
 | Fixing lint, checkov, tflint, or pre-commit failures | `.claude/steering/lint-remediation.md` |
 | Running pre-flight or post-deploy checks | Use the `deployment-orchestrator` skill |
 | Launching or managing a detached agent run on EKS (agent-runner CLI) | Use the `agent-runtime` skill |
-| Selecting a serving config / filling the Stage 0b lever ledger | `.claude/steering/inference-first-principles.md` (predict the regime) → `docs/optimization-stack.md` (T0–T5 lever catalog: priority per regime, typical Δ, conflicts). Account for every tier; defer with a reason, don't skip silently |
+| Selecting a serving config / filling the Stage 0b lever ledger | `.claude/steering/inference-first-principles.md` (predict the regime) → `docs/optimization-stack.md` (T0–T6 lever catalog: priority per regime, typical Δ, conflicts). Account for every tier; defer with a reason, don't skip silently |
+| Tuning a serving config past the first working deploy (in-spec optimization loop) | `standards/benchmark-commons/OPTIMIZATION-LOOP.md` — declared SLO objective, lineage/dead-end trajectory record, plateau/budget exit, reward-hacking guard. The loop reads `optimization-stack.md` as its search space + ordering prior |
 | Gating a serving config before deploy (Stage 0c) | `python3 standards/serving-commons/resolver/validate-serving-config.py --sidecar <benchmark.yaml> --corpus-root .` — fail-closed; exit 2 blocks. See `standards/serving-commons/README.md` |
 | Validating GPU hardware before serving (Stage 4a) | Use `gpu-infra` MCP tools: `discover_cluster`, `check_gpu_health`, `run_nccl_test` |
 | Diagnosing GPU hardware issues | Use `gpu-infra` MCP tools: `explain_xid`, `get_gpu_metrics`, `check_gpu_health` |
@@ -87,6 +88,7 @@ Read these files **on demand** based on what you're doing:
 | `domains/gpu-serving/blueprints/deepseek-v4-flash/` | `domains/gpu-serving/specs/deepseek-v4-flash.md` |
 | `domains/gpu-serving/blueprints/deepseek-ocr-2-eks/` | `domains/gpu-serving/specs/deepseek-ocr-2-eks.md` |
 | `domains/gpu-serving/blueprints/fin-attribute-extraction/` | `domains/gpu-serving/specs/fin-attribute-extraction.md` |
+| `domains/gpu-serving/blueprints/minimax-m2/` | `domains/gpu-serving/specs/minimax-m2.md` |
 | `domains/gpu-serving/blueprints/qwen3-embedding-8b-hyperpod/` | `domains/gpu-serving/specs/qwen3-embedding-8b-hyperpod.md` |
 | `domains/agent-runtime/blueprints/research-agent/` | `domains/agent-runtime/specs/research-agent.md` |
 | `domains/agent-runtime/blueprints/managed-agent-runner/` | `domains/agent-runtime/specs/managed-agent-runner.md` |

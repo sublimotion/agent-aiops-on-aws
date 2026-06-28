@@ -1,0 +1,106 @@
+# MiniMax-M2 — PRODUCTION autoscaling reference (NOT applied on the benchmark cluster).
+# This is a customer-deliverable template. Scale on QUEUE DEPTH, never GPU% — a vLLM
+# replica sits at ~100% GPU with a single request, so GPU% saturates long before the
+# queue builds and cannot distinguish "busy-and-fine" from "flooded". The signal that
+# actually predicts the TTFT blowup is vllm:num_requests_waiting / request_queue_time.
+#
+# HARD CONSTRAINTS (from the benchmark, see spec §Production Scaling Recommendation):
+#   - M2 scale-out is ~8min (warm NVMe cache) to ~60min (cold node) — TOO SLOW to chase
+#     spikes. This autoscaler is for SUSTAINED load shifts (business-hours ramp), NOT
+#     spike absorption. Spikes are handled by engine admission control + gateway shedding.
+#   - maxReplicas is GPU-bounded: floor(GPUs_per_node / TP_degree). On p6-b200 (8 GPUs):
+#     TP4 -> 2 replicas/node; TP2 -> 4. Beyond that needs more nodes (~30min B200 join).
+#   - MUST pair with prefix-affinity routing (llm-d EPP) or a new replica cold-caches the
+#     shared 90K prefix and spikes the TTFT it was added to fix. Autoscaling without
+#     prefix-affinity routing makes the cache-hit (the best lever) WORSE.
+#   - <TODO customer>: the queue thresholds below derive from the customer's TTFT budget,
+#     which is still unset. Set threshold so that (queue_depth / prefill_rate) < TTFT_budget.
+#
+# Prereqs in the customer's prod cluster: KEDA installed, Prometheus scraping vLLM /metrics,
+# weights pre-staged on node NVMe + a warm node pool so scale-out is boot-only.
+
+---
+# ── Option A (RECOMMENDED): KEDA ScaledObject on queue depth ──────────────────
+# KEDA speaks Prometheus natively (cleaner than HPA + prometheus-adapter for a
+# per-replica queue metric) and handles scale-to/from-zero.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: minimax-m2-queue-autoscale
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: vllm-minimax-m2          # the vLLM Deployment (prod runs a Deployment, not a bare Pod)
+  minReplicaCount: 1               # floor; raise to peak-sized for spike resilience (idle cost tradeoff)
+  maxReplicaCount: 2               # = floor(8 B200 / TP4). Set 4 if TP2. Per NODE — add nodes for more.
+  cooldownPeriod: 600              # 10min: do NOT thrash a model that takes minutes to boot
+  pollingInterval: 30
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 120   # confirm sustained load before paying a ~8min boot
+          policies: [{type: Pods, value: 1, periodSeconds: 300}]   # one replica at a time
+        scaleDown:
+          stabilizationWindowSeconds: 900   # slow scale-in; avoid flapping off a transient dip
+          policies: [{type: Pods, value: 1, periodSeconds: 600}]
+  triggers:
+    # PRIMARY — queue depth per replica. Scale out when the running set can't keep up.
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus.monitoring.svc:9090
+        metricName: vllm_num_requests_waiting
+        query: max(vllm:num_requests_waiting)         # per-replica max; KEDA targets replicas = ceil(metric/threshold)
+        threshold: "8"                                 # <TODO customer> tune from TTFT budget — queued reqs that still meet SLO
+        activationThreshold: "2"                       # don't wake from 0 for noise
+    # SECONDARY — queue WAIT time, the most direct SLO proxy (defense in depth).
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus.monitoring.svc:9090
+        metricName: vllm_request_queue_time_p95
+        query: histogram_quantile(0.95, sum(rate(vllm:request_queue_time_seconds_bucket[2m])) by (le))
+        threshold: "5"                                 # <TODO customer> seconds of queue-wait p95 = scale-out trigger
+
+---
+# ── Option B (fallback): HPA + prometheus-adapter ─────────────────────────────
+# Use ONLY if KEDA is not available. Requires prometheus-adapter exposing
+# vllm:num_requests_waiting as a custom/external metric. More plumbing, same signal.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: minimax-m2-hpa
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: vllm-minimax-m2
+  minReplicas: 1
+  maxReplicas: 2                   # GPU-bounded, same as KEDA above
+  metrics:
+    - type: Pods
+      pods:
+        metric:
+          name: vllm_num_requests_waiting   # surfaced by prometheus-adapter
+        target:
+          type: AverageValue
+          averageValue: "8"        # <TODO customer> per-replica queue depth
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 120
+      policies: [{type: Pods, value: 1, periodSeconds: 300}]
+    scaleDown:
+      stabilizationWindowSeconds: 900
+      policies: [{type: Pods, value: 1, periodSeconds: 600}]
+
+# ── What this does NOT do (read before deploying) ────────────────────────────
+# 1. It does NOT prevent spike-induced TTFT explosion — scale-out is too slow. Pair with:
+#    - engine admission: --max-num-seqs tuned to the KV-supported running set (queue excess explicitly)
+#    - gateway shedding: llm-d EPP returns fast backpressure/429 when all replicas saturated
+#      (a fast reject beats a 125s TTFT for an interactive coding agent)
+# 2. It does NOT add prefix-affinity — deploy llm-d (InferencePool + EPP, prefix-cache-aware
+#    scorer) in FRONT of this Deployment so new replicas get whole prefix-groups, not random
+#    requests. Without it, scale-out cold-caches the shared prefix.
+# 3. It does NOT add nodes — maxReplicas is per-node GPU budget. Cluster-autoscaler / Karpenter
+#    on a B200 pool handles node scale, but B200 capacity-block join is ~30min — size the warm
+#    pool for expected peak rather than reacting.

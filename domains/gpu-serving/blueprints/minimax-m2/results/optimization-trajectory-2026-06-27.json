@@ -1,0 +1,43 @@
+{
+  "objective": "pareto_map: output_tokens_per_sec vs concurrency (TTFT/ITL reported, not gated)",
+  "regime": "prefill-heavy huge-context MoE | B200 SM100 NVSwitch | KV-capacity/reuse + prefill-latency",
+  "guardrail": "lightweight garbage screen: no repetition loop / empty / broken tool-parse; error_rate<=0.01",
+  "nodes": [
+    {
+      "id": "tp4-gpu-only-cold-c1",
+      "parent": "tp4-gpu-only-baseline",
+      "lever_delta": [
+        "shape=tp4",
+        "kv_arm=gpu-only",
+        "scenario=cold",
+        "conc=1"
+      ],
+      "confidence": "code-confirmed",
+      "objective_value": 77.0,
+      "guardrail_value": "quality_pass=true err=0",
+      "regime": "prefill-heavy huge-context MoE | B200 SM100 | KV-reuse",
+      "status": "kept",
+      "ttft_p95_s": 2.425,
+      "itl_p95_s": 0.0095,
+      "prefix_hit_rate": 0
+    },
+    {
+      "id": "tp4-gpu-only-cold-c8",
+      "parent": "tp4-gpu-only-baseline",
+      "lever_delta": [
+        "shape=tp4",
+        "kv_arm=gpu-only",
+        "scenario=cold",
+        "conc=8"
+      ],
+      "confidence": "code-confirmed",
+      "objective_value": 185.1,
+      "guardrail_value": "quality_pass=true err=0",
+      "regime": "prefill-heavy huge-context MoE | B200 SM100 | KV-reuse",
+      "status": "kept",
+      "ttft_p95_s": 18,
+      "itl_p95_s": 0.22310588235294115,
+      "prefix_hit_rate": 0
+    }
+  ]
+}

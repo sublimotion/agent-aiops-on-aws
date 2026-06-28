@@ -92,6 +92,13 @@ terraform apply -target='<deployment_resource>' -auto-approve
 kubectl -n <namespace> scale deployment <name> --replicas=1
 ```
 
+#### Pin kubectl context explicitly in unattended runners with destructive actions
+<!-- stack: (general) | validated: 2026-06-27 -->
+
+When running detached scripts that scale nodes (`aws eks update-nodegroup-config ... desiredSize=0`) or terminate instances, NEVER rely on ambient `kubectl` current-context — it can drift if a parallel run in another shell switches clusters. Pin the context in every kubectl call (`KCTX=(kubectl --context "$EXPECT_CONTEXT")`) and gate any destructive action behind a positive preflight confirmation that you are operating the intended cluster (`PREFLIGHT_OK` set only after verifying the expected node is Ready in the expected context). Also: **label nodes by selector (`kubectl label -l ai-infra/role=<role> ...`), never by a parsed node name** — name-parsing from `jsonpath`/`cut` is fragile and silently mislabels (bit minimax-m2 3×, leaving pods unschedulable).
+
+**Why**: 2026-06-27 on minimax-m2 — kubectl context drifted from us-east-2 to a us-west-2 run; a detached sweep's trap-scaledown fired `aws --region us-east-2 ... desiredSize=0` while kubectl targeted us-west-2, draining the live B200. Context-pinning + the preflight interlock prevent the wrong-cluster trap from executing. Corollary: a trap-scaledown-on-SIGTERM is correct for unattended safety but **fights manual "keep the node" intervention** — to stop such a run without losing the node, disarm the trap first or re-assert `desiredSize=1` immediately.
+
 #### NIXL disables cuda_ipc by default — single-node P/D disaggregation requires explicit transport configuration
 <!-- stack: nixl=0.3.x, dynamo=alpha, vllm=0.18+, sglang>=0.5.13 | validated: 2026-06-17 -->
 
@@ -120,6 +127,16 @@ When `HF_HUB_OFFLINE=1` is set in the serving container (air-gapped, no HuggingF
 
 Record whether benchmarks run via `kubectl port-forward` (from local machine) or server-side (inside the cluster via `kubectl exec`). Port-forward benchmarks measure client → API server → pod latency; server-side benchmarks measure pod-local inference latency only. This distinction is critical for interpreting TTFT and E2E latency results.
 
+#### vLLM cache-hit measurement is server-side only (Prometheus counters), not per-request
+<!-- stack: vllm=0.19.1rc1-0.23.0 | validated: 2026-06-27 -->
+
+vLLM 0.19.x–0.23.x reports prefix cache hits in **server counters** on `/metrics` (`vllm:prefix_cache_hits_total`, `vllm:prefix_cache_queries_total`), NOT in the per-request response's `cached_tokens` field (returns `None` on these builds). Client-side cache measurement reads 0 and is misleading — harvest the Prometheus counter delta before/after the batch: `hit_rate = (hits_after - hits_before) / (queries_after - queries_before)`. **Before trusting a "cache=0" reading, verify the observability/Prometheus pod is actually running and scraping the serving pod** — a missing scraper is an instrumentation gap, not a cache miss (this masqueraded as "caching broken" 3× in one session until the obs pod was found un-deployed).
+
+#### Validate the output artifact, not just the exit code, after an unattended run
+<!-- stack: (general) | validated: 2026-06-27 -->
+
+A runner exiting `rc=0` does NOT mean it produced its deliverable. After any detached/unattended run, confirm the output exists and is well-formed before trusting the success signal (`[[ -s out.json ]] && jq empty out.json`). Prefer an **append-only `.jsonl` ledger + rebuild-the-headline-artifact-at-end** pattern so a single bad incremental write can't zero the deliverable. **Specific trap:** never combine `python3 - <<'HEREDOC'` with `json.load(sys.stdin)` — the heredoc owns stdin, so `json.load` parses the consumed script text → `JSONDecodeError` → silently empty output. Pass data by file-path argument. (2026-06-27: this zeroed a benchmark's headline `pareto.json` to `[]` while the run reported success; only artifact-validation caught it before a multi-hour re-run.)
+
 #### FP8 quantization compatibility check for MoE models
 
 Before reserving GPU capacity for Mixture-of-Experts models with FP8 quantization, verify that all weight dimensions (including shared experts) remain divisible by `block_k` (typically 128) at the target tensor parallelism degree. Example: if a shared expert MLP `down_proj` has `input_size=512`, TP=8 produces `input_size_per_partition=64`, which is not divisible by 128 and will cause a ValueError at model load time. Test TP compatibility on a CPU-only or smaller GPU instance before committing to a capacity block.
@@ -133,6 +150,7 @@ Serving stacks with JIT kernel compilation (DeepGEMM), `torch.compile`, and CUDA
 |-----------------------------|-------------|------------------------|---------|
 | SGLang DeepGEMM / Blackwell sm_120 | ~15 min | 9 kernel configs × 65536 iters; cache on NVMe | 2026-03 |
 | vLLM DeepGEMM / B200 sm_100f | ~16 min    | 77s load + 200s JIT (117 kernels) + 200s warmup (2259 kernels) + 509s `torch.compile` + 245s CUDA-graph (51 graphs); cache `/root/.cache/vllm/deep_gemm/cache/` + `/root/.cache/vllm/torch_aot_compile/` | 2026-05 |
+| vLLM DeepGEMM / B200 sm_100 (MiniMax-M2 FP8, 214GB) | ~35-40 min | weight load alone **25.5 min** (130 shards @ ~13s/shard) + torch.compile + CUDA-graph. `/root/.cache/vllm/` caches the JIT/compile tail only, NOT the weight load (pure NVMe read BW — unavoidable per boot; spot reclaim re-incurs the full load) | 2026-06 |
 | TensorRT-LLM engine build   | 10-15 min   | offline engine build; pre-build where possible | (general) |
 
 #### LMCache v0.3.15 incompatible with SGLang NSA/MLA attention (as of 2026-03-07) — blocks KV offloading for GLM-5, DeepSeek V3, and similar MLA models

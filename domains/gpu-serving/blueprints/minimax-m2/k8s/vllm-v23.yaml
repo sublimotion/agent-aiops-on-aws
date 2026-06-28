@@ -1,0 +1,74 @@
+# MiniMax-M2 FP8 baseline — vLLM, TP4 + EP4, 4× B200 (SM100 NVSwitch).
+# This is the Stage 5 baseline that must pass the Stage 0c B200 FP8-MoE CORRECTNESS gate
+# (no FlashInfer float32-router-logits assertion; 20-sample non-garbled output; valid
+# <minimax:tool_call> parsing) BEFORE any benchmarking.
+#
+# CRITICAL B200 pin: --moe-backend triton + env VLLM_USE_FLASHINFER_MOE_FP8=0.
+#   MiniMax casts router_logits to float32; FlashInfer/TRTLLM FP8 MoE asserts on SM100
+#   (vLLM #33543). Triton FP8 MoE is the safe Blackwell path. This is the single most
+#   likely startup failure.
+# Uses 4 of the node's 8 GPUs (TP4). Other 4 reserved for the Stage-6b DP2 second replica (H4a).
+# Cold start ~16 min first boot (DeepGEMM JIT + torch.compile + CUDA graph capture);
+#   /root/.cache/vllm persisted to NVMe → warm restarts ~6-8 min. Do NOT call a probe
+#   failure before ~16 min on first boot.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vllm-minimax-m2-v23
+  namespace: default
+  labels: {app: vllm-minimax-m2, phase: v23}
+spec:
+  restartPolicy: Never
+  nodeSelector: {blueprint: minimax-m2}
+  tolerations:
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}   # ACTUAL node taint
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+  hostNetwork: true
+  containers:
+    - name: vllm
+      image: vllm/vllm-openai:v0.23.0        # model-specific tag; falls back to recent stock sm_100/cu128 if unavailable
+      command:
+        - bash
+        - -c
+        - |
+          exec python3 -m vllm.entrypoints.openai.api_server \
+            --model /mnt/nvme/models/minimax-m2 \
+            --served-model-name MiniMax-M2 \
+            --tensor-parallel-size 4 \
+            --enable-expert-parallel \
+            --moe-backend triton \
+            --tool-call-parser minimax_m2 \
+            --reasoning-parser minimax_m2_append_think \
+            --enable-auto-tool-choice \
+            --enable-prefix-caching \
+            --kv-cache-dtype fp8 \
+            --max-model-len 196608 \
+            --gpu-memory-utilization 0.90 \
+            --compilation-config '{"mode":3,"pass_config":{"fuse_minimax_qk_norm":true}}' \
+            --trust-remote-code \
+            --host 0.0.0.0 --port 8000
+      env:
+        - {name: VLLM_USE_FLASHINFER_MOE_FP8, value: "0"}   # belt-and-suspenders vs the SM100 router-logits assertion (#33543)
+        - {name: SAFETENSORS_FAST_GPU, value: "1"}
+        - {name: VLLM_USE_V1, value: "1"}
+        - {name: HF_HOME, value: /mnt/nvme/hf-cache}
+        - {name: VLLM_CACHE_ROOT, value: /root/.cache/vllm}   # mapped to NVMe below → warm-start JIT cache
+        - name: HF_TOKEN
+          valueFrom: {secretKeyRef: {name: hf-token, key: token}}
+      resources:
+        requests: {nvidia.com/gpu: "4", cpu: "32", memory: 256Gi}
+        limits:   {nvidia.com/gpu: "4", cpu: "64", memory: 512Gi}
+      securityContext: {capabilities: {add: ["IPC_LOCK"]}}
+      volumeMounts:
+        - {name: nvme, mountPath: /mnt/nvme, mountPropagation: HostToContainer}
+        - {name: vllm-cache, mountPath: /root/.cache/vllm}     # persist DeepGEMM JIT + torch.compile cache to NVMe
+        - {name: shm, mountPath: /dev/shm}
+      readinessProbe:
+        httpGet: {path: /health, port: 8000}
+        initialDelaySeconds: 120
+        periodSeconds: 15
+        failureThreshold: 80                                   # ~20 min grace for first-boot DeepGEMM JIT cold start
+  volumes:
+    - {name: nvme, hostPath: {path: /mnt/nvme, type: Directory}}
+    - {name: vllm-cache, hostPath: {path: /mnt/nvme/vllm-cache, type: DirectoryOrCreate}}
+    - {name: shm, emptyDir: {medium: Memory, sizeLimit: 64Gi}}

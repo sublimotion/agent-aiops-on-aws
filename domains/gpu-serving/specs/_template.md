@@ -90,12 +90,26 @@ Predict the bottleneck regime, then account for every optimization tier — so a
 | T3 | Speculative decode | |
 | T4 | Parallelism (TP/EP/DP shape) | |
 | T5 | Kernel / compile | |
+| T6 | Model / graph surgery (off by default) | |
+
+3. **Optimization objective** (the SLO the in-spec loop maximizes — see [`standards/benchmark-commons/OPTIMIZATION-LOOP.md`](../../../standards/benchmark-commons/OPTIMIZATION-LOOP.md)). Declare it here; the loop reads it, the `carryover-auditor` pressure-tests it. Leave the loop unused for a one-shot deploy, but a declared objective is required for any spec that intends to tune past the first working config:
+
+```yaml
+optimization_objective:
+  maximize: ____                # metric @ operating point, e.g. output_tokens_per_sec @ c=1
+  subject_to:
+    quality_gate: { eval: ____, baseline: ____, tolerance: ____, held_out: true }
+    invariants: [ all_modalities_intact, error_rate_max: 0.001 ]
+  budget: { max_configs: ____, max_wall_clock_min: ____, max_usd: ____ }
+  plateau: { min_improvement: ____, patience: ____ }
+```
 
 - [ ] Regime predicted with one-line reasoning
 - [ ] Every tier is either `applied` (with config) or `deferred` (with reason) — no blank rows
 - [ ] Any tier whose `docs/optimization-stack.md` priority is high for the predicted regime is `applied`, OR its deferral reason explicitly addresses why the high-priority lever doesn't pay here
 - [ ] **Any deferral that cites an engine blocker ("BLOCKED by PR #X", "incompatible with …", "not supported in <engine> yet") is re-verified against the live tracker** — `mdc prs <model>` plus `gh pr view <N> --repo <vllm-project/vllm|sgl-project/sglang>` / `gh issue list --repo <repo> --search "<feature> in:title" --state all`. A merged PR or newer release may have lifted the blocker. Record the blocker's `validated: YYYY-MM-DD` next to the deferral; a blocker carried from a card/lessons.md without re-check is not a valid deferral reason for a high-priority lever
 - [ ] The same tier list will be filled with measured deltas in the Stage 6 Tier Stack Table (this ledger is the *plan*; Stage 6 is the *result*)
+- [ ] If the spec will tune past the first working config: `optimization_objective` is declared with all four blocks (maximize / subject_to / budget / plateau), and the `quality_gate` is `held_out: true` (reward-hacking guard — a loop must not see the eval it optimizes against)
 
 ### Stage 0c — Serving-Config Resolver (fail-closed)
 - [ ] `python3 standards/serving-commons/resolver/validate-serving-config.py --sidecar blueprints/<name>/benchmark.yaml --corpus-root .` exits 0 (no hard-rule FAILs)
@@ -146,9 +160,14 @@ Predict the bottleneck regime, then account for every optimization tier — so a
 - [ ] Speculative decode acceptance rate (if MTP/spec decode enabled)
 
 **Tier Stack Table** (required — closes the Stage 0b ledger): fill the table from `docs/optimization-stack.md` with the **measured** Δ each tier delivered vs T0, and mark any tier blocked. This is the *result* half of the Stage 0b *plan*; `compound-learner` reads it to refresh the catalog's delta cells.
-- [ ] One row per tier T0–T5: config landed, Δ tok/s vs T0, Δ TTFT p99 vs T0, blocked? (with reason)
+- [ ] One row per tier T0–T6: config landed, Δ tok/s vs T0, Δ TTFT p99 vs T0, blocked? (with reason). T6 is expected empty unless the loop reached a T0–T5 plateau.
 - [ ] Every tier marked `deferred` in Stage 0b is reconciled here (still deferred, or applied + measured)
 - [ ] Any tier that underperformed its `optimization-stack.md` typical-Δ range is noted in `lessons.md`
+
+**Optimization trajectory** (required *if* `optimization_objective` was declared in Stage 0b): the in-spec loop emits `results/optimization-trajectory-<date>.json` per [`OPTIMIZATION-LOOP.md`](../../../standards/benchmark-commons/OPTIMIZATION-LOOP.md). The best node fills the Tier Stack Table above; the full node set is the path `compound-learner` mines for regime-tagged deltas and dead-ends.
+- [ ] Each kept config is a single-variable change vs its parent (so the measured Δ is attributable to one lever)
+- [ ] Every config ran the held-out quality gate *before* its objective was measured; `quality_breach` nodes recorded, not silently dropped
+- [ ] Loop terminated on a declared budget or plateau condition (not an arbitrary stop)
 
 **Enriched artifact output**: Store in `blueprints/<name>/results/` following the schema from `standards/benchmark-commons/PROPOSAL.md`. Each artifact includes: model metadata, engine config, infrastructure, workload, core metrics, SLO evaluation, and optional extensions.
 

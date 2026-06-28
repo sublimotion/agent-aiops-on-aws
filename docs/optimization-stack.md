@@ -10,8 +10,8 @@ Every blueprint's Stage 6 benchmark report should fill out the **Tier Stack Tabl
 
 This catalog is the **generalized-guideline** rung of the optimization knowledge ladder — read it at config-selection time, feed measured results back into it after benchmarking:
 
-- **Start of loop (spec Stage 0b):** predict the regime from [`.claude/steering/inference-first-principles.md`](../.claude/steering/inference-first-principles.md), then use the tier priorities + conflicts here to fill the spec's lever ledger. Account for every tier; defer with a reason, never skip silently.
-- **End of loop (`compound-learner`):** the Stage 6 Tier Stack Table's measured deltas are fed back into this doc's typical-Δ cells, and any high-priority tier skipped without justification is flagged. See `.claude/agents/compound-learner.md` § "Optimization coverage refresh".
+- **Start of loop (spec Stage 0b):** predict the regime from [`.claude/steering/inference-first-principles.md`](../.claude/steering/inference-first-principles.md), then use the tier priorities + conflicts here to fill the spec's lever ledger. Account for every tier; defer with a reason, never skip silently. This catalog is both the **search space** (which levers exist) and the **ordering prior** (which to try first per regime) for the in-spec optimization loop — see [`standards/benchmark-commons/OPTIMIZATION-LOOP.md`](../standards/benchmark-commons/OPTIMIZATION-LOOP.md).
+- **End of loop (`compound-learner`):** the Stage 6 Tier Stack Table's measured deltas — and the in-spec loop's `optimization-trajectory-<date>.json` (kept deltas *and* dead-ends) — are fed back into this doc's typical-Δ cells and conflicts tables. Any high-priority tier skipped without justification is flagged. See `.claude/agents/compound-learner.md` § "Optimization coverage refresh".
 
 **Which rung absorbs a lesson** (invariance test — "still true after a framework version bump?"):
 
@@ -21,7 +21,7 @@ This catalog is the **generalized-guideline** rung of the optimization knowledge
 | Technique-class, true across ≥2 models/frameworks | **this doc** (generalized lever) |
 | Specific model/engine/version/instance | blueprint `lessons.md` + `mdc`/`gpu-infra` cards (T2/T3) |
 
-A single datapoint is a card fact; promote to this doc only on the *second* occurrence across models.
+A single datapoint is a card fact; promote to this doc only on the *second* occurrence **across regime-matched runs** (same roofline regime, different model) — not merely across model names. A win in a different regime is not evidence for this regime. See `compound-learner.md` for the regime-match promotion rule.
 
 ## The six tiers
 
@@ -33,13 +33,14 @@ A single datapoint is a card fact; promote to this doc only on the *second* occu
 | **T3** | Speculative decode | Produce multiple tokens per BW-bound step when decode is the bottleneck | EAGLE3 (when draft available); MTP (when native); none otherwise |
 | **T4** | Parallelism | Shape the replica and fleet for the workload | TP-to-fit + DP replicas; not pure TP=max |
 | **T5** | Kernel / compile | Squeeze scheduling + kernel overhead out of the remaining margin | torch.compile + FLASHINFER_MLA (MLA) or FA3 (others) |
+| **T6** | Model / graph surgery | Change the served *artifact* itself — prune layers/vocab, fold operators, train a better drafter | **Off by default — requires a held-out quality gate.** Only when T0–T5 plateau and the regime is decode-BW/launch-bound |
 
 ## Composition order
 
 Tiers must be enabled in order. Each tier's memory and throughput effects feed into the next tier's feasibility.
 
 ```
-T0 → T1 → T2 → T3 → T4 → T5
+T0 → T1 → T2 → T3 → T4 → T5 → T6
 ```
 
 Why the order matters:
@@ -48,6 +49,7 @@ Why the order matters:
 - **T2 before T3**: prefix cache changes prefill cost profile; spec decode only helps decode. Measure T2 delta before enabling T3 or you conflate the two.
 - **T3 before T4**: spec decode runs per replica; sweep TP/DP after T3 is in place or you'll re-tune parallelism.
 - **T4 before T5**: kernel tuning is replica-local — need the final replica shape to tune against.
+- **T5 before T6**: surgery changes the artifact and carries quality risk + a re-validation cost. Exhaust the config-only levers (T0–T5) first; only reshape the model when they plateau and the regime says the remaining cost is weight-read or kernel-launch. T6 is also the only tier that can *invalidate* prior tier measurements (a pruned model is a new T0), so it goes last.
 
 ## Canonical configuration per tier
 
@@ -180,6 +182,32 @@ engine:
 - **torch.compile + dynamic batching**: first compile stall can mask as a health-check failure; bump startup probe timeout.
 - **DeepGEMM JIT**: adds 15 min to first cold start; cache to persistent volume.
 
+---
+
+### T6 — Model / graph surgery
+
+**Goal**: when config-only levers (T0–T5) plateau, change the *served artifact itself* to cut the dominant decode cost. This is the highest-Δ tier in the decode-BW / launch-bound regime — and the highest-risk, because it changes model outputs. **Off by default. Never apply without a held-out quality gate (see [`standards/benchmark-commons/OPTIMIZATION-LOOP.md`](../standards/benchmark-commons/OPTIMIZATION-LOOP.md)).**
+
+| Technique | When to use | Typical Δ | Quality risk |
+|-----------|-------------|-----------|--------------|
+| **Layer pruning** (delete redundant decoder layers) | decode-BW-bound; weight-read dominates the step | 1.05–1.25× (∝ layers removed) | Medium — **gate required** |
+| **Drafter fine-tuning** (retrain the spec-decode draft head on target traces) | T3 spec-decode already on; acceptance < ~3 tok/step | 1.1–1.4× per-user (higher acceptance, byte-identical output) | **None** — greedy verify keeps output identical |
+| **Vocab pruning + fused sparse argmax** | large-vocab models (Gemma ~256k) at low concurrency | 1.05–1.15× | Low–medium — gate on tail tokens |
+| **Operator / embedding folding** (fold per-layer scales into adjacent ops) | model-specific decode-time ops with no kernel reuse | 1.02–1.08× | None — algebraic identity |
+
+**Canonical posture**: try **drafter fine-tuning first** — it is the only T6 lever that is provably lossless (greedy verify emits the target's exact argmax, so raising draft acceptance raises tok/step with byte-identical output). Everything else changes the artifact and must pass the held-out gate before its Δ is admitted.
+
+**Optimization target for drafter fine-tuning is acceptance length, not loss** — the draft head exists only to be accepted by the target, so train and select on mean accepted-tokens-per-step on a held-out trace set, not on the drafter's own perplexity.
+
+**Evidence (Fast Gemma Challenge, A10G, gemma-4-E4B-it, c=1, 2026-06):** layer pruning of decoder layers {2,3,4,37}/42 gave +24 TPS at −0.28% tokens/step — and the **redundant layers were the EARLY ones** (skipping layer 2 *improved* PPL); late-layer pruning mostly failed. Drafter fine-tuning drove the `osoi*` frontier line. The binding constraint for pruning was drafter *acceptance*, not PPL. (Single-model, single-hardware datapoint — a card fact until a 2nd regime-matched occurrence; see routing ladder.)
+
+**Conflicts**:
+- **Surgery invalidates prior tier measurements**: a pruned/folded model is a new T0. Re-baseline T1–T5 against the surgical artifact; don't carry forward pre-surgery deltas.
+- **Pruning vs spec-decode acceptance**: removing layers can lower drafter acceptance more than it saves weight-read. Measure tokens/step after each pruned layer; stop when acceptance cost exceeds the bandwidth saving (this is the regime where the Gemma frontier stopped).
+- **Reward-hacking surface**: throughput-positive surgery that quietly degrades quality is exactly the failure the held-out gate exists to catch. A relaxed-acceptance "win" is a quality change, not a T6 lever (Gemma's eps-relaxed acceptance was ruled invalid).
+
+---
+
 ## Tier stack table (required in every Stage 6 report)
 
 Every blueprint's benchmark report fills this out. One row per tier.
@@ -192,15 +220,16 @@ Every blueprint's benchmark report fills this out. One row per tier.
 | T3 | — | — | — | ⚠️ EAGLE3 draft not available |
 | T4 | TP=4 + DP=2 | 4.2× | 0.48× | — |
 | T5 | torch.compile + FLASHINFER_MLA | 4.8× | 0.42× | — |
+| T6 | — | — | — | ⚠️ not attempted — T0–T5 not yet plateaued |
 
-Leave rows empty (or mark "not attempted") for tiers not applied. Flag any blocker in its own row so the gap is visible.
+Leave rows empty (or mark "not attempted") for tiers not applied. Flag any blocker in its own row so the gap is visible. T6 is expected empty for most deployments — only fill it when the in-spec optimization loop reached a T0–T5 plateau and surgery was the remaining lever.
 
 ## Running the comparison automatically
 
 The six tiers map directly to sidecar configurations. Each tier gets one sidecar; the benchmark runner sweeps them via a tag-per-tier pattern:
 
 ```bash
-for tier in t0-baseline t1-fp8 t2-prefix-hicache t3-eagle3 t4-tp4-dp2 t5-compile; do
+for tier in t0-baseline t1-fp8 t2-prefix-hicache t3-eagle3 t4-tp4-dp2 t5-compile t6-surgery; do
   ./run-benchmark.sh \
     --endpoint http://svc:8000 \
     --workload concurrency-sweep \
@@ -218,6 +247,7 @@ The resulting artifacts share model + hardware + workload, so `runner/compare.py
 - **Disagg P/D (NIXL) aggregate throughput** vs colocated TP — never measured.
 - **Wide EP beyond NVL8** — requires GB200/GB300 NVL72 access.
 - **Mooncake KV tiering** — spec exists, no data.
+- **T6 surgery deltas on a production model we serve** — layer-pruning / drafter-FT evidence is Gemma-only (A10G, c=1). Needs one regime-matched datapoint on a B200/B300 deployment before promotion past card-fact.
 
 See `domains/gpu-serving/specs/kimi-k2.6-speculative.md` Phase 5 for the most up-to-date single-node frontier plan (T3 + T5 expansion).
 

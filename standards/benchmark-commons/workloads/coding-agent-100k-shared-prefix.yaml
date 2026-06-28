@@ -1,0 +1,191 @@
+catalog_id: coding-agent-100k-shared-prefix
+use_case: coding-agent-concurrency
+description: >
+  Goodput-oriented workload for self-hosting a coding agent (Claude Code-style,
+  Anthropic /v1/messages signature) that replaces the Claude API for many
+  concurrent developers. The CUSTOMER GOAL is to maximize the number of
+  concurrent developers while holding "OK interactivity" — so the headline
+  metric is NOT peak throughput and NOT single-request TTFT, it is the
+  *goodput knee*: the highest concurrency at which the interactivity SLO
+  (TTFT + ITL ceilings) still holds.
+
+  This card exists to settle one architectural question with DATA, not opinion:
+  for a >100K-token, high-reuse coding context, is the right KV architecture
+  (a) plain in-GPU prefix cache (APC), (b) CPU KV offload, (c) NVMe/disk KV
+  tiering, or (d) prefix-decode disaggregation? The customer benchmarked CPU
+  offload on a COLD workload and saw it regress (-38% RPM, +194% ITL) — but a
+  cold run cannot evaluate an offload tier that only pays under reuse. This
+  card forces both regimes and full telemetry so the bottleneck CLASS is
+  measured (per .claude/steering/benchmark-analysis.md), not inferred.
+
+  Origin: MiniMax-M2 engagement (domains/gpu-serving/specs/minimax-m2.md), 4xH200.
+  Customer claim to test: ">100K input tokens, >90% repeated."
+
+modality: text
+
+# ── Scenario matrix ────────────────────────────────────────────────────────
+# Run EVERY scenario at EACH concurrency step in the sweep. The reuse_pattern
+# is the most important variable — it decides whether offload/disagg can pay.
+# Lengths are FORCED (the customer's FORCE_ISL/FORCE_OSL methodology) so deltas
+# are attributable; output runs to EOS where noted so the reasoning model's
+# real <think> token usage is not erased (benchmark-analysis.md reasoning rule).
+scenarios:
+  # --- FLOOR: matches the customer's existing "sin caché" benchmark ---
+  - id: replace-sonnet-cold
+    reuse_pattern: none            # ~0-40% incidental hit; the floor
+    force_isl: 59128               # "Reemplazar Sonnet — carga media" (recommended)
+    output: run-to-eos             # do NOT force OSL on a thinking model; measure actual
+    osl_reference: 224             # customer's Claude-derived OSL, for context only
+    cache: prefix-apc-on
+
+  - id: replace-sonnet-p75-cold
+    reuse_pattern: none
+    force_isl: 94386               # "Reemplazar Sonnet — P75" (worst-case prefill)
+    output: run-to-eos
+    osl_reference: 485
+    cache: prefix-apc-on
+
+  # --- THE PRODUCTION CLAIM: fixed 90K shared prefix, small unique suffix ---
+  # This is the regime that decides the architecture. Same big prefix across all
+  # concurrent developers (shared codebase/system context), each turn appends a
+  # short new message.
+  - id: coding-shared-prefix-90k
+    reuse_pattern: cross-request-shared-prefix
+    shared_prefix_tokens: 90000    # the >90%-repeated context (fixed, cacheable)
+    unique_suffix_tokens: {mean: 350, std_dev: 150}   # the new per-turn message
+    output: run-to-eos
+    osl_reference: 224
+    reuse_fraction_target: 0.90    # assert measured hit-rate approaches this after warmup
+
+  # --- THE HEADLINE PRODUCTION SCENARIO: 100K input, 90% KV-cache reuse ---
+  # The customer's stated regime ("inputs above 100k tokens where more than 90%
+  # are repeated"). ISL≈100K with a 90K shared prefix → 90% of every prompt is the
+  # SAME cacheable context, only ~10K varies. This is THE case that decides whether
+  # distributed KV cache / offload pays. byte-identical shared prefix is mandatory
+  # (APC/radix exact-match) or the hit rate collapses.
+  - id: coding-100k-90pct-reuse
+    reuse_pattern: cross-request-shared-prefix
+    total_isl: 100000              # ISL ≈ 100K (the customer's headline)
+    shared_prefix_tokens: 90000    # 90% repeated → byte-identical across all requests/devs
+    unique_suffix_tokens: {mean: 10000, std_dev: 2000}   # the ~10% that varies per request
+    prefix_byte_identical: true    # CRITICAL — no timestamps/IDs in the prefix or hit-rate collapses
+    output: run-to-eos
+    osl_reference: 224
+    reuse_fraction_target: 0.90    # MEASURE: does observed cached/prompt fraction actually hit 0.90?
+
+# ── KV architecture arms (the A/B that produces the defensible recommendation) ─
+# Each arm is a SEPARATE serving config (sidecar), run across the full scenario
+# matrix + concurrency sweep. Single-variable: only the KV tier changes between
+# arms so the goodput-knee delta is attributable (OPTIMIZATION-LOOP.md).
+kv_architecture_arms:
+  - id: gpu-only
+    description: In-GPU prefix cache only (APC). The honest baseline.
+    config: { enable_prefix_caching: true, kv_offload: none }
+  - id: cpu-offload
+    description: CPU KV offload tier (the customer's OffloadingConnector). Re-run on the REUSE regime, not just cold.
+    config: { enable_prefix_caching: true, kv_offload: cpu }
+  - id: nvme-disk
+    description: NVMe/disk KV tiering — third tier below CPU for very large reuse sets.
+    config: { enable_prefix_caching: true, kv_offload: cpu+nvme }
+  # disagg is evaluated in the spec's Stage 6b (H4) as a separate architecture,
+  # not a sidecar flip — it changes the deployment topology. Listed here for traceability.
+
+# ── Load: concurrency SWEEP, not a fixed point ───────────────────────────────
+load:
+  type: concurrency-sweep
+  concurrency_steps: [1, 4, 8, 16, 32, 64, 128, 256, 512]   # PRESSURE-TEST past 128
+  push_beyond_last: true           # if 512 still holds (no error spike, throughput still rising,
+                                   # KV < 95%), KEEP DOUBLING (1024, 2048, ...) until a saturation
+                                   # signal appears — do NOT stop at an arbitrary 128 ceiling. The
+                                   # goodput knee for a 90%-cached workload (only ~10K fresh tokens/req)
+                                   # may be FAR higher than a cold workload's, so the high-reuse
+                                   # scenarios especially must be pushed until they actually break.
+  num_requests_per_step: 200
+  warmup_requests: 40              # MUST exceed prefix-warm threshold so shared prefix is cached before measuring
+  saturation_signals:              # stop climbing a config when ANY fires (record it as the knee cause)
+    - error_rate_gt: 0.02
+    - throughput_plateau           # tok/s stops rising as concurrency doubles
+    - kv_utilization_gt: 0.97      # KV pool full → preemptions imminent
+    - preemptions_per_min_gt: 0    # scheduler evicting → past the residency ceiling
+
+# ── Interactivity SLO (the guardrail the goodput objective maximizes against) ─
+# TODO(customer): confirm the real thresholds. These are UNVALIDATED placeholders
+# based on interactive coding-agent UX. The goodput knee is defined as the max
+# concurrency where BOTH hold at the stated percentile.
+slo:
+  ttft_cold_p95_ms: 8000           # PLACEHOLDER — first request at 90K prefill is expensive
+  ttft_warm_p95_ms: 2000           # PLACEHOLDER — cached-prefix request (the common case)
+  itl_p95_ms: 50                   # PLACEHOLDER — ~20 tok/s streaming floor
+  e2e_p95_ms: 60000
+  error_rate_max: 0.001
+  goodput_definition: "max concurrency where ttft_warm_p95 AND itl_p95 both hold"
+
+# ── Telemetry: EVERYTHING (the point is to locate the bottleneck class) ───────
+# Per benchmark-analysis.md: a bottleneck CLASS is a measured claim. Each field
+# below maps to the evidence required to assert prefill / decode-BW / KV-capacity
+# / KV-transfer-bound, so the offload-vs-disagg recommendation is defensible.
+extensions:
+  cache_stats:
+    prefix_hit_rate: required              # validates the 90%-reuse claim; headline for shared-prefix scenario
+    kv_utilization_pct: required           # the "KV cache spikes" the customer flagged — track over time, not just peak
+    kv_utilization_timeseries: required    # spike shape, not just max — when does it hit 97%?
+    eviction_rate: required                # shared prefix must NOT be evicted; eviction => need bigger/tiered cache
+    cold_vs_warm_ttft_ratio: required      # quantifies the caching benefit per arm
+  kv_tiering:                              # the offload/disk-specific evidence
+    gpu_kv_hit_rate: required              # served from HBM
+    cpu_kv_hit_rate: required              # served from CPU offload tier (0 on gpu-only arm)
+    nvme_kv_hit_rate: required             # served from disk tier (nvme-disk arm only)
+    kv_transfer_bytes_per_token: required  # PCIe/NVMe traffic on the decode path — the offload COST
+    kv_transfer_latency_ms: required       # how much transfer stalls decode (explains ITL inflation)
+  scheduler:
+    preemptions_per_min: required          # 0 on the cold benchmark => offload had no preemption to relieve. Re-check under reuse+high-c.
+    queue_time_p95_ms: required            # admission-bound signal (max-num-seqs too high => queueing)
+    running_vs_waiting_requests: required  # is concurrency real or just queued?
+    batched_tokens_per_step: required      # prefill-chunk size; small => decode interleaves => ITL protected
+  prefill:
+    ttft_fraction_of_e2e: required         # >50% => prefill-bound (the diagnosis gate). NEVER assert decode-bound without this.
+    chunked_prefill_active: required        # CRITICAL: verify the KV connector did NOT silently disable chunked prefill (suspected offload-regression mechanism)
+  # ── DCGM hardware telemetry — answers "WHICH resource are we bound to?" ──────
+  # The whole point: at the goodput knee, is it HBM-bandwidth, tensor-compute,
+  # PCIe/NVLink transfer, or KV-capacity that caps us? That decides the fix.
+  dcgm:
+    endpoint: "http://localhost:9400/metrics"
+    required_gauges:                       # CONFIRMED available on this node's driver
+      - DCGM_FI_DEV_GPU_UTIL               # coarse occupancy
+      - DCGM_FI_DEV_FB_USED                # framebuffer (KV+weights) — KV-capacity ceiling
+      - DCGM_FI_DEV_POWER_USAGE            # W — power-normalized $/throughput + a compute-bound proxy (near-TDP => compute-bound)
+      - DCGM_FI_DEV_GPU_TEMP
+      - DCGM_FI_DEV_XID_ERRORS             # any non-zero invalidates the run
+    prof_counters:                         # the ROOFLINE classifiers — try to enable, but see caveat
+      attempt: true
+      wanted:
+        - DCGM_FI_PROF_DRAM_ACTIVE         # HBM-BW active => decode-BW-bound signal
+        - DCGM_FI_PROF_PIPE_TENSOR_ACTIVE  # tensor-core active => prefill-compute-bound signal
+        - DCGM_FI_PROF_SM_ACTIVE
+        - DCGM_FI_PROF_NVLINK_TX_BYTES     # TP collective + any KV transfer traffic
+        - DCGM_FI_PROF_NVLINK_RX_BYTES
+      caveat: >
+        DCGM_FI_PROF_* were NOT enabled on this node's driver on the first attempt
+        (lessons.md stage-4b; same as kimi-k2.6-nvfp4 L11). The runner MUST try to
+        enable the profiling module (dcgmi profile --pause/--resume or DCP_ALLOW_*),
+        and IF still unavailable, fall back to BOUNDEDNESS-BY-INFERENCE: use
+        FB_USED + POWER (near-TDP=compute, low-power+flat-throughput=BW/transfer)
+        + the vLLM histograms (TTFT-fraction = prefill share, ITL vs KV-transfer
+        bytes = transfer-bound). Record explicitly whether PROF counters were
+        available — the bottleneck-class claim's confidence depends on it.
+  reasoning:
+    thinking_tokens_ratio: required        # M2 emits <think>; needed to interpret run-to-eos OSL vs Claude's forced 224
+    think_block_retained: required         # quality invariant — must survive across turns
+  power:
+    tokens_per_joule: optional             # $/concurrent-developer framing
+
+# ── What this card must let us conclude ──────────────────────────────────────
+# After running all arms x scenarios x concurrency steps, the data answers:
+#   1. Is the workload actually >90% reuse? (prefix_hit_rate on shared-prefix scenario)
+#   2. What bounds us at the goodput knee? (ttft_fraction_of_e2e, kv_utilization, preemptions, queue_time)
+#   3. Does CPU offload help WHEN there is reuse? (cpu_kv_hit_rate, goodput-knee delta vs gpu-only)
+#   4. Does NVMe tiering extend the reuse set further, or just add transfer latency?
+#   5. Is the offload regression a "no bottleneck to relieve" effect or a chunked-prefill conflict? (chunked_prefill_active, preemptions)
+#   6. Only if GPU/CPU/NVMe tiers all fail to hold interactivity at target concurrency
+#      is prefix-decode DISAGGREGATION justified (Stage 6b H4) — disagg is frontier-only
+#      (steering: project_pd_disagg_frontier_only), so it must be earned by this data.

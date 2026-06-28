@@ -21,8 +21,9 @@ Then collect:
 2. **All readiness audits** — glob `<blueprint-dir>/results/readiness-audit-*.md` and read every one. Audits accumulate over time; patterns only become visible across multiple sessions.
 3. **All deployment logs** — glob `<blueprint-dir>/results/deployment-log-*.md` and read every one. If a deployment log is embedded inside a readiness audit file (as is common), treat it as part of that audit.
 4. `<blueprint-dir>/results/benchmark-report.md` — if it exists, the executive summary and key findings sections, **including the Stage 6 Tier Stack Table** (measured Δ per optimization tier vs T0).
-5. The blueprint spec's **Stage 0b lever ledger** — the planned `applied`/`deferred` disposition per tier. You compare plan (0b) against result (Stage 6) in the optimization-coverage step below.
-6. Current steering files — read all of `.claude/steering/*.md` so you don't duplicate rules that already exist.
+5. **Optimization trajectory** — glob `<blueprint-dir>/results/optimization-trajectory-*.json` and read every one. Each is the in-spec optimization loop's search path: nodes of `{parent, lever_delta, confidence, objective_value, guardrail_value, regime, status}` (schema: `standards/benchmark-commons/OPTIMIZATION-LOOP.md`). This is the richest optimization input — it carries *kept deltas AND dead-ends*, with the `regime` tag you key promotion on. If absent (one-shot deploy, no loop), skip the trajectory-specific steps below.
+6. The blueprint spec's **Stage 0b lever ledger + `optimization_objective`** — the planned `applied`/`deferred` disposition per tier, and the declared objective/guardrails. You compare plan (0b) against result (Stage 6 + trajectory) in the optimization-coverage step below.
+7. Current steering files — read all of `.claude/steering/*.md` so you don't duplicate rules that already exist.
 
 ## Version refresh protocol
 
@@ -68,6 +69,12 @@ This is the end-of-loop half of the optimization flywheel. The spec's Stage 0b l
 ### Process
 
 1. **Refresh measured deltas in `docs/optimization-stack.md`.** For each tier the Stage 6 Tier Stack Table measured, update that tier's "typical delta range" / blueprint-evidence cells with the new dated datapoint (e.g., "Kimi K2.6 NVFP4 on B200: 1.7× decode vs FP8, 2026-06-17"). Append evidence; do not delete prior datapoints unless a value is superseded for the *same* model+hardware. This is the only doc whose delta cells you edit — treat it as the dated-evidence layer.
+
+   **1a. Mine the optimization trajectory (if present).** The trajectory's nodes are a finer-grained evidence source than the single-config Tier Stack Table — they isolate per-lever deltas via single-variable A/Bs. Two node types, both promotable through the routing ladder in step 3:
+   - **Kept deltas** (`status: kept`) — a `lever_delta` with a measured objective gain. Same promotion path as a Tier Stack delta, but attributable to one lever.
+   - **Dead-ends** (`status: dead-end` or `quality_breach`) — a lever that *regressed* or breached the guardrail. **These are first-class.** A dead-end that recurs across ≥2 specs in the **same regime** is promoted as a **conflict / no-op row** in the relevant tier of `optimization-stack.md` (not a delta — a pruning fact), so the next loop in that regime skips it without spending a run. Example shape: a row under T3's conflicts table, "n-gram spec-decode net-negative at c=1 [decode-BW, Ampere] — overhead unamortized; Seen: <model> <date>." A single dead-end is a card fact (blueprint `lessons.md`); the 2nd regime-matched occurrence is a generalized conflict.
+   - **`confidence` gates trust**: only promote a delta whose node is `code-confirmed` or `config-inferred`. A `ppl-match`/`name-inferred` edge means the lineage (and thus the attribution) is unverified — note it but do not refresh a catalog cell from it.
+   - **A guardrail-relaxing "win" is never a delta** — see the reward-hacking rule in "What NOT to elevate."
 2. **Reconcile plan vs result.** Compare the Stage 0b ledger to the Stage 6 table:
    - A tier `applied` in 0b and measured in Stage 6 → confirm the Δ landed in the catalog's typical range. If it underperformed, that's a candidate lesson ("X hurts on Y hardware").
    - A tier `deferred` in 0b with a sound reason and still absent → no action — **unless the reason is an engine blocker** ("BLOCKED by PR #X", "incompatible", "not supported in <engine> yet"). Blockers decay: re-verify against the live tracker (`gh pr view <N> --repo <repo>`, `gh issue list --repo <repo> --search "<feature> in:title" --state all`, `mdc prs <model>`). If the PR merged or a newer release lifted it, record a lesson ("<feature> unblocked as of <engine> <version>/PR #X merged YYYY-MM-DD — re-test next deployment") and, if it raises a high-priority lever for this regime, note it in the relevant tier of `optimization-stack.md`. A stale blocker that silently suppressed a lever is the same defect class as a carryover gap.
@@ -77,10 +84,15 @@ This is the end-of-loop half of the optimization flywheel. The spec's Stage 0b l
    | If the lesson… | Lands in | Example |
    |----------------|----------|---------|
    | is rederivable from the roofline (physics; survives model + framework + hardware swap) | `.claude/steering/inference-first-principles.md` (rare — only if a new attention arch / precision changes the math) | "MoE weight term dominates decode bytes regardless of attention trick" |
-   | is a **technique-class** statement true across ≥2 models/frameworks (survives a version bump) | `docs/optimization-stack.md` (generalized lever catalog) | "speculative decode is net-negative past c≈256 with a stock draft"; "disagg loses unless forced cross-node" |
+   | is a **technique-class** statement true across ≥2 **regime-matched** runs (survives a version bump) | `docs/optimization-stack.md` (generalized lever catalog) | "speculative decode is net-negative past c≈256 with a stock draft"; "disagg loses unless forced cross-node" |
    | names a specific model/engine/version/instance (dies on the next release) | blueprint `lessons.md` + `mdc learn` / `gpu-infra learn` (T2/T3 cards, version-stamped) | "`--tool-call-parser glm47` for GLM-5"; "vLLM 0.18 + GPTQ-Int4 = garbage" |
 
-   Most optimization lessons stay at the card level. Promote to the catalog only on the *second* occurrence across models — a single datapoint is a card fact, a recurrence is a generalized lever.
+   Most optimization lessons stay at the card level. Promote to the catalog only on the *second* occurrence **across regime-matched runs** — a single datapoint is a card fact, a recurrence *in the same roofline regime* is a generalized lever.
+
+   **Regime-match, not model-match (the heterogeneity contract).** Unlike a single-hardware competition where every lesson is universal, this fleet spans models, GPU archs, and concurrency points — a lever's Δ is only portable *within its regime*. The `regime` field on each trajectory node (roofline regime + gpu_arch + concurrency, e.g. `decode-BW | sm_90 | c=1`) is the match key:
+   - Two wins for the same lever in the **same regime** on **different models** → promote to the catalog, and **port the context into the "When to apply" cell** — state the regime conditions the Δ held under (mirror the TP4+DP2 rule in `inference-first-principles.md`, which carries an explicit "single-node, high-concurrency MoE only" qualifier). A bare Δ with no regime qualifier is not a promotable lever.
+   - Same model, **different regime** (e.g. a win at c=1 and a different result at c=512) → both stay card facts; the *divergence* itself may be a roofline note if it's rederivable.
+   - A win in regime A applied to a spec in regime B → **never** auto-promote; at most a "untested in this regime" pointer.
 
 ### Output format
 
@@ -94,7 +106,13 @@ Add to the compound summary:
 ### Optimization coverage gaps
 | Tier skipped | Predicted regime | Why it likely paid | Elevated to catalog? |
 |--------------|------------------|--------------------|----------------------|
+
+### Optimization trajectory (omit if no optimization-trajectory-*.json)
+| Lever delta | Regime | Δ (objective) | Confidence | Status | Catalog action (delta / conflict-row / card-only) |
+|-------------|--------|---------------|------------|--------|----------------------------------------------------|
 ```
+
+For trajectory rows: a `kept` delta with a 2nd regime-matched occurrence → catalog delta cell; a recurring `dead-end` → conflict/no-op row in the tier; a `quality_breach` or guardrail-relaxing win → `lessons.md` quality-change note (never catalog). First occurrence of anything → card-only.
 
 If the blueprint has no Stage 6 Tier Stack Table (older blueprint, or benchmark not yet run), note that and skip this step rather than inventing deltas.
 
@@ -225,6 +243,7 @@ If no hardware lessons were found, omit this section.
 - File paths derivable from `project-structure.md`.
 - Patterns already documented in an existing steering rule (dedup check above).
 - Operational details specific to one model or one instance type that wouldn't help other blueprints.
+- **A throughput/objective gain achieved by relaxing the quality guardrail is NEVER a lever.** If a trajectory node hit a higher `objective_value` by loosening acceptance, dropping a modality, widening the PPL/quality tolerance, or otherwise weakening `subject_to`, it is a **quality-change lesson**, not a tier delta — record it in `lessons.md` as "objective X is reachable only at quality cost Y," never as a catalog Δ. (Origin: Fast Gemma Challenge "relaxed acceptance" hit 321 TPS by emitting non-greedy tokens and was ruled invalid — a real number, a degraded model. A loop hill-climbing on throughput rediscovers this; the held-out fail-closed gate and this rule are what stop it from contaminating the catalog.) A `quality_breach` node is evidence the guard worked, not a result to promote.
 
 ## Compaction trigger (git-churn drift detection)
 
@@ -263,6 +282,7 @@ After reviewing all inputs:
 - lessons.md entries: N total, N since last compound run
 - Readiness audits: N files (list dates)
 - Deployment logs: N files (list dates)
+- Optimization trajectories: N files (list dates), M nodes total (K kept / D dead-ends)
 
 ### Audit signal
 | Audit date | Verdict | P0 items | Recurring FAILs | Key PENDING items |

@@ -1,0 +1,57 @@
+# Stage MiniMax-M2 FP8 weights (~450GB) to node NVMe at /mnt/nvme/models/minimax-m2.
+# Runs on the SAME node (nodeSelector blueprint=minimax-m2) so the download lands on
+# the local NVMe RAID that the serving pod hostPath-mounts. NO GPU request — CPU staging only.
+# ⚠️ Spot reclaim WIPES NVMe — re-run this Job on any fresh node before serving.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: stage-minimax-m2
+  namespace: default
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels: {app: stage-minimax-m2}
+    spec:
+      restartPolicy: Never
+      nodeSelector: {blueprint: minimax-m2}
+      # hostNetwork + dnsPolicy: Default — the B200 node cannot reach the CoreDNS ClusterIP
+      # (172.20.0.10) from a hostNetwork pod (no CNI/kube-proxy DNS path on this node), so
+      # ClusterFirstWithHostNet fails with "Temporary failure in name resolution". Default
+      # inherits the node's resolv.conf (VPC resolver 10.0.0.2) which resolves pypi/HF.
+      hostNetwork: true
+      dnsPolicy: Default
+      tolerations:
+        - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}   # ACTUAL node taint
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+      containers:
+        - name: hf-download
+          image: python:3.11-slim
+          command:
+            - bash
+            - -c
+            - |
+              set -euo pipefail
+              pip install --no-cache-dir -q "huggingface_hub[hf_transfer]"
+              export HF_HUB_ENABLE_HF_TRANSFER=1
+              DEST=/mnt/nvme/models/minimax-m2
+              mkdir -p "$DEST"
+              echo "[stage] downloading MiniMaxAI/MiniMax-M2 FP8 (~450GB) to $DEST"
+              hf download MiniMaxAI/MiniMax-M2 --local-dir "$DEST"
+              echo "[stage] done. shard + config inventory:"
+              ls -1 "$DEST" | head -20
+              echo "[stage] safetensors shard count:"; ls -1 "$DEST"/*.safetensors 2>/dev/null | wc -l
+              du -sh "$DEST"
+              test -f "$DEST/config.json" && echo "config.json OK"
+              test -f "$DEST/tokenizer.json" -o -f "$DEST/tokenizer.model" && echo "tokenizer OK"
+          env:
+            - name: HF_TOKEN
+              valueFrom: {secretKeyRef: {name: hf-token, key: token}}
+            - {name: HF_HOME, value: /mnt/nvme/hf-cache}
+          resources:
+            requests: {cpu: "8", memory: 16Gi}
+            limits:   {cpu: "16", memory: 32Gi}
+          volumeMounts:
+            - {name: nvme, mountPath: /mnt/nvme, mountPropagation: HostToContainer}
+      volumes:
+        - {name: nvme, hostPath: {path: /mnt/nvme, type: Directory}}

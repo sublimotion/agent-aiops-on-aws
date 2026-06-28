@@ -1,0 +1,143 @@
+# MiniMax-M2 — Benchmark Sidecar (B200, vLLM)
+# Source of truth: domains/gpu-serving/specs/minimax-m2.md (audited 2026-06-27).
+#
+# Objective is GOODPUT (max concurrent developers at OK interactivity), NOT
+# min-latency and NOT peak throughput. Workload is prefill-heavy huge-context
+# (ISL 11K–94K, OSL 66–485) with a CLAIMED >90% shared-prefix reuse → a
+# KV-capacity / KV-reuse + prefill-latency problem.
+#
+# Substrate change vs customer: they benchmarked on 4× H200; no Hopper capacity,
+# so we run 4× B200 (p6-b200.48xlarge, SM100, NVSwitch). B200 numbers are a FRESH
+# baseline, NOT comparable to the customer's H200 dashboards (match-before-compare).
+
+model:
+  name: MiniMax-M2
+  id: MiniMaxAI/MiniMax-M2
+  architecture: minimax_m2-moe          # MiniMaxM2ForCausalLM, 62 layers, 256 experts / 8 active, per-layer qk_norm, MTP(3)
+  parameters_total: "230B"
+  parameters_active: "10B"
+  quantization: fp8                     # native: config.json quant_method=fp8, F8_E4M3
+  fp8_granularity: block                # weight_block_size [128,128] → block-wise → TP-divisibility rule APPLIES
+  # Verified from HF config.json 2026-06-27. The MoE expert FFN dim is `intermediate_size`
+  # (shared_intermediate_size=0 → no shared expert; mlp_intermediate_size=8192 is the dense path).
+  moe_intermediate_size: 1536           # /TP4 = 384, %128==0 → OK. /TP8 = 192, %128!=0 → FAIL (this is WHY pure TP8 is unsupported).
+  max_model_len: 196608                 # == max_position_embeddings (M2). M2.7 = 204800.
+  max_position_embeddings: 196608
+  num_hidden_layers: 62
+  num_attention_heads: 48               # head_dim 128
+  num_local_experts: 256
+  num_experts_per_tok: 8
+  supports_mtp: true                    # use_mtp:true, 3 modules — cheap decode-latency A/B only (OSL tiny → T3 deferred)
+  # NOTE: NOT MLA — MiniMax-M2 is GQA + per-layer qk_norm, not latent attention.
+  #       So lmcache-mla-incompat does NOT apply; CPU-offload KV (OffloadingConnector) is on the table for Stage 6b.
+
+# ── Engine ────────────────────────────────────────────────────────────────────
+engine:
+  name: vllm
+  # Prefer the model-specific tag; falls back to a recent stock B200 (sm_100/cu128) tag at deploy.
+  container_image: "vllm/vllm-openai:minimax27"
+  min_version: "0.23.0"                 # corrupted-output fix (commit cf3eacfe, 2025-12-11) lands at v0.23.0+
+  tensor_parallel: 4                    # TP4 — matches customer; 230B FP8 ~220GB CANNOT fit one 180GB B200.
+  expert_parallel: 4                    # --enable-expert-parallel (EP4). Recipe: TP4+EP4 > TP8+EP8 on H-class; re-verify on B200.
+  pipeline_parallel: 1
+  data_parallel: 1                      # H4a (Stage 6b): TP4+DP2 across the 8 B200s is the high-priority parallelism lever.
+  replicas: 1
+  reasoning: true
+  kv_cache_dtype: fp8                   # T1: customer runs --kv-cache-dtype fp8. Keep.
+  attention_backend: auto               # NOT flashinfer for MoE — see moe_backend pin below.
+  prefix_caching: true                  # T2 baseline: --enable-prefix-caching ON. The APC hit-rate is the decisive number.
+  cuda_graph: true
+  extra_args:
+    # ── B200 MoE-backend pin (CRITICAL, the single most likely startup failure) ──
+    # MiniMax casts router_logits to float32; FlashInfer/TRTLLM FP8 MoE only supports
+    # float32 router_logits for DeepSeek-style routing → assertion failure on SM100
+    # (vLLM #33543). vLLM #37056 auto-removes FLASHINFER_TRTLLM/CUTLASS from the SM100
+    # candidate list; pin Triton explicitly so it does not matter whether #37056 is in
+    # the build. Triton FP8 MoE is the safe Blackwell path.
+    moe-backend: triton
+    # Belt-and-suspenders env equivalent is set in the manifest: VLLM_USE_FLASHINFER_MOE_FP8=0
+    tool-call-parser: minimax_m2        # only one registered tool parser
+    reasoning-parser: minimax_m2_append_think   # appends <think> into content → survives multi-turn (HF requirement)
+    enable-auto-tool-choice: true
+    trust-remote-code: true
+    # T5 kernel/compile: qk_norm fusion (PR #37045). Drop fuse_minimax_qk_norm if the build lacks it.
+    compilation-config: '{"mode":3,"pass_config":{"fuse_minimax_qk_norm":true}}'
+    gpu-memory-utilization: "0.90"      # 94K-ctx prefill activation headroom; 0.95 watched for OOM (Stage 5).
+
+# ── Optimization levers (Stage 6b — NOT run yet; deployment-correctness first) ──
+optimization:
+  # H1 — KV tier A/B/C (orthogonal, separate sidecars): gpu-only / cpu-offload / nvme-disk.
+  #      RE-TEST offload under REUSE (coding-shared-prefix-90k), not cold. First check:
+  #      assert chunked_prefill_active stays TRUE when OffloadingConnector engages (cheapest root cause).
+  kv_tier_arms: [gpu-only, cpu-offload, nvme-disk]
+  # H2 — Admission control: --max-num-seqs 512 likely too high (512×90K can't fit KV pool).
+  max_num_seqs_sweep: [64, 128, 256, 512]
+  max_num_batched_tokens_sweep: [16384, 32768, 65536, 131072]
+  # H3 — Compilation: mode:3 + fuse_minimax_qk_norm (requires #37045 build).
+  # H4a — Replication TP4+DP2 (BEFORE disagg; kimi-k2.6-nvfp4 saw +19-25% vs TP8 same regime).
+  # H4b — P/D disagg (EARNED only if H1–H4a fail; same-node NVLink+UCX cuda_ipc, NOT EFA).
+  # H5 — Model A/B: M2 vs M2.7 (same-arch drop-in; verify M2.7 active-param count first — latency risk).
+  speculative_decode:                    # T3 deferred (OSL tiny). Native MTP exists — cheap low-conc A/B only.
+    algorithm: MTP
+    enabled_sweep: [false]               # baseline OFF; do not enable without measured acceptance >= 0.60
+
+# ── Workloads (Stage 6 — NOT run yet) ───────────────────────────────────────────
+workloads:
+  catalog_id: coding-agent-100k-shared-prefix
+  scenarios:
+    - name: replace-sonnet-cold          # the cold floor, matches customer's existing benchmark
+      input_tokens: {mean: 59128}
+      output_tokens: to-eos
+    - name: replace-sonnet-p75-cold
+      input_tokens: {mean: 94386}
+      output_tokens: to-eos
+    - name: coding-shared-prefix-90k      # the production claim that decides the architecture
+      shared_prefix_tokens: 90000
+      unique_suffix_tokens: {mean: 350}
+      prefix_byte_identical: true         # APC exact-match requires byte-identical prefix
+      enable_prefix_caching: true
+
+# ── SLO (interactivity guardrail; concurrency is what we maximize under it) ─────
+slo:
+  ttft_warm_p95_ms: 2000                 # TODO(customer) placeholder, unvalidated
+  itl_p95_ms: 50                         # ~20 tok/s streaming floor
+  error_rate_max: 0.001
+
+# ── Infrastructure ──────────────────────────────────────────────────────────────
+infrastructure:
+  substrate: eks
+  cluster_name: qwen3-next-bench-eks-cluster
+  nodegroup: ai-infra-use2-b200-spot
+  instance_type: p6-b200.48xlarge
+  region: us-east-2
+  ami_family: al2023                     # AL2 lacks ib_umad for Fabric Manager on NVL5+ (b200-requires-al2023 rule)
+  node_selector: { blueprint: minimax-m2 }
+  gpu:
+    name: B200
+    arch: sm_100                         # SM100 NVSwitch — stock cu128 images (NOT -cu130/sm_103/B300).
+    count: 4                             # TP4 of the node's 8; other 4 spare / DP2 second replica (H4a).
+    vram_gb: 180
+    interconnect: nvswitch               # NCCL-broken-on-PCIe (g7e sm_120) does NOT apply to B200 NVSwitch.
+
+# ── Observability (MANDATORY — Kimi-spec lost all TTFT data) ────────────────────
+observability:
+  required: true
+  prometheus: { port: 9090, retention: 7d, s3_sync: true }
+  engine_metrics:
+    vllm:
+      endpoint: "http://localhost:8000/metrics"
+      required_histograms:
+        - "vllm:time_to_first_token_seconds_bucket"
+        - "vllm:time_per_output_token_seconds_bucket"
+        - "vllm:e2e_request_latency_seconds_bucket"
+      required_gauges:
+        - "vllm:gpu_cache_usage_perc"
+        - "vllm:num_requests_running"
+        - "vllm:num_requests_waiting"
+        - "vllm:gpu_prefix_cache_hit_rate"
+
+# ── Cost ────────────────────────────────────────────────────────────────────────
+cost:
+  instance_type: p6-b200.48xlarge
+  spot_price_per_hr: 18.00
+  # Decision unit is $/concurrent-developer at the interactivity SLO (NOT $/Mtok).
