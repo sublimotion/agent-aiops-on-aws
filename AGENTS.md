@@ -123,6 +123,7 @@ Read these files **on demand** based on what you're doing:
 | `domains/autoresearch/blueprints/e-harness2-jit-vs-offline-authoring/` | `domains/autoresearch/specs/e-harness2-jit-vs-offline-authoring.md` |
 | `domains/autoresearch/blueprints/e-harness3-reward-regime-x-locus/` | `domains/autoresearch/specs/e-harness3-reward-regime-x-locus.md` |
 | `domains/autoresearch/blueprints/e-trace-profile-mechanism/` | `domains/autoresearch/specs/e-trace-profile-mechanism.md` |
+| `domains/autoresearch/blueprints/cheaper-verifier-cascade/` | `domains/autoresearch/specs/cheaper-verifier-cascade.md` |
 
 **Blueprint-local context** — for operational details (lessons, results, plans), look inside the blueprint directory itself rather than in specs.
 
