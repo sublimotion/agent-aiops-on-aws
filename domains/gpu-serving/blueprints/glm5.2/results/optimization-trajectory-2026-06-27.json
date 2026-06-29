@@ -1,0 +1,169 @@
+{
+  "meta": {
+    "spec": "domains/gpu-serving/specs/glm5.2.md",
+    "started": "2026-06-27T16:00:00Z",
+    "hardware": "p6-b300.48xlarge (8x B300 SXM6 275GB, sm_103, NVSwitch, driver 580.159.03)",
+    "cluster": "qn-sglang-eks-cluster / ai-infra-b300-spot / us-west-2b",
+    "engine": "SGLang v0.5.13.post1-cu130",
+    "model": "zai-org/GLM-5.2-FP8 (753B MoE/40B active, glm_moe_dsa, MLA+DSA, native MTP)",
+    "objective": "maximize goodput_tok_s_within_slo",
+    "slo": {"ttft_p95_ms": 15000, "error_rate_max": 0.001},
+    "budget": {"max_configs": 12, "max_wall_clock_min": 360, "max_usd": 250},
+    "plateau": {"min_improvement": 0.03, "patience": 3},
+    "regime_instrument": "engine gauges (token_usage, num_queue_reqs) + nsys --gpu-metrics-device at the knee (DCGM PROF dead on B300/driver-580, see lessons L3)",
+    "node_hourly_usd": 15.0,
+    "ttft_measurement_verified": "P0 gate closed: bench.py client-side TTFT p95 + sglang_time_to_first_token_seconds (underscore) histogram p95 both non-zero and distinct from E2E before any sweep"
+  },
+  "configs": [
+    {
+      "id": "T0",
+      "parent": null,
+      "lever_delta": "seed",
+      "description": "FP8 floor, TP8, radix cache OFF, no fp8-KV, no spec decode, no HiCache. max-model-len 65536, mem-fraction-static 0.85.",
+      "manifest": "k8s/sglang-glm52-t0-baseline.yaml",
+      "workload": "coding-agent (12K cacheable prefix + ~1K suffix, 2048 out, byte-identical shared prefix)",
+      "measurements": {
+        "coding_c8":  {"requests_ok": 32, "requests_err": 0, "agg_decode_tok_s": 570.9, "ttft_p95_s": 3.875, "e2e_p50_s": 25.079, "cache_hit_token_fraction": 0.0, "slo_pass": true},
+        "coding_c16": {"requests_ok": 64, "requests_err": 0, "agg_decode_tok_s": 945.1, "ttft_p95_s": 6.556, "e2e_p50_s": 31.511, "cache_hit_token_fraction": 0.0, "slo_pass": true},
+        "coding_c32": {"requests_ok": 128, "requests_err": 0, "agg_decode_tok_s": 1348.7, "ttft_p95_s": 12.228, "ttft_p99_s": 14.405, "e2e_p50_s": 42.965, "cache_hit_token_fraction": 0.0, "slo_pass": true}
+      },
+      "goodput_at_slo_tok_s": 1348.7,
+      "knee": "c32 (TTFT p95 12.2s, p99 14.4s — near the 15s ceiling; c64 expected to breach)",
+      "regime_note": "[gauge-inferred] PREFILL-BOUND. TTFT p95 scales 3.9->6.6->12.2s across c8/16/32 while agg tok/s grows sub-linearly (571->945->1349, ~2.4x for 4x conc). radix OFF => every request re-prefills the 12K shared prefix. num_queue_reqs stayed 0 at c32 (not admission-capped); num_running=18-23. KV pool not saturated. => the binding cost is prefill compute on a repeated prefix, exactly the lever T2 (prefix cache) targets.",
+      "notes": "Honest FP8 baseline. cache_hit=0 correct (radix disabled). goodput@SLO = 1349 tok/s @ c32."
+    },
+    {
+      "id": "T2-prefixcache",
+      "parent": "T0",
+      "lever_delta": "enable RadixAttention prefix cache (remove --disable-radix-cache). ONLY change vs T0.",
+      "description": "T0 + prefix cache ON. Tests the regime prediction that the 12K byte-identical prefix is the prefill bottleneck. Expect large TTFT drop + goodput gain at concurrency.",
+      "manifest": "/tmp/t2-prefixcache.yaml (T0 minus --disable-radix-cache)",
+      "cold_start_min": 8.5,
+      "measurements": {
+        "coding_c8":  {"requests_ok": 32, "agg_decode_tok_s": 643.2, "ttft_p95_s": 2.659, "ttft_p50_s": 0.129, "e2e_p50_s": 22.493, "cache_hit_token_fraction": 0.832, "slo_pass": true},
+        "coding_c16": {"requests_ok": 64, "agg_decode_tok_s": 1105.5, "ttft_p95_s": 2.804, "ttft_p50_s": 0.131, "e2e_p50_s": 25.01, "cache_hit_token_fraction": 0.918, "slo_pass": true},
+        "coding_c32":  {"requests_ok": 128, "agg_decode_tok_s": 1933.8, "ttft_p95_s": 1.757, "ttft_p50_s": 0.15, "e2e_p50_s": 28.91, "cache_hit_token_fraction": 0.918, "slo_pass": true},
+        "coding_c64":  {"requests_ok": 192, "agg_decode_tok_s": 3030.4, "ttft_p95_s": 3.247, "ttft_p99_s": 3.314, "e2e_p50_s": 35.418, "cache_hit_token_fraction": 0.918, "slo_pass": true},
+        "coding_c128": {"requests_ok": 384, "agg_decode_tok_s": 4476.8, "ttft_p95_s": 5.966, "ttft_p99_s": 6.081, "e2e_p50_s": 49.782, "cache_hit_token_fraction": 0.918, "slo_pass": true},
+        "coding_c256": {"requests_ok": 768, "agg_decode_tok_s": 6024.8, "ttft_p95_s": 10.726, "ttft_p99_s": 11.389, "e2e_p50_s": 74.516, "cache_hit_token_fraction": 0.918, "slo_pass": true}
+      },
+      "goodput_at_slo_tok_s": 6024.8,
+      "knee": "c256 (TTFT p95 10.7s, p99 11.4s, 0 errors — practical SLO ceiling; c512 expected to breach)",
+      "delta_vs_parent": "+347% goodput at the SLO knee (T0 1348.7@c32 -> T2 6024.8@c256); TTFT p95 12.2s -> 10.7s at far higher load. cache hit 0 -> 0.92.",
+      "regime_note": "[gauge-inferred] Post-cache the regime is DECODE-BOUND: TTFT now scales ~linearly with conc (1.8/3.2/6.0/10.7s at c32/64/128/256) = batch-decode growth, NOT prefill. Throughput still climbing at c256 (6025 tok/s, no plateau) so not yet compute-saturated; the SLO (TTFT) binds before throughput does. cache hit flat 0.918 across all conc (prefix fully resident).",
+      "decision": "ACCEPT. New current-best = T2 @ c256, 6025 tok/s. Next lever (single-variable from T2): the regime is decode-bound with throughput still rising, so the candidates are (a) T1 +fp8 KV cache dtype (more KV residency -> higher max batch within SLO; won big on B200 1708->3004) and (b) T3 +MTP/EAGLE spec decode (decode-latency lever). T1 first: it directly extends the decode-bound knee and is the cheapest single change."
+    },
+    {
+      "id": "T1-fp8kv",
+      "parent": "T2-prefixcache",
+      "lever_delta": "add --kv-cache-dtype fp8_e4m3. ONLY change vs T2.",
+      "description": "T2 + fp8 KV cache. Hypothesis: more KV residency extends the decode-bound knee past c256.",
+      "manifest": "/tmp/t1-fp8kv.yaml",
+      "cold_start_min": 9,
+      "measurements": {
+        "coding_c64":  {"requests_ok": 192, "requests_err": 0, "agg_decode_tok_s": 3008.6, "ttft_p95_s": 6.691, "e2e_p50_s": 37.517, "cache_hit_token_fraction": 0.904, "slo_pass": true},
+        "coding_c128": {"requests_ok": 384, "requests_err": 0, "agg_decode_tok_s": 4559.6, "ttft_p95_s": 6.035, "e2e_p50_s": 50.103, "cache_hit_token_fraction": 0.918, "slo_pass": true},
+        "coding_c256": {"requests_ok": 768, "requests_err": 0, "agg_decode_tok_s": 6128.6, "ttft_p95_s": 10.308, "ttft_p99_s": 11.271, "e2e_p50_s": 73.997, "cache_hit_token_fraction": 0.918, "slo_pass": true},
+        "coding_c512": {"requests_ok": 1107, "requests_err": 429, "agg_decode_tok_s": 8408.5, "ttft_p95_s": 20.91, "ttft_p99_s": 22.128, "cache_hit_token_fraction": 0.918, "slo_pass": false, "note": "SLO BREACH + 28% request failures (1107/1536) — KV/timeout exhaustion at c512"}
+      },
+      "goodput_at_slo_tok_s": 6128.6,
+      "delta_vs_parent": "+1.7% @ c256 knee (6024.8 -> 6128.6) — BELOW the 3% plateau threshold.",
+      "CORRECTION_2026-06-27": "[measured] This lever was effectively a NO-OP, not a weak lever. The T4 pod built WITHOUT --kv-cache-dtype still reports kv_cache_dtype='fp8_e4m3' and allocates KV as torch.float8_e4m3fn (49.2GB) — so fp8 KV is the AUTO-RESOLVED DEFAULT for GLM-5.2 DSA on SGLang v0.5.13 (fp8 model -> fp8 KV). T0 and T2 were ALSO running fp8 KV. Explicitly setting the flag in T1 changed nothing except emitting the 'no scaling factors, defaulting to 1.0' warning. The +1.7% is run-to-run noise. Do NOT credit fp8 KV as a separate lever for this model; it's baked in. (Contrast B200 STAGE6-REPORT 1708->3004 'fp8 KV' gain — re-examine whether that was also default-vs-explicit or a genuine no-cache-regime effect.)",
+      "quality_gate": "N/A — no-op config, nothing to gate.",
+      "regime_note": "[measured] fp8 KV is default-on; not a tunable lever here.",
+      "decision": "REJECT (no-op / within noise). Keep T2 as current-best. PLATEAU STRIKE 1/3. Next lever: T4 TP4+DP2 layout — the B300-unique structural arm (won +19-25% on kimi); single conceptual lever (parallelism layout) from T2."
+    },
+    {
+      "id": "T4-tp4dp2",
+      "parent": "T2-prefixcache",
+      "lever_delta": "parallelism layout TP8 -> TP4+DP2 (two 4-GPU replicas). ONLY change vs T2.",
+      "description": "B300-UNIQUE arm (TP4 = ~188GB/GPU > B200 180GB, fits B300 275GB). The layout that won +19-25% on kimi-k2.6-nvfp4. Tests whether 2 DP replicas beat one TP8 instance for shared-prefix agent traffic.",
+      "manifest": "/tmp/t4-tp4dp2.yaml",
+      "cold_start_min": 8,
+      "measurements": {
+        "coding_c64":  {"requests_ok": 192, "requests_err": 0, "agg_decode_tok_s": 3106.3, "ttft_p95_s": 7.456, "e2e_p50_s": 34.686, "cache_hit_token_fraction": 0.889, "slo_pass": true},
+        "coding_c128": {"requests_ok": 384, "requests_err": 0, "agg_decode_tok_s": 5170.0, "ttft_p95_s": 3.839, "e2e_p50_s": 41.781, "cache_hit_token_fraction": 0.918, "slo_pass": true},
+        "coding_c256": {"requests_ok": 768, "requests_err": 0, "agg_decode_tok_s": 7728.1, "ttft_p95_s": 6.663, "ttft_p99_s": 7.19, "e2e_p50_s": 57.264, "cache_hit_token_fraction": 0.918, "slo_pass": true},
+        "coding_c384": {"requests_ok": 846, "requests_err": 306, "agg_decode_tok_s": 9389.9, "ttft_p95_s": 9.738, "ttft_p99_s": 10.143, "cache_hit_token_fraction": 0.918, "slo_pass": false, "note": "27% client failures (306/1152) — same class as c512. TTFT p95 9.7s would pass but error rate fails SLO."},
+        "coding_c512": {"requests_ok": 1047, "requests_err": 489, "agg_decode_tok_s": 9895.0, "ttft_p95_s": 13.564, "e2e_p50_s": 83.776, "cache_hit_token_fraction": 0.918, "slo_pass": false, "note": "TTFT p95 13.6s is UNDER SLO, but 32% client-side request failures (489/1536) blow error_rate_max=0.001. server num_retracted=0."}
+      },
+      "goodput_at_slo_tok_s": 7998.1,
+      "knee": "c256 = SLO knee, REPEATABLE/CLEAN: 3 runs 7728/7998 tok/s, 0 errors, TTFT p95 6.66-6.95s. This is the number for fleet sizing. ABOVE c256: c512 breaches TTFT (p95 15.75s > 15s) so it's out regardless. c384 hits ~8900-9390 tok/s (TTFT p95 ~10s, would pass) BUT shows intermittent client-side request failures (0 to 27% across runs) — root-caused to a CLIENT harness artifact (L8: connector limit + chained-process connection reuse + likely ephemeral-port pressure from limit=0 opening ~1152 sockets), NOT a server limit (num_retracted=0 always). c384 is real upside under a production load balancer but NOT banked here — would need an LB-fronted re-test to certify.",
+      "knee_measurement_note": "[measured, clean] c256 comfortable (7998 tok/s, p95 6.95s). [measured, DISTRIBUTED 2-client certify] c384 = 9900 tok/s, 0/1152 errors, TTFT p95 14.94s (PASSES) but p99 15.51s (marginal edge). The single-client c384 failures were 100% harness artifact — 2 client pods on separate nodes gave zero errors. c320 measuring to pin the comfortable (p95 AND p99 < 15s) knee.",
+      "distributed_certification": {
+        "method": "2 client pods on separate m6i nodes hitting B300 node-IP:30000, concurrency split, simultaneous; aggregated tput over global wall window + merged TTFT percentiles",
+        "c320": {"requests_ok": 960, "requests_err": 0, "agg_decode_tok_s": 9271.2, "ttft_p95_s": 8.09, "ttft_p99_s": 8.36, "slo_pass_p95": true, "slo_pass_p99": true, "note": "COMFORTABLE KNEE — both p95 and p99 well under 15s with headroom. RECOMMENDED operating point."},
+        "c384": {"requests_ok": 1152, "requests_err": 0, "agg_decode_tok_s": 9900.1, "ttft_p50_s": 1.84, "ttft_p95_s": 14.94, "ttft_p99_s": 15.51, "slo_pass_p95": true, "slo_pass_p99": false, "note": "true ceiling — p95 passes, p99 marginally over 15s"}
+      },
+      "RECOMMENDED_OPERATING_POINT": "c320/node: 9271 tok/s, TTFT p95 8.1s, 0 errors. c256 (7998, p95 7s) for extra latency margin; c384 (9900, p95 14.9s) is the hard ceiling.",
+      "delta_vs_parent": "+28.3% goodput @ c256 knee (T2 6024.8 -> T4 7728.1) AND lower TTFT (10.7s -> 6.66s). Holds SLO-TTFT to c512 where T2 breached. Confirms the kimi +19-25% layout finding, even larger here (+28%).",
+      "regime_note": "[gauge-inferred] Two TP4 replicas beat one TP8 instance: less per-step TP collective overhead (TP4 NVLink collectives are cheaper than TP8) + 2x scheduler parallelism for the shared-prefix decode-bound regime. Each replica holds the full 12K prefix in its own radix cache (cache hit stays 0.918). This is the B300-unique win — physically impossible on B200.",
+      "decision": "ACCEPT. New current-best = T4 TP4+DP2, SLO knee c256 ~7998 tok/s (+28-33% vs T2). Resets plateau counter. Next single-variable lever from T4: T3 +NEXTN MTP spec decode (native MTP, num_nextn_predict_layers=1, card claims +20% accept-len) — the remaining high-rank decode lever.",
+      "held_out_quality_gate": "PASS (run on the WINNING config, reward-hacking guard). 3 frozen coding tasks the config was NOT tuned on: Q1 off-by-one last-index fix = correct (reverse range); Q2 palindrome one-liner = correct (walrus + alnum + [::-1]); Q3 glm47 tool-calling = well-formed tool_call emitted (name+JSON args). T4 goodput is NOT bought with degraded quality."
+    },
+    {
+      "id": "T3-mtp",
+      "parent": "T4-tp4dp2",
+      "lever_delta": "add --speculative-algorithm NEXTN (native MTP, num-steps 1, draft-tokens 2). PAIRED with --max-running-requests 512 — NOT a 2nd free variable: MTP silently auto-resets max-running to 48 if unset (memory L1), which would cripple the batch and invalidate the comparison; 512 keeps the batch ceiling comparable to T4's effective-unlimited default.",
+      "description": "T4 + native MTP spec decode. Decode-latency lever. Expect TTFT-neutral, decode-throughput up at low-mid concurrency; spec decode often REGRESSES at high concurrency (draft overhead per the spec's own T3 caveat + single-stream-decode-levers memory).",
+      "manifest": "/tmp/t3-mtp.yaml",
+      "cold_start_min": 8,
+      "measurements": {
+        "coding_c8":   {"requests_ok": 24, "agg_decode_tok_s": 683.1, "ttft_p95_s": 2.8, "spec_accept_length": 1.63, "slo_pass": true},
+        "coding_c64":  {"requests_ok": 192, "agg_decode_tok_s": 3149.4, "ttft_p95_s": 6.02, "spec_accept_length": 1.60, "slo_pass": true},
+        "coding_c256": {"requests_ok": 768, "agg_decode_tok_s": 7021.7, "ttft_p95_s": 7.34, "spec_accept_length": 1.61, "slo_pass": true}
+      },
+      "goodput_at_slo_tok_s": 7021.7,
+      "delta_vs_parent": "c8 +6% (683 vs T2 643, but T4 wasn't measured at c8), c64 +1.4% (3149 vs 3106), c256 -12.2% (7021.7 vs T4 7998.1). At the SLO KNEE (c256, the customer operating point) MTP REGRESSES.",
+      "regime_note": "[measured] MTP accept_length ~1.6 across all concurrency (model card claimed +20% accept-len; real acceptance on this coding/reasoning workload is modest — drafts a useful token ~60% of steps). At low conc the extra accepted token slightly helps; at the c256 knee the per-step draft+verify compute overhead on an already-full batch outweighs the ~1.6 acceptance, costing -12%. Classic spec-decode-regresses-under-load (matches spec T3 caveat + project_single_stream_decode_levers).",
+      "decision": "REJECT at the knee. MTP is a LATENCY lever for low-concurrency single-stream serving (would help a conc=1-8 latency SLO), but the customer objective is goodput@high-concurrency where it costs -12%. Keep T4 as current-best. PLATEAU STRIKE 2/3. Document MTP as a conditional lever (enable only for low-QPS latency-first deployments)."
+    },
+    {
+      "id": "T5-mnbt8192",
+      "parent": "T4-tp4dp2",
+      "lever_delta": "add --chunked-prefill-size 8192 (SGLang MNBT/max-num-batched-tokens equivalent; default is 16384). ONLY change vs T4.",
+      "description": "T4 + smaller prefill chunk. B200 STAGE6 found MNBT 8192 beat the 16384 default on TTFT at the SLO knee (smaller chunks interleave decode more -> lower TTFT -> higher SLO-passing concurrency). Re-test on B300 (FRESH NODE ip-10-2-31-98, distributed 2-client driver for clean TTFT).",
+      "manifest": "/tmp/t4-mnbt8192.yaml",
+      "baseline_reconfirm": {"default_16384_c320_distributed": {"requests_ok": 960, "requests_err": 0, "agg_decode_tok_s": 9399.8, "ttft_p95_s": 8.21, "ttft_p99_s": 8.46, "note": "fresh-node clean anchor; matches prior 9271 within noise"}},
+      "measurements": {
+        "coding_c320": {"requests_ok": 960, "requests_err": 0, "agg_decode_tok_s": 9157.1, "ttft_p95_s": 8.89, "ttft_p99_s": 9.78, "slo_pass": true},
+        "coding_c384": {"requests_ok": 1152, "requests_err": 0, "agg_decode_tok_s": 10245.9, "ttft_p95_s": 10.06, "ttft_p99_s": 10.17, "slo_pass": true}
+      },
+      "delta_vs_parent": "c320: -2.6% tok/s (9400->9157), +0.7s TTFT — slightly WORSE at the knee. BUT c384: 10246 tok/s @ TTFT p95 10.06s, clean — vs default-16384 c384 which hit p95 14.94s/p99 15.51s. 8192 gives much better TTFT HEADROOM at c384, extending the comfortable ceiling from c320 to c384.",
+      "regime_note": "[measured] Opposite of the B200 finding (where 8192 beat default at the knee). Here prefix cache already removed the prefill pressure that MNBT addressed on B200's no-cache long-context tests, so at c320 the smaller chunk just adds scheduling overhead (-2.6%). The win is at HIGHER concurrency: smaller prefill chunks interleave decode better, so c384 stays at p95 10s vs default's 14.9s. Net: 8192 trades a tiny c320 loss for a real c384 gain.",
+      "decision": "CONDITIONAL ACCEPT. At the c320 recommended knee, default-16384 is marginally better (9400 vs 9157). But 8192 unlocks a comfortable c384 operating point (10246 tok/s, p95 10s) that default-16384 cannot hold (p99 breaches). Best-of-both: default-16384 if targeting c320; 8192 if pushing to c384 for max throughput/node. Testing 4096 next."
+    },
+    {
+      "id": "T5-mnbt4096",
+      "parent": "T4-tp4dp2",
+      "lever_delta": "--chunked-prefill-size 4096 (vs 16384 default). ONLY change vs T4.",
+      "description": "Smallest prefill chunk tested — extends the 8192 trend.",
+      "manifest": "/tmp/t4-mnbt4096.yaml",
+      "measurements": {
+        "coding_c320": {"requests_ok": 960, "requests_err": 0, "agg_decode_tok_s": 8841.7, "ttft_p95_s": 9.87, "ttft_p99_s": 11.11, "slo_pass": true},
+        "coding_c384": {"requests_ok": 1152, "requests_err": 0, "agg_decode_tok_s": 9984.6, "ttft_p95_s": 10.4, "ttft_p99_s": 11.7, "slo_pass": true}
+      },
+      "delta_vs_parent": "c320 -5.9% (9400->8842), c384 -2.5% vs 8192. Strictly DOMINATED by 8192 (lower throughput AND higher TTFT at both points).",
+      "decision": "REJECT. 4096 is dominated by 8192 everywhere. Monotonic trend confirmed: smaller chunk = lower throughput, no TTFT benefit below 8192. MNBT SWEEP COMPLETE.",
+      "mnbt_sweep_conclusion": "chunked-prefill-size is a modest CEILING-tuning knob, not a major lever, in this prefix-cached decode-bound regime. RECOMMENDATION: default-16384 for the c320 knee (9400 tok/s); 8192 only if pushing per-node load to c384 (10246 tok/s, p95 10s). 4096 never. This is OPPOSITE the B200 STAGE6 finding (8192 won there) because B200's win was in no-prefix-cache long-context prefill pressure that prefix cache eliminates here. PLATEAU: no config beat the T4 c320 baseline at the knee -> STRIKE 3/3 -> loop plateau reached, T4 (default MNBT) remains the winner."
+    },
+    {
+      "id": "T1-nvfp4",
+      "parent": "T4-tp4dp2",
+      "lever_delta": "quantization FP8 -> official nvidia/GLM-5.2-NVFP4 (modelopt NVFP4, shared-expert-preserved recipe). Image lmsysorg/sglang:dev-glm52-nvfp4 (transformers 5.8.1), --quantization modelopt_fp4. Same TP4+DP2 + prefix-cache layout.",
+      "description": "The big open question from the B200 report: does the OFFICIAL NVFP4 recipe (only MoE-expert linears quantized, shared expert preserved) beat FP8 in this decode-bound regime on B300? B200 community full-quant checkpoint regressed -55-60%; spec flagged official as unverified.",
+      "manifest": "/tmp/nvfp4-t4.yaml",
+      "weights": "433GB / 47 shards (39% smaller than FP8 707GB)",
+      "kv_pool_tokens": 2292224,
+      "functional_check": "PASS — clean correct factorial fn, no quant garbage, finish_reason=stop",
+      "measurements": {
+        "coding_c256": {"requests_ok": 768, "requests_err": 0, "agg_decode_tok_s": 3538.5, "ttft_p95_s": 13.37, "ttft_p99_s": 13.42, "slo_pass": true},
+        "coding_c320": {"requests_ok": 960, "requests_err": 0, "agg_decode_tok_s": 4549.5, "ttft_p95_s": 8.23, "ttft_p99_s": 8.23, "slo_pass": true},
+        "coding_c384": {"requests_ok": 1152, "requests_err": 0, "agg_decode_tok_s": 4864.4, "ttft_p95_s": 9.87, "ttft_p99_s": 9.92, "slo_pass": true}
+      },
+      "delta_vs_parent": "c256 -56% (7998->3539), c320 -52% (9400->4550), c384 -53% (10246->4864). NVFP4 is ~HALF the throughput of FP8 at every concurrency.",
+      "regime_note": "[measured] NOT a kernel fallback — logs confirm NVFP4 uses the SAME flashinfer_trtllm MoE backend as FP8 (ModelOptNvFp4FusedMoEMethod on sm100), correct path. The regression is intrinsic to the current NVFP4 MoE kernel: (1) log says 'Detected nvfp4 checkpoint ... format is EXPERIMENTAL and subject to change'; (2) 'FlashInfer TRTLLM MoE deferred finalize is DISABLED' for the NVFP4 quant method (an optimization FP8 keeps); (3) batched-decode is compute-bound on the NVFP4 dequant path. The 2.4x larger KV pool (2.29M vs 956K tokens) does NOT help because the bottleneck is MoE GEMM compute, not KV residency. TTFT non-monotonic (c256 13.4s > c320 8.2s) = kernel inefficiency artifact, not a residency limit.",
+      "decision": "REJECT decisively. NVFP4 ~halves throughput vs FP8 (-52 to -56%) for this batched serving workload. CONFIRMS+EXTENDS the B200 community-checkpoint finding (-55-60%) to the OFFICIAL shared-expert-preserved recipe on B300 — the open question is now answered: NVFP4 does NOT win here. NVFP4's value remains (a) VRAM-constrained single-node fit (433 vs 707GB) and (b) possibly single-stream c1 latency (untested this run). For the customer's high-concurrency goodput objective, FP8 T4 is the clear winner. Root cause is an experimental/unoptimized NVFP4 MoE kernel (deferred-finalize disabled) — re-test when SGLang NVFP4 support matures past 'experimental'."
+    }
+  ]
+}

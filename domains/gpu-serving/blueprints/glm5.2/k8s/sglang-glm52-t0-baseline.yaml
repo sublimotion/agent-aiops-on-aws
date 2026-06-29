@@ -1,6 +1,7 @@
 # GLM-5.2-FP8 — T0 BASELINE (SGLang, TP8). FP8-floor reference: NO prefix cache, NO spec decode,
 # NO HiCache. Establishes the honest baseline before layering T1-T5. (BF16 doesn't fit — FP8 is the floor.)
-# Node: ai-infra-use2-b200-spot (us-east-2), labeled blueprint=glm5.2 after scale-up.
+# Node: ai-infra-b300-spot (us-west-2, cluster qn-sglang-eks-cluster) for THIS fresh B300 loop;
+# also runnable on ai-infra-use2-b200-spot (us-east-2). Node labeled blueprint=glm5.2 after scale-up.
 apiVersion: v1
 kind: Pod
 metadata:
@@ -11,7 +12,8 @@ spec:
   restartPolicy: Never
   nodeSelector: {blueprint: glm5.2}
   tolerations:
-    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}   # the ACTUAL node taint (kimi L2)
+    - {key: ai-infra/b300, operator: Exists, effect: NoSchedule}   # B300 arm taint (THIS run, us-west-2)
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}   # B200 arm taint (kimi L2)
     - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
   hostNetwork: true
   containers:
