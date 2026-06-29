@@ -33,6 +33,7 @@ Read these files **on demand** based on what you're doing:
 | About to deploy a HyperPod blueprint (spec ending in `-hyperpod`) | `.claude/steering/tech-stack.md` §SageMaker HyperPod Inference Operator release tracking, then WebFetch the release-notes URL to confirm the pinned version is current |
 | Deploying an agent-runtime blueprint | `domains/agent-runtime/specs/<name>.md` |
 | Running an autoresearch experiment | `domains/autoresearch/specs/<name>.md` |
+| Designing a verifier, model router, cascade, or test-time selection | `docs/verifier-router-mechanism-selection.md` — measure regime first (routing headroom, cost-spread, verify-cost, verifier portability) → decision tree picks the mechanism (single model / verifier-gated cascade / trained router). Don't build before measuring |
 | Running the compound step after deployment | `domains/<domain>/blueprints/<name>/lessons.md` + `.claude/steering/*.md`; compound-learner must generate YAML frontmatter (see `docs/card-format.md`) as its final step, then run `scripts/fe.sh learn <path>` |
 | Fixing lint, checkov, tflint, or pre-commit failures | `.claude/steering/lint-remediation.md` |
 | Running pre-flight or post-deploy checks | Use the `deployment-orchestrator` skill |
@@ -89,6 +90,7 @@ Read these files **on demand** based on what you're doing:
 | `domains/gpu-serving/blueprints/deepseek-ocr-2-eks/` | `domains/gpu-serving/specs/deepseek-ocr-2-eks.md` |
 | `domains/gpu-serving/blueprints/fin-attribute-extraction/` | `domains/gpu-serving/specs/fin-attribute-extraction.md` |
 | `domains/gpu-serving/blueprints/minimax-m2/` | `domains/gpu-serving/specs/minimax-m2.md` |
+| `domains/gpu-serving/blueprints/minimax-m2-kv-tiering/` | `domains/gpu-serving/specs/minimax-m2-kv-tiering.md` |
 | `domains/gpu-serving/blueprints/qwen3-embedding-8b-hyperpod/` | `domains/gpu-serving/specs/qwen3-embedding-8b-hyperpod.md` |
 | `domains/agent-runtime/blueprints/research-agent/` | `domains/agent-runtime/specs/research-agent.md` |
 | `domains/agent-runtime/blueprints/managed-agent-runner/` | `domains/agent-runtime/specs/managed-agent-runner.md` |
