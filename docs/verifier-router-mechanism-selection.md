@@ -86,6 +86,24 @@ Full catalog (mechanism, train-time origin, test-time reuse recipe, calibration 
 
 ---
 
+## Where this sits vs the AI-gateway / semantic-router landscape
+
+AI gateways are converging from **heuristic governance rules → learned routing**. The exemplar is **vLLM Semantic Router** (an Envoy `ext_proc` control plane): a small fine-tuned classifier + embeddings map a request's **intent / domain / complexity** to a model tier or reasoning-on/off, with policy plugins (PII, jailbreak, semantic cache, hallucination detection) and a "token economy layer." It is a real, shipped, latency-conscious deployment substrate with governance baked in — the operational layer this research does **not** build.
+
+The distinction is **layer, not rivalry** — they are complementary:
+
+- **Gateways provide the *mechanism* (and the substrate); this framework provides the *decision*.** Semantic Router gives you an intent classifier + policy rules and a place to run them. It does not tell you *whether routing pays off for your (pool, task, budget)* — which is exactly what the solo-pass-matrix diagnostic + decision tree above answer. Most regimes land in case 1/2 (ship the cheapest-adequate model, or a reactive cascade), where an upfront intent router is more machinery than the regime needs.
+
+- **Intent-routing vs capability-routing.** Gateways route on *what the request is about* (intent/domain → "code goes to the code model") — a **proxy for difficulty**, computed upfront. Our experiments measured the thing the proxy stands in for: *which model actually solves it* (measured pass-rate; reactive verifier-gate or hidden-state head). When cheap models match frontier (our result: qwen3-235b ties Opus at 1/20th cost), the proxy is unnecessary — you don't classify intent to route, you just use the cheap model. Intent-routing is solving a *harder* problem (predict difficulty upfront) than most regimes require.
+
+- **Upfront vs reactive — and when each wins.** An intent classifier is **predictive/upfront** (cheaper at inference, no try-then-verify tax) = the framework's **case 3** tool (latency-bound / high-volume). A verifier-gated cascade is **reactive** (discovers difficulty instead of predicting it) = **case 2**, no training. The gateway's strength is precisely case 3; this framework's contribution is telling you when you're *not* in case 3.
+
+- **The shared blind spot: portability.** A gateway's intent classifier is **per-pool / per-domain** — retrain it when the model lineup or task distribution shifts (the same pool-lock as a positional CMA-ES head; the same non-transfer as the learned-RF AUC 0.363). Semantic Router's docs don't cover adding a model or transferring across pools. The **content-addressed router** (`domains/autoresearch/specs/content-addressed-router.md`) is the research answer to *their* unstated gap too: route by model *descriptors* (price, capability, context) so a new model is a descriptor row, not a retrain.
+
+**Net:** the contribution here is not "build another router" — gateways already ship good ones. It is the **decision theory** for what (if anything) to put in the gateway: a cheap diagnostic that says which regime you're in, the honest finding that *cost-per-intelligence is collapsing the need for routing at all*, and the *portable* router form for the case-3 minority where routing is warranted. Deploy the diagnostic everywhere; deploy a router only where it earns its keep; make it content-addressed so it isn't pool-locked.
+
+---
+
 ## Checklist for a verifier/router spec
 
 1. **Measure first.** Run the solo pass matrix → headroom, cost-spread, per-model cost. Don't design before this.
@@ -98,5 +116,7 @@ Full catalog (mechanism, train-time origin, test-time reuse recipe, calibration 
 - `domains/autoresearch/blueprints/learned-verifier/VERIFICATION_FRAMEWORK.md` — the *primitives + implementation playbook* (complements this doc's *mechanism-selection*).
 - `domains/autoresearch/blueprints/learned-verifier/VERIFIER_ECONOMICS.md` — verify-method cost table (test-exec vs SVG vs learned vs judge).
 - `domains/autoresearch/blueprints/trinity-coordinator/` — the worked cost-aware-routing example (probe, clean cascade, lessons #31–33).
+- `domains/autoresearch/specs/content-addressed-router.md` — the portable (descriptor-conditioned) router bet; the case-3 "reusable router" form.
+- vLLM Semantic Router (`vllm-semantic-router.com`) — exemplar AI-gateway / intent-router; the deployment substrate this framework's decision theory sits above (see landscape section).
 - `docs/verification-program-retrospective.md` — cross-program verification audit.
 - obsidian `RLVR-Verifier-Catalog-Test-Time-Reuse.md` — verifier types as RL byproducts + reuse recipes.
