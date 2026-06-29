@@ -230,3 +230,183 @@ sanity check, not a headline; run the full 80 for a real pass@1.
 
 **PHASE 0 = VALIDATED.** The shared rollout path now routes to Bedrock correctly,
 which also unblocks Phase 0.5 (CMA-ES train-from-scratch uses the same path).
+
+## Phase 0.5 — CMA-ES training loop bring-up (VALIDATED 2026-06-25)
+
+The vendored OpenReview submission is **eval-only** — `CMAEvolutionTrainer` ships
+`run_test` + diagnostics but **no training loop** (no `cma.ask/tell`, no `.train()`;
+`self.solver.result.xfavorite` reads a solver that's never created; the README's
+`experiments/with_training/testing_standalone.py` was omitted). Wrote
+`scripts/cma_train.py: CMATrainingLoop(CMAEvolutionTrainer)` implementing the missing
+loop from existing primitives (`cma`, `submit_training_job`, the `run_test` scoring
+pattern). Ran the full 3-iter smoke end-to-end on an on-demand g6e.2xlarge (L40S);
+reward 0.667→1.0→1.0, all mechanics proven. Findings, in the order they bit:
+
+13. **No training loop exists** (above). Subclass, don't edit es.py.
+14. **`decompose_model.py` breaks on transformers 5.x**: it loads the checkpoint's
+    native **bf16**, and `torch.svd` has no bf16 kernel (`linalg_svd_cpu not
+    implemented for 'BFloat16'`). Fix: `from_pretrained(..., dtype=torch.float32)` +
+    `torch.svd(v.float())`. The original ran on older transformers that defaulted fp32.
+15. **`datasets==5.0.0` drops remote-script loading** → LiveCodeBench's `version_tag`
+    custom loader fails (`Couldn't find cache ... config 'default-version_tag=...'`).
+    Pin **`datasets==3.6.0`** + `fsspec<=2025.3.0`. Verified v1 loads (400 samples).
+16. **Job pool is never initialized by fugu** — `job_manager.initialize()` lived in
+    the omitted driver. `_score_candidate`/`run_test` both assert `pool is not None`.
+    Replicate the eval harness's worker_config dict (evaluate_*:541-569) +
+    `cleanup()` + `initialize(num_workers, worker_config)`. atexit handles teardown.
+17. **Single-GPU GPU-ordinal crash**: vendored default `worker_gpu_assignments=
+    [1]*N` (their rig: router cuda:0, workers cuda:1+). On a 1-GPU box → `CUDA error:
+    invalid device ordinal`. Pass `worker_gpu_assignments=[0]*num_workers`. The
+    Qwen3-0.6B router (×N spawned copies, ~1.2GB each) fits L40S 46GB at 8 workers.
+18. **THE BIG ONE — empty-response retry storm (5-min hangs)**: `fugu/utils._query_llm`
+    dispatches by **name predicate** (`_is_oai_model`="gpt", `_is_anthropic_model`=
+    "claude", `_is_gemini_model`, `_is_deepseek_model`) *before* reaching the rebound
+    provider funcs. Our Bedrock names `nova-pro`/`gemma-3-27b`/`qwen3-32b-*` match
+    NONE → "Unsupported model" → `""` → tenacity `_should_retry_response` retries 15×
+    (`wait_exponential max=30` ≈ 5 min/episode). Rebinding `query_oai`+friends is not
+    enough; a predicate must select one. **Fix**: in `bedrock_clients.install()`, make
+    `_is_oai_model` a catch-all for any `by_friendly_name` worker. (py-spy showed the
+    worker parked in `tenacity/nap.py` — that's how it was found.)
+19. **Reasoning models emit empty TEXT when they hit maxTokens**: qwen3-32b at
+    `reasoning_effort=high` returns a separate `reasoningContent` block; on a hard
+    problem it burns the whole 4096-token budget thinking → `stopReason=max_tokens` →
+    empty `text` block → `_extract_text` returns `""` → same retry storm as #18.
+    **Two-part fix**: (a) `_extract_text` falls back to reasoning text when there's no
+    visible answer (never returns empty when the model spoke); (b) raise `max_tokens`
+    4096→**8192** so the answer survives. After both, the smoke ran 165 Bedrock calls
+    with **0 retry-hangs** (was ~5 min/episode).
+
+**Gate did its job**: the 3-iter smoke (near-random-init head) correctly FAILED the
+Phase-0.5 non-degeneracy gate — `worker degeneracy: 3 unused workers` + `entropy
+1.013 nats <= 1.5 (head not conditioning)`. That is the **expected** verdict for a
+3-iter warmup and the gate's whole purpose: block a premature full run. The mechanics
+(CMA ask/tell, role_usage/verifier_early_halts emission, es_log write, S3 sync every
+iter, best_model.npy = 19,456 params) are all proven. Artifacts in
+`s3://agent-aiops-bench-us-east-2/trinity-coordinator/phase05-smoke-20260625-000753/`.
+
+20. **Spawn-isolation hides cost/throttle telemetry from the main process**:
+    `spend=$0.00`, `throttle.calls=0` every iter even though workers made 165 calls —
+    `cost_bedrock`/`THROTTLE_TELEMETRY` accumulate in the **worker** interpreters, not
+    main. Harmless for the smoke but the **full run's cost cap would be blind**. TODO
+    before Phase 1: aggregate per-worker cost back to main (return it in the episode
+    tuple, or have workers write cost to a shared file/S3 the callback reads).
+
+21. **`scripts/bootstrap.sh`** automates fresh-box setup (venv, pinned deps, SVD
+    decompose **with S3 cache**, + an import/routing self-check that asserts every
+    worker name routes to Bedrock — would have caught #18 pre-launch). Spot churn
+    (lost 2 instances mid-validation) → ran the validating smoke on **on-demand**;
+    SVD weights cached to `s3://.../trinity-coordinator/_cache/` for fast re-staging.
+
+## Phase 1 full run → SATURATION boundary result + cost-aware pivot (2026-06-26)
+
+22. **Cost/throttle telemetry IS spawn-isolated (lessons #20 confirmed live, then
+    FIXED).** Per-PID sink under `CAR_TRINITY_TELEMETRY_DIR`: each worker flushes
+    cumulative `cost_<pid>.json` / `throttle_<pid>.json` / `tokens_<pid>.json`
+    (monotonic → last-write-wins, no lock); main aggregates. Verified: spend went
+    `$0.00`→`$0.17` and throttle calls `0`→`63` after the fix. The cost cap now
+    enforces real spend.
+
+23. **Vendored bonus-weight knobs are DEAD.** `cost_bonus_weight`,
+    `diversity_bonus_weight`, `turn_bonus_weight`, `role_bonus_weight` are stored +
+    printed + dumped to es_log but **never applied to any reward** (grep proves they're
+    read only in `__init__`/prints). Same incompleteness as the missing training loop
+    (#13) and missing `_calculate_closed_source_costs` (#24). Reward shaping had to be
+    BUILT in `CMATrainingLoop._score_candidate`, not configured.
+
+24. **`run_test` crashes on a missing method → silent total loss of validation.**
+    `es.py:569` calls `self._calculate_closed_source_costs(test_results)`, absent from
+    the eval-only submission. It throws AFTER a full 44-min 300-task eval, discarding
+    every held-out score (we had ZERO `type=test` entries for 17 iters). Added the
+    method to `CMATrainingLoop` (returns the cost_bedrock aggregate). Lesson: a
+    validation path that "runs" isn't validated until you see a score land.
+
+25. **SATURATION boundary result — strong pool + easy task → scaffold collapse, no
+    routing signal.** On LiveCodeBench-only with Opus/Sonnet/qwen-reasoning,
+    `best_cand_reward` was **0.933 at iter 0** (random-init head) and flat 0.87–1.0
+    for 17 iters — noise, not a learning curve. CMA-ES rationally pruned Thinker
+    (314→0) and Verifier (185→~5): role collapse is the SYMPTOM of saturation, not a
+    bug. **Why the verifier "didn't help": no headroom.** Frontier models one-shot
+    the task, so there are no errors to catch — consistent with verifier-reward (the
+    verifier wins on SWE-bench where patches are bug-prone, with REAL test execution;
+    here it's pure-LLM ACCEPT/REJECT judging already-correct answers). Verifiers help
+    where there are bugs to find; this regime has almost none.
+
+26. **PIVOT: cost is the headroom axis when accuracy saturates.** Budget-constrained
+    Pareto reward `= raw_passrate − λ·max(0, episode_cost − budget)`. Even at ceiling
+    accuracy, "hit 0.93 as CHEAPLY as possible" has huge headroom — Opus is **38×**
+    qwen-direct on blended $/Mtok (measured: deepseek-r1 is priciest PER TURN at
+    $0.00118 because reasoning emits ~213 out-tok, a 130× cross-pool spread). This is
+    the cost-aware-routing thesis ("don't need Opus all the time") made the objective.
+    `--cost-budget-usd` + `--cost-lambda`; sweep λ → Pareto frontier = the result.
+
+27. **Provider-agnostic token counter.** Bedrock Converse returns
+    `usage.{inputTokens,outputTokens,totalTokens}` in an IDENTICAL schema for every
+    provider (Anthropic/Amazon/Qwen/DeepSeek/Gemma — live-verified; Opus adds
+    `cacheReadInputTokens`). Capture REAL tokens at the single `_query_converse` seam
+    (`record_usage`); price SEPARATELY via PRICES so counts stay reconcilable if
+    prices change. Beats any hardcoded token proxy — measured deepseek reasoning
+    volume would've been missed by a flat assumption.
+
+28. **Role-collapse-as-difficulty-detector (agent-evals framing).** The role-usage
+    signature itself reads the (pool, task) regime: collapse-to-solver + flat-ceiling
+    = too easy; persistent verifier/thinker + climbing reward = difficulty sweet spot;
+    collapse + low reward = too hard. Trinity is incidentally a saturation/headroom
+    instrument for a model pool, not just a router.
+
+29. **Positional head ⇒ pool composition is baked into head geometry.** Output layer
+    is `hidden→(L agents + 3 roles)`; neuron i is bound to `llm_names[i]` with no
+    notion of WHICH model sits there. Transfers across TASKS for a fixed pool (the
+    paper's "generalizable" claim — hidden-state input, not model identity). But:
+    swap-at-position = logits transfer, policy MISCALIBRATED (why ord 0 was frozen);
+    add-a-model = widen output, warm-start known neurons, short re-evolve. A
+    **content-addressed head** (condition each logit on a model descriptor incl.
+    $/Mtok) would make the pool itself transferable — research extension (OQ).
+
+30. **Operational: stop = kill main THEN orphaned spawn workers.** `pkill -f
+    run_trinity_agent` leaves `multiprocessing.spawn`/`resource_tracker` children
+    holding GPU memory (the parent's atexit pool-cleanup doesn't fire on SIGTERM).
+    Must also `pkill -9 -f multiprocessing.spawn` + `resource_tracker` and confirm
+    `nvidia-smi` → 0 MiB before relaunch. Also: **stdout is block-buffered to the log
+    file**, so human-readable iter/RESUMED prints lag badly — monitor authoritative
+    state via `es_log.json` + `py-spy`, not `grep` on the live log.
+
+## Grading-bias bug + clean routing result (2026-06-27..29)
+
+31. **core.py grading was tag-only → silently biased the whole experiment.**
+    `fugu/utils.extract_answer` returned None when a model emitted no `<answer>`
+    tags, and `livecodebench.py:550` then scored it **0.0 even for a correct full
+    solution**. DeepSeek-V3 (returns prose + ```python fence) scored 0.0 in every
+    core.py path while generating 7959–18054-char correct solutions. This biased
+    BOTH the cost-min training (router collapsed onto gpt-oss-120b, a tag-emitter,
+    partly as a grading artifact) AND the held-out eval. Fixed `extract_answer` with
+    a fenced-block fallback (prefer `<answer>`, else longest ```python, else raw) —
+    parity with the differentiation-probe extraction. **Probe-vs-core extraction
+    parity is mandatory**: a fix in the standalone probe does NOT propagate to the
+    vendored grading path.
+
+32. **The trinity scaffold is a baseline tar pit — bypass it.** Three layered bugs
+    surfaced one after another trying to get a clean baseline THROUGH core.py:
+    tag-only grading (#31); `static:` routing-override leaves role logits =
+    untrained head → model jerked through a random Thinker/Verifier dance (deepseek
+    0.87→0.27); `static_solver:` (force Solver role, max_turns=1) → the solver
+    prompt expects prior-Thinker context, model returns ~160-char non-answers.
+    Resolution: a **standalone harness** (`scripts/clean_router_eval.py`) that owns
+    the turn loop + prompts + extraction and reuses ONLY the primitives that work
+    (`_query_converse`, `cost_bedrock`, `DirectCodeExecutor`, probe extraction).
+    Validated immediately: deepseek-v3 0.83 (not 0.0).
+
+33. **CLEAN ROUTING RESULT (n=40 LiveCodeBench, seed 42, trustworthy):**
+    - best-static: deepseek-v3 / qwen3-235b / **claude-opus-4-8 all tie at 0.825**,
+      but qwen3-235b costs **$0.00063/prob vs Opus $0.01278 — 20× cheaper, same
+      accuracy.** The "don't need Opus" thesis, emphatic.
+    - **verifier-gated cascade (cheap solve → Opus verifier ACCEPT/REJECT → escalate
+      gpt-oss-120b→deepseek-v3→opus) = 0.900**, beating best-static by **+7.5pt**
+      (captures part of the 0.975 oracle). Ladder: 40 start gpt-oss-120b, 18
+      escalate to deepseek-v3, 6 reach Opus. So routing DOES lift accuracy.
+    - BUT cascade costs **$0.0178/prob — more than always-Opus ($0.0128)** because
+      the verifier (Opus judging every cheap solve, ~58 calls) dominates cost. So
+      verifier-gated routing **trades cost for accuracy here; not Pareto-dominant**
+      with a frontier verifier. A *cheaper* verifier would likely make it dominate
+      (same +accuracy, far less verify cost) — the clear follow-up.
+    - The learned CMA-ES head result is NOT used: its training ran under the biased
+      grader (#31), so that number is void pending a clean retrain.

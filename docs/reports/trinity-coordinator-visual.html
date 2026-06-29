@@ -257,7 +257,29 @@ query_llm(model=name, ...)   <span class="muted"># → Bedrock</span></pre>
   </div>
 
   <div class="callout">
-    <b>Routing still has headroom (not saturated).</b> A perfect router (oracle = solve-if-any-model-solves) reaches <b>0.967</b> vs the best single model's 0.867 — <b>+10 points</b>. And a cheap-first policy already wins: <code>gpt-oss-120b</code> + escalate-to-Opus-on-failure = <b>0.867</b>, beating Opus-only (0.73) while spending a fraction. The router's job here is less "reach higher accuracy" and more "reach deepseek-v3-level accuracy for deepseek-v3-level cost, with frontier escalation only for the residual hard tail."
+    <b>Routing still has headroom (not saturated).</b> A perfect router (oracle = solve-if-any-model-solves) reaches <b>0.967</b> vs the best single model's 0.867 — <b>+10 points</b>. The question §6c answers: does an actual router capture it, and at what cost.
+  </div>
+
+  <!-- ===================== 6c. CLEAN ROUTING RESULT ===================== -->
+  <h2>6c · Does routing on top help? (clean harness, n=40)</h2>
+  <p>The learned CMA-ES router's training was corrupted by a grading bug (core.py scored any model that didn't emit <code>&lt;answer&gt;</code> tags as 0.0 — see §9), so that number is void. Instead we test the routing <i>concept</i> cleanly with a standalone harness that bypasses the buggy scaffold: a <b>verifier-gated escalation cascade</b> — cheap model solves → a frontier verifier judges ACCEPT/REJECT → escalate to a stronger model on REJECT.</p>
+
+  <table>
+    <tr><th>arm</th><th>pass@1</th><th>$/problem</th><th></th></tr>
+    <tr><td>static: qwen3-235b</td><td>0.825</td><td><b>$0.00063</b></td><td><span class="pill p-cheap">20× cheaper than Opus, same accuracy</span></td></tr>
+    <tr><td>static: deepseek-v3</td><td>0.825</td><td>$0.00212</td><td><span class="pill p-cheap">open</span></td></tr>
+    <tr><td>static: claude-opus-4-8</td><td>0.825</td><td>$0.01278</td><td><span class="pill p-opus">frontier</span></td></tr>
+    <tr><td>static: gpt-oss-120b</td><td>0.600</td><td>$0.00110</td><td><span class="pill p-cheap">cheap solver</span></td></tr>
+    <tr><td><b>verifier-gated cascade</b></td><td><b>0.900</b></td><td>$0.01782</td><td><span class="pill p-mid">+7.5pt accuracy, but cost premium</span></td></tr>
+    <tr><td>oracle (any model solves)</td><td>0.975</td><td>—</td><td>ceiling</td></tr>
+  </table>
+  <p class="small muted">n=40 LiveCodeBench, seed 42, shared problem set. Cascade ladder: 40 start at gpt-oss-120b → 18 escalate to deepseek-v3 → 6 reach Opus. Verifier = Opus judging every cheap solve.</p>
+
+  <div class="callout good">
+    <b>"Don't need Opus" — emphatic.</b> Three models tie at <b>0.825 including Opus</b>, but <code>qwen3-235b</code> gets there at <b>$0.00063 vs Opus's $0.01278 — 20× cheaper, identical accuracy.</b> On this task class the Opus premium buys nothing.
+  </div>
+  <div class="callout warn">
+    <b>Routing lifts accuracy but isn't free here.</b> The verifier-gated cascade reaches <b>0.900 (+7.5pt over best-static)</b> — escalation genuinely rescues problems the cheap solver fails, capturing part of the 0.967 oracle. <b>But it costs $0.0178/prob — more than always-Opus ($0.0128)</b>, because a frontier verifier judging every cheap solve dominates the bill. So verifier-gated routing <b>trades cost for accuracy; it is not Pareto-dominant with a frontier verifier.</b> A cheaper verifier is the clear next lever — same accuracy lift, far less verification cost.
   </div>
 
   <!-- ===================== 7. TRANSFERABILITY ===================== -->
@@ -292,6 +314,10 @@ query_llm(model=name, ...)   <span class="muted"># → Bedrock</span></pre>
   <!-- ===================== ENGINEERING ===================== -->
   <h2>9 · Hard-won engineering lessons (selected)</h2>
   <div class="grid g2">
+    <div class="card small" style="margin:0">
+      <div class="lab">grading bias (the big one)</div>
+      core.py graded any model that didn't emit <code>&lt;answer&gt;</code> tags as <b>0.0</b> — even correct full solutions. DeepSeek-V3 (prose+```python) scored 0 everywhere in-scaffold while generating correct 8K-char answers. This silently biased <i>both</i> training and eval toward tag-emitting models. Fixed extraction with a fenced-block fallback; the corrupted learned-router result was discarded. <b>Probe-vs-core extraction parity is mandatory.</b>
+    </div>
     <div class="card small" style="margin:0">
       <div class="lab">the vendored code is eval-only</div>
       The training loop, <code>_calculate_closed_source_costs</code>, and every <code>*_bonus_weight</code> knob were missing or dead. All reward shaping had to be built, not configured.

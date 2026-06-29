@@ -504,11 +504,17 @@ def query_llm(
 
 def extract_answer(text: str) -> Optional[str]:
     """
-    Extract whatever sits between <answer> … </answer> tags.
-    Returns None if the tags are missing or if `text` is falsy.
+    Extract the answer the grader should run. Prefer <answer>…</answer> tags;
+    if absent, FALL BACK to the last ```python fenced block, then to raw text.
 
-    Added a defensive check so reward computation won't crash
-    even if the upstream model (still) returns an empty string.
+    GRADING-FAIRNESS FIX (2026-06-27): models comply with the <answer> tag
+    unevenly. DeepSeek-V3 (and others) return prose + a ```python fence instead
+    of tags. The original tag-only version returned None for them → instant 0.0
+    score, EVEN WHEN the model produced a correct full solution. That silently
+    biased the whole experiment (training + eval) against any non-<answer> model
+    — e.g. the cost-min router collapsed onto a tag-emitting model partly as a
+    grading artifact. Mirrors the fix in scripts/differentiation_probe.py so the
+    core grading path matches it. (lessons: probe-vs-core extraction parity.)
     """
     if not text:
         return None
@@ -516,7 +522,17 @@ def extract_answer(text: str) -> Optional[str]:
     match = re.search(r"<answer>(.*?)</answer>", text, flags=re.IGNORECASE | re.DOTALL)
     if match:
         return match.group(1).strip()
-    return None
+
+    # Fallback 1: the last ```python (or bare ```) fenced block — the substantive
+    # code when a model ignores the tag instruction.
+    blocks = re.findall(r"```(?:python)?\s*(.*?)```", text, flags=re.DOTALL)
+    if blocks:
+        return max(blocks, key=len).strip()
+
+    # Fallback 2: no tags, no fences — hand back the raw text; extract_code()
+    # downstream strips stray markers and the executor decides. Better than a
+    # guaranteed 0.0 for a model that may have emitted bare code.
+    return text.strip() or None
 
 
 def batch_completion(
