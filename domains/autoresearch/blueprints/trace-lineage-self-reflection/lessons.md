@@ -73,3 +73,17 @@ Correction: spec previously cited arXiv:2602.06413 for long-horizon decay — th
 ## Status
 
 Harness: BUILT + VALIDATED. Experiment: BLOCKED on headroom, but **path unblocked** — adopt a documented-drift substrate (2509.09677 self-conditioning as primary, PyMigBench as the real-code track) instead of the saturated synthetic task. v2 redesign captured above; not yet built. Do not fan out to cluster until the control arm demonstrably drifts on the chosen substrate.
+
+## Substrate hunt — two more falsified, PyMigBench too heavy (2026-07-06 cont.)
+
+Continued the search for a substrate that BOTH drifts AND is realistic. Result: the realistic + drifting + cheap combination does not exist off-the-shelf.
+
+- **Synthetic file-ledger task (gen_horizon_task.py):** falsified. Sonnet hits 1.0 at K=4/turns=80. Trace inspection shows WHY: the agent **offloads state to files** (reads/writes each balance) and computes the whole op-list in one batch — files ARE its memory, so nothing to forget. This is the deepest finding of the session: **file access prevents drift** on simple tasks.
+- **Forced in-context horizon (horizon_incontext.py, Bedrock Converse, one op/turn, no tools):** DOES drift under self-conditioning (inject-error-rate 0.3 stepped accuracy 0.75→0.5 mid-run). BUT this regime is **unrealistic** — real agents use files/tools; amputating them manufactures drift artificially. AND the drift lives in CONTEXT, not files, so the file-event detector can't observe it. **Kept only as a sanity-check probe** that drift is inducible on our stack; NOT the experiment. (Note: an off-by-one — model 1-indexes acct_1..acct_4 vs truth acct_0.. — inflated the "wrong" count; arithmetic was otherwise correct. Moot given the pivot.)
+- **PyMigBench (arXiv:2504.13272):** the documented 94%→64% coupled-site drift is REAL and file-based, but the benchmark ships **metadata only** (YAML: 335 migrations / 3096 changes). The study's 64% rests on a **hand-curated ~25-migration subset with bespoke per-repo virtualenvs** (date-based dep reconstruction, no lockfiles). No released harness (figshare artifact = 2 sample apps + reports, no runner). Reproducing = **multi-week SWE-bench-class env engineering.** Too heavy for a go/no-go pilot.
+
+### The genuine finding (user's insight, confirmed)
+**Agents that persist state to files do not drift on simple tasks — the file is durable memory.** Realistic file-based drift only appears in tasks complex enough to have NON-OBVIOUS coupled sites (a call site you didn't think to grep, a derived value in an unexpected place). Those tasks require heavy real-repo infrastructure. So the reliability layer's correctness value is narrower than hoped: it pays off on *complex* real codebases, not toy tasks, and demonstrating it needs a real-repo substrate.
+
+### Pivot decision
+Recommended: reuse the **SWE-bench** infra already standing (verification-primitives-swebench: Docker-from-Hub working, 175/300 baseline, m7i EC2). **PASS_TO_PASS regressions = mechanical drift oracle** (agent broke a coupled site) on real file tasks that lineage.py CAN observe. Turns "multi-week rebuild" into "reuse what exists." Alternative: Aider refactor benchmark (AST-graded, no Docker, lighter, but saturates on top models).
