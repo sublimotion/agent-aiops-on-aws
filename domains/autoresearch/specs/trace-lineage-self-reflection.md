@@ -91,6 +91,15 @@ State which cells run vs exploratory before launch. Main result = arm × length 
 - Optional temporal-store evaluation: Graphiti (only if the seeded oracle needs fact-versioning beyond file-reference coupling — likely NOT needed for v1).
 - Optional external check: LongMemEval (ICLR 2025, arXiv:2410.10813) "knowledge updates" split, to show the result isn't purely our bespoke corpus.
 
+## Execution substrate — agent-runtime (agent-runner on EKS)
+
+This experiment is a strong fit for the detached-agent runtime (`../agent-runner`, `agent-runtime` skill): it's massively parallel (arms × tiers × K × trials = hundreds of independent runs) and needs **only** the run role's existing perms (S3/DynamoDB/ECR/Bedrock/KMS) — the no-infra-perms limit that blocks GPU-serving is a non-issue here. Verified against the repo (2026-07):
+
+- **Launch:** `agent-runner launch <spec> --harness claude-code --cluster <name>`; runs headless `claude -p ... --output-format stream-json --max-turns 200` (default Opus via Bedrock IRSA); outputs to `s3://<bucket>/runs/<id>/{run.log,report.html}` + an `agent-run/<id>` git branch. 24h default deadline → long tier + compaction achievable.
+- **TRACE-FORMAT ADAPTER REQUIRED (prerequisite):** agent-runner captures **stream-json** in `run.log` (S3), NOT `~/.claude/projects/**/*.jsonl`. `lineage.py` currently parses the projects-JSONL shape. The file events (tool_use `file_path`) are all present in stream-json (see `agent-runner report.py`), so this is a **parser variant, not a data gap** — add a `--stream-json` input mode to `lineage.py`. This is the one real build prerequisite.
+- **Stop-hook feasibility (advisory + reflect):** settings.json hooks load in `-p` mode (repo `.claude/settings.json` is checked out into the worktree). Per Claude Code headless docs, a Stop hook's `decision: block` "prevents Claude from stopping, continues the conversation" and injects `reason`/`additionalContext` — so **reflect arms are feasible headless** (this corrects an earlier over-firm "not supported" read). **One documented unknown:** the `decision: block` × `--max-turns` interaction (does a block extend past the turn cap, or does the cap terminate anyway?). **Gate with a 5-turn smoke test** (`claude -p --max-turns 5` + a blocking Stop hook; confirm it exceeds 5 turns) before committing the reflect arms to a full cluster run.
+- **Phasing:** control + advisory are runnable as soon as the stream-json adapter lands; reflect arms after the smoke test passes.
+
 ## Rule the experiment would produce
 
 If the hypothesis holds:
