@@ -44,6 +44,32 @@ Ran the recommended sweep immediately. **Haiku 4.5 (`us.anthropic.claude-haiku-4
 
 **The pilot's real lesson about the experiment:** the hard part isn't building the detector or the arms (both work) — it's **inducing genuine drift**. A task a capable model solves in <50 turns will never drift. The experiment's validity depends entirely on constructing a trajectory long/hard enough that the *control* agent forgets. Until a drifting regime is demonstrated, fanning out to the cluster would burn spend measuring a null effect. This mirrors trinity-coordinator: when accuracy saturates, there is no signal on the accuracy axis.
 
+## Drift-headroom research (2026-07-06) — the blocker is now solvable
+
+Two research passes for "where is drift already documented, so we reuse real headroom instead of synthesizing it." Root cause of our null result, confirmed: **frontier models saturate per-step reliability (~1.0); drift only appears under a knob that COMPOUNDS across steps.** Our task had no compounding. Documented drift takes two shapes:
+- **Composition drift** — per-edit correct, the SET fails. PyMigBench: per-change 89-94% but end-to-end unit-test pass 64% (GPT-4o) / 36% (Llama-3.1). MQuAKE: single-edit recall 88-96% → multi-hop propagation 7-8%.
+- **Horizon drift** — success ≈ p^H. arXiv:2509.09677 (ICLR 2026): ~100% single-step accuracy still collapses <50% within ~15 dependent steps; **self-conditioning** (injecting the model's own prior errors into context) worsens it; not fixed by scale; thinking models immune. τ-bench: pass^1<50% → pass^8<25%.
+
+### Recommended drift-induction protocol (adopt this)
+**arXiv:2509.09677 self-conditioning setup** — `github.com/long-horizon-execution/measuring-execution` (public code + HF dataset). Run a **non-thinking model** over a **long dependent-step budget (100+)** with **controlled injection of its own prior errors**. Two dials (horizon length × injected-error rate) put a control agent reliably in the 30-70% band. The injected-error mechanism IS the inconsistency the detector must catch — clean stress test. Mechanically graded (key-value execution).
+
+### Substrate menu for reuse (all mechanically graded — no LLM judge)
+| Substrate | Fit | Headroom | Grading |
+|-----------|-----|----------|---------|
+| arXiv:2509.09677 self-conditioning | purest horizon-drift, manufactures on demand | tunable 30-70% | key-value exact |
+| PyMigBench (arXiv:2504.13272) | REAL code coupled-site propagation | ~36% fail (94%→64%) | unit tests (supply harness) |
+| τ-bench (arXiv:2406.12045) | built-in `pass^k` drift metric, loop maps 1:1 | pass^8<25% | DB-state (no judge) |
+| Aider refactor benchmark | fast partial/lazy-edit detector, no Docker | mid-tier 45-63% | AST node-count |
+| MQuAKE (arXiv:2305.14795) | knowledge analog of coupled-site | ~92% fail | exact/alias match |
+
+Skip LongMemEval / LoCoMo — LLM-judge graded (violates the mechanical-oracle discipline; verifier-reward recall-ceiling lesson).
+
+### Recommended two-track redesign for v2
+- **Track A (prove the mechanism):** adopt 2509.09677 self-conditioning — reliably drifting control arm; detector must catch the injected errors; reflect-vs-control lift is measurable here.
+- **Track B (prove it's real):** PyMigBench — ecologically-valid code coupled-site propagation; value-drift mode already fits.
+
+Correction: spec previously cited arXiv:2602.06413 for long-horizon decay — that is theory-only with no code. Empirical paper is 2509.09677. Spec fixed.
+
 ## Status
 
-Harness: BUILT + VALIDATED. Experiment: BLOCKED on headroom — do not fan out to cluster until a drifting regime is found. This is a correctness-of-conclusion gate, not a plumbing gate.
+Harness: BUILT + VALIDATED. Experiment: BLOCKED on headroom, but **path unblocked** — adopt a documented-drift substrate (2509.09677 self-conditioning as primary, PyMigBench as the real-code track) instead of the saturated synthetic task. v2 redesign captured above; not yet built. Do not fan out to cluster until the control arm demonstrably drifts on the chosen substrate.

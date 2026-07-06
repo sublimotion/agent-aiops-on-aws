@@ -14,7 +14,7 @@ A hypothesis without a threshold is a wish. Threshold: **≥15pp** consistency-c
 
 ## Why this matters
 
-As agents run longer and more autonomously, derived representations of history — compaction summaries, `MEMORY.md`, the agent's own recollection — drift from the immutable trace of what actually happened. The agent then acts on stale facts. This is measured, not hypothetical: "context rot" (Chroma 2025) shows recall degrades with context length; arXiv:2602.06413 shows decision advantage decays exponentially with run length. The raw JSONL trace is ground truth; every derived representation is lossy. A lineage index over the trace lets the agent **detect and rectify** consistency breaches it would otherwise carry forward — a **harness reliability layer** whose value is proportional to how autonomous the run is. A positive result unlocks a second prize (out of scope here, see below): JIT fact-retrieval from the trace so context can stay *small*, attacking inference cost at the root.
+As agents run longer and more autonomously, derived representations of history — compaction summaries, `MEMORY.md`, the agent's own recollection — drift from the immutable trace of what actually happened. The agent then acts on stale facts. This is measured, not hypothetical: "context rot" (Chroma 2025) shows recall degrades with context length; "The Illusion of Diminishing Returns" (arXiv:2509.09677, ICLR 2026) shows task success ≈ p^H — ~100% single-step accuracy still collapses below 50% within ~15 dependent steps, worsened by self-conditioning (injecting the model's own prior errors into context). The raw JSONL trace is ground truth; every derived representation is lossy. A lineage index over the trace lets the agent **detect and rectify** consistency breaches it would otherwise carry forward — a **harness reliability layer** whose value is proportional to how autonomous the run is. A positive result unlocks a second prize (out of scope here, see below): JIT fact-retrieval from the trace so context can stay *small*, attacking inference cost at the root.
 
 ## Novelty / prior art (why this isn't reinventing the wheel)
 
@@ -53,7 +53,12 @@ Drop / rethink the layer if any of:
 - **Reward-hacking guard:** the drift flag says *"B references A which changed"* — it **never reveals the correct value**. Pointer, not answer. The oracle target stays held-out (same discipline as the optimization-loop quality gate). An agent cannot game completion by reading the flag.
 
 ### Trajectory-length tiers (tests the scaling claim)
-Run each arm at ≥2 tiers: **short** (task alone, ~few turns) and **long** (task embedded after enough filler/other-work turns to trigger ≥1 compaction). The primary hypothesis is about the *interaction* (arm × length), not just the arm main effect.
+Run each arm at ≥2 tiers: **short** (task alone, ~few turns) and **long**. The primary hypothesis is about the *interaction* (arm × length), not just the arm main effect.
+
+> **Pilot correction (2026-07-06, see blueprint lessons.md):** the v1 synthetic value-propagation task has **no drift headroom** — both Sonnet 4.6 and Haiku 4.5 hit 1.0 completion at every cell (K≤8, short and long), because "change X everywhere" on toy files doesn't compound. Light filler does NOT induce forgetting. **The long tier must use a documented drift-induction protocol**, not hand-rolled filler:
+> - **Primary — self-conditioning (arXiv:2509.09677, `github.com/long-horizon-execution/measuring-execution`):** non-thinking model, 100+ dependent steps, controlled injection of its own prior errors. Dials (horizon × injected-error rate) put control in the 30-70% band on demand; the injected errors are exactly what the detector must catch.
+> - **Real-code track — PyMigBench (arXiv:2504.13272):** documented per-change 94% → composite 64% (unit-test graded) — ecologically-valid coupled-site propagation, fits value-drift mode.
+> Skip LLM-judge substrates (LongMemEval, LoCoMo) — mechanical oracle only.
 
 ## Matrix
 
@@ -132,7 +137,8 @@ Cheap by design: seeded tasks are tiny, the oracle is grep, and the model can be
 - Detector + prior blueprint: `domains/ai-infra/blueprints/trace-effectiveness/` (analyze.py, lineage.py, README.md, spec `domains/ai-infra/specs/trace-effectiveness.md`).
 - Self-correction: arXiv:2310.01798 (LLMs Cannot Self-Correct Reasoning Yet, ICLR 2024); arXiv:2305.11738 (CRITIC); arXiv:2303.11366 (Reflexion).
 - Provenance-for-agent-memory (audit-only prior art we differentiate from): ContextNest arXiv:2607.02116; Episodic-to-Semantic arXiv:2607.01988.
-- Long-horizon drift: Context Rot (Chroma, 2025, trychroma.com/research/context-rot); arXiv:2602.06413.
+- Long-horizon drift (measured, reproducible): "The Illusion of Diminishing Returns" arXiv:2509.09677 (ICLR 2026, success≈p^H, self-conditioning, public code github.com/long-horizon-execution/measuring-execution — the recommended drift-induction protocol); Context Rot (Chroma, 2025, github.com/chroma-core/context-rot); "LLMs Get Lost in Multi-Turn" arXiv:2505.06120 (instruction-sharding, ~39% drop); Lost in the Middle arXiv:2307.03172. (NOTE: arXiv:2602.06413 previously cited here is theory-only with no code — replaced by the empirical 2509.09677.)
+- Drift-headroom benchmarks for substrate reuse (mechanically graded): τ-bench arXiv:2406.12045 (built-in `pass^k` drift metric, DB-state oracle, pass^8<25% retail); PyMigBench LLM-migration arXiv:2504.13272 (real code coupled-site propagation, per-change 94% → composite 64%); Aider refactor benchmark (AST-graded partial-edit detector); MQuAKE arXiv:2305.14795 (multi-hop edit propagation → 7-8%, knowledge analog). Skip LLM-judge-graded evals (LongMemEval, LoCoMo) to keep the oracle mechanical.
 - Memory-consistency benchmarks: LongMemEval arXiv:2410.10813 (ICLR 2025); LoCoMo arXiv:2402.17753. Cross-file coupling: CrossCodeEval arXiv:2310.11248.
 - Temporal-memory data model (build-vs-borrow): Graphiti — github.com/getzep/graphiti (Apache-2.0).
 - Native context features: Anthropic context-engineering (anthropic.com/engineering/effective-context-engineering-for-ai-agents); memory tool + context-editing (platform.claude.com/docs/en/docs/build-with-claude/context-editing).
