@@ -400,6 +400,59 @@ AWS message explicitly: get p5en by NOT specifying an AZ, or use us-east-2b/2c. 
 NOT a capacity guarantee for scarce instance types; for p5en, omit the AZ pin (let the ASG pick across
 2a/2b/2c) or target 2b/2c directly. Nodegroup deleted after CREATE_FAILED to stop retry/billing.
 
+### 2026-06-30 session: B200 KV-tiering run — findings + the self-inflicted process failures
+<!-- captured: 2026-06-30 | stage: 6b+infra+process -->
+
+**Gate before believing any of this**: `minimax-m2/scripts/preflight-dry.sh` (Stage 0a) now enforces the
+config/process guards below as RUNNABLE checks. Run it (exit 0) before any B200 spend.
+
+**vLLM 0.23 serving facts (source- + on-hardware-verified):**
+- cpu-offload: `--kv-transfer-config '{"kv_connector":"OffloadingConnector","kv_role":"kv_both","kv_connector_extra_config":{"cpu_bytes_to_use":<BYTES>}}'`.
+  Key is **`cpu_bytes_to_use`** (bytes), NOT `num_cpu_blocks` (that was v0.11). No `--kv_offloading_backend/size` CLI flags exist.
+- nvme/disk tiering **IS supported on 0.23**: add `"spec_name":"TieringOffloadingSpec"` + `"secondary_tiers":[{"type":"fs","root_dir":"/mnt/nvme/kv-cache"}]`
+  (`fs`=FileSystemTierManager; registered tiers example/fs/obj). Old `nvme_path`/`num_nvme_blocks` keys are silently ignored.
+- **DP is broken on M2/0.23**: every `--data-parallel-size` shape (tp2dp2/tp4dp2/tp2dp4) fails engine-init (DPLBAsyncMPClient path);
+  plain TP4 boots fine. Scale concurrency with TP4 + higher `--max-num-seqs`, not DP replicas.
+- gpu-only / cpu-offload / tp4ep4 all reach `/health 200` on 0.23. **No 0.23 THROUGHPUT measured yet** (see harness bugs);
+  parity with the 0.19 reference (59 pts) is therefore **unconfirmed**.
+
+**Workload signal (gpu-only, distinct-prefix, working-set>HBM):** KV util→1.00 and preemptions begin at conc≥64 once N≥43
+distinct prefixes — the GPU KV pool saturates/evicts. This IS the regime where an offload tier should pay (unlike the old
+single-shared-prefix run where one 90K prefix fit HBM → offload was ±4% noise). Throughput collapses as N grows
+(c64: ~642→~190 tok/s for N=22→86); TTFT p95 → 130-180s at the knee. **Caveat: these gpu-only points ran the STALE minimax27
+image (see split-brain below), NOT 0.23 — don't attribute them to 0.23.**
+
+**The expensive process failures (root cause = validate AFTER spending instead of BEFORE):**
+1. **Split-brain manifest** — TWO copies of `gen-serving-manifest.sh` (`minimax-m2/k8s/` = canonical, used by the boot GATE;
+   `minimax-m2-kv-tiering/k8s/` = stale, used by the SWEEP). Fixes landed in one; the sweep ran the other (minimax27 image,
+   num_cpu_blocks). Symptom: gate PASSES, sweep FAILS the same arm. Fix: keep ONE generator; preflight-dry asserts single/identical.
+   Audit rule: when a fix works in one path but not another that "shares" code, `find -name <file>` FIRST.
+2. **Wrong-version source** — I read vLLM **v0.11** source, shipped `num_cpu_blocks`, burned a B200 cycle; engine is v0.23. Pin
+   source-reading to the EXACT deployed tag; trust the running engine's error ("X must be specified") over remembered source.
+3. **set -u bug shipped to a node** — `local a="$1" b="${a}"` nounset crash AFTER 21min staging. Fix: `bash -n` + a stubbed-kubectl
+   `set -uo pipefail` unit test of every orchestrator function BEFORE a GPU launch (now in preflight-dry).
+4. **External pgrep scaledown watchdog false-fired** — polled `pgrep <orchestrator>`, couldn't see the nohup'd process across the
+   background-task sandbox, scaled the NG to 0 MID-STAGING (node drained, stage Job retry-budget burned, duplicate node spawned).
+   NEVER key a destructive action on cross-sandbox pgrep. Scaledown belongs ONLY in the orchestrator's EXIT trap, keyed on the
+   real NG name (`ai-infra-use2-b200-spot-maz`), with a wall-clock backstop. The in-trap pattern is VALIDATED (clean EXIT→scale-0→0 instances).
+5. **100%-error sweeps (err=1.0, tok/s=0) while pods are /health-200 = `--served-model-name` MISMATCH → http404.**
+   Real root cause (initially misread as a dcgmi `-r` parse error — that's a harmless non-fatal probe). The v0.23 manifest
+   DROPPED `--served-model-name` ("a flag they don't use"), so vLLM served the model under its `--model` PATH
+   (`/mnt/nvme/models/minimax_m2`) while bench.py POSTs `{"model":"MiniMax-M2"}` → 404 on every request. The stale minimax27
+   manifest HAD `--served-model-name MiniMax-M2` → matched → worked (why only true-v0.23 runs failed). **Fix: keep
+   `--served-model-name MiniMax-M2`** (also what the customer's code agents target). Diagnosis only became possible after adding
+   an `error_sample` field to bench.py (it had DISCARDED the per-request error → 100%-error runs were unexplainable). LESSON:
+   a bench client must surface WHY requests fail, not just count; `/health 200` ≠ requests work; model-name mismatch is
+   fail-closed-checkable offline (preflight-dry [4b]).
+
+**Infra:**
+- **B200 on-demand capacity HOPS AZs** — single-AZ NG whack-a-moles (CREATE_FAILED in 2b→2a→2b). Fix: ONE multi-subnet NG over every
+  NAT-routed AZ (2a+2b; 2c is IGW-only/no public-IP → excluded), desired=1/max=1; the ASG lands wherever capacity is. On CREATE_FAILED,
+  delete the NG and STOP — don't hammer. Spot is a SEPARATE pool from on-demand (spot landed in ~2min when on-demand was exhausted region-wide).
+- **Fresh spot node = raw UNMOUNTED instance-store** — `/mnt/nvme` doesn't exist (8× raw nvme1-8n1); stage Job's hostPath(type:Directory)
+  fails forever. Preflight must `nsenter --target=1 --mount` → `mkfs.xfs -f /dev/nvme1n1` (if no blkid) → `mount … /mnt/nvme` + mkdir subdirs
+  (idempotent). Now folded into the orchestrator preflight. Permanent fix: an NVMe-prep DaemonSet on the b200 nodegroup.
+
 ### bug: pip install in pod preamble is a NO-OP on v0.23.0 base (PEP 668 externally-managed) → tokenizer dep never lands
 <!-- captured: 2026-06-28 | stage: 6b -->
 
@@ -481,3 +534,69 @@ basename (minimax-m2 → minimax_hyphen_m2 module) is implicated. UNTESTED fix t
 off-GPU or 1 smoke): stage the model to a HYPHEN-FREE dir `/mnt/nvme/models/minimax_m2` and point --model there
 (removes the module-name mangling entirely). P3's earlier lone "success" is now doubtful/unreproducible — do
 not trust it. Until a 1-pod smoke BOOTS clean (health 200 + tool-call), do NOT launch any sweep.
+
+### ROOT CAUSE (definitive, upstream-confirmed): poisoned transformers_modules cache from hyphenated model dir
+<!-- captured: 2026-06-29 | stage: 6b -->
+
+The M2 boot failures (`Unrecognized configuration class transformers_modules.minimax_hyphen_m2...`) are
+explained by TWO upstream issues, NOT a missing dep (my earlier tokenizer-dep + pip diagnoses were both wrong):
+- **transformers #35570** (CLOSED): trust_remote_code derives the custom-code MODULE NAME from the model-dir
+  basename. A HYPHEN ('minimax-m2') is illegal in a python module name → transformers mangles it to
+  'minimax_hyphen_m2' and writes/imports it under `$HF_HOME/modules/transformers_modules/`. This module is
+  CREATED ONCE AND CACHED.
+- **vLLM #39610** (CLOSED): M2/Qwen3.5 FP8 loading is fragile across vLLM builds (loads on v0.19.0, regressed
+  on some nightlies) — which is WHY the `minimax27`=0.19.1rc1 pin matters.
+
+**Why session-1 worked but every later boot failed (the discrepancy the user flagged):** NOT image drift
+(minimax27 tag last-pushed 2026-04-12, never moved) and NOT the hyphen alone (both runs used
+/mnt/nvme/models/minimax-m2). It's the STATEFUL cache: HF_HOME=/mnt/nvme/hf-cache is a PERSISTED hostPath.
+Session-1 (fresh node, clean cache) wrote the module correctly. Later boots on a reused node imported a
+PARTIAL/POISONED transformers_modules left by a failed prior boot → broken module → the error. Spot-reclaim
+wiping NVMe on some nodes but not others produced the intermittent pattern.
+
+**Fix (applied to all serving manifests 2026-06-29)**: in the preamble, (1) `rm -rf
+$HF_HOME/modules/transformers_modules` to clear the poisonable cache every boot, AND (2) serve from a
+HYPHEN-FREE symlink `ln -sfn .../minimax-m2 .../minimax_m2; --model .../minimax_m2` so the module name is never
+mangled in the first place. Belt-and-suspenders against #35570. This should be validated with a 1-pod boot
+before the next sweep. **Meta-lesson: a non-deterministic boot failure on a node with a PERSISTED HF_HOME is a
+cache-poisoning smell — suspect $HF_HOME/modules before blaming the image or deps.**
+
+### PIVOT (customer feedback 2026-06-29): TARGET v0.23, NOT 0.19 — 0.19 lacks /v1/messages
+<!-- captured: 2026-06-29 | stage: requirements -->
+
+Customer confirmed: (1) they successfully run M2.5 AND M2.7 on **vLLM v0.23** on H200; (2) **v0.19 lacks the
+`/v1/messages` (Anthropic-compatible) endpoint that their code agents REQUIRE**. So 0.19 is a non-starter for
+their production use regardless of benchmarks — my "use 0.19, drop 0.23" conclusion was WRONG for the customer.
+
+Reconciliation with our evidence: our 0.23 boot failures were the `transformers_modules` cache-poisoning /
+hyphen issue (transformers #35570) — an ENVIRONMENTAL problem in OUR harness (persisted HF_HOME on reused spot
+nodes), NOT a vLLM-version incompatibility. The customer on fresh H200s never hit our poisoned-cache state.
+Our "0.19 works" was real but irrelevant (0.19 can't serve their agents). 
+
+**Corrected target: v0.23** + the cache-wipe + hyphen-free fix (which DID work — module name went clean to
+`transformers_modules.minimax_m2`). Remaining blocker: AutoTokenizer can't resolve GPT2Tokenizer via the custom
+MiniMaxM2Config (config.json auto_map registers AutoConfig+AutoModelForCausalLM but NOT AutoTokenizer; tokenizer
+is standard GPT2 w/ tokenizer.json). Customer boots M2.5/M2.7 on 0.23 fine → solvable; match their exact launch
+flags or use --tokenizer-mode. **Get the customer's working 0.23 launch command — it shortcuts this entirely.**
+
+### SOLVED (2026-06-29, cheap g6e probe): stock v0.23.0 loads M2 fine — failures were STALE/POISONED NVMe artifacts
+<!-- captured: 2026-06-29 | stage: 6b -->
+
+A CPU-only tokenizer+config probe on the cheap g6e node (no GPU, ~MB of files, seconds) DEFINITIVELY settled it:
+- **stock `vllm/vllm-openai:v0.23.0` HAS transformers 5.12.0 + sentencepiece + tiktoken already.** The
+  "need sentencepiece/tiktoken" error was a MISLEADING SYMPTOM, not a missing dep.
+- `AutoTokenizer.from_pretrained('MiniMaxAI/MiniMax-M2', trust_remote_code=True)` → **PASS** (TokenizersBackend, vocab 200000), both from repo-id AND from a fresh hyphen-free local dir.
+- `AutoConfig...` → **PASS** (MiniMaxM2Config, model_type minimax_m2).
+- transformers logged "A new version of configuration_minimax_m2.py was downloaded" → the FRESH remote code works.
+
+**Therefore the serving-pod failures were NOT image/version/deps/hyphen** — they were **stale + poisoned NVMe
+artifacts**: (1) the model was staged during the early broken sessions and may carry an old/partial
+`configuration_minimax_m2.py`; (2) the `transformers_modules` cache on the persisted HF_HOME hostPath was
+poisoned by repeated failed boots. Each later boot re-imported the broken cached module → the errors.
+
+**DEFINITIVE FIX**: (1) RE-STAGE the model FRESH (delete /mnt/nvme/models/minimax-m2 first), (2) wipe
+$HF_HOME/modules/transformers_modules every boot (already in manifests), (3) stock v0.23.0 image + the
+customer's exact flags + hyphen-free dir. No baked image needed, no dep install needed.
+**Meta-lesson (the expensive one): when a model load fails, FIRST reproduce the load on a $1 CPU node with a
+FRESH download before touching a GPU. A persisted model/cache dir on a benchmark node is a prime suspect for
+non-deterministic load failures — re-stage fresh rather than debugging the serving stack.**

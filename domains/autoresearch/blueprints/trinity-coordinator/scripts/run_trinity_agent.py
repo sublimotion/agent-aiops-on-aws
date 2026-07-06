@@ -66,14 +66,30 @@ def install_bedrock_adaptation(vendor_root: Path) -> None:
     if scripts_dir not in os.environ.get("PYTHONPATH", ""):
         os.environ["PYTHONPATH"] = scripts_dir + os.pathsep + os.environ.get("PYTHONPATH", "")
 
+    # Spend/throttle sink dir — inherited by spawned workers via env; each worker
+    # flushes its cumulative cost+throttle here, main aggregates (lessons #20).
+    # Start clean so a re-run doesn't sum stale PID files from a prior run.
+    tdir = os.environ.setdefault(
+        "CAR_TRINITY_TELEMETRY_DIR", str(vendor_root / "logs" / "run" / "_telemetry"))
+    try:
+        import glob as _glob
+        os.makedirs(tdir, exist_ok=True)
+        for _f in _glob.glob(os.path.join(tdir, "cost_*.json")) + \
+                  _glob.glob(os.path.join(tdir, "throttle_*.json")):
+            os.remove(_f)
+    except Exception:
+        pass
+
     import fugu.utils  # noqa: F401  (ensure module objects exist to rebind)
     import fugu.cost   # noqa: F401
 
     import bedrock_clients
     import cost_bedrock
+    import routing_policy
 
     bedrock_clients.install()
     cost_bedrock.install()
+    routing_policy.install()   # baseline routing override (no-op unless CAR_TRINITY_ROUTING_POLICY set)
     _log("installed Bedrock Converse dispatch + pricing over fugu (main + spawn-worker via sitecustomize)")
 
 
@@ -179,6 +195,21 @@ def check_phase05_gates(stats: dict) -> tuple[bool, list[str]]:
     if ent <= 1.5:
         failures.append(f"entropy {ent:.3f} nats <= 1.5 (head not conditioning)")
 
+    # 5. Brand/concentration bias — no single worker > 40% of selections.
+    # Entropy (above) measures dispersion symmetrically but can pass while one
+    # worker still dominates; rl-conductor found the base model had a ~52% Opus
+    # brand-skew that biased the reward signal (grpo-router-negative-result.md,
+    # MEMORY brand-bias). 40% (vs uniform ~14% over 7 workers) flags over-
+    # concentration that entropy alone may miss.
+    total = sum(c for c in dist.values() if c) or 0
+    if total:
+        top_name, top_c = max(dist.items(), key=lambda kv: (kv[1] or 0))
+        frac = (top_c or 0) / total
+        if frac > 0.40:
+            failures.append(f"brand/concentration bias: '{top_name}' = {frac:.0%} "
+                            f"of selections (> 40%); head may be position/brand-skewed "
+                            f"like rl-conductor's ~52% Opus skew")
+
     return (len(failures) == 0), failures
 
 
@@ -273,7 +304,7 @@ def run_eval(args) -> int:
 def run_training(args, *, smoke: bool) -> int:
     """Phase 0.5 (smoke) / Phase 1 (full) — CMA-ES from scratch on the Bedrock pool."""
     import cost_bedrock
-    from bedrock_clients import THROTTLE_TELEMETRY
+    import bedrock_clients
 
     vendor = Path(args.vendor_root).resolve()
     install_bedrock_adaptation(vendor)
@@ -281,46 +312,94 @@ def run_training(args, *, smoke: bool) -> int:
     snapshot_prices(args.s3_uri)
 
     from fugu.trainer import RouterInfrastructure
-    from fugu.algorithms.es import CMAEvolutionTrainer
+    # The vendored CMAEvolutionTrainer is EVAL-ONLY (no train loop — the OpenReview
+    # submission omitted it). CMATrainingLoop subclasses it to add the missing
+    # cma.ask/tell optimization using the same scoring primitive (submit_training_job)
+    # that run_test uses. See scripts/cma_train.py + lessons.md finding #13.
+    from cma_train import CMATrainingLoop
 
     log_dir = Path(args.log_dir or (vendor / "logs" / "run")).resolve()
     log_dir.mkdir(parents=True, exist_ok=True)
 
     iters = args.iters if args.iters else (3 if smoke else 60)
-    _log(f"{'SMOKE' if smoke else 'FULL'} CMA-ES: iters={iters} lambda=32 mCMA=16 "
-         f"workers={len(llm_names)} cost_cap=${args.cost_cap_usd}")
+    # Smoke validates loop MECHANICS (ask/tell, gate-key emission, es_log write,
+    # S3 sync, cost-cap, throttle survival) on a small episode budget — NOT a
+    # trained model. Full run uses the paper's λ=32, mCMA=16. λ=6×mCMA=3×3 iters
+    # ≈ 54 episodes total keeps the smoke cheap (<$30) while exercising every path.
+    popsize = 6 if smoke else 32
+    num_repeats = 3 if smoke else 16
+    _log(f"{'SMOKE' if smoke else 'FULL'} CMA-ES: iters={iters} lambda={popsize} "
+         f"mCMA={num_repeats} workers={len(llm_names)} cost_cap=${args.cost_cap_usd}")
 
+    # Single-GPU box (g6e.Nxlarge = 1× L40S → cuda:0 only). The vendored default is
+    # worker_gpu_assignments=[1]*N (their multi-GPU rig put the router on cuda:0 and
+    # workers on cuda:1+), which on one GPU raises "CUDA error: invalid device
+    # ordinal". Pin every worker + the router to cuda:0. The Qwen3-0.6B router (×N
+    # spawned copies) is tiny (~1.2GB each) — fits L40S 46GB even at 8 workers.
     infra = RouterInfrastructure(
         task=args.task, model_name="Qwen/Qwen3-0.6B", llm_names=llm_names,
-        log_dir=str(log_dir), seed=42, temperature=0.1, max_tokens=4096, max_turns=5,
+        # 8192 (not the upstream 4096): reasoning workers (qwen3-32b-reasoning,
+        # deepseek-r1) can burn the whole 4096 budget on the reasoningContent block
+        # alone (stopReason=max_tokens) → empty answer → fugu 15× retry hang. Double
+        # the budget so the answer text survives. _extract_text also falls back to
+        # reasoning text as a belt-and-suspenders anti-hang.
+        log_dir=str(log_dir), seed=42, temperature=0.1, max_tokens=8192, max_turns=5,
         servers={n: None for n in llm_names}, ports={n: None for n in llm_names},
         num_workers=args.num_workers, debug=args.debug,
+        worker_gpu_assignments=[0] * args.num_workers,
         test_ratio=0.2, valid_ratio=0.2, configure_splits=True,
         trinity=True,
     )
-    trainer = CMAEvolutionTrainer(
-        infrastructure=infra, num_iters=iters, test_interval=5,
-        num_repeats=16, sigma0=0.03, seed=42, num_tests=300,
+    trainer = CMATrainingLoop(
+        infrastructure=infra, num_iters=iters,
+        test_interval=0 if smoke else 5,   # no validation run during smoke
+        num_repeats=num_repeats, sigma0=0.03, seed=42, num_tests=300,
         test_size=300, servers={n: None for n in llm_names},
-        opt_layer_indices=[26],
+        opt_layer_indices=[26], popsize_override=popsize,
         diversity_bonus_weight=0.15, cost_bonus_weight=args.cost_bonus_weight,
         turn_bonus_weight=0.1, role_bonus_weight=0.0,
         use_structured_router=False, closed_model_config=None,
         agent_configs=cfgs, use_consultant=False, use_verifier=True,
         trinity=True, last_token_predict=False,
     )
+    # Budget-constrained Pareto reward (set as attrs — vendored __init__ doesn't
+    # accept these). reward = raw_passrate − λ·max(0, episode_cost − budget).
+    # budget=0 or λ=0 → reward == raw pass-rate (upstream behavior preserved).
+    trainer.cost_budget_usd = args.cost_budget_usd
+    trainer.cost_lambda = args.cost_lambda
+    if args.cost_budget_usd > 0 and args.cost_lambda > 0:
+        _log(f"COST-AWARE reward: budget=${args.cost_budget_usd:.4f}/episode "
+             f"lambda={args.cost_lambda} (real measured tokens × verified prices)")
 
     # Per-iteration callback: checkpoint + rollouts + telemetry to S3 (incl iter 0),
     # cost-cap enforcement, and (smoke) Phase-0.5 gates.
     def on_iter(it: int, iter_stats: dict) -> None:
-        THROTTLE_TELEMETRY  # telemetry is module-global; snapshot it
-        tele = THROTTLE_TELEMETRY.snapshot()
-        spend = cost_bedrock.total_spend()
+        # Spend + throttle accumulate inside the spawned Pool workers (separate
+        # interpreters), NOT this process. Aggregate across per-PID sink files
+        # written under CAR_TRINITY_TELEMETRY_DIR (cost_bedrock/_Telemetry flush
+        # after every call) so the cost cap actually sees real spend. (lessons #20)
+        tele = bedrock_clients.aggregate_throttle()
+        spend = cost_bedrock.aggregate_spend()
         iter_stats = dict(iter_stats or {})
         iter_stats["throttle"] = tele
         iter_stats["spend_usd"] = spend
         s3_put_json(iter_stats, args.s3_uri, f"iter_stats/iter_{it}.json")
         s3_sync(log_dir, args.s3_uri)   # checkpoints + rollouts, every iter incl 0
+        # iter-0 durability HARD gate: prove the S3 sync path actually works before
+        # committing the multi-day run. cost-aware-routing lost ~$200 to a spot
+        # reclaim between iter 0 and the first persisted checkpoint; the lesson is
+        # "confirm the iter-0 object EXISTS in S3, don't assume the sync worked."
+        if it == 0 and args.s3_uri:
+            es_key = args.s3_uri.rstrip("/") + "/es_log.json"
+            try:
+                subprocess.run(["aws", "s3", "ls", es_key], check=True,
+                               capture_output=True, text=True, timeout=60)
+                _log(f"iter-0 durability OK: {es_key} present in S3")
+            except Exception:
+                raise SystemExit(
+                    f"FATAL: iter-0 checkpoint NOT in S3 ({es_key}) — the durability "
+                    f"path is broken; refusing to run a multi-day job that can't "
+                    f"survive a reclaim. Fix S3 sync before relaunching.")
         _log(f"iter {it}: spend=${spend:.2f} throttle={tele}")
         if spend >= args.cost_cap_usd:
             raise SystemExit(f"COST CAP ${args.cost_cap_usd} reached at iter {it} "
@@ -329,18 +408,27 @@ def run_training(args, *, smoke: bool) -> int:
             _log(f"WARNING dropped-episode rate {tele['dropped_rate']:.3%} > 2% — "
                  f"rate-limited, not compute-bound. Raise concurrency or add a region.")
 
-    # The vendored CMAEvolutionTrainer exposes a train loop; attach our hook if it
-    # supports a per-iteration callback, else wrap. Name is best-effort: prefer an
-    # explicit callback kwarg, fall back to a monkeypatched logging hook.
-    if hasattr(trainer, "set_iteration_callback"):
-        trainer.set_iteration_callback(on_iter)
-        rc = trainer.train()
-    else:
-        rc = _train_with_polling(trainer, log_dir, on_iter, smoke=smoke)
+    # Phase-0.5 smoke gate: wrap the callback to enforce the spec's non-degeneracy
+    # checks (worker + role diversity, throttle survival, entropy) and halt early
+    # if the training path is unhealthy BEFORE spending the full budget.
+    def on_iter_gated(it: int, iter_stats: dict) -> None:
+        on_iter(it, iter_stats)
+        if smoke:
+            ok, reasons = check_phase05_gates(iter_stats)
+            if not ok and it >= 2:   # give 0,1,2 to warm up, then assert
+                # Write the gate report BEFORE raising — the SystemExit skips the
+                # final report-write block below, so persist it here for durability.
+                agg = _collect_smoke_stats(log_dir)
+                s3_put_json({"passed": False, "failures": reasons,
+                             "halted_at_iter": it, "stats": agg},
+                            args.s3_uri, "phase05_gate_report.json")
+                raise SystemExit(f"PHASE 0.5 GATE FAIL at iter {it}: {reasons}")
+
+    rc = trainer.train(iteration_callback=on_iter_gated)
 
     # Final exfiltration (artifact durability before any teardown).
     s3_sync(log_dir, args.s3_uri)
-    s3_put_json(cost_bedrock.get_cost_summary(), args.s3_uri, "cost_summary_final.json")
+    s3_put_json(cost_bedrock.aggregate_cost_summary(), args.s3_uri, "cost_summary_final.json")
 
     if smoke:
         stats = _collect_smoke_stats(log_dir)
@@ -436,10 +524,25 @@ def main() -> int:
     p.add_argument("--cost-cap-usd", type=float, default=5000.0)
     p.add_argument("--cost-bonus-weight", type=float, default=0.0,
                    help="0.0 reproduces upstream; sweep >0 for the cost-aware extension (OQ3)")
+    p.add_argument("--cost-budget-usd", type=float, default=0.0,
+                   help="per-episode $ budget for the budget-constrained Pareto reward; "
+                        "0 disables cost shaping (raw pass-rate). Sweep with --cost-lambda.")
+    p.add_argument("--cost-lambda", type=float, default=0.0,
+                   help="penalty weight on per-episode cost overage above --cost-budget-usd. "
+                        "Sweep this to trace the cost/accuracy Pareto frontier.")
+    p.add_argument("--routing-policy", default=os.environ.get("CAR_TRINITY_ROUTING_POLICY", "learned"),
+                   help="learned (Trinity head) | static:<ord> (best-static+scaffold) | "
+                        "random (random+scaffold). Scaffold-matched baselines that hold the "
+                        "3-role multi-turn loop fixed and vary ONLY routing — de-confounds the "
+                        "routing claim from the verifier-scaffold effect.")
     p.add_argument("--debug", action="store_true")
     args = p.parse_args()
 
-    _log(f"phase={args.phase} vendor={args.vendor_root} s3={args.s3_uri or '(none)'}")
+    # Set BEFORE any install so it propagates to spawned workers (sitecustomize).
+    os.environ["CAR_TRINITY_ROUTING_POLICY"] = args.routing_policy
+
+    _log(f"phase={args.phase} vendor={args.vendor_root} s3={args.s3_uri or '(none)'} "
+         f"routing={args.routing_policy}")
     if args.phase == "eval":
         return run_eval(args)
     return run_training(args, smoke=(args.phase == "smoke"))

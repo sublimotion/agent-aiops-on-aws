@@ -1,0 +1,43 @@
+{
+  "objective": "pareto_map: output_tokens_per_sec vs concurrency (TTFT/ITL reported, not gated)",
+  "regime": "prefill-heavy huge-context MoE | B200 SM100 NVSwitch | KV-capacity/reuse + prefill-latency",
+  "guardrail": "lightweight garbage screen: no repetition loop / empty / broken tool-parse; error_rate<=0.01",
+  "nodes": [
+    {
+      "id": "tp4-gpu-only-NOBOOT",
+      "parent": "tp4-gpu-only-baseline",
+      "lever_delta": [
+        "kv_arm=gpu-only"
+      ],
+      "confidence": "code-confirmed",
+      "objective_value": null,
+      "guardrail_value": "pod failed to boot",
+      "regime": "B200 SM100 distinct-prefix",
+      "status": "dead-end"
+    },
+    {
+      "id": "tp4-cpu-offload-NOBOOT",
+      "parent": "tp4-gpu-only-baseline",
+      "lever_delta": [
+        "kv_arm=cpu-offload"
+      ],
+      "confidence": "code-confirmed",
+      "objective_value": null,
+      "guardrail_value": "pod failed to boot",
+      "regime": "B200 SM100 distinct-prefix",
+      "status": "dead-end"
+    },
+    {
+      "id": "tp4-nvme-tiering-NOBOOT",
+      "parent": "tp4-gpu-only-baseline",
+      "lever_delta": [
+        "kv_arm=nvme-tiering"
+      ],
+      "confidence": "code-confirmed",
+      "objective_value": null,
+      "guardrail_value": "pod failed to boot",
+      "regime": "B200 SM100 distinct-prefix",
+      "status": "dead-end"
+    }
+  ]
+}

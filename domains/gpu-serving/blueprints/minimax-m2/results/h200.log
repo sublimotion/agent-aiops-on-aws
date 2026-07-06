@@ -1,0 +1,97 @@
+[2026-06-28T16:13:05Z] === H200 KNEE COMPARISON START ===
+[2026-06-28T16:13:05Z] waiting for p5en node Ready...
+[2026-06-28T16:17:08Z] === H200 KNEE COMPARISON START ===
+[2026-06-28T16:17:08Z] waiting for p5en node Ready...
+[2026-06-28T16:17:16Z] SIGTERM
+[2026-06-28T16:17:16Z] EXIT rc=143
+[2026-06-28T16:17:16Z] scale0 skipped (preflight failed)
+[2026-06-28T16:38:07Z] PREFLIGHT FAIL: no Ready h200 node. ABORT
+[2026-06-28T16:38:07Z] EXIT rc=1
+[2026-06-28T16:38:07Z] scale0 skipped (preflight failed)
+[2026-06-28T19:32:54Z] === H200 KNEE COMPARISON START ===
+[2026-06-28T19:32:55Z] waiting for p5en node Ready...
+[2026-06-28T19:54:00Z] PREFLIGHT FAIL: no Ready h200 node. ABORT
+[2026-06-28T19:54:00Z] EXIT rc=1
+[2026-06-28T19:54:00Z] scale0 skipped (preflight failed)
+[2026-06-28T21:03:51Z] === H200 KNEE COMPARISON START ===
+[2026-06-28T21:03:51Z] waiting for p5en node Ready...
+[2026-06-28T21:05:31Z] PREFLIGHT OK (p5en) — scaledown ARMED. GPUs=
+job.batch/stage-minimax-m2 created
+[2026-06-28T21:05:37Z] staging weights to H200 NVMe (~25min)...
+[2026-06-28T21:13:05Z] WALL CAP 300m
+configmap/dcgm-metrics-prof-minimax unchanged
+configmap/prometheus-bench-config-minimax unchanged
+The Pod "observability-bench" is invalid: 
+* spec.tolerations: Forbidden: existing toleration can not be modified except its tolerationSeconds
+* spec: Forbidden: pod updates may not change fields other than `spec.containers[*].image`,`spec.initContainers[*].image`,`spec.activeDeadlineSeconds`,`spec.tolerations` (only additions to existing tolerations),`spec.terminationGracePeriodSeconds` (allow it to be set to 1 if it was previously negative)
+  core.PodSpec{
+  	... // 6 identical fields
+  	ActiveDeadlineSeconds:        nil,
+  	DNSPolicy:                    "ClusterFirst",
+- 	NodeSelector:                 map[string]string{"blueprint": "minimax-m2"},
++ 	NodeSelector:                 map[string]string{"blueprint": "minimax-m2-h200"},
+  	ServiceAccountName:           "default",
+  	AutomountServiceAccountToken: nil,
+  	... // 23 identical fields
+  }
+
+configmap/minimax-bench-scripts unchanged
+pod/bench-runner created
+pod/vllm-minimax-m2-h200 created
+[2026-06-28T21:56:47Z] booting H200 serving pod (pip-install + ~30min cold start)...
+[2026-06-28T21:56:49Z] h200 boot phase=Pending health=
+[2026-06-28T21:57:32Z] h200 boot phase=Pending health=
+[2026-06-28T21:58:14Z] h200 boot phase=Pending health=
+[2026-06-28T21:58:56Z] h200 boot phase=Pending health=
+[2026-06-28T21:59:39Z] h200 boot phase=Pending health=
+[2026-06-28T22:00:21Z] h200 boot phase=Running health=000
+[2026-06-28T22:01:04Z] h200 boot phase=Running health=
+[2026-06-28T22:01:46Z] h200 boot phase=Running health=
+[2026-06-28T22:02:29Z] h200 boot phase=Running health=
+[2026-06-28T22:03:11Z] h200 boot phase=Running health=
+[2026-06-28T22:03:54Z] h200 boot phase=Running health=
+[2026-06-28T22:04:37Z] h200 boot phase=Running health=
+[2026-06-28T22:05:19Z] h200 boot phase=Running health=
+[2026-06-28T22:06:02Z] h200 boot phase=Running health=
+[2026-06-28T22:06:43Z] H200 boot FAILED phase=Failed
+(APIServer pid=1)            ^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 665, in run_server
+(APIServer pid=1)     await run_server_worker(listen_address, sock, args, **uvicorn_kwargs)
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 679, in run_server_worker
+(APIServer pid=1)     async with build_async_engine_client(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 99, in build_async_engine_client
+(APIServer pid=1)     async with build_async_engine_client_from_engine_args(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 123, in build_async_engine_client_from_engine_args
+(APIServer pid=1)     vllm_config = engine_args.create_engine_config(usage_context=usage_context)
+(APIServer pid=1)                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py", line 2229, in create_engine_config
+(APIServer pid=1)     config = VllmConfig(
+(APIServer pid=1)              ^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/pydantic/_internal/_dataclasses.py", line 121, in __init__
+(APIServer pid=1)     s.__pydantic_validator__.validate_python(ArgsKwargs(args, kwargs), self_instance=s)
+(APIServer pid=1) pydantic_core._pydantic_core.ValidationError: 1 validation error for VllmConfig
+(APIServer pid=1)   Value error, Couldn't instantiate the backend tokenizer from one of: 
+(APIServer pid=1) (1) a `tokenizers` library serialization file, 
+(APIServer pid=1) (2) a slow tokenizer instance to convert or 
+(APIServer pid=1) (3) an equivalent slow tokenizer class to instantiate and convert. 
+(APIServer pid=1) You need to have sentencepiece or tiktoken installed to convert a slow tokenizer to a fast one. [type=value_error, input_value=ArgsKwargs((), {'model_co... 'shutdown_timeout': 0}), input_type=ArgsKwargs]
+(APIServer pid=1)     For further information visit https://errors.pydantic.dev/2.13/v/value_error
+[2026-06-28T22:06:44Z] EXIT rc=1
+[2026-06-28T22:06:46Z] p5en scaled to 0 (1)
+[2026-06-28T23:17:08Z] WALL CAP 420m
+[2026-06-28T23:58:08Z] === H200 KNEE COMPARISON START ===
+[2026-06-28T23:58:09Z] waiting for p5en node Ready...
+[2026-06-29T00:18:59Z] PREFLIGHT FAIL: no Ready h200 node. ABORT
+[2026-06-29T00:18:59Z] EXIT rc=1
+[2026-06-29T00:18:59Z] scale0 skipped (preflight failed)
+[2026-06-29T02:32:54Z] WALL CAP 420m
+[2026-06-29T04:03:51Z] WALL CAP 420m
+[2026-06-29T06:58:09Z] WALL CAP 420m

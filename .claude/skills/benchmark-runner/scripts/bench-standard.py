@@ -110,15 +110,25 @@ async def capture_prom_metrics(prom_url: str, engine: str, t_start: float, t_end
             "num_preemptions": "vllm:num_preemptions_total",
         },
         "sglang": {
-            "ttft": "sglang:time_to_first_token_seconds_bucket",
-            "tpot": "sglang:time_per_output_token_seconds_bucket",
-            "e2e":  "sglang:e2e_request_latency_seconds_bucket",
-            "requests_success": "sglang:num_requests_success_total",
-            "requests_error": "sglang:num_requests_error_total",
-            "kv_cache_usage": "sglang:token_usage_ratio",
-            "prefix_hits": "sglang:prefix_cache_hit_rate",
+            # Prometheus sanitizes ':' -> '_' on ingestion (colon is reserved for recording rules),
+            # so selectors MUST use the underscore form. Names verified against a live SGLang
+            # v0.5.13 /metrics scrape on 2026-06-27 (GLM-5.2 B300 run) — several differ beyond the
+            # colon swap (ITL not TPOT; token_usage not token_usage_ratio; cache_hit_rate; no
+            # success/error split — only num_requests_total + http_responses_total w/ status label).
+            "ttft": "sglang_time_to_first_token_seconds_bucket",
+            "tpot": "sglang_inter_token_latency_seconds_bucket",
+            "e2e":  "sglang_e2e_request_latency_seconds_bucket",
+            # No native success/error split in this SGLang build; derive from HTTP responses on the
+            # inference endpoints (2xx = success, non-2xx = error). prom_counter_delta sums the vector.
+            "requests_success": 'sglang_http_responses_total{endpoint=~"/generate|/v1/chat/completions|/v1/completions",status_code=~"2.."}',
+            "requests_error": 'sglang_http_responses_total{endpoint=~"/generate|/v1/chat/completions|/v1/completions",status_code!~"2.."}',
+            "kv_cache_usage": "sglang_token_usage",
+            "prefix_hits": "sglang_cache_hit_rate",
             "prefix_queries": None,
-            "num_preemptions": None,
+            "num_preemptions": "sglang_num_retracted_reqs",
+            "num_queue_reqs": "sglang_num_queue_reqs",
+            "num_running_reqs": "sglang_num_running_reqs",
+            "spec_accept_length": "sglang_spec_accept_length",
         },
     }.get(engine, {})
 

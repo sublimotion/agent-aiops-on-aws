@@ -25,6 +25,22 @@ Brief description of the autoresearch experiment.
 - **Termination**: When to stop
 - **Logging**: How results are recorded
 
+For any search with >=8 planned candidates or more than one agent/operator,
+declare the collaboration mechanics explicitly:
+
+- **Shared state**: single append-only artifact for candidates, results, failed
+  attempts, and open blockers
+- **Candidate schema**: hypothesis, parent, delta, expected value, verifier,
+  stop condition, owner, status
+- **Novelty gate**: reject duplicate config/code hashes, repeated dead-ends, and
+  candidates too small to change the next decision
+- **Portfolio allocation**: per-wave split across exploration, exploitation,
+  blocker-checking, and critic/review
+- **Critic merge**: after each wave, dedupe lineage, verify guardrails, update
+  the frontier, and choose the next wave
+- **Trace capture**: store enough agent trace or summary to explain why the
+  candidate was tried, not just whether it won
+
 ### 4. Networking
 - **Access**: How to reach the compute
 

@@ -25,7 +25,7 @@ set -uo pipefail   # NOT -e: a failed config must NOT kill the run (it must cont
 
 # ── Config ──────────────────────────────────────────────────────────────────
 CLUSTER="qwen3-next-bench-eks-cluster"
-NODEGROUP="ai-infra-use2-b200-spot"
+NODEGROUP="${NODEGROUP:-ai-infra-use2-b200-spot-maz}"
 REGION="us-east-2"
 EXPECT_CONTEXT="${EXPECT_CONTEXT:-qwen3-next-bench-eks-cluster}"   # kubectl context that maps to CLUSTER. PINNED (restored 2026-06-27 after usw2 flip).
 # We pass --context EXPLICITLY to every kubectl call so a context drift in another shell
@@ -77,6 +77,13 @@ scale_to_zero() {
   local reason="$1"
   if [ "$SCALED_DOWN" = "1" ]; then return 0; fi
   SCALED_DOWN=1
+  # When invoked as a phase of a multi-phase orchestrator, the PARENT owns scaledown so the
+  # node persists between phases. The parent sets SKIP_SCALEDOWN=1.
+  if [ "${SKIP_SCALEDOWN:-0}" = "1" ]; then
+    log "TRAP(${reason}): SKIP_SCALEDOWN=1 (orchestrated phase) -> leaving node up for the parent."
+    status "PHASE_DONE reason=${reason} scaled_down=deferred-to-parent $(date -u +%FT%TZ)"
+    return 0
+  fi
   if [ "$PREFLIGHT_OK" != "1" ]; then
     log "TRAP(${reason}): PREFLIGHT did not pass (never confirmed operating ${CLUSTER}) -> NOT scaling down. Node left as-is; verify manually."
     status "EXIT_NO_SCALEDOWN reason=${reason} preflight=failed $(date -u +%FT%TZ)"
@@ -360,8 +367,12 @@ ensure_serving_pod() {  # $1=shape $2=arm -> echoes pod name on stdout, returns 
   log "  launching ${pod} (boot budget ~40min)..."
   "${KCTX[@]}" apply -f "$manifest" >>"$LOG" 2>&1 || { log "  apply FAILED ${pod}"; return 1; }
   if wait_ready "$pod" 3000; then echo "$pod"; return 0; fi
-  log "  ${pod} FAILED to become ready — capturing last logs"
-  "${KCTX[@]}" logs "$pod" --tail=30 >>"$LOG" 2>&1
+  log "  ${pod} FAILED to become ready — capturing last logs (deep tail for EngineCore WORKER trace)"
+  # --tail=30 only catches the APIServer re-raise (wait_for_engine_startup); the REAL root cause prints
+  # earlier in the EngineCore worker subprocess. Capture a deep tail + isolate the worker traceback.
+  "${KCTX[@]}" logs "$pod" --tail=400 >>"$LOG" 2>&1
+  log "  --- WORKER-side error lines ---"
+  "${KCTX[@]}" logs "$pod" --tail=400 2>/dev/null | grep -iE "EngineCore|Worker|Error|assert|raise|Exception|Traceback|not supported|incompatible|CUDA|NCCL|ValueError|RuntimeError" | tail -40 >>"$LOG" 2>&1
   "${KCTX[@]}" delete pod "$pod" --ignore-not-found >>"$LOG" 2>&1
   return 1
 }
@@ -599,6 +610,12 @@ done
 
 finalize_pareto       # rebuild headline pareto-<date>.json from the durable per-point ledger
 finalize_trajectory
+# ZERO-RUNS GUARD (2026-06-28): a sweep that booted nothing must FAIL LOUDLY, not silently "complete".
+if [ "${DONE_RUNS}" -eq 0 ]; then
+  log "=== SWEEP FAILED: 0 benchmark runs (every serving pod failed to boot/serve). NOT a success. ==="
+  status "FAILED runs=0 configs=${DONE_CONFIGS} reason=no-pod-served $(date -u +%FT%TZ)"
+  exit 4
+fi
 log "=== SWEEP COMPLETE: ${DONE_RUNS} runs, ${DONE_CONFIGS} configs. pareto=${PARETO} traj=${TRAJ} ==="
 status "COMPLETE runs=${DONE_RUNS} configs=${DONE_CONFIGS} $(date -u +%FT%TZ)"
 # EXIT trap fires here -> scale_to_zero

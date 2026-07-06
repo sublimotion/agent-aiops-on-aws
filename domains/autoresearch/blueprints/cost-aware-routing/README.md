@@ -4,6 +4,8 @@
 
 **`phase1-redesign-2026-05-28.md`** — current Phase 1 design. ModernBERT classifier + closed-form cost-aware policy (regime-A architecture). Replaces the superseded GRPO 7B framing.
 
+**`phase3-verification-cascade-2026-06-22.md`** — PROPOSAL. Cheap-first cascade with a ground-truth verification gate on coding tasks (regime B). Prompted by arXiv 2604.07494v1; tests the one lever Phase 1/2 never tried, without reopening the classifier-router negative.
+
 Read alongside:
 - Spec entry point: `domains/autoresearch/specs/cost-aware-routing.md` (with SUPERSEDED banner pointing here).
 - Negative-result writeup: `domains/autoresearch/specs/grpo-router-negative-result.md` (the abandoned GRPO 7B framing).

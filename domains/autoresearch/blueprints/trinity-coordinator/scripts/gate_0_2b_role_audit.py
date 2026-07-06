@@ -89,6 +89,12 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--reps", type=int, default=5)
     ap.add_argument("--threshold", type=float, default=0.90)
+    # Must mirror the run's real serving config. Phase 1 uses max_tokens=8192
+    # (run_trinity_agent): reasoning workers (qwen3-32b @ high effort) burn the
+    # whole budget on the reasoningContent block and emit empty/truncated answer
+    # text at 1024/4096 → the thinker/verifier parsers see "" and the gate reports
+    # a FALSE failure. Test at the budget we actually serve. (lessons #19)
+    ap.add_argument("--max-tokens", type=int, default=8192)
     args = ap.parse_args()
 
     print(f"Gate 0.2b — {len(POOL)}×3 = {len(POOL)*3} cells, {args.reps} reps each, "
@@ -105,7 +111,8 @@ def main() -> int:
                 txt = _query_converse(
                     w.model_id, w.friendly_name, w.concurrency, eff,
                     [{"role": "user", "content": prompt}],
-                    max_tokens=1024, temperature=0.1,
+                    max_tokens=args.max_tokens, temperature=0.1,
+                    no_temperature=("no-temperature" in getattr(w, "api_quirks", ())),
                 )
                 if parser(txt):
                     passes += 1

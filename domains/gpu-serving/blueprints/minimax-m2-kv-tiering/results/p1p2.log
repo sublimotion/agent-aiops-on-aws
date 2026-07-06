@@ -1,0 +1,546 @@
+[2026-06-28T15:44:35Z] === P1+P2 RE-RUN START ===
+[2026-06-28T15:44:35Z] waiting for node Ready...
+[2026-06-28T15:45:10Z] PREFLIGHT OK — scaledown ARMED.
+job.batch/stage-minimax-m2 created
+[2026-06-28T15:45:16Z] staging weights (~25min)...
+configmap/dcgm-metrics-prof-minimax unchanged
+configmap/prometheus-bench-config-minimax unchanged
+pod/observability-bench created
+[2026-06-28T16:36:31Z] observability applied
+[2026-06-28T16:36:31Z] === BOOT SMOKE: tp4 gpu-only via patched gen-serving-manifest.sh ===
+pod/vllm-tp4-gpu-only created
+[2026-06-28T16:36:33Z] smoke pod=vllm-tp4-gpu-only; waiting for boot (pip install + ~35min cold start)...
+[2026-06-28T16:36:35Z] smoke phase=Pending health=
+[2026-06-28T16:37:18Z] smoke phase=Pending health=
+[2026-06-28T16:38:01Z] smoke phase=Pending health=
+[2026-06-28T16:38:44Z] smoke phase=Pending health=
+[2026-06-28T16:39:27Z] smoke phase=Pending health=
+[2026-06-28T16:40:09Z] smoke phase=Pending health=
+[2026-06-28T16:40:52Z] smoke phase=Running health=
+[2026-06-28T16:41:34Z] smoke phase=Running health=
+[2026-06-28T16:42:17Z] smoke phase=Running health=
+[2026-06-28T16:43:00Z] smoke phase=Running health=
+[2026-06-28T16:43:43Z] smoke phase=Running health=
+[2026-06-28T16:44:27Z] smoke phase=Running health=
+[2026-06-28T16:45:10Z] smoke phase=Running health=
+[2026-06-28T16:45:52Z] smoke phase=Running health=
+[2026-06-28T16:46:34Z] BOOT SMOKE FAILED phase=Failed — fix did NOT work. Capturing logs, aborting (trap scales down).
+(APIServer pid=1)   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/uvloop/__init__.py", line 48, in wrapper
+(APIServer pid=1)     return await main
+(APIServer pid=1)            ^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 680, in run_server
+(APIServer pid=1)     await run_server_worker(listen_address, sock, args, **uvicorn_kwargs)
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 694, in run_server_worker
+(APIServer pid=1)     async with build_async_engine_client(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 100, in build_async_engine_client
+(APIServer pid=1)     async with build_async_engine_client_from_engine_args(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 124, in build_async_engine_client_from_engine_args
+(APIServer pid=1)     vllm_config = engine_args.create_engine_config(usage_context=usage_context)
+(APIServer pid=1)                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py", line 2023, in create_engine_config
+(APIServer pid=1)     config = VllmConfig(
+(APIServer pid=1)              ^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/pydantic/_internal/_dataclasses.py", line 121, in __init__
+(APIServer pid=1)     s.__pydantic_validator__.validate_python(ArgsKwargs(args, kwargs), self_instance=s)
+(APIServer pid=1) pydantic_core._pydantic_core.ValidationError: 1 validation error for VllmConfig
+(APIServer pid=1)   Value error, Unrecognized configuration class <class 'transformers_modules.minimax_hyphen_m2.configuration_minimax_m2.MiniMaxM2Config'> to build an AutoTokenizer.
+(APIServer pid=1) Model type should be one of Aimv2Config, AlbertConfig, AlignConfig, ArceeConfig, AriaConfig, AyaVisionConfig, BarkConfig, BartConfig, BertConfig, BertGenerationConfig, BigBirdConfig, BigBirdPegasusConfig, BioGptConfig, BitNetConfig, BlenderbotConfig, BlenderbotSmallConfig, BlipConfig, Blip2Config, BloomConfig, BltConfig, BridgeTowerConfig, BrosConfig, CamembertConfig, CanineConfig, ChameleonConfig, ChineseCLIPConfig, ClapConfig, CLIPConfig, CLIPSegConfig, ClvpConfig, LlamaConfig, CodeGenConfig, CohereConfig, Cohere2Config, ColPaliConfig, ColQwen2Config, ConvBertConfig, CpmAntConfig, CsmConfig, CTRLConfig, Data2VecAudioConfig, Data2VecTextConfig, DbrxConfig, DebertaConfig, DebertaV2Config, DeepseekV2Config, DeepseekV3Config, DeepseekVLConfig, DeepseekVLHybridConfig, DiaConfig, DiffLlamaConfig, DistilBertConfig, DPRConfig, ElectraConfig, Emu3Config, ErnieConfig, Ernie4_5Config, Ernie4_5_MoeConfig, ErnieMConfig, EsmConfig, Exaone4Config, FalconConfig, FalconMambaConfig, FastSpeech2ConformerConfig, FlaubertConfig, FlexOlmoConfig, FNetConfig, FSMTConfig, FunnelConfig, GemmaConfig, Gemma2Config, Gemma3Config, Gemma3TextConfig, Gemma3nConfig, Gemma3nTextConfig, GitConfig, GlmConfig, Glm4Config, Glm4MoeConfig, Glm4vConfig, Glm4vMoeConfig, GPT2Config, GPT2Config, GPTBigCodeConfig, GPTNeoConfig, GPTNeoXConfig, GPTNeoXJapaneseConfig, GptOssConfig, GPTJConfig, GPTSanJapaneseConfig, GraniteConfig, GraniteMoeConfig, GraniteMoeHybridConfig, GraniteMoeSharedConfig, GroundingDinoConfig, GroupViTConfig, HeliumConfig, HubertConfig, IBertConfig, IdeficsConfig, Idefics2Config, Idefics3Config, InstructBlipConfig, InstructBlipVideoConfig, InternVLConfig, JambaConfig, JanusConfig, JetMoeConfig, JukeboxConfig, Kosmos2Config, Kosmos2_5Config, LayoutLMConfig, LayoutLMv2Config, LayoutLMv3Config, LEDConfig, LiltConfig, LlamaConfig, Llama4Config, Llama4TextConfig, LlavaConfig, LlavaNextConfig, LlavaNextVideoConfig, LlavaOnevisionConfig, LongformerConfig, LongT5Config, LukeConfig, LxmertConfig, M2M100Config, MambaConfig, Mamba2Config, MarianConfig, MBartConfig, MegaConfig, MegatronBertConfig, MetaClip2Config, MgpstrConfig, MiniMaxConfig, MinistralConfig, MistralConfig, Mistral3Config, MixtralConfig, MllamaConfig, MMGroundingDinoConfig, MobileBertConfig, ModernBertConfig, MoonshineConfig, MoshiConfig, MPNetConfig, MptConfig, MraConfig, MT5Config, MusicgenConfig, MusicgenMelodyConfig, MvpConfig, NemotronConfig, NezhaConfig, NllbMoeConfig, NystromformerConfig, OlmoConfig, Olmo2Config, Olmo3Config, OlmoeConfig, OmDetTurboConfig, OneFormerConfig, OpenAIGPTConfig, OPTConfig, Owlv2Config, OwlViTConfig, PaliGemmaConfig, PegasusConfig, PegasusXConfig, PerceiverConfig, PersimmonConfig, PhiConfig, Phi3Config, PhimoeConfig, Pix2StructConfig, PixtralVisionConfig, PLBartConfig, ProphetNetConfig, QDQBertConfig, Qwen2Config, Qwen2_5OmniConfig, Qwen2_5_VLConfig, Qwen2AudioConfig, Qwen2MoeConfig, Qwen2VLConfig, Qwen3Config, Qwen3MoeConfig, Qwen3NextConfig, Qwen3OmniMoeConfig, Qwen3VLConfig, Qwen3VLMoeConfig, RagConfig, RealmConfig, RecurrentGemmaConfig, ReformerConfig, RemBertConfig, RetriBertConfig, RobertaConfig, RobertaPreLayerNormConfig, RoCBertConfig, RoFormerConfig, RwkvConfig, SeamlessM4TConfig, SeamlessM4Tv2Config, ShieldGemma2Config, SiglipConfig, Siglip2Config, SmolLM3Config, Speech2TextConfig, Speech2Text2Config, SpeechT5Config, SplinterConfig, SqueezeBertConfig, StableLmConfig, Starcoder2Config, SwitchTransformersConfig, T5Config, T5GemmaConfig, TapasConfig, TransfoXLConfig, TvpConfig, UdopConfig, UMT5Config, VideoLlavaConfig, ViltConfig, VipLlavaConfig, VisualBertConfig, VitsConfig, VoxtralConfig, Wav2Vec2Config, Wav2Vec2BertConfig, Wav2Vec2ConformerConfig, WhisperConfig, XCLIPConfig, XGLMConfig, XLMConfig, XLMProphetNetConfig, XLMRobertaConfig, XLMRobertaXLConfig, XLNetConfig, xLSTMConfig, XmodConfig, YosoConfig, ZambaConfig, Zamba2Config. [type=value_error, input_value=ArgsKwargs((), {'model_co... 'shutdown_timeout': 0}), input_type=ArgsKwargs]
+(APIServer pid=1)     For further information visit https://errors.pydantic.dev/2.12/v/value_error
+[2026-06-28T16:46:35Z] EXIT rc=1
+[2026-06-28T16:46:36Z] scale-to-zero accepted (1)
+[2026-06-28T19:33:06Z] === P1+P2 RE-RUN START ===
+[2026-06-28T19:33:07Z] waiting for node Ready...
+[2026-06-28T19:34:15Z] PREFLIGHT OK — scaledown ARMED.
+job.batch/stage-minimax-m2 created
+[2026-06-28T19:34:20Z] staging weights (~25min)...
+configmap/dcgm-metrics-prof-minimax unchanged
+configmap/prometheus-bench-config-minimax unchanged
+pod/observability-bench created
+[2026-06-28T20:25:42Z] observability applied
+[2026-06-28T20:25:42Z] === BOOT SMOKE: tp4 gpu-only via patched gen-serving-manifest.sh ===
+pod/vllm-tp4-gpu-only created
+[2026-06-28T20:25:45Z] smoke pod=vllm-tp4-gpu-only; waiting for boot (pip install + ~35min cold start)...
+[2026-06-28T20:25:47Z] smoke phase=Pending health=
+[2026-06-28T20:26:30Z] smoke phase=Pending health=
+[2026-06-28T20:27:12Z] smoke phase=Pending health=
+[2026-06-28T20:27:55Z] smoke phase=Pending health=
+[2026-06-28T20:28:37Z] smoke phase=Pending health=
+[2026-06-28T20:29:20Z] smoke phase=Running health=
+[2026-06-28T20:30:02Z] smoke phase=Running health=
+[2026-06-28T20:30:45Z] smoke phase=Running health=
+[2026-06-28T20:31:28Z] smoke phase=Running health=
+[2026-06-28T20:32:10Z] smoke phase=Running health=
+[2026-06-28T20:32:53Z] smoke phase=Running health=
+[2026-06-28T20:33:36Z] smoke phase=Running health=
+[2026-06-28T20:34:20Z] smoke phase=Running health=
+[2026-06-28T20:35:02Z] BOOT SMOKE FAILED phase=Failed — fix did NOT work. Capturing logs, aborting (trap scales down).
+(APIServer pid=1)            ^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 665, in run_server
+(APIServer pid=1)     await run_server_worker(listen_address, sock, args, **uvicorn_kwargs)
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 679, in run_server_worker
+(APIServer pid=1)     async with build_async_engine_client(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 99, in build_async_engine_client
+(APIServer pid=1)     async with build_async_engine_client_from_engine_args(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 123, in build_async_engine_client_from_engine_args
+(APIServer pid=1)     vllm_config = engine_args.create_engine_config(usage_context=usage_context)
+(APIServer pid=1)                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py", line 2229, in create_engine_config
+(APIServer pid=1)     config = VllmConfig(
+(APIServer pid=1)              ^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/pydantic/_internal/_dataclasses.py", line 121, in __init__
+(APIServer pid=1)     s.__pydantic_validator__.validate_python(ArgsKwargs(args, kwargs), self_instance=s)
+(APIServer pid=1) pydantic_core._pydantic_core.ValidationError: 1 validation error for VllmConfig
+(APIServer pid=1)   Value error, Couldn't instantiate the backend tokenizer from one of: 
+(APIServer pid=1) (1) a `tokenizers` library serialization file, 
+(APIServer pid=1) (2) a slow tokenizer instance to convert or 
+(APIServer pid=1) (3) an equivalent slow tokenizer class to instantiate and convert. 
+(APIServer pid=1) You need to have sentencepiece or tiktoken installed to convert a slow tokenizer to a fast one. [type=value_error, input_value=ArgsKwargs((), {'model_co... 'shutdown_timeout': 0}), input_type=ArgsKwargs]
+(APIServer pid=1)     For further information visit https://errors.pydantic.dev/2.13/v/value_error
+[2026-06-28T20:35:03Z] EXIT rc=1
+[2026-06-28T20:35:05Z] scale-to-zero accepted (1)
+[2026-06-28T21:03:51Z] === P1+P2 RE-RUN START ===
+[2026-06-28T21:03:51Z] waiting for node Ready...
+[2026-06-28T21:04:27Z] PREFLIGHT OK — scaledown ARMED.
+job.batch/stage-minimax-m2 created
+[2026-06-28T21:04:32Z] staging weights (~25min)...
+configmap/dcgm-metrics-prof-minimax unchanged
+configmap/prometheus-bench-config-minimax unchanged
+pod/observability-bench created
+[2026-06-28T21:55:43Z] observability applied
+[2026-06-28T21:55:43Z] === BOOT SMOKE: tp4 gpu-only via patched gen-serving-manifest.sh ===
+pod/vllm-tp4-gpu-only created
+[2026-06-28T21:55:45Z] smoke pod=vllm-tp4-gpu-only; waiting for boot (pip install + ~35min cold start)...
+[2026-06-28T21:55:47Z] smoke phase=Pending health=
+[2026-06-28T21:56:29Z] smoke phase=Pending health=
+[2026-06-28T21:57:12Z] smoke phase=Pending health=
+[2026-06-28T21:57:54Z] smoke phase=Pending health=
+[2026-06-28T21:58:37Z] smoke phase=Pending health=
+[2026-06-28T21:59:51Z] smoke phase=Running health=
+[2026-06-28T22:00:32Z] BOOT SMOKE FAILED phase=Failed — fix did NOT work. Capturing logs, aborting (trap scales down).
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 99, in build_async_engine_client
+(APIServer pid=1)     async with build_async_engine_client_from_engine_args(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 123, in build_async_engine_client_from_engine_args
+(APIServer pid=1)     vllm_config = engine_args.create_engine_config(usage_context=usage_context)
+(APIServer pid=1)                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py", line 1725, in create_engine_config
+(APIServer pid=1)     maybe_override_with_speculators(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/transformers_utils/config.py", line 660, in maybe_override_with_speculators
+(APIServer pid=1)     config_dict, _ = PretrainedConfig.get_config_dict(
+(APIServer pid=1)                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py", line 687, in get_config_dict
+(APIServer pid=1)     config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+(APIServer pid=1)                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/transformers/configuration_utils.py", line 742, in _get_config_dict
+(APIServer pid=1)     resolved_config_file = cached_file(
+(APIServer pid=1)                            ^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py", line 293, in cached_file
+(APIServer pid=1)     file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/transformers/utils/hub.py", line 488, in cached_files
+(APIServer pid=1)     raise OSError(f"{e}") from e
+(APIServer pid=1) OSError: Repo id must be in the form 'repo_name' or 'namespace/repo_name': '/mnt/nvme/models/minimax-m2'. Use `repo_type` argument if needed.
+[2026-06-28T22:00:34Z] EXIT rc=1
+[2026-06-28T22:00:35Z] scale-to-zero accepted (1)
+[2026-06-28T22:44:35Z] WALL CAP hit
+[2026-06-28T23:58:08Z] === P1+P2 RE-RUN START ===
+[2026-06-28T23:58:09Z] waiting for node Ready...
+[2026-06-28T23:59:46Z] PREFLIGHT OK — scaledown ARMED.
+job.batch/stage-minimax-m2 created
+[2026-06-28T23:59:51Z] staging weights (~25min)...
+configmap/dcgm-metrics-prof-minimax unchanged
+configmap/prometheus-bench-config-minimax unchanged
+pod/observability-bench created
+[2026-06-29T00:51:07Z] observability applied
+[2026-06-29T00:51:07Z] === BOOT SMOKE: tp4 gpu-only via patched gen-serving-manifest.sh ===
+pod/vllm-tp4-gpu-only created
+[2026-06-29T00:51:09Z] smoke pod=vllm-tp4-gpu-only; waiting for boot (pip install + ~35min cold start)...
+[2026-06-29T00:51:11Z] smoke phase=Pending health=
+[2026-06-29T00:51:54Z] smoke phase=Pending health=
+[2026-06-29T00:52:37Z] smoke phase=Pending health=
+[2026-06-29T00:53:19Z] smoke phase=Pending health=
+[2026-06-29T00:54:02Z] smoke phase=Pending health=
+[2026-06-29T00:54:47Z] smoke phase=Running health=
+[2026-06-29T00:55:29Z] smoke phase=Running health=
+[2026-06-29T00:56:11Z] smoke phase=Running health=
+[2026-06-29T00:56:54Z] smoke phase=Running health=
+[2026-06-29T00:57:36Z] smoke phase=Running health=
+[2026-06-29T00:58:19Z] smoke phase=Running health=
+[2026-06-29T00:59:01Z] smoke phase=Running health=
+[2026-06-29T00:59:44Z] smoke phase=Running health=
+[2026-06-29T01:00:26Z] smoke phase=Running health=
+[2026-06-29T01:01:07Z] BOOT SMOKE FAILED phase=Failed — fix did NOT work. Capturing logs, aborting (trap scales down).
+(APIServer pid=1)            ^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 665, in run_server
+(APIServer pid=1)     await run_server_worker(listen_address, sock, args, **uvicorn_kwargs)
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 679, in run_server_worker
+(APIServer pid=1)     async with build_async_engine_client(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 99, in build_async_engine_client
+(APIServer pid=1)     async with build_async_engine_client_from_engine_args(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 123, in build_async_engine_client_from_engine_args
+(APIServer pid=1)     vllm_config = engine_args.create_engine_config(usage_context=usage_context)
+(APIServer pid=1)                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py", line 2229, in create_engine_config
+(APIServer pid=1)     config = VllmConfig(
+(APIServer pid=1)              ^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/pydantic/_internal/_dataclasses.py", line 121, in __init__
+(APIServer pid=1)     s.__pydantic_validator__.validate_python(ArgsKwargs(args, kwargs), self_instance=s)
+(APIServer pid=1) pydantic_core._pydantic_core.ValidationError: 1 validation error for VllmConfig
+(APIServer pid=1)   Value error, Couldn't instantiate the backend tokenizer from one of: 
+(APIServer pid=1) (1) a `tokenizers` library serialization file, 
+(APIServer pid=1) (2) a slow tokenizer instance to convert or 
+(APIServer pid=1) (3) an equivalent slow tokenizer class to instantiate and convert. 
+(APIServer pid=1) You need to have sentencepiece or tiktoken installed to convert a slow tokenizer to a fast one. [type=value_error, input_value=ArgsKwargs((), {'model_co... 'shutdown_timeout': 0}), input_type=ArgsKwargs]
+(APIServer pid=1)     For further information visit https://errors.pydantic.dev/2.13/v/value_error
+[2026-06-29T01:01:08Z] EXIT rc=1
+[2026-06-29T01:01:10Z] scale-to-zero accepted (1)
+[2026-06-29T02:33:07Z] WALL CAP hit
+[2026-06-29T04:03:51Z] WALL CAP hit
+[2026-06-29T06:58:09Z] WALL CAP hit
+[2026-06-29T16:58:40Z] === P1+P2 RE-RUN START ===
+[2026-06-29T16:58:40Z] waiting for node Ready...
+[2026-06-29T17:00:28Z] PREFLIGHT OK — scaledown ARMED.
+job.batch/stage-minimax-m2 created
+[2026-06-29T17:00:37Z] staging weights (~25min)...
+configmap/dcgm-metrics-prof-minimax unchanged
+configmap/prometheus-bench-config-minimax unchanged
+pod/observability-bench created
+[2026-06-29T17:52:16Z] observability applied
+[2026-06-29T17:52:16Z] === BOOT SMOKE: tp4 gpu-only via patched gen-serving-manifest.sh ===
+pod/vllm-tp4-gpu-only created
+[2026-06-29T17:52:20Z] smoke pod=vllm-tp4-gpu-only; waiting for boot (pip install + ~35min cold start)...
+[2026-06-29T17:52:23Z] smoke phase=Pending health=
+[2026-06-29T17:53:06Z] smoke phase=Pending health=
+[2026-06-29T17:53:49Z] smoke phase=Pending health=
+[2026-06-29T17:54:32Z] smoke phase=Pending health=
+[2026-06-29T17:55:14Z] smoke phase=Pending health=
+[2026-06-29T17:55:57Z] smoke phase=Running health=000
+[2026-06-29T17:56:40Z] smoke phase=Running health=
+[2026-06-29T17:57:24Z] smoke phase=Running health=
+[2026-06-29T17:58:07Z] smoke phase=Running health=
+[2026-06-29T17:58:50Z] smoke phase=Running health=
+[2026-06-29T17:59:34Z] smoke phase=Running health=
+[2026-06-29T18:00:17Z] smoke phase=Running health=
+[2026-06-29T18:00:59Z] smoke phase=Running health=
+[2026-06-29T18:01:43Z] smoke phase=Running health=
+[2026-06-29T18:02:25Z] BOOT SMOKE FAILED phase=Failed — fix did NOT work. Capturing logs, aborting (trap scales down).
+(APIServer pid=1)   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/uvloop/__init__.py", line 48, in wrapper
+(APIServer pid=1)     return await main
+(APIServer pid=1)            ^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 680, in run_server
+(APIServer pid=1)     await run_server_worker(listen_address, sock, args, **uvicorn_kwargs)
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 694, in run_server_worker
+(APIServer pid=1)     async with build_async_engine_client(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 100, in build_async_engine_client
+(APIServer pid=1)     async with build_async_engine_client_from_engine_args(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 124, in build_async_engine_client_from_engine_args
+(APIServer pid=1)     vllm_config = engine_args.create_engine_config(usage_context=usage_context)
+(APIServer pid=1)                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py", line 2023, in create_engine_config
+(APIServer pid=1)     config = VllmConfig(
+(APIServer pid=1)              ^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/pydantic/_internal/_dataclasses.py", line 121, in __init__
+(APIServer pid=1)     s.__pydantic_validator__.validate_python(ArgsKwargs(args, kwargs), self_instance=s)
+(APIServer pid=1) pydantic_core._pydantic_core.ValidationError: 1 validation error for VllmConfig
+(APIServer pid=1)   Value error, Unrecognized configuration class <class 'transformers_modules.minimax_m2.configuration_minimax_m2.MiniMaxM2Config'> to build an AutoTokenizer.
+(APIServer pid=1) Model type should be one of Aimv2Config, AlbertConfig, AlignConfig, ArceeConfig, AriaConfig, AyaVisionConfig, BarkConfig, BartConfig, BertConfig, BertGenerationConfig, BigBirdConfig, BigBirdPegasusConfig, BioGptConfig, BitNetConfig, BlenderbotConfig, BlenderbotSmallConfig, BlipConfig, Blip2Config, BloomConfig, BltConfig, BridgeTowerConfig, BrosConfig, CamembertConfig, CanineConfig, ChameleonConfig, ChineseCLIPConfig, ClapConfig, CLIPConfig, CLIPSegConfig, ClvpConfig, LlamaConfig, CodeGenConfig, CohereConfig, Cohere2Config, ColPaliConfig, ColQwen2Config, ConvBertConfig, CpmAntConfig, CsmConfig, CTRLConfig, Data2VecAudioConfig, Data2VecTextConfig, DbrxConfig, DebertaConfig, DebertaV2Config, DeepseekV2Config, DeepseekV3Config, DeepseekVLConfig, DeepseekVLHybridConfig, DiaConfig, DiffLlamaConfig, DistilBertConfig, DPRConfig, ElectraConfig, Emu3Config, ErnieConfig, Ernie4_5Config, Ernie4_5_MoeConfig, ErnieMConfig, EsmConfig, Exaone4Config, FalconConfig, FalconMambaConfig, FastSpeech2ConformerConfig, FlaubertConfig, FlexOlmoConfig, FNetConfig, FSMTConfig, FunnelConfig, GemmaConfig, Gemma2Config, Gemma3Config, Gemma3TextConfig, Gemma3nConfig, Gemma3nTextConfig, GitConfig, GlmConfig, Glm4Config, Glm4MoeConfig, Glm4vConfig, Glm4vMoeConfig, GPT2Config, GPT2Config, GPTBigCodeConfig, GPTNeoConfig, GPTNeoXConfig, GPTNeoXJapaneseConfig, GptOssConfig, GPTJConfig, GPTSanJapaneseConfig, GraniteConfig, GraniteMoeConfig, GraniteMoeHybridConfig, GraniteMoeSharedConfig, GroundingDinoConfig, GroupViTConfig, HeliumConfig, HubertConfig, IBertConfig, IdeficsConfig, Idefics2Config, Idefics3Config, InstructBlipConfig, InstructBlipVideoConfig, InternVLConfig, JambaConfig, JanusConfig, JetMoeConfig, JukeboxConfig, Kosmos2Config, Kosmos2_5Config, LayoutLMConfig, LayoutLMv2Config, LayoutLMv3Config, LEDConfig, LiltConfig, LlamaConfig, Llama4Config, Llama4TextConfig, LlavaConfig, LlavaNextConfig, LlavaNextVideoConfig, LlavaOnevisionConfig, LongformerConfig, LongT5Config, LukeConfig, LxmertConfig, M2M100Config, MambaConfig, Mamba2Config, MarianConfig, MBartConfig, MegaConfig, MegatronBertConfig, MetaClip2Config, MgpstrConfig, MiniMaxConfig, MinistralConfig, MistralConfig, Mistral3Config, MixtralConfig, MllamaConfig, MMGroundingDinoConfig, MobileBertConfig, ModernBertConfig, MoonshineConfig, MoshiConfig, MPNetConfig, MptConfig, MraConfig, MT5Config, MusicgenConfig, MusicgenMelodyConfig, MvpConfig, NemotronConfig, NezhaConfig, NllbMoeConfig, NystromformerConfig, OlmoConfig, Olmo2Config, Olmo3Config, OlmoeConfig, OmDetTurboConfig, OneFormerConfig, OpenAIGPTConfig, OPTConfig, Owlv2Config, OwlViTConfig, PaliGemmaConfig, PegasusConfig, PegasusXConfig, PerceiverConfig, PersimmonConfig, PhiConfig, Phi3Config, PhimoeConfig, Pix2StructConfig, PixtralVisionConfig, PLBartConfig, ProphetNetConfig, QDQBertConfig, Qwen2Config, Qwen2_5OmniConfig, Qwen2_5_VLConfig, Qwen2AudioConfig, Qwen2MoeConfig, Qwen2VLConfig, Qwen3Config, Qwen3MoeConfig, Qwen3NextConfig, Qwen3OmniMoeConfig, Qwen3VLConfig, Qwen3VLMoeConfig, RagConfig, RealmConfig, RecurrentGemmaConfig, ReformerConfig, RemBertConfig, RetriBertConfig, RobertaConfig, RobertaPreLayerNormConfig, RoCBertConfig, RoFormerConfig, RwkvConfig, SeamlessM4TConfig, SeamlessM4Tv2Config, ShieldGemma2Config, SiglipConfig, Siglip2Config, SmolLM3Config, Speech2TextConfig, Speech2Text2Config, SpeechT5Config, SplinterConfig, SqueezeBertConfig, StableLmConfig, Starcoder2Config, SwitchTransformersConfig, T5Config, T5GemmaConfig, TapasConfig, TransfoXLConfig, TvpConfig, UdopConfig, UMT5Config, VideoLlavaConfig, ViltConfig, VipLlavaConfig, VisualBertConfig, VitsConfig, VoxtralConfig, Wav2Vec2Config, Wav2Vec2BertConfig, Wav2Vec2ConformerConfig, WhisperConfig, XCLIPConfig, XGLMConfig, XLMConfig, XLMProphetNetConfig, XLMRobertaConfig, XLMRobertaXLConfig, XLNetConfig, xLSTMConfig, XmodConfig, YosoConfig, ZambaConfig, Zamba2Config. [type=value_error, input_value=ArgsKwargs((), {'model_co... 'shutdown_timeout': 0}), input_type=ArgsKwargs]
+(APIServer pid=1)     For further information visit https://errors.pydantic.dev/2.12/v/value_error
+[2026-06-29T18:02:27Z] EXIT rc=1
+[2026-06-29T18:02:30Z] scale-to-zero accepted (1)
+[2026-06-29T18:50:45Z] === P1+P2 RE-RUN START ===
+[2026-06-29T18:50:45Z] waiting for node Ready...
+[2026-06-29T18:52:28Z] PREFLIGHT OK — scaledown ARMED.
+job.batch/stage-minimax-m2 created
+[2026-06-29T18:52:35Z] staging weights (~25min)...
+configmap/dcgm-metrics-prof-minimax unchanged
+configmap/prometheus-bench-config-minimax unchanged
+pod/observability-bench created
+[2026-06-29T19:46:16Z] observability applied
+[2026-06-29T19:46:16Z] === BOOT SMOKE: tp4 gpu-only via patched gen-serving-manifest.sh ===
+pod/vllm-tp4-gpu-only created
+[2026-06-29T19:46:24Z] smoke pod=vllm-tp4-gpu-only; waiting for boot (pip install + ~35min cold start)...
+[2026-06-29T19:46:32Z] smoke phase=Pending health=
+[2026-06-29T19:47:22Z] smoke phase=Pending health=
+[2026-06-29T19:48:08Z] smoke phase=Pending health=
+[2026-06-29T19:48:56Z] smoke phase=Pending health=
+[2026-06-29T19:49:47Z] smoke phase=Running health=000
+[2026-06-29T19:50:34Z] smoke phase=Running health=
+[2026-06-29T19:51:20Z] smoke phase=Running health=
+[2026-06-29T19:52:06Z] smoke phase=Running health=
+[2026-06-29T19:52:51Z] smoke phase=Running health=
+[2026-06-29T19:53:36Z] smoke phase=Running health=
+[2026-06-29T19:54:20Z] smoke phase=Running health=
+[2026-06-29T19:55:05Z] smoke phase=Running health=
+[2026-06-29T19:55:49Z] smoke phase=Running health=
+[2026-06-29T19:56:31Z] BOOT SMOKE FAILED phase=Failed — fix did NOT work. Capturing logs, aborting (trap scales down).
+(APIServer pid=1)            ^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 665, in run_server
+(APIServer pid=1)     await run_server_worker(listen_address, sock, args, **uvicorn_kwargs)
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 679, in run_server_worker
+(APIServer pid=1)     async with build_async_engine_client(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 99, in build_async_engine_client
+(APIServer pid=1)     async with build_async_engine_client_from_engine_args(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 123, in build_async_engine_client_from_engine_args
+(APIServer pid=1)     vllm_config = engine_args.create_engine_config(usage_context=usage_context)
+(APIServer pid=1)                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py", line 2229, in create_engine_config
+(APIServer pid=1)     config = VllmConfig(
+(APIServer pid=1)              ^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/pydantic/_internal/_dataclasses.py", line 121, in __init__
+(APIServer pid=1)     s.__pydantic_validator__.validate_python(ArgsKwargs(args, kwargs), self_instance=s)
+(APIServer pid=1) pydantic_core._pydantic_core.ValidationError: 1 validation error for VllmConfig
+(APIServer pid=1)   Value error, Couldn't instantiate the backend tokenizer from one of: 
+(APIServer pid=1) (1) a `tokenizers` library serialization file, 
+(APIServer pid=1) (2) a slow tokenizer instance to convert or 
+(APIServer pid=1) (3) an equivalent slow tokenizer class to instantiate and convert. 
+(APIServer pid=1) You need to have sentencepiece or tiktoken installed to convert a slow tokenizer to a fast one. [type=value_error, input_value=ArgsKwargs((), {'model_co... 'shutdown_timeout': 0}), input_type=ArgsKwargs]
+(APIServer pid=1)     For further information visit https://errors.pydantic.dev/2.13/v/value_error
+[2026-06-29T19:56:33Z] EXIT rc=1
+[2026-06-29T19:56:35Z] scale-to-zero accepted (1)
+[2026-06-29T23:58:40Z] WALL CAP hit
+[2026-06-30T00:54:37Z] === P1+P2 RE-RUN START ===
+[2026-06-30T00:54:37Z] waiting for node Ready...
+[2026-06-30T00:56:24Z] PREFLIGHT OK — scaledown ARMED.
+job.batch/stage-minimax-m2 created
+[2026-06-30T00:56:31Z] staging weights (~25min)...
+configmap/dcgm-metrics-prof-minimax unchanged
+configmap/prometheus-bench-config-minimax unchanged
+pod/observability-bench created
+[2026-06-30T01:48:44Z] observability applied
+[2026-06-30T01:48:44Z] === BOOT SMOKE: tp4 gpu-only via patched gen-serving-manifest.sh ===
+pod/vllm-tp4-gpu-only created
+[2026-06-30T01:48:49Z] smoke pod=vllm-tp4-gpu-only; waiting for boot (pip install + ~35min cold start)...
+[2026-06-30T01:48:53Z] smoke phase=Pending health=
+[2026-06-30T01:49:37Z] smoke phase=Pending health=
+[2026-06-30T01:50:20Z] smoke phase=Pending health=
+[2026-06-30T01:50:45Z] WALL CAP hit
+[2026-06-30T01:51:04Z] smoke phase=Pending health=
+[2026-06-30T01:51:48Z] smoke phase=Pending health=
+[2026-06-30T01:52:31Z] smoke phase=Running health=
+[2026-06-30T01:53:15Z] smoke phase=Running health=
+[2026-06-30T01:53:59Z] smoke phase=Running health=
+[2026-06-30T01:54:42Z] smoke phase=Running health=
+[2026-06-30T01:55:25Z] smoke phase=Running health=
+[2026-06-30T01:56:08Z] smoke phase=Running health=
+[2026-06-30T01:56:50Z] BOOT SMOKE FAILED phase=Failed — fix did NOT work. Capturing logs, aborting (trap scales down).
+(APIServer pid=1)            ^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 665, in run_server
+(APIServer pid=1)     await run_server_worker(listen_address, sock, args, **uvicorn_kwargs)
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 679, in run_server_worker
+(APIServer pid=1)     async with build_async_engine_client(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 99, in build_async_engine_client
+(APIServer pid=1)     async with build_async_engine_client_from_engine_args(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 123, in build_async_engine_client_from_engine_args
+(APIServer pid=1)     vllm_config = engine_args.create_engine_config(usage_context=usage_context)
+(APIServer pid=1)                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py", line 2229, in create_engine_config
+(APIServer pid=1)     config = VllmConfig(
+(APIServer pid=1)              ^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/pydantic/_internal/_dataclasses.py", line 121, in __init__
+(APIServer pid=1)     s.__pydantic_validator__.validate_python(ArgsKwargs(args, kwargs), self_instance=s)
+(APIServer pid=1) pydantic_core._pydantic_core.ValidationError: 1 validation error for VllmConfig
+(APIServer pid=1)   Value error, Couldn't instantiate the backend tokenizer from one of: 
+(APIServer pid=1) (1) a `tokenizers` library serialization file, 
+(APIServer pid=1) (2) a slow tokenizer instance to convert or 
+(APIServer pid=1) (3) an equivalent slow tokenizer class to instantiate and convert. 
+(APIServer pid=1) You need to have sentencepiece or tiktoken installed to convert a slow tokenizer to a fast one. [type=value_error, input_value=ArgsKwargs((), {'model_co... 'shutdown_timeout': 0}), input_type=ArgsKwargs]
+(APIServer pid=1)     For further information visit https://errors.pydantic.dev/2.13/v/value_error
+[2026-06-30T01:56:53Z] EXIT rc=1
+[2026-06-30T01:56:56Z] scale-to-zero accepted (1)
+[2026-06-30T02:04:52Z] === P1+P2 RE-RUN START ===
+[2026-06-30T02:04:53Z] waiting for node Ready...
+[2026-06-30T02:05:00Z] PREFLIGHT OK — scaledown ARMED.
+job.batch/stage-minimax-m2 created
+[2026-06-30T02:05:07Z] staging weights (~25min)...
+configmap/dcgm-metrics-prof-minimax unchanged
+configmap/prometheus-bench-config-minimax unchanged
+pod/observability-bench created
+[2026-06-30T02:56:52Z] observability applied
+[2026-06-30T02:56:52Z] === BOOT SMOKE: tp4 gpu-only via patched gen-serving-manifest.sh ===
+pod/vllm-tp4-gpu-only created
+[2026-06-30T02:56:56Z] smoke pod=vllm-tp4-gpu-only; waiting for boot (pip install + ~35min cold start)...
+[2026-06-30T02:56:59Z] smoke phase=Pending health=
+[2026-06-30T02:57:42Z] smoke phase=Pending health=
+[2026-06-30T02:58:26Z] smoke phase=Pending health=
+[2026-06-30T02:59:09Z] smoke phase=Pending health=
+[2026-06-30T02:59:52Z] smoke phase=Pending health=
+[2026-06-30T03:00:35Z] smoke phase=Pending health=
+[2026-06-30T03:01:18Z] smoke phase=Pending health=
+[2026-06-30T03:02:01Z] smoke phase=Pending health=
+[2026-06-30T03:02:44Z] smoke phase=Pending health=
+[2026-06-30T03:03:28Z] smoke phase=Pending health=
+[2026-06-30T03:04:11Z] smoke phase=Pending health=
+[2026-06-30T03:04:55Z] smoke phase=Pending health=
+[2026-06-30T03:05:38Z] smoke phase=Pending health=
+[2026-06-30T03:06:22Z] smoke phase=Pending health=
+[2026-06-30T03:07:05Z] smoke phase=Pending health=
+[2026-06-30T03:07:48Z] smoke phase=Pending health=
+[2026-06-30T03:08:31Z] smoke phase=Pending health=
+[2026-06-30T03:09:15Z] smoke phase=Pending health=
+[2026-06-30T03:09:59Z] smoke phase=Pending health=
+[2026-06-30T03:10:41Z] smoke phase=Pending health=
+[2026-06-30T03:11:25Z] smoke phase=Pending health=
+[2026-06-30T03:12:08Z] smoke phase=Pending health=
+[2026-06-30T03:12:50Z] smoke phase=Pending health=
+[2026-06-30T03:13:33Z] smoke phase=Pending health=
+[2026-06-30T03:14:16Z] smoke phase=Pending health=
+[2026-06-30T03:14:59Z] smoke phase=Pending health=
+[2026-06-30T03:15:42Z] smoke phase=Pending health=
+[2026-06-30T03:16:25Z] smoke phase=Pending health=
+[2026-06-30T03:17:08Z] smoke phase=Pending health=
+[2026-06-30T03:17:52Z] smoke phase=Pending health=
+[2026-06-30T03:18:35Z] smoke phase=Pending health=
+[2026-06-30T03:19:18Z] smoke phase=Pending health=
+[2026-06-30T03:20:01Z] smoke phase=Pending health=
+[2026-06-30T03:20:45Z] smoke phase=Pending health=
+[2026-06-30T03:21:28Z] smoke phase=Pending health=
+[2026-06-30T03:22:10Z] smoke phase=Pending health=
+[2026-06-30T03:22:54Z] smoke phase=Pending health=
+[2026-06-30T03:23:37Z] smoke phase=Pending health=
+[2026-06-30T03:24:20Z] smoke phase=Pending health=
+[2026-06-30T03:25:04Z] smoke phase=Pending health=
+[2026-06-30T03:25:47Z] smoke phase=Pending health=
+[2026-06-30T03:26:31Z] smoke phase=Pending health=
+[2026-06-30T03:27:14Z] smoke phase=Pending health=
+[2026-06-30T03:27:57Z] smoke phase=Pending health=
+[2026-06-30T03:28:40Z] smoke phase=Pending health=
+[2026-06-30T03:29:24Z] smoke phase=Pending health=
+[2026-06-30T03:30:07Z] smoke phase=Pending health=
+[2026-06-30T03:30:50Z] smoke phase=Pending health=
+[2026-06-30T03:31:33Z] smoke phase=Pending health=
+[2026-06-30T03:32:16Z] smoke phase=Pending health=
+[2026-06-30T03:32:59Z] smoke phase=Pending health=
+[2026-06-30T03:33:42Z] smoke phase=Pending health=
+[2026-06-30T03:34:25Z] smoke phase=Pending health=
+[2026-06-30T03:35:09Z] smoke phase=Pending health=
+[2026-06-30T03:35:52Z] smoke phase=Pending health=
+[2026-06-30T03:36:35Z] smoke phase=Pending health=
+[2026-06-30T03:37:19Z] smoke phase=Pending health=
+[2026-06-30T03:38:02Z] smoke phase=Pending health=
+[2026-06-30T03:38:45Z] smoke phase=Pending health=
+[2026-06-30T03:39:28Z] smoke phase=Pending health=
+[2026-06-30T03:40:11Z] smoke phase=Pending health=
+[2026-06-30T03:40:54Z] smoke phase=Pending health=
+[2026-06-30T03:41:37Z] smoke phase=Pending health=
+[2026-06-30T03:42:19Z] smoke phase=Pending health=
+[2026-06-30T03:43:03Z] smoke phase=Pending health=
+[2026-06-30T03:43:46Z] smoke phase=Pending health=
+[2026-06-30T03:44:29Z] smoke phase=Pending health=
+[2026-06-30T03:45:12Z] smoke phase=Pending health=
+[2026-06-30T03:45:56Z] smoke phase=Pending health=
+[2026-06-30T03:46:39Z] smoke phase=Pending health=
+[2026-06-30T03:47:22Z] smoke phase=Pending health=
+[2026-06-30T03:48:06Z] smoke phase=Pending health=
+[2026-06-30T03:48:49Z] smoke phase=Pending health=
+[2026-06-30T03:49:33Z] smoke phase=Pending health=
+[2026-06-30T03:50:16Z] smoke phase=Pending health=
+[2026-06-30T03:51:01Z] smoke phase=Pending health=
+[2026-06-30T03:51:46Z] smoke phase=Pending health=
+[2026-06-30T03:52:31Z] smoke phase=Pending health=
+[2026-06-30T03:53:16Z] smoke phase=Pending health=
+[2026-06-30T03:54:01Z] smoke phase=Pending health=
+[2026-06-30T03:54:41Z] smoke never healthy; abort
+[2026-06-30T03:54:41Z] EXIT rc=1
+[2026-06-30T03:54:43Z] scale-to-zero accepted (1)
+[2026-06-30T05:44:50Z] === P1+P2 RE-RUN START ===
+[2026-06-30T05:44:50Z] waiting for node Ready...
+[2026-06-30T05:44:56Z] PREFLIGHT OK — scaledown ARMED.
+job.batch/stage-minimax-m2 created
+[2026-06-30T05:45:03Z] staging weights (~25min)...
+[2026-06-30T05:50:11Z] SIGTERM
+[2026-06-30T05:50:11Z] EXIT rc=143
+[2026-06-30T05:50:13Z] scale-to-zero accepted (1)
+[2026-06-30T06:02:48Z] === P1+P2 RE-RUN START ===
+[2026-06-30T06:02:48Z] waiting for node Ready...
+[2026-06-30T06:02:53Z] PREFLIGHT OK — scaledown ARMED.
+job.batch/stage-minimax-m2 created
+[2026-06-30T06:02:59Z] staging weights (~25min)...
+configmap/dcgm-metrics-prof-minimax unchanged
+configmap/prometheus-bench-config-minimax unchanged
+pod/observability-bench created
+[2026-06-30T06:54:18Z] observability applied
+[2026-06-30T06:54:18Z] === BOOT SMOKE: tp4 gpu-only via patched gen-serving-manifest.sh ===
+pod/vllm-tp4-gpu-only created
+[2026-06-30T06:54:22Z] smoke pod=vllm-tp4-gpu-only; waiting for boot (pip install + ~35min cold start)...
+[2026-06-30T06:54:25Z] smoke phase=Pending health=
+[2026-06-30T06:55:08Z] smoke phase=Pending health=
+[2026-06-30T06:55:52Z] smoke phase=Pending health=
+[2026-06-30T06:56:35Z] smoke phase=Pending health=
+[2026-06-30T06:57:17Z] smoke phase=Pending health=
+[2026-06-30T06:58:00Z] smoke phase=Running health=000
+[2026-06-30T06:58:44Z] smoke phase=Running health=000
+[2026-06-30T06:59:27Z] smoke phase=Running health=000
+[2026-06-30T07:00:10Z] smoke phase=Running health=000
+[2026-06-30T07:00:54Z] smoke phase=Running health=000
+[2026-06-30T07:01:36Z] smoke phase=Running health=000
+[2026-06-30T07:02:20Z] smoke phase=Running health=200
+[2026-06-30T07:02:20Z] BOOT SMOKE PASS — patched gen-manifest boots. Proceeding to sweeps.
+pod "vllm-tp4-gpu-only" deleted from default namespace
+[2026-06-30T07:06:05Z] === PHASE 1: KV-tiering distinct-prefix sweep ===
+pareto: 19 points -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2-kv-tiering/results/pareto-2026-06-30.json
+trajectory: 21 nodes -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2-kv-tiering/results/optimization-trajectory-2026-06-30.json
+[2026-06-30T08:55:26Z] PHASE 1 complete
+[2026-06-30T08:55:26Z] === PHASE 2: DP/TP parallelism sweep ===
+pareto: 0 points -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2/results/pareto-2026-06-30.json
+trajectory: 6 nodes -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2/results/optimization-trajectory-2026-06-30.json
+[2026-06-30T09:58:02Z] PHASE 2 ended rc=4 (check P2 STATUS)
+[2026-06-30T09:58:02Z] === P1+P2 DONE ===
+[2026-06-30T09:58:02Z] EXIT rc=0
+[2026-06-30T09:58:04Z] scale-to-zero accepted (1)

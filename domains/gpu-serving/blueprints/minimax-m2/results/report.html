@@ -55,10 +55,9 @@ ul{margin:8px 0;padding-left:20px} li{margin:4px 0}
     <h1>MiniMax-M2 on B200 — Serving Benchmark Study</h1>
     <div class="sub">230B MoE (10B active), FP8 · 4× B200 (SM100, NVSwitch) · vLLM · TP4 / TP4+EP4</div>
     <div class="meta">
-      <span class="chip">engine: vLLM 0.19.1rc1</span>
-      <span class="chip">tool/reasoning parser: minimax_m2 / append_think</span>
+      <span class="chip">base charts: vLLM 0.19.1rc1 (59 pts)</span>
+      <span class="chip">+ 2026-07-01 v0.23.0 update</span>
       <span class="chip">MoE backend: triton</span>
-      <span class="chip">59 measured points</span>
       <span class="chip">internal engineering report</span>
     </div>
   </div>
@@ -68,7 +67,7 @@ ul{margin:8px 0;padding-left:20px} li{margin:4px 0}
 <div class="cards">
   <div class="card good"><div class="n">~8×</div><div class="l">throughput from prefix caching<br>(226 → 1888 tok/s, cold→shared)</div></div>
   <div class="card acc"><div class="n">2158</div><div class="l">peak tok/s (TP4+EP4, shared-prefix @c128)</div></div>
-  <div class="card vio"><div class="n">±4%</div><div class="l">CPU-offload vs GPU-only — noise<br>(no regression under reuse)</div></div>
+  <div class="card vio"><div class="n">0.0</div><div class="l">CPU-offload tier-hit on v0.23<br>(no benefit — see v0.23 update)</div></div>
   <div class="card warn"><div class="n">100%</div><div class="l">KV utilization @c512 on 100k-reuse<br>(queue 259 — the saturation knee)</div></div>
 </div>
 
@@ -78,7 +77,7 @@ ul{margin:8px 0;padding-left:20px} li{margin:4px 0}
   <div class="finding"><span class="badge b-myth">myth-bust</span><div><b>CPU KV offload neither helped nor hurt under reuse.</b> Across every matched point, CPU-offload tracked GPU-only within ±4% (measurement noise), with 0 preemptions. A large offload "regression" is a <i>cold-workload / configuration</i> artifact, not an inherent cost of the offload tier on B200.</div></div>
   <div class="finding"><span class="badge b-bound">bottleneck</span><div><b>The 100K / 90%-reuse regime is KV-capacity-bound.</b> Prefix hit-rate held at 90% as designed, but KV-pool utilization rose with concurrency to 100% at c512, where queue depth jumped to 259 and TTFT hit ~309s. This is the saturation knee: capacity, not prefill compute, caps this regime.</div></div>
   <div class="finding"><span class="badge b-bound">parallelism</span><div><b>Expert parallelism (TP4+EP4) lifts the cached ceiling.</b> On shared-prefix at c128, TP4+EP4 reached 2,158 tok/s vs TP4's 1,544 (+40%) at <i>lower</i> TTFT (17s vs 32s). EP helps precisely where the workload is cache-fed and compute can be spread.</div></div>
-  <div class="finding"><span class="badge b-caveat">build</span><div><b>Engine build is a live constraint.</b> Benchmarked on a model-specific vLLM 0.19.1rc1 image. The stock vLLM 0.23.0 image <b>fails to boot</b> MiniMax-M2 on a missing tokenizer backend (<code>sentencepiece</code>/<code>tiktoken</code>) — a packaging gap, one-line fixable, but a hard blocker out-of-the-box.</div></div>
+  <div class="finding"><span class="badge b-caveat">build</span><div><b>Engine build is a live constraint.</b> These charts: model-specific vLLM 0.19.1rc1 image. <s>The stock 0.23.0 image fails to boot on a missing tokenizer backend</s> — <b>SUPERSEDED (see v0.23 update above):</b> stock v0.23.0 now boots M2 cleanly via an integrity-repair preamble; 0.23 TP4 is the deployable config.</div></div>
 </div>
 
 <div class="panel" style="border-color:var(--amber)">
@@ -89,6 +88,16 @@ ul{margin:8px 0;padding-left:20px} li{margin:4px 0}
     <li><b>DP parallelism shapes</b> — TP2+DP2, TP4+DP2, TP2+DP4 (the "best shape across 8 GPUs" question) were not run. Only single-replica TP4 and TP4+EP4 have data.</li>
     <li><b>v0.23.0 correctness/perf A/B</b> — blocked at boot by the tokenizer-backend gap; needs a patched image, then re-test.</li>
   </ul>
+</div>
+
+<h2>⟳ v0.23.0 update (2026-07-01) — the deployable engine</h2>
+<div class="panel" style="border-color:var(--accent)">
+  <p class="note">The charts below this section are the original <b>0.19.1rc1</b> study. The customer must run <b>v0.23.0</b> (it has the <code>/v1/messages</code> endpoint their code agents need; 0.19 does not). This panel re-measures the load-bearing questions on stock v0.23.0, 4× B200, TP4, FP8 — all points <b>err=0</b>, served-model-name matched.</p>
+  <div class="finding"><span class="badge b-key">deploy</span><div><b>v0.23.0 TP4 is at parity with 0.19 on the base path.</b> Shared-prefix gpu-only: 0.23 reached <b>1,848 tok/s @c256</b> (vs 0.19's 1,752) and 1,573 @c128 (vs 1,544). No base-path regression — <b>0.23 TP4 is the recommended deployable config</b>.</div></div>
+  <div class="finding"><span class="badge b-caveat">regression</span><div><b>The +40% expert-parallel lever is GONE on 0.23 (as configured).</b> Identical shape (TP4, DP1, <code>--enable-expert-parallel</code>) that gave <b>2,158 tok/s @c128 on 0.19</b> yields only <b>1,486</b> on 0.23 — <i>below</i> its own TP4 (1,573). The MoE/EP path was reworked 0.19→0.23; the benefit now requires the <b>DP-based EP path</b> (<code>EP_SIZE=TP×DP</code>), which for M2 currently <b>fails to boot</b> (every <code>--data-parallel-size</code> shape dies at engine-init). So EP headroom is <b>unavailable on 0.23 until the DP-boot bug is resolved</b> — a gated <code>tp1dp4ep</code>/<code>tp2dp2ep</code> recovery run is built and pending.</div></div>
+  <div class="finding"><span class="badge b-myth">offload</span><div><b>CPU KV offload delivers no benefit on v0.23 — and appears not to engage.</b> gpu-only vs cpu-offload at the distinct-prefix knee is neutral-to-negative (N=86 c=64: 304→323 tok/s; N=172 c=64: 313→270). The decisive number: <b>offload_tier_hit = 0.000 in every config</b>, even at N=86/c=128 where the KV pool is <b>full (100%) and preempting (5/min)</b> — vLLM chose to <b>recompute</b> evicted blocks rather than fetch from CPU. <span style="color:var(--amber)"><b>OPEN:</b> "0 tier-hit + recompute-under-pressure" indicates offload is not catching evictions, but whether that is a genuine bug, a renamed-counter mis-measurement (0.23 restructured the offload module), or a missing store-threshold knob is <b>not yet settled</b> — needs a run that reads the 0.23 pod's actual connector store/load metrics.</span> Either way: <b>do not rely on CPU offload for this workload.</b></div></div>
+  <div class="finding"><span class="badge b-key">boot</span><div><b>Boot is solved on stock v0.23.0.</b> The 0.19-era "tokenizer backend missing" blocker below is <b>superseded</b>: stock <code>vllm/vllm-openai:v0.23.0</code> boots M2 cleanly with an integrity-repair preamble (re-fetch config/tokenizer, hyphen-free model dir). cpu-offload needs key <code>cpu_bytes_to_use</code> (not the 0.19 <code>num_cpu_blocks</code>); NVMe/disk tiering IS supported (<code>TieringOffloadingSpec</code>+<code>fs</code>).</div></div>
+  <p class="note" style="margin-top:12px"><b>vs the customer (4× H200):</b> we matched TP4/fp8/OffloadingConnector but NOT hardware — B200≠H200, so absolute tok/s and their RPM/ITL dashboards are <b>not directly comparable</b> (their RPM 65.9 vs our ~36 is dominated by OSL: their 66–485 vs our fixed 512). We reproduced their <i>qualitative</i> finding (offload doesn't help) and explained it (tier never engages). A true capacity number needs an <b>H200 like-for-like run</b> (still open).</p>
 </div>
 
 <h2>Model family evolution (M2 → M2.5 → M2.7)</h2>

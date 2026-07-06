@@ -3432,3 +3432,1045 @@ tar: Removing leading `/' from member names
     }
 }
 [2026-06-27T21:30:57Z] scale-to-zero accepted (attempt 1).
+[2026-06-28T13:40:41Z] === MiniMax-M2 B200 Pareto sweep START (date=2026-06-28) ===
+[2026-06-28T13:40:41Z] grid: shapes=[tp2dp2 tp4dp2 tp2dp4] arms=[gpu-only nvme-tiering] scenarios=[cold shared-prefix 100k-90pct-reuse] conc=[1 4 8 16 32 64 128 256 512]
+[2026-06-28T13:40:41Z] push_beyond_last=1 (ceiling=8192) reuse_target=0.90 | sat-signals: err>0.02/0.10 kv>0.97 preempt>0 plateau<1.05x
+[2026-06-28T13:40:41Z] total configs=18 | hard cap=420min | nodegroup=ai-infra-use2-b200-spot
+[2026-06-28T13:40:41Z] PREFLIGHT: binding to context 'qwen3-next-bench-eks-cluster' and verifying cluster=qwen3-next-bench-eks-cluster...
+[2026-06-28T13:40:42Z] PREFLIGHT OK: context->cluster verified, B200 node Ready. Scaledown ARMED.
+configmap/minimax-bench-scripts unchanged
+pod/bench-runner configured
+[2026-06-28T13:40:44Z] waiting for bench-runner pod ready (pip install aiohttp)...
+Error: unable to establish a connection to the specified host: localhost
+Error: Unable to connect to host engine. Host engine connection invalid/disconnected.
+PARSE ERROR: Argument: -r
+             Couldn't find match for argument
+
+Usage: 
+
+
+For complete USAGE and HELP type: 
+   dcgmi profile --help
+
+[2026-06-28T13:40:52Z] DCGM PROF counters: prof_counters_available=false (false => roofline by FB+POWER+vLLM-histogram inference)
+[2026-06-28T13:40:52Z] --- CONFIG 1/18: shape=tp2dp2 kv_arm=gpu-only ---
+No resources found
+[2026-06-28T13:40:54Z]   launching vllm-tp2dp2-gpu-only (boot budget ~40min)...
+pod/vllm-tp2dp2-gpu-only created
+[2026-06-28T13:45:02Z]   pod vllm-tp2dp2-gpu-only entered phase=Failed before ready
+[2026-06-28T13:45:02Z]   vllm-tp2dp2-gpu-only FAILED to become ready — capturing last logs
+(APIServer pid=1)   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/uvloop/__init__.py", line 48, in wrapper
+(APIServer pid=1)     return await main
+(APIServer pid=1)            ^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 680, in run_server
+(APIServer pid=1)     await run_server_worker(listen_address, sock, args, **uvicorn_kwargs)
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 694, in run_server_worker
+(APIServer pid=1)     async with build_async_engine_client(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 100, in build_async_engine_client
+(APIServer pid=1)     async with build_async_engine_client_from_engine_args(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 124, in build_async_engine_client_from_engine_args
+(APIServer pid=1)     vllm_config = engine_args.create_engine_config(usage_context=usage_context)
+(APIServer pid=1)                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py", line 2023, in create_engine_config
+(APIServer pid=1)     config = VllmConfig(
+(APIServer pid=1)              ^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/pydantic/_internal/_dataclasses.py", line 121, in __init__
+(APIServer pid=1)     s.__pydantic_validator__.validate_python(ArgsKwargs(args, kwargs), self_instance=s)
+(APIServer pid=1) pydantic_core._pydantic_core.ValidationError: 1 validation error for VllmConfig
+(APIServer pid=1)   Value error, Unrecognized configuration class <class 'transformers_modules.minimax_hyphen_m2.configuration_minimax_m2.MiniMaxM2Config'> to build an AutoTokenizer.
+(APIServer pid=1) Model type should be one of Aimv2Config, AlbertConfig, AlignConfig, ArceeConfig, AriaConfig, AyaVisionConfig, BarkConfig, BartConfig, BertConfig, BertGenerationConfig, BigBirdConfig, BigBirdPegasusConfig, BioGptConfig, BitNetConfig, BlenderbotConfig, BlenderbotSmallConfig, BlipConfig, Blip2Config, BloomConfig, BltConfig, BridgeTowerConfig, BrosConfig, CamembertConfig, CanineConfig, ChameleonConfig, ChineseCLIPConfig, ClapConfig, CLIPConfig, CLIPSegConfig, ClvpConfig, LlamaConfig, CodeGenConfig, CohereConfig, Cohere2Config, ColPaliConfig, ColQwen2Config, ConvBertConfig, CpmAntConfig, CsmConfig, CTRLConfig, Data2VecAudioConfig, Data2VecTextConfig, DbrxConfig, DebertaConfig, DebertaV2Config, DeepseekV2Config, DeepseekV3Config, DeepseekVLConfig, DeepseekVLHybridConfig, DiaConfig, DiffLlamaConfig, DistilBertConfig, DPRConfig, ElectraConfig, Emu3Config, ErnieConfig, Ernie4_5Config, Ernie4_5_MoeConfig, ErnieMConfig, EsmConfig, Exaone4Config, FalconConfig, FalconMambaConfig, FastSpeech2ConformerConfig, FlaubertConfig, FlexOlmoConfig, FNetConfig, FSMTConfig, FunnelConfig, GemmaConfig, Gemma2Config, Gemma3Config, Gemma3TextConfig, Gemma3nConfig, Gemma3nTextConfig, GitConfig, GlmConfig, Glm4Config, Glm4MoeConfig, Glm4vConfig, Glm4vMoeConfig, GPT2Config, GPT2Config, GPTBigCodeConfig, GPTNeoConfig, GPTNeoXConfig, GPTNeoXJapaneseConfig, GptOssConfig, GPTJConfig, GPTSanJapaneseConfig, GraniteConfig, GraniteMoeConfig, GraniteMoeHybridConfig, GraniteMoeSharedConfig, GroundingDinoConfig, GroupViTConfig, HeliumConfig, HubertConfig, IBertConfig, IdeficsConfig, Idefics2Config, Idefics3Config, InstructBlipConfig, InstructBlipVideoConfig, InternVLConfig, JambaConfig, JanusConfig, JetMoeConfig, JukeboxConfig, Kosmos2Config, Kosmos2_5Config, LayoutLMConfig, LayoutLMv2Config, LayoutLMv3Config, LEDConfig, LiltConfig, LlamaConfig, Llama4Config, Llama4TextConfig, LlavaConfig, LlavaNextConfig, LlavaNextVideoConfig, LlavaOnevisionConfig, LongformerConfig, LongT5Config, LukeConfig, LxmertConfig, M2M100Config, MambaConfig, Mamba2Config, MarianConfig, MBartConfig, MegaConfig, MegatronBertConfig, MetaClip2Config, MgpstrConfig, MiniMaxConfig, MinistralConfig, MistralConfig, Mistral3Config, MixtralConfig, MllamaConfig, MMGroundingDinoConfig, MobileBertConfig, ModernBertConfig, MoonshineConfig, MoshiConfig, MPNetConfig, MptConfig, MraConfig, MT5Config, MusicgenConfig, MusicgenMelodyConfig, MvpConfig, NemotronConfig, NezhaConfig, NllbMoeConfig, NystromformerConfig, OlmoConfig, Olmo2Config, Olmo3Config, OlmoeConfig, OmDetTurboConfig, OneFormerConfig, OpenAIGPTConfig, OPTConfig, Owlv2Config, OwlViTConfig, PaliGemmaConfig, PegasusConfig, PegasusXConfig, PerceiverConfig, PersimmonConfig, PhiConfig, Phi3Config, PhimoeConfig, Pix2StructConfig, PixtralVisionConfig, PLBartConfig, ProphetNetConfig, QDQBertConfig, Qwen2Config, Qwen2_5OmniConfig, Qwen2_5_VLConfig, Qwen2AudioConfig, Qwen2MoeConfig, Qwen2VLConfig, Qwen3Config, Qwen3MoeConfig, Qwen3NextConfig, Qwen3OmniMoeConfig, Qwen3VLConfig, Qwen3VLMoeConfig, RagConfig, RealmConfig, RecurrentGemmaConfig, ReformerConfig, RemBertConfig, RetriBertConfig, RobertaConfig, RobertaPreLayerNormConfig, RoCBertConfig, RoFormerConfig, RwkvConfig, SeamlessM4TConfig, SeamlessM4Tv2Config, ShieldGemma2Config, SiglipConfig, Siglip2Config, SmolLM3Config, Speech2TextConfig, Speech2Text2Config, SpeechT5Config, SplinterConfig, SqueezeBertConfig, StableLmConfig, Starcoder2Config, SwitchTransformersConfig, T5Config, T5GemmaConfig, TapasConfig, TransfoXLConfig, TvpConfig, UdopConfig, UMT5Config, VideoLlavaConfig, ViltConfig, VipLlavaConfig, VisualBertConfig, VitsConfig, VoxtralConfig, Wav2Vec2Config, Wav2Vec2BertConfig, Wav2Vec2ConformerConfig, WhisperConfig, XCLIPConfig, XGLMConfig, XLMConfig, XLMProphetNetConfig, XLMRobertaConfig, XLMRobertaXLConfig, XLNetConfig, xLSTMConfig, XmodConfig, YosoConfig, ZambaConfig, Zamba2Config. [type=value_error, input_value=ArgsKwargs((), {'model_co... 'shutdown_timeout': 0}), input_type=ArgsKwargs]
+(APIServer pid=1)     For further information visit https://errors.pydantic.dev/2.12/v/value_error
+pod "vllm-tp2dp2-gpu-only" deleted from default namespace
+[2026-06-28T13:45:04Z]   shape=tp2dp2/gpu-only pod did not come up — recording config as dead-end, skipping scenarios
+[2026-06-28T13:45:04Z] --- CONFIG 2/18: shape=tp2dp2 kv_arm=nvme-tiering ---
+No resources found
+[2026-06-28T13:45:05Z]   launching vllm-tp2dp2-nvme-tiering (boot budget ~40min)...
+pod/vllm-tp2dp2-nvme-tiering created
+[2026-06-28T13:49:49Z]   pod vllm-tp2dp2-nvme-tiering entered phase=Failed before ready
+[2026-06-28T13:49:49Z]   vllm-tp2dp2-nvme-tiering FAILED to become ready — capturing last logs
+(APIServer pid=1)   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/uvloop/__init__.py", line 48, in wrapper
+(APIServer pid=1)     return await main
+(APIServer pid=1)            ^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 680, in run_server
+(APIServer pid=1)     await run_server_worker(listen_address, sock, args, **uvicorn_kwargs)
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 694, in run_server_worker
+(APIServer pid=1)     async with build_async_engine_client(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 100, in build_async_engine_client
+(APIServer pid=1)     async with build_async_engine_client_from_engine_args(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 124, in build_async_engine_client_from_engine_args
+(APIServer pid=1)     vllm_config = engine_args.create_engine_config(usage_context=usage_context)
+(APIServer pid=1)                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py", line 2023, in create_engine_config
+(APIServer pid=1)     config = VllmConfig(
+(APIServer pid=1)              ^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/pydantic/_internal/_dataclasses.py", line 121, in __init__
+(APIServer pid=1)     s.__pydantic_validator__.validate_python(ArgsKwargs(args, kwargs), self_instance=s)
+(APIServer pid=1) pydantic_core._pydantic_core.ValidationError: 1 validation error for VllmConfig
+(APIServer pid=1)   Value error, Unrecognized configuration class <class 'transformers_modules.minimax_hyphen_m2.configuration_minimax_m2.MiniMaxM2Config'> to build an AutoTokenizer.
+(APIServer pid=1) Model type should be one of Aimv2Config, AlbertConfig, AlignConfig, ArceeConfig, AriaConfig, AyaVisionConfig, BarkConfig, BartConfig, BertConfig, BertGenerationConfig, BigBirdConfig, BigBirdPegasusConfig, BioGptConfig, BitNetConfig, BlenderbotConfig, BlenderbotSmallConfig, BlipConfig, Blip2Config, BloomConfig, BltConfig, BridgeTowerConfig, BrosConfig, CamembertConfig, CanineConfig, ChameleonConfig, ChineseCLIPConfig, ClapConfig, CLIPConfig, CLIPSegConfig, ClvpConfig, LlamaConfig, CodeGenConfig, CohereConfig, Cohere2Config, ColPaliConfig, ColQwen2Config, ConvBertConfig, CpmAntConfig, CsmConfig, CTRLConfig, Data2VecAudioConfig, Data2VecTextConfig, DbrxConfig, DebertaConfig, DebertaV2Config, DeepseekV2Config, DeepseekV3Config, DeepseekVLConfig, DeepseekVLHybridConfig, DiaConfig, DiffLlamaConfig, DistilBertConfig, DPRConfig, ElectraConfig, Emu3Config, ErnieConfig, Ernie4_5Config, Ernie4_5_MoeConfig, ErnieMConfig, EsmConfig, Exaone4Config, FalconConfig, FalconMambaConfig, FastSpeech2ConformerConfig, FlaubertConfig, FlexOlmoConfig, FNetConfig, FSMTConfig, FunnelConfig, GemmaConfig, Gemma2Config, Gemma3Config, Gemma3TextConfig, Gemma3nConfig, Gemma3nTextConfig, GitConfig, GlmConfig, Glm4Config, Glm4MoeConfig, Glm4vConfig, Glm4vMoeConfig, GPT2Config, GPT2Config, GPTBigCodeConfig, GPTNeoConfig, GPTNeoXConfig, GPTNeoXJapaneseConfig, GptOssConfig, GPTJConfig, GPTSanJapaneseConfig, GraniteConfig, GraniteMoeConfig, GraniteMoeHybridConfig, GraniteMoeSharedConfig, GroundingDinoConfig, GroupViTConfig, HeliumConfig, HubertConfig, IBertConfig, IdeficsConfig, Idefics2Config, Idefics3Config, InstructBlipConfig, InstructBlipVideoConfig, InternVLConfig, JambaConfig, JanusConfig, JetMoeConfig, JukeboxConfig, Kosmos2Config, Kosmos2_5Config, LayoutLMConfig, LayoutLMv2Config, LayoutLMv3Config, LEDConfig, LiltConfig, LlamaConfig, Llama4Config, Llama4TextConfig, LlavaConfig, LlavaNextConfig, LlavaNextVideoConfig, LlavaOnevisionConfig, LongformerConfig, LongT5Config, LukeConfig, LxmertConfig, M2M100Config, MambaConfig, Mamba2Config, MarianConfig, MBartConfig, MegaConfig, MegatronBertConfig, MetaClip2Config, MgpstrConfig, MiniMaxConfig, MinistralConfig, MistralConfig, Mistral3Config, MixtralConfig, MllamaConfig, MMGroundingDinoConfig, MobileBertConfig, ModernBertConfig, MoonshineConfig, MoshiConfig, MPNetConfig, MptConfig, MraConfig, MT5Config, MusicgenConfig, MusicgenMelodyConfig, MvpConfig, NemotronConfig, NezhaConfig, NllbMoeConfig, NystromformerConfig, OlmoConfig, Olmo2Config, Olmo3Config, OlmoeConfig, OmDetTurboConfig, OneFormerConfig, OpenAIGPTConfig, OPTConfig, Owlv2Config, OwlViTConfig, PaliGemmaConfig, PegasusConfig, PegasusXConfig, PerceiverConfig, PersimmonConfig, PhiConfig, Phi3Config, PhimoeConfig, Pix2StructConfig, PixtralVisionConfig, PLBartConfig, ProphetNetConfig, QDQBertConfig, Qwen2Config, Qwen2_5OmniConfig, Qwen2_5_VLConfig, Qwen2AudioConfig, Qwen2MoeConfig, Qwen2VLConfig, Qwen3Config, Qwen3MoeConfig, Qwen3NextConfig, Qwen3OmniMoeConfig, Qwen3VLConfig, Qwen3VLMoeConfig, RagConfig, RealmConfig, RecurrentGemmaConfig, ReformerConfig, RemBertConfig, RetriBertConfig, RobertaConfig, RobertaPreLayerNormConfig, RoCBertConfig, RoFormerConfig, RwkvConfig, SeamlessM4TConfig, SeamlessM4Tv2Config, ShieldGemma2Config, SiglipConfig, Siglip2Config, SmolLM3Config, Speech2TextConfig, Speech2Text2Config, SpeechT5Config, SplinterConfig, SqueezeBertConfig, StableLmConfig, Starcoder2Config, SwitchTransformersConfig, T5Config, T5GemmaConfig, TapasConfig, TransfoXLConfig, TvpConfig, UdopConfig, UMT5Config, VideoLlavaConfig, ViltConfig, VipLlavaConfig, VisualBertConfig, VitsConfig, VoxtralConfig, Wav2Vec2Config, Wav2Vec2BertConfig, Wav2Vec2ConformerConfig, WhisperConfig, XCLIPConfig, XGLMConfig, XLMConfig, XLMProphetNetConfig, XLMRobertaConfig, XLMRobertaXLConfig, XLNetConfig, xLSTMConfig, XmodConfig, YosoConfig, ZambaConfig, Zamba2Config. [type=value_error, input_value=ArgsKwargs((), {'model_co... 'shutdown_timeout': 0}), input_type=ArgsKwargs]
+(APIServer pid=1)     For further information visit https://errors.pydantic.dev/2.12/v/value_error
+pod "vllm-tp2dp2-nvme-tiering" deleted from default namespace
+[2026-06-28T13:49:51Z]   shape=tp2dp2/nvme-tiering pod did not come up — recording config as dead-end, skipping scenarios
+[2026-06-28T13:49:51Z] --- CONFIG 3/18: shape=tp4dp2 kv_arm=gpu-only ---
+No resources found
+[2026-06-28T13:49:53Z]   launching vllm-tp4dp2-gpu-only (boot budget ~40min)...
+pod/vllm-tp4dp2-gpu-only created
+[2026-06-28T13:53:29Z]   pod vllm-tp4dp2-gpu-only entered phase=Failed before ready
+[2026-06-28T13:53:29Z]   vllm-tp4dp2-gpu-only FAILED to become ready — capturing last logs
+(APIServer pid=1)   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/uvloop/__init__.py", line 48, in wrapper
+(APIServer pid=1)     return await main
+(APIServer pid=1)            ^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 680, in run_server
+(APIServer pid=1)     await run_server_worker(listen_address, sock, args, **uvicorn_kwargs)
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 694, in run_server_worker
+(APIServer pid=1)     async with build_async_engine_client(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 100, in build_async_engine_client
+(APIServer pid=1)     async with build_async_engine_client_from_engine_args(
+(APIServer pid=1)                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=1)     return await anext(self.gen)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 124, in build_async_engine_client_from_engine_args
+(APIServer pid=1)     vllm_config = engine_args.create_engine_config(usage_context=usage_context)
+(APIServer pid=1)                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py", line 2023, in create_engine_config
+(APIServer pid=1)     config = VllmConfig(
+(APIServer pid=1)              ^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/pydantic/_internal/_dataclasses.py", line 121, in __init__
+(APIServer pid=1)     s.__pydantic_validator__.validate_python(ArgsKwargs(args, kwargs), self_instance=s)
+(APIServer pid=1) pydantic_core._pydantic_core.ValidationError: 1 validation error for VllmConfig
+(APIServer pid=1)   Value error, Unrecognized configuration class <class 'transformers_modules.minimax_hyphen_m2.configuration_minimax_m2.MiniMaxM2Config'> to build an AutoTokenizer.
+(APIServer pid=1) Model type should be one of Aimv2Config, AlbertConfig, AlignConfig, ArceeConfig, AriaConfig, AyaVisionConfig, BarkConfig, BartConfig, BertConfig, BertGenerationConfig, BigBirdConfig, BigBirdPegasusConfig, BioGptConfig, BitNetConfig, BlenderbotConfig, BlenderbotSmallConfig, BlipConfig, Blip2Config, BloomConfig, BltConfig, BridgeTowerConfig, BrosConfig, CamembertConfig, CanineConfig, ChameleonConfig, ChineseCLIPConfig, ClapConfig, CLIPConfig, CLIPSegConfig, ClvpConfig, LlamaConfig, CodeGenConfig, CohereConfig, Cohere2Config, ColPaliConfig, ColQwen2Config, ConvBertConfig, CpmAntConfig, CsmConfig, CTRLConfig, Data2VecAudioConfig, Data2VecTextConfig, DbrxConfig, DebertaConfig, DebertaV2Config, DeepseekV2Config, DeepseekV3Config, DeepseekVLConfig, DeepseekVLHybridConfig, DiaConfig, DiffLlamaConfig, DistilBertConfig, DPRConfig, ElectraConfig, Emu3Config, ErnieConfig, Ernie4_5Config, Ernie4_5_MoeConfig, ErnieMConfig, EsmConfig, Exaone4Config, FalconConfig, FalconMambaConfig, FastSpeech2ConformerConfig, FlaubertConfig, FlexOlmoConfig, FNetConfig, FSMTConfig, FunnelConfig, GemmaConfig, Gemma2Config, Gemma3Config, Gemma3TextConfig, Gemma3nConfig, Gemma3nTextConfig, GitConfig, GlmConfig, Glm4Config, Glm4MoeConfig, Glm4vConfig, Glm4vMoeConfig, GPT2Config, GPT2Config, GPTBigCodeConfig, GPTNeoConfig, GPTNeoXConfig, GPTNeoXJapaneseConfig, GptOssConfig, GPTJConfig, GPTSanJapaneseConfig, GraniteConfig, GraniteMoeConfig, GraniteMoeHybridConfig, GraniteMoeSharedConfig, GroundingDinoConfig, GroupViTConfig, HeliumConfig, HubertConfig, IBertConfig, IdeficsConfig, Idefics2Config, Idefics3Config, InstructBlipConfig, InstructBlipVideoConfig, InternVLConfig, JambaConfig, JanusConfig, JetMoeConfig, JukeboxConfig, Kosmos2Config, Kosmos2_5Config, LayoutLMConfig, LayoutLMv2Config, LayoutLMv3Config, LEDConfig, LiltConfig, LlamaConfig, Llama4Config, Llama4TextConfig, LlavaConfig, LlavaNextConfig, LlavaNextVideoConfig, LlavaOnevisionConfig, LongformerConfig, LongT5Config, LukeConfig, LxmertConfig, M2M100Config, MambaConfig, Mamba2Config, MarianConfig, MBartConfig, MegaConfig, MegatronBertConfig, MetaClip2Config, MgpstrConfig, MiniMaxConfig, MinistralConfig, MistralConfig, Mistral3Config, MixtralConfig, MllamaConfig, MMGroundingDinoConfig, MobileBertConfig, ModernBertConfig, MoonshineConfig, MoshiConfig, MPNetConfig, MptConfig, MraConfig, MT5Config, MusicgenConfig, MusicgenMelodyConfig, MvpConfig, NemotronConfig, NezhaConfig, NllbMoeConfig, NystromformerConfig, OlmoConfig, Olmo2Config, Olmo3Config, OlmoeConfig, OmDetTurboConfig, OneFormerConfig, OpenAIGPTConfig, OPTConfig, Owlv2Config, OwlViTConfig, PaliGemmaConfig, PegasusConfig, PegasusXConfig, PerceiverConfig, PersimmonConfig, PhiConfig, Phi3Config, PhimoeConfig, Pix2StructConfig, PixtralVisionConfig, PLBartConfig, ProphetNetConfig, QDQBertConfig, Qwen2Config, Qwen2_5OmniConfig, Qwen2_5_VLConfig, Qwen2AudioConfig, Qwen2MoeConfig, Qwen2VLConfig, Qwen3Config, Qwen3MoeConfig, Qwen3NextConfig, Qwen3OmniMoeConfig, Qwen3VLConfig, Qwen3VLMoeConfig, RagConfig, RealmConfig, RecurrentGemmaConfig, ReformerConfig, RemBertConfig, RetriBertConfig, RobertaConfig, RobertaPreLayerNormConfig, RoCBertConfig, RoFormerConfig, RwkvConfig, SeamlessM4TConfig, SeamlessM4Tv2Config, ShieldGemma2Config, SiglipConfig, Siglip2Config, SmolLM3Config, Speech2TextConfig, Speech2Text2Config, SpeechT5Config, SplinterConfig, SqueezeBertConfig, StableLmConfig, Starcoder2Config, SwitchTransformersConfig, T5Config, T5GemmaConfig, TapasConfig, TransfoXLConfig, TvpConfig, UdopConfig, UMT5Config, VideoLlavaConfig, ViltConfig, VipLlavaConfig, VisualBertConfig, VitsConfig, VoxtralConfig, Wav2Vec2Config, Wav2Vec2BertConfig, Wav2Vec2ConformerConfig, WhisperConfig, XCLIPConfig, XGLMConfig, XLMConfig, XLMProphetNetConfig, XLMRobertaConfig, XLMRobertaXLConfig, XLNetConfig, xLSTMConfig, XmodConfig, YosoConfig, ZambaConfig, Zamba2Config. [type=value_error, input_value=ArgsKwargs((), {'model_co... 'shutdown_timeout': 0}), input_type=ArgsKwargs]
+(APIServer pid=1)     For further information visit https://errors.pydantic.dev/2.12/v/value_error
+pod "vllm-tp4dp2-gpu-only" deleted from default namespace
+[2026-06-28T13:53:32Z]   shape=tp4dp2/gpu-only pod did not come up — recording config as dead-end, skipping scenarios
+[2026-06-28T13:53:32Z] --- CONFIG 4/18: shape=tp4dp2 kv_arm=nvme-tiering ---
+No resources found
+[2026-06-28T13:53:33Z]   launching vllm-tp4dp2-nvme-tiering (boot budget ~40min)...
+pod/vllm-tp4dp2-nvme-tiering created
+[2026-06-28T13:54:49Z]   pod vllm-tp4dp2-nvme-tiering entered phase=Failed before ready
+[2026-06-28T13:54:49Z]   vllm-tp4dp2-nvme-tiering FAILED to become ready — capturing last logs
+(APIServer pid=1)                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/tracing/otel.py", line 178, in sync_wrapper
+(APIServer pid=1)     return func(*args, **kwargs)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 129, in make_async_mp_client
+(APIServer pid=1)     return DPLBAsyncMPClient(*client_args)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 1335, in __init__
+(APIServer pid=1)     super().__init__(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 1152, in __init__
+(APIServer pid=1)     super().__init__(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/tracing/otel.py", line 178, in sync_wrapper
+(APIServer pid=1)     return func(*args, **kwargs)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 900, in __init__
+(APIServer pid=1)     super().__init__(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 535, in __init__
+(APIServer pid=1)     with launch_core_engines(
+(APIServer pid=1)          ^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 144, in __exit__
+(APIServer pid=1)     next(self.gen)
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/utils.py", line 1094, in launch_core_engines
+(APIServer pid=1)     wait_for_engine_startup(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/utils.py", line 1153, in wait_for_engine_startup
+(APIServer pid=1)     raise RuntimeError(
+(APIServer pid=1) RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+/usr/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
+/usr/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 3 leaked shared_memory objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
+pod "vllm-tp4dp2-nvme-tiering" deleted from default namespace
+[2026-06-28T13:54:51Z]   shape=tp4dp2/nvme-tiering pod did not come up — recording config as dead-end, skipping scenarios
+[2026-06-28T13:54:51Z] --- CONFIG 5/18: shape=tp2dp4 kv_arm=gpu-only ---
+No resources found
+[2026-06-28T13:54:53Z]   launching vllm-tp2dp4-gpu-only (boot budget ~40min)...
+pod/vllm-tp2dp4-gpu-only created
+[2026-06-28T13:56:06Z]   pod vllm-tp2dp4-gpu-only entered phase=Failed before ready
+[2026-06-28T13:56:06Z]   vllm-tp2dp4-gpu-only FAILED to become ready — capturing last logs
+(APIServer pid=1)                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/tracing/otel.py", line 178, in sync_wrapper
+(APIServer pid=1)     return func(*args, **kwargs)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 129, in make_async_mp_client
+(APIServer pid=1)     return DPLBAsyncMPClient(*client_args)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 1335, in __init__
+(APIServer pid=1)     super().__init__(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 1152, in __init__
+(APIServer pid=1)     super().__init__(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/tracing/otel.py", line 178, in sync_wrapper
+(APIServer pid=1)     return func(*args, **kwargs)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 900, in __init__
+(APIServer pid=1)     super().__init__(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 535, in __init__
+(APIServer pid=1)     with launch_core_engines(
+(APIServer pid=1)          ^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 144, in __exit__
+(APIServer pid=1)     next(self.gen)
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/utils.py", line 1094, in launch_core_engines
+(APIServer pid=1)     wait_for_engine_startup(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/utils.py", line 1153, in wait_for_engine_startup
+(APIServer pid=1)     raise RuntimeError(
+(APIServer pid=1) RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+/usr/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
+/usr/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 5 leaked shared_memory objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
+pod "vllm-tp2dp4-gpu-only" deleted from default namespace
+[2026-06-28T13:56:08Z]   shape=tp2dp4/gpu-only pod did not come up — recording config as dead-end, skipping scenarios
+[2026-06-28T13:56:08Z] --- CONFIG 6/18: shape=tp2dp4 kv_arm=nvme-tiering ---
+No resources found
+[2026-06-28T13:56:10Z]   launching vllm-tp2dp4-nvme-tiering (boot budget ~40min)...
+pod/vllm-tp2dp4-nvme-tiering created
+[2026-06-28T13:57:23Z]   pod vllm-tp2dp4-nvme-tiering entered phase=Failed before ready
+[2026-06-28T13:57:23Z]   vllm-tp2dp4-nvme-tiering FAILED to become ready — capturing last logs
+(APIServer pid=1)                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/tracing/otel.py", line 178, in sync_wrapper
+(APIServer pid=1)     return func(*args, **kwargs)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 129, in make_async_mp_client
+(APIServer pid=1)     return DPLBAsyncMPClient(*client_args)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 1335, in __init__
+(APIServer pid=1)     super().__init__(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 1152, in __init__
+(APIServer pid=1)     super().__init__(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/tracing/otel.py", line 178, in sync_wrapper
+(APIServer pid=1)     return func(*args, **kwargs)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 900, in __init__
+(APIServer pid=1)     super().__init__(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 535, in __init__
+(APIServer pid=1)     with launch_core_engines(
+(APIServer pid=1)          ^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 144, in __exit__
+(APIServer pid=1)     next(self.gen)
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/utils.py", line 1094, in launch_core_engines
+(APIServer pid=1)     wait_for_engine_startup(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/utils.py", line 1153, in wait_for_engine_startup
+(APIServer pid=1)     raise RuntimeError(
+(APIServer pid=1) RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+/usr/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
+/usr/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 5 leaked shared_memory objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
+pod "vllm-tp2dp4-nvme-tiering" deleted from default namespace
+[2026-06-28T13:57:25Z]   shape=tp2dp4/nvme-tiering pod did not come up — recording config as dead-end, skipping scenarios
+[2026-06-28T13:57:25Z] === SWEEP COMPLETE: 0 runs, 6 configs. pareto=/Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2/results/pareto-2026-06-28.json traj=/Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2/results/optimization-trajectory-2026-06-28.json ===
+[2026-06-28T13:57:25Z] TRAP(EXIT(rc=0)): SKIP_SCALEDOWN=1 (orchestrated phase) -> leaving node up for the parent.
+[2026-06-30T08:55:26Z] === MiniMax-M2 B200 Pareto sweep START (date=2026-06-30) ===
+[2026-06-30T08:55:26Z] grid: shapes=[tp2dp2 tp4dp2 tp2dp4] arms=[gpu-only nvme-tiering] scenarios=[cold shared-prefix 100k-90pct-reuse] conc=[1 4 8 16 32 64 128 256 512]
+[2026-06-30T08:55:26Z] push_beyond_last=1 (ceiling=8192) reuse_target=0.90 | sat-signals: err>0.02/0.10 kv>0.97 preempt>0 plateau<1.05x
+[2026-06-30T08:55:26Z] total configs=18 | hard cap=420min | nodegroup=ai-infra-use2-b200-spot
+[2026-06-30T08:55:26Z] PREFLIGHT: binding to context 'qwen3-next-bench-eks-cluster' and verifying cluster=qwen3-next-bench-eks-cluster...
+[2026-06-30T08:55:28Z] PREFLIGHT OK: context->cluster verified, B200 node Ready. Scaledown ARMED.
+configmap/minimax-bench-scripts unchanged
+pod/bench-runner configured
+[2026-06-30T08:55:31Z] waiting for bench-runner pod ready (pip install aiohttp)...
+Error: unable to establish a connection to the specified host: localhost
+Error: Unable to connect to host engine. Host engine connection invalid/disconnected.
+PARSE ERROR: Argument: -r
+             Couldn't find match for argument
+
+Usage: 
+
+
+For complete USAGE and HELP type: 
+   dcgmi profile --help
+
+[2026-06-30T08:55:42Z] DCGM PROF counters: prof_counters_available=false (false => roofline by FB+POWER+vLLM-histogram inference)
+[2026-06-30T08:55:42Z] --- CONFIG 1/18: shape=tp2dp2 kv_arm=gpu-only ---
+No resources found
+[2026-06-30T08:55:44Z]   launching vllm-tp2dp2-gpu-only (boot budget ~40min)...
+pod/vllm-tp2dp2-gpu-only created
+[2026-06-30T09:54:42Z]   pod vllm-tp2dp2-gpu-only not ready after 3000s
+[2026-06-30T09:54:42Z]   vllm-tp2dp2-gpu-only FAILED to become ready — capturing last logs
+(EngineCore_DP0 pid=1366) INFO 06-30 09:40:17 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP1 pid=1367) INFO 06-30 09:40:19 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP0 pid=1366) INFO 06-30 09:41:17 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP1 pid=1367) INFO 06-30 09:41:19 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP0 pid=1366) INFO 06-30 09:42:17 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP1 pid=1367) INFO 06-30 09:42:19 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP0 pid=1366) INFO 06-30 09:43:17 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP1 pid=1367) INFO 06-30 09:43:19 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP0 pid=1366) INFO 06-30 09:44:17 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP1 pid=1367) INFO 06-30 09:44:19 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP0 pid=1366) INFO 06-30 09:45:17 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP1 pid=1367) INFO 06-30 09:45:19 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP0 pid=1366) INFO 06-30 09:46:17 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP1 pid=1367) INFO 06-30 09:46:19 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP0 pid=1366) INFO 06-30 09:47:17 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP1 pid=1367) INFO 06-30 09:47:19 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP0 pid=1366) INFO 06-30 09:48:17 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP1 pid=1367) INFO 06-30 09:48:19 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP0 pid=1366) INFO 06-30 09:49:17 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP1 pid=1367) INFO 06-30 09:49:19 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP0 pid=1366) INFO 06-30 09:50:17 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP1 pid=1367) INFO 06-30 09:50:20 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP0 pid=1366) INFO 06-30 09:51:17 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP1 pid=1367) INFO 06-30 09:51:20 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP0 pid=1366) INFO 06-30 09:52:17 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP1 pid=1367) INFO 06-30 09:52:20 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP0 pid=1366) INFO 06-30 09:53:17 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP1 pid=1367) INFO 06-30 09:53:20 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP0 pid=1366) INFO 06-30 09:54:17 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+(EngineCore_DP1 pid=1367) INFO 06-30 09:54:20 [shm_broadcast.py:705] No available shared memory broadcast block found in 60 seconds. This typically happens when some processes are hanging or doing some time-consuming work (e.g. compilation, weight/kv cache quantization).
+pod "vllm-tp2dp2-gpu-only" deleted from default namespace
+[2026-06-30T09:55:18Z]   shape=tp2dp2/gpu-only pod did not come up — recording config as dead-end, skipping scenarios
+[2026-06-30T09:55:18Z] --- CONFIG 2/18: shape=tp2dp2 kv_arm=nvme-tiering ---
+nvme-tiering UNSUPPORTED on stock vLLM OffloadingConnector (only CPUOffloadingSpec registered; no disk medium). Use cpu-offload, or LMCache/Mooncake for a disk tier.
+[2026-06-30T09:55:18Z]   gen manifest FAILED tp2dp2/nvme-tiering
+[2026-06-30T09:55:18Z]   shape=tp2dp2/nvme-tiering pod did not come up — recording config as dead-end, skipping scenarios
+[2026-06-30T09:55:18Z] --- CONFIG 3/18: shape=tp4dp2 kv_arm=gpu-only ---
+No resources found
+[2026-06-30T09:55:21Z]   launching vllm-tp4dp2-gpu-only (boot budget ~40min)...
+pod/vllm-tp4dp2-gpu-only created
+[2026-06-30T09:56:36Z]   pod vllm-tp4dp2-gpu-only entered phase=Failed before ready
+[2026-06-30T09:56:36Z]   vllm-tp4dp2-gpu-only FAILED to become ready — capturing last logs
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/async_llm.py", line 146, in __init__
+(APIServer pid=1)     self.engine_core = EngineCoreClient.make_async_mp_client(
+(APIServer pid=1)                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/tracing/otel.py", line 178, in sync_wrapper
+(APIServer pid=1)     return func(*args, **kwargs)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 130, in make_async_mp_client
+(APIServer pid=1)     return DPLBAsyncMPClient(*client_args)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 1383, in __init__
+(APIServer pid=1)     super().__init__(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 1200, in __init__
+(APIServer pid=1)     super().__init__(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/tracing/otel.py", line 178, in sync_wrapper
+(APIServer pid=1)     return func(*args, **kwargs)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 948, in __init__
+(APIServer pid=1)     super().__init__(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 570, in __init__
+(APIServer pid=1)     with launch_core_engines(
+(APIServer pid=1)          ^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 144, in __exit__
+(APIServer pid=1)     next(self.gen)
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/utils.py", line 1190, in launch_core_engines
+(APIServer pid=1)     wait_for_engine_startup(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/utils.py", line 1249, in wait_for_engine_startup
+(APIServer pid=1)     raise RuntimeError(
+(APIServer pid=1) RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+/usr/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 2 leaked shared_memory objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
+pod "vllm-tp4dp2-gpu-only" deleted from default namespace
+[2026-06-30T09:56:40Z]   shape=tp4dp2/gpu-only pod did not come up — recording config as dead-end, skipping scenarios
+[2026-06-30T09:56:40Z] --- CONFIG 4/18: shape=tp4dp2 kv_arm=nvme-tiering ---
+nvme-tiering UNSUPPORTED on stock vLLM OffloadingConnector (only CPUOffloadingSpec registered; no disk medium). Use cpu-offload, or LMCache/Mooncake for a disk tier.
+[2026-06-30T09:56:40Z]   gen manifest FAILED tp4dp2/nvme-tiering
+[2026-06-30T09:56:40Z]   shape=tp4dp2/nvme-tiering pod did not come up — recording config as dead-end, skipping scenarios
+[2026-06-30T09:56:40Z] --- CONFIG 5/18: shape=tp2dp4 kv_arm=gpu-only ---
+No resources found
+[2026-06-30T09:56:43Z]   launching vllm-tp2dp4-gpu-only (boot budget ~40min)...
+pod/vllm-tp2dp4-gpu-only created
+[2026-06-30T09:57:58Z]   pod vllm-tp2dp4-gpu-only entered phase=Failed before ready
+[2026-06-30T09:57:58Z]   vllm-tp2dp4-gpu-only FAILED to become ready — capturing last logs
+(APIServer pid=1)                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/tracing/otel.py", line 178, in sync_wrapper
+(APIServer pid=1)     return func(*args, **kwargs)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 130, in make_async_mp_client
+(APIServer pid=1)     return DPLBAsyncMPClient(*client_args)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 1383, in __init__
+(APIServer pid=1)     super().__init__(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 1200, in __init__
+(APIServer pid=1)     super().__init__(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/tracing/otel.py", line 178, in sync_wrapper
+(APIServer pid=1)     return func(*args, **kwargs)
+(APIServer pid=1)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 948, in __init__
+(APIServer pid=1)     super().__init__(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core_client.py", line 570, in __init__
+(APIServer pid=1)     with launch_core_engines(
+(APIServer pid=1)          ^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=1)   File "/usr/lib/python3.12/contextlib.py", line 144, in __exit__
+(APIServer pid=1)     next(self.gen)
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/utils.py", line 1190, in launch_core_engines
+(APIServer pid=1)     wait_for_engine_startup(
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/utils.py", line 1249, in wait_for_engine_startup
+(APIServer pid=1)     raise RuntimeError(
+(APIServer pid=1) RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+/usr/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
+/usr/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 5 leaked shared_memory objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
+pod "vllm-tp2dp4-gpu-only" deleted from default namespace
+[2026-06-30T09:58:01Z]   shape=tp2dp4/gpu-only pod did not come up — recording config as dead-end, skipping scenarios
+[2026-06-30T09:58:01Z] --- CONFIG 6/18: shape=tp2dp4 kv_arm=nvme-tiering ---
+nvme-tiering UNSUPPORTED on stock vLLM OffloadingConnector (only CPUOffloadingSpec registered; no disk medium). Use cpu-offload, or LMCache/Mooncake for a disk tier.
+[2026-06-30T09:58:01Z]   gen manifest FAILED tp2dp4/nvme-tiering
+[2026-06-30T09:58:01Z]   shape=tp2dp4/nvme-tiering pod did not come up — recording config as dead-end, skipping scenarios
+[2026-06-30T09:58:01Z] === SWEEP FAILED: 0 benchmark runs (every serving pod failed to boot/serve). NOT a success. ===
+[2026-06-30T09:58:01Z] TRAP(EXIT(rc=4)): SKIP_SCALEDOWN=1 (orchestrated phase) -> leaving node up for the parent.
+[2026-06-30T12:58:43Z] === MiniMax-M2 B200 Pareto sweep START (date=2026-06-30) ===
+[2026-06-30T12:58:43Z] grid: shapes=[tp4 tp4ep4] arms=[gpu-only] scenarios=[shared-prefix] conc=[64 128 256]
+[2026-06-30T12:58:43Z] push_beyond_last=1 (ceiling=8192) reuse_target=0.90 | sat-signals: err>0.02/0.10 kv>0.97 preempt>0 plateau<1.05x
+[2026-06-30T12:58:43Z] total configs=2 | hard cap=420min | nodegroup=ai-infra-use2-b200-spot-maz
+[2026-06-30T12:58:43Z] PREFLIGHT: binding to context 'qwen3-next-bench-eks-cluster' and verifying cluster=qwen3-next-bench-eks-cluster...
+[2026-06-30T12:58:45Z] PREFLIGHT OK: context->cluster verified, B200 node Ready. Scaledown ARMED.
+configmap/minimax-bench-scripts unchanged
+pod/bench-runner configured
+[2026-06-30T12:58:47Z] waiting for bench-runner pod ready (pip install aiohttp)...
+Error: unable to establish a connection to the specified host: localhost
+Error: Unable to connect to host engine. Host engine connection invalid/disconnected.
+PARSE ERROR: Argument: -r
+             Couldn't find match for argument
+
+Usage: 
+
+
+For complete USAGE and HELP type: 
+   dcgmi profile --help
+
+[2026-06-30T12:58:57Z] DCGM PROF counters: prof_counters_available=false (false => roofline by FB+POWER+vLLM-histogram inference)
+[2026-06-30T12:58:57Z] --- CONFIG 1/2: shape=tp4 kv_arm=gpu-only ---
+No resources found
+[2026-06-30T12:59:00Z]   launching vllm-tp4-gpu-only (boot budget ~40min)...
+pod/vllm-tp4-gpu-only created
+[2026-06-30T13:01:26Z]   serving pod ready: vllm-tp4-gpu-only
+[2026-06-30T13:01:30Z]   [tp4-gpu-only-shared-prefix] chunked_prefill_active=false
+[2026-06-30T13:01:30Z]   [tp4-gpu-only-shared-prefix] concurrency=64
+{
+  "scenario": "shared-prefix",
+  "concurrency": 64,
+  "model": "MiniMax-M2",
+  "requests_ok": 0,
+  "requests_err": 128,
+  "error_rate": 1.0,
+  "duration_s": 0.433,
+  "agg_decode_tok_s": 0.0,
+  "prompt_tokens_total": 0,
+  "cached_tokens_total": 0,
+  "client_cache_hit_fraction": null,
+  "reuse_fraction_target": null,
+  "reuse_target_met": null,
+  "kv_tier": {
+    "available": true,
+    "tokens_fresh_prefill": 0.0,
+    "tokens_gpu_hbm_hit": 0.0,
+    "tokens_offload_tier_hit": 0.0,
+    "tokens_recomputed": null,
+    "frac_fresh_prefill": null,
+    "frac_gpu_hbm_hit": null,
+    "frac_offload_tier_hit": null,
+    "gpu_prefix_hit_rate": null,
+    "external_prefix_hit_rate": null,
+    "kv_utilization_end": 0.0,
+    "kv_transfer_bytes_latency_exposed": true
+  },
+  "ttft_avg_s": null,
+  "ttft_p50_s": null,
+  "ttft_p95_s": null,
+  "ttft_p99_s": null,
+  "ttft_samples": 0,
+  "ttft_cold_avg_s": null,
+  "ttft_warm_avg_s": null,
+  "ttft_cold_warm_ratio": null,
+  "ttft_cold_samples": 0,
+  "ttft_warm_samples": 0,
+  "itl_client_mean_s": null,
+  "e2e_p50_s": null,
+  "e2e_p95_s": null,
+  "e2e_p99_s": null,
+  "quality_pass": false,
+  "quality_empty": 0,
+  "quality_repetition_loops": 0,
+  "quality_sampled": 0,
+  "t_start": 1782824492.7300808,
+  "t_end": 1782824493.163326
+}
+command terminated with exit code 3
+tar: Removing leading `/' from member names
+[2026-06-30T13:02:19Z]   [tp4-gpu-only-shared-prefix] c=64 done: tok/s=0.0 err=1.0 ttft_p95=None qpass=false
+[2026-06-30T13:02:20Z]   [tp4-gpu-only-shared-prefix] SATURATION at c=64: error_rate>0.1 (tok/s=0 kv=0 preempt=0) — knee found, stopping climb
+[2026-06-30T13:02:20Z] --- CONFIG 2/2: shape=tp4ep4 kv_arm=gpu-only ---
+pod "vllm-tp4-gpu-only" deleted from default namespace
+[2026-06-30T13:02:25Z]   launching vllm-tp4ep4-gpu-only (boot budget ~40min)...
+pod/vllm-tp4ep4-gpu-only created
+[2026-06-30T13:04:50Z]   serving pod ready: vllm-tp4ep4-gpu-only
+[2026-06-30T13:04:54Z]   [tp4ep4-gpu-only-shared-prefix] chunked_prefill_active=false
+[2026-06-30T13:04:54Z]   [tp4ep4-gpu-only-shared-prefix] concurrency=64
+{
+  "scenario": "shared-prefix",
+  "concurrency": 64,
+  "model": "MiniMax-M2",
+  "requests_ok": 0,
+  "requests_err": 128,
+  "error_rate": 1.0,
+  "duration_s": 0.449,
+  "agg_decode_tok_s": 0.0,
+  "prompt_tokens_total": 0,
+  "cached_tokens_total": 0,
+  "client_cache_hit_fraction": null,
+  "reuse_fraction_target": null,
+  "reuse_target_met": null,
+  "kv_tier": {
+    "available": true,
+    "tokens_fresh_prefill": 0.0,
+    "tokens_gpu_hbm_hit": 0.0,
+    "tokens_offload_tier_hit": 0.0,
+    "tokens_recomputed": null,
+    "frac_fresh_prefill": null,
+    "frac_gpu_hbm_hit": null,
+    "frac_offload_tier_hit": null,
+    "gpu_prefix_hit_rate": null,
+    "external_prefix_hit_rate": null,
+    "kv_utilization_end": 0.0,
+    "kv_transfer_bytes_latency_exposed": true
+  },
+  "ttft_avg_s": null,
+  "ttft_p50_s": null,
+  "ttft_p95_s": null,
+  "ttft_p99_s": null,
+  "ttft_samples": 0,
+  "ttft_cold_avg_s": null,
+  "ttft_warm_avg_s": null,
+  "ttft_cold_warm_ratio": null,
+  "ttft_cold_samples": 0,
+  "ttft_warm_samples": 0,
+  "itl_client_mean_s": null,
+  "e2e_p50_s": null,
+  "e2e_p95_s": null,
+  "e2e_p99_s": null,
+  "quality_pass": false,
+  "quality_empty": 0,
+  "quality_repetition_loops": 0,
+  "quality_sampled": 0,
+  "t_start": 1782824697.2397466,
+  "t_end": 1782824697.6889873
+}
+command terminated with exit code 3
+[2026-06-30T13:05:48Z]   [tp4ep4-gpu-only-shared-prefix] c=64 done: tok/s=0.0 err=1.0 ttft_p95=nan qpass=false
+[2026-06-30T13:05:49Z]   [tp4ep4-gpu-only-shared-prefix] SATURATION at c=64: error_rate>0.1 (tok/s=0 kv=0 preempt=0) — knee found, stopping climb
+[2026-06-30T13:05:49Z] === SWEEP COMPLETE: 2 runs, 2 configs. pareto=/Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2/results/pareto-2026-06-30.json traj=/Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2/results/optimization-trajectory-2026-06-30.json ===
+[2026-06-30T13:05:49Z] TRAP(EXIT(rc=0)): SKIP_SCALEDOWN=1 (orchestrated phase) -> leaving node up for the parent.
+[2026-06-30T16:54:30Z] === MiniMax-M2 B200 Pareto sweep START (date=2026-06-30) ===
+[2026-06-30T16:54:30Z] grid: shapes=[tp4 tp4ep4] arms=[gpu-only] scenarios=[shared-prefix] conc=[64 128 256]
+[2026-06-30T16:54:30Z] push_beyond_last=1 (ceiling=8192) reuse_target=0.90 | sat-signals: err>0.02/0.10 kv>0.97 preempt>0 plateau<1.05x
+[2026-06-30T16:54:30Z] total configs=2 | hard cap=420min | nodegroup=ai-infra-use2-b200-spot-maz
+[2026-06-30T16:54:30Z] PREFLIGHT: binding to context 'qwen3-next-bench-eks-cluster' and verifying cluster=qwen3-next-bench-eks-cluster...
+[2026-06-30T16:54:32Z] PREFLIGHT OK: context->cluster verified, B200 node Ready. Scaledown ARMED.
+configmap/minimax-bench-scripts unchanged
+pod/bench-runner configured
+[2026-06-30T16:54:34Z] waiting for bench-runner pod ready (pip install aiohttp)...
+Error: unable to establish a connection to the specified host: localhost
+Error: Unable to connect to host engine. Host engine connection invalid/disconnected.
+PARSE ERROR: Argument: -r
+             Couldn't find match for argument
+
+Usage: 
+
+
+For complete USAGE and HELP type: 
+   dcgmi profile --help
+
+[2026-06-30T16:54:45Z] DCGM PROF counters: prof_counters_available=false (false => roofline by FB+POWER+vLLM-histogram inference)
+[2026-06-30T16:54:45Z] --- CONFIG 1/2: shape=tp4 kv_arm=gpu-only ---
+No resources found
+[2026-06-30T16:54:48Z]   launching vllm-tp4-gpu-only (boot budget ~40min)...
+pod/vllm-tp4-gpu-only created
+[2026-06-30T16:57:14Z]   serving pod ready: vllm-tp4-gpu-only
+[2026-06-30T16:57:22Z]   [tp4-gpu-only-shared-prefix] chunked_prefill_active=false
+[2026-06-30T16:57:22Z]   [tp4-gpu-only-shared-prefix] concurrency=64
+{
+  "scenario": "shared-prefix",
+  "concurrency": 64,
+  "model": "MiniMax-M2",
+  "requests_ok": 0,
+  "requests_err": 128,
+  "error_rate": 1.0,
+  "error_sample": [
+    "http404"
+  ],
+  "duration_s": 0.406,
+  "agg_decode_tok_s": 0.0,
+  "prompt_tokens_total": 0,
+  "cached_tokens_total": 0,
+  "client_cache_hit_fraction": null,
+  "reuse_fraction_target": null,
+  "reuse_target_met": null,
+  "kv_tier": {
+    "available": true,
+    "tokens_fresh_prefill": 0.0,
+    "tokens_gpu_hbm_hit": 0.0,
+    "tokens_offload_tier_hit": 0.0,
+    "tokens_recomputed": null,
+    "frac_fresh_prefill": null,
+    "frac_gpu_hbm_hit": null,
+    "frac_offload_tier_hit": null,
+    "gpu_prefix_hit_rate": null,
+    "external_prefix_hit_rate": null,
+    "kv_utilization_end": 0.0,
+    "kv_transfer_bytes_latency_exposed": true
+  },
+  "ttft_avg_s": null,
+  "ttft_p50_s": null,
+  "ttft_p95_s": null,
+  "ttft_p99_s": null,
+  "ttft_samples": 0,
+  "ttft_cold_avg_s": null,
+  "ttft_warm_avg_s": null,
+  "ttft_cold_warm_ratio": null,
+  "ttft_cold_samples": 0,
+  "ttft_warm_samples": 0,
+  "itl_client_mean_s": null,
+  "e2e_p50_s": null,
+  "e2e_p95_s": null,
+  "e2e_p99_s": null,
+  "quality_pass": false,
+  "quality_empty": 0,
+  "quality_repetition_loops": 0,
+  "quality_sampled": 0,
+  "t_start": 1782838646.680147,
+  "t_end": 1782838647.0864377
+}
+command terminated with exit code 3
+tar: Removing leading `/' from member names
+[2026-06-30T16:58:27Z]   [tp4-gpu-only-shared-prefix] c=64 done: tok/s=0.0 err=1.0 ttft_p95=nan qpass=false
+[2026-06-30T16:58:27Z]   [tp4-gpu-only-shared-prefix] SATURATION at c=64: error_rate>0.1 (tok/s=0 kv=0 preempt=0) — knee found, stopping climb
+[2026-06-30T16:58:27Z] --- CONFIG 2/2: shape=tp4ep4 kv_arm=gpu-only ---
+pod "vllm-tp4-gpu-only" deleted from default namespace
+[2026-06-30T16:58:32Z]   launching vllm-tp4ep4-gpu-only (boot budget ~40min)...
+pod/vllm-tp4ep4-gpu-only created
+[2026-06-30T17:01:08Z]   serving pod ready: vllm-tp4ep4-gpu-only
+[2026-06-30T17:01:19Z]   [tp4ep4-gpu-only-shared-prefix] chunked_prefill_active=false
+[2026-06-30T17:01:19Z]   [tp4ep4-gpu-only-shared-prefix] concurrency=64
+{
+  "scenario": "shared-prefix",
+  "concurrency": 64,
+  "model": "MiniMax-M2",
+  "requests_ok": 0,
+  "requests_err": 128,
+  "error_rate": 1.0,
+  "error_sample": [
+    "http404"
+  ],
+  "duration_s": 0.429,
+  "agg_decode_tok_s": 0.0,
+  "prompt_tokens_total": 0,
+  "cached_tokens_total": 0,
+  "client_cache_hit_fraction": null,
+  "reuse_fraction_target": null,
+  "reuse_target_met": null,
+  "kv_tier": {
+    "available": true,
+    "tokens_fresh_prefill": 0.0,
+    "tokens_gpu_hbm_hit": 0.0,
+    "tokens_offload_tier_hit": 0.0,
+    "tokens_recomputed": null,
+    "frac_fresh_prefill": null,
+    "frac_gpu_hbm_hit": null,
+    "frac_offload_tier_hit": null,
+    "gpu_prefix_hit_rate": null,
+    "external_prefix_hit_rate": null,
+    "kv_utilization_end": 0.0,
+    "kv_transfer_bytes_latency_exposed": true
+  },
+  "ttft_avg_s": null,
+  "ttft_p50_s": null,
+  "ttft_p95_s": null,
+  "ttft_p99_s": null,
+  "ttft_samples": 0,
+  "ttft_cold_avg_s": null,
+  "ttft_warm_avg_s": null,
+  "ttft_cold_warm_ratio": null,
+  "ttft_cold_samples": 0,
+  "ttft_warm_samples": 0,
+  "itl_client_mean_s": null,
+  "e2e_p50_s": null,
+  "e2e_p95_s": null,
+  "e2e_p99_s": null,
+  "quality_pass": false,
+  "quality_empty": 0,
+  "quality_repetition_loops": 0,
+  "quality_sampled": 0,
+  "t_start": 1782838927.2389693,
+  "t_end": 1782838927.6682012
+}
+command terminated with exit code 3
+tar: Removing leading `/' from member names
+[2026-06-30T17:03:31Z]   [tp4ep4-gpu-only-shared-prefix] c=64 done: tok/s=0.0 err=1.0 ttft_p95=nan qpass=false
+[2026-06-30T17:03:31Z]   [tp4ep4-gpu-only-shared-prefix] SATURATION at c=64: error_rate>0.1 (tok/s=0 kv=0 preempt=0) — knee found, stopping climb
+[2026-06-30T17:03:31Z] === SWEEP COMPLETE: 2 runs, 2 configs. pareto=/Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2/results/pareto-2026-06-30.json traj=/Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2/results/optimization-trajectory-2026-06-30.json ===
+[2026-06-30T17:03:31Z] TRAP(EXIT(rc=0)): SKIP_SCALEDOWN=1 (orchestrated phase) -> leaving node up for the parent.
+[2026-06-30T19:48:57Z] === MiniMax-M2 B200 Pareto sweep START (date=2026-06-30) ===
+[2026-06-30T19:48:57Z] grid: shapes=[tp4 tp4ep4] arms=[gpu-only] scenarios=[shared-prefix] conc=[64 128 256]
+[2026-06-30T19:48:57Z] push_beyond_last=1 (ceiling=8192) reuse_target=0.90 | sat-signals: err>0.02/0.10 kv>0.97 preempt>0 plateau<1.05x
+[2026-06-30T19:48:57Z] total configs=2 | hard cap=420min | nodegroup=ai-infra-use2-b200-spot-maz
+[2026-06-30T19:48:57Z] PREFLIGHT: binding to context 'qwen3-next-bench-eks-cluster' and verifying cluster=qwen3-next-bench-eks-cluster...
+[2026-06-30T19:49:00Z] PREFLIGHT OK: context->cluster verified, B200 node Ready. Scaledown ARMED.
+configmap/minimax-bench-scripts unchanged
+pod/bench-runner configured
+[2026-06-30T19:49:02Z] waiting for bench-runner pod ready (pip install aiohttp)...
+Error: unable to establish a connection to the specified host: localhost
+Error: Unable to connect to host engine. Host engine connection invalid/disconnected.
+PARSE ERROR: Argument: -r
+             Couldn't find match for argument
+
+Usage: 
+
+
+For complete USAGE and HELP type: 
+   dcgmi profile --help
+
+[2026-06-30T19:49:15Z] DCGM PROF counters: prof_counters_available=false (false => roofline by FB+POWER+vLLM-histogram inference)
+[2026-06-30T19:49:15Z] --- CONFIG 1/2: shape=tp4 kv_arm=gpu-only ---
+No resources found
+[2026-06-30T19:49:18Z]   launching vllm-tp4-gpu-only (boot budget ~40min)...
+pod/vllm-tp4-gpu-only created
+[2026-06-30T19:51:40Z]   serving pod ready: vllm-tp4-gpu-only
+[2026-06-30T19:51:46Z]   [tp4-gpu-only-shared-prefix] chunked_prefill_active=false
+[2026-06-30T19:51:46Z]   [tp4-gpu-only-shared-prefix] concurrency=64
+{
+  "scenario": "shared-prefix",
+  "concurrency": 64,
+  "model": "MiniMax-M2",
+  "requests_ok": 128,
+  "requests_err": 0,
+  "error_rate": 0.0,
+  "error_sample": [],
+  "duration_s": 50.075,
+  "agg_decode_tok_s": 1308.8,
+  "prompt_tokens_total": 12290707,
+  "cached_tokens_total": 0,
+  "client_cache_hit_fraction": 0.0,
+  "reuse_fraction_target": null,
+  "reuse_target_met": null,
+  "kv_tier": {
+    "available": true,
+    "tokens_fresh_prefill": 145443.0,
+    "tokens_gpu_hbm_hit": 12145264.0,
+    "tokens_offload_tier_hit": 0.0,
+    "tokens_recomputed": null,
+    "frac_fresh_prefill": 0.0118,
+    "frac_gpu_hbm_hit": 0.9882,
+    "frac_offload_tier_hit": 0.0,
+    "gpu_prefix_hit_rate": 0.9882,
+    "external_prefix_hit_rate": null,
+    "kv_utilization_end": 0.0,
+    "kv_transfer_bytes_latency_exposed": true
+  },
+  "ttft_avg_s": 8.9004,
+  "ttft_p50_s": 7.9881,
+  "ttft_p95_s": 14.9433,
+  "ttft_p99_s": 14.9653,
+  "ttft_samples": 128,
+  "ttft_cold_avg_s": 8.9004,
+  "ttft_warm_avg_s": null,
+  "ttft_cold_warm_ratio": null,
+  "ttft_cold_samples": 128,
+  "ttft_warm_samples": 0,
+  "itl_client_mean_s": 0.0296,
+  "e2e_p50_s": 19.5041,
+  "e2e_p95_s": 30.5858,
+  "e2e_p99_s": 30.6076,
+  "quality_pass": true,
+  "quality_empty": 0,
+  "quality_repetition_loops": 0,
+  "quality_sampled": 10,
+  "t_start": 1782849109.6046681,
+  "t_end": 1782849159.6795692
+}
+tar: Removing leading `/' from member names
+[2026-06-30T19:53:41Z]   [tp4-gpu-only-shared-prefix] c=64 done: tok/s=1308.8 err=0 ttft_p95=17.866666666666667 qpass=true
+[2026-06-30T19:53:42Z]   [tp4-gpu-only-shared-prefix] concurrency=128
+{
+  "scenario": "shared-prefix",
+  "concurrency": 128,
+  "model": "MiniMax-M2",
+  "requests_ok": 256,
+  "requests_err": 0,
+  "error_rate": 0.0,
+  "error_sample": [],
+  "duration_s": 83.329,
+  "agg_decode_tok_s": 1572.9,
+  "prompt_tokens_total": 24586547,
+  "cached_tokens_total": 0,
+  "client_cache_hit_fraction": 0.0,
+  "reuse_fraction_target": null,
+  "reuse_target_met": null,
+  "kv_tier": {
+    "available": true,
+    "tokens_fresh_prefill": 192227.0,
+    "tokens_gpu_hbm_hit": 24394320.0,
+    "tokens_offload_tier_hit": 0.0,
+    "tokens_recomputed": null,
+    "frac_fresh_prefill": 0.0078,
+    "frac_gpu_hbm_hit": 0.9922,
+    "frac_offload_tier_hit": 0.0,
+    "gpu_prefix_hit_rate": 0.9922,
+    "external_prefix_hit_rate": null,
+    "kv_utilization_end": 0.0,
+    "kv_transfer_bytes_latency_exposed": true
+  },
+  "ttft_avg_s": 12.8102,
+  "ttft_p50_s": 10.0897,
+  "ttft_p95_s": 29.2457,
+  "ttft_p99_s": 29.6261,
+  "ttft_samples": 256,
+  "ttft_cold_avg_s": 12.8102,
+  "ttft_warm_avg_s": null,
+  "ttft_cold_warm_ratio": null,
+  "ttft_cold_samples": 256,
+  "ttft_warm_samples": 0,
+  "itl_client_mean_s": 0.0528,
+  "e2e_p50_s": 37.6123,
+  "e2e_p95_s": 59.0267,
+  "e2e_p99_s": 59.1314,
+  "quality_pass": true,
+  "quality_empty": 0,
+  "quality_repetition_loops": 0,
+  "quality_sampled": 10,
+  "t_start": 1782849226.4151456,
+  "t_end": 1782849309.743959
+}
+[2026-06-30T19:56:26Z]   [tp4-gpu-only-shared-prefix] c=128 done: tok/s=1572.9 err=0 ttft_p95=35.93650793650793 qpass=true
+[2026-06-30T19:56:26Z]   [tp4-gpu-only-shared-prefix] concurrency=256
+{
+  "scenario": "shared-prefix",
+  "concurrency": 256,
+  "model": "MiniMax-M2",
+  "requests_ok": 512,
+  "requests_err": 0,
+  "error_rate": 0.0,
+  "error_sample": [],
+  "duration_s": 141.842,
+  "agg_decode_tok_s": 1848.1,
+  "prompt_tokens_total": 49139747,
+  "cached_tokens_total": 0,
+  "client_cache_hit_fraction": 0.0,
+  "reuse_fraction_target": null,
+  "reuse_target_met": null,
+  "kv_tier": {
+    "available": true,
+    "tokens_fresh_prefill": 291955.0,
+    "tokens_gpu_hbm_hit": 48847792.0,
+    "tokens_offload_tier_hit": 0.0,
+    "tokens_recomputed": null,
+    "frac_fresh_prefill": 0.0059,
+    "frac_gpu_hbm_hit": 0.9941,
+    "frac_offload_tier_hit": 0.0,
+    "gpu_prefix_hit_rate": 0.9941,
+    "external_prefix_hit_rate": null,
+    "kv_utilization_end": 0.0,
+    "kv_transfer_bytes_latency_exposed": true
+  },
+  "ttft_avg_s": 30.8673,
+  "ttft_p50_s": 28.5926,
+  "ttft_p95_s": 51.883,
+  "ttft_p99_s": 58.6361,
+  "ttft_samples": 512,
+  "ttft_cold_avg_s": 30.8673,
+  "ttft_warm_avg_s": null,
+  "ttft_cold_warm_ratio": null,
+  "ttft_cold_samples": 512,
+  "ttft_warm_samples": 0,
+  "itl_client_mean_s": 0.065,
+  "e2e_p50_s": 65.8033,
+  "e2e_p95_s": 85.4602,
+  "e2e_p99_s": 94.4386,
+  "quality_pass": true,
+  "quality_empty": 0,
+  "quality_repetition_loops": 0,
+  "quality_sampled": 10,
+  "t_start": 1782849390.284873,
+  "t_end": 1782849532.1264665
+}
+[2026-06-30T20:00:02Z]   [tp4-gpu-only-shared-prefix] c=256 done: tok/s=1848.1 err=0 ttft_p95=69.33333333333331 qpass=true
+[2026-06-30T20:00:02Z] --- CONFIG 2/2: shape=tp4ep4 kv_arm=gpu-only ---
+pod "vllm-tp4-gpu-only" deleted from default namespace
+[2026-06-30T20:00:09Z]   launching vllm-tp4ep4-gpu-only (boot budget ~40min)...
+pod/vllm-tp4ep4-gpu-only created
+[2026-06-30T20:02:40Z]   serving pod ready: vllm-tp4ep4-gpu-only
+[2026-06-30T20:02:45Z]   [tp4ep4-gpu-only-shared-prefix] chunked_prefill_active=false
+[2026-06-30T20:02:45Z]   [tp4ep4-gpu-only-shared-prefix] concurrency=64
+{
+  "scenario": "shared-prefix",
+  "concurrency": 64,
+  "model": "MiniMax-M2",
+  "requests_ok": 128,
+  "requests_err": 0,
+  "error_rate": 0.0,
+  "error_sample": [],
+  "duration_s": 52.694,
+  "agg_decode_tok_s": 1243.7,
+  "prompt_tokens_total": 12293717,
+  "cached_tokens_total": 0,
+  "client_cache_hit_fraction": 0.0,
+  "reuse_fraction_target": null,
+  "reuse_target_met": null,
+  "kv_tier": {
+    "available": true,
+    "tokens_fresh_prefill": 144389.0,
+    "tokens_gpu_hbm_hit": 12149328.0,
+    "tokens_offload_tier_hit": 0.0,
+    "tokens_recomputed": null,
+    "frac_fresh_prefill": 0.0117,
+    "frac_gpu_hbm_hit": 0.9883,
+    "frac_offload_tier_hit": 0.0,
+    "gpu_prefix_hit_rate": 0.9883,
+    "external_prefix_hit_rate": null,
+    "kv_utilization_end": 0.0,
+    "kv_transfer_bytes_latency_exposed": true
+  },
+  "ttft_avg_s": 9.1449,
+  "ttft_p50_s": 8.8853,
+  "ttft_p95_s": 14.5354,
+  "ttft_p99_s": 14.5565,
+  "ttft_samples": 128,
+  "ttft_cold_avg_s": 9.1449,
+  "ttft_warm_avg_s": null,
+  "ttft_cold_warm_ratio": null,
+  "ttft_cold_samples": 128,
+  "ttft_warm_samples": 0,
+  "itl_client_mean_s": 0.0313,
+  "e2e_p50_s": 22.2764,
+  "e2e_p95_s": 31.2805,
+  "e2e_p99_s": 31.3105,
+  "quality_pass": true,
+  "quality_empty": 0,
+  "quality_repetition_loops": 0,
+  "quality_sampled": 10,
+  "t_start": 1782849768.834046,
+  "t_end": 1782849821.528504
+}
+tar: Removing leading `/' from member names
+[2026-06-30T20:04:54Z]   [tp4ep4-gpu-only-shared-prefix] c=64 done: tok/s=1243.7 err=0 ttft_p95=17.866666666666667 qpass=true
+[2026-06-30T20:04:54Z]   [tp4ep4-gpu-only-shared-prefix] concurrency=128
+{
+  "scenario": "shared-prefix",
+  "concurrency": 128,
+  "model": "MiniMax-M2",
+  "requests_ok": 256,
+  "requests_err": 0,
+  "error_rate": 0.0,
+  "error_sample": [],
+  "duration_s": 88.188,
+  "agg_decode_tok_s": 1486.3,
+  "prompt_tokens_total": 24562708,
+  "cached_tokens_total": 0,
+  "client_cache_hit_fraction": 0.0,
+  "reuse_fraction_target": null,
+  "reuse_target_met": null,
+  "kv_tier": {
+    "available": true,
+    "tokens_fresh_prefill": 192868.0,
+    "tokens_gpu_hbm_hit": 24369840.0,
+    "tokens_offload_tier_hit": 0.0,
+    "tokens_recomputed": null,
+    "frac_fresh_prefill": 0.0079,
+    "frac_gpu_hbm_hit": 0.9921,
+    "frac_offload_tier_hit": 0.0,
+    "gpu_prefix_hit_rate": 0.9921,
+    "external_prefix_hit_rate": null,
+    "kv_utilization_end": 0.0,
+    "kv_transfer_bytes_latency_exposed": true
+  },
+  "ttft_avg_s": 13.4981,
+  "ttft_p50_s": 10.5804,
+  "ttft_p95_s": 30.7223,
+  "ttft_p99_s": 31.0,
+  "ttft_samples": 256,
+  "ttft_cold_avg_s": 13.4981,
+  "ttft_warm_avg_s": null,
+  "ttft_cold_warm_ratio": null,
+  "ttft_cold_samples": 256,
+  "ttft_warm_samples": 0,
+  "itl_client_mean_s": 0.0571,
+  "e2e_p50_s": 37.0569,
+  "e2e_p95_s": 61.7989,
+  "e2e_p99_s": 61.8497,
+  "quality_pass": true,
+  "quality_empty": 0,
+  "quality_repetition_loops": 0,
+  "quality_sampled": 10,
+  "t_start": 1782849896.2638202,
+  "t_end": 1782849984.4521434
+}
+tar: Removing leading `/' from member names
+[2026-06-30T20:07:30Z]   [tp4ep4-gpu-only-shared-prefix] c=128 done: tok/s=1486.3 err=0 ttft_p95=36 qpass=true
+[2026-06-30T20:07:31Z]   [tp4ep4-gpu-only-shared-prefix] concurrency=256
+{
+  "scenario": "shared-prefix",
+  "concurrency": 256,
+  "model": "MiniMax-M2",
+  "requests_ok": 512,
+  "requests_err": 0,
+  "error_rate": 0.0,
+  "error_sample": [],
+  "duration_s": 147.149,
+  "agg_decode_tok_s": 1781.5,
+  "prompt_tokens_total": 49131492,
+  "cached_tokens_total": 0,
+  "client_cache_hit_fraction": 0.0,
+  "reuse_fraction_target": null,
+  "reuse_target_met": null,
+  "kv_tier": {
+    "available": true,
+    "tokens_fresh_prefill": 291636.0,
+    "tokens_gpu_hbm_hit": 48839856.0,
+    "tokens_offload_tier_hit": 0.0,
+    "tokens_recomputed": null,
+    "frac_fresh_prefill": 0.0059,
+    "frac_gpu_hbm_hit": 0.9941,
+    "frac_offload_tier_hit": 0.0,
+    "gpu_prefix_hit_rate": 0.9941,
+    "external_prefix_hit_rate": null,
+    "kv_utilization_end": 0.0,
+    "kv_transfer_bytes_latency_exposed": true
+  },
+  "ttft_avg_s": 31.1379,
+  "ttft_p50_s": 27.9392,
+  "ttft_p95_s": 54.7236,
+  "ttft_p99_s": 61.7779,
+  "ttft_samples": 512,
+  "ttft_cold_avg_s": 31.1379,
+  "ttft_warm_avg_s": null,
+  "ttft_cold_warm_ratio": null,
+  "ttft_cold_samples": 512,
+  "ttft_warm_samples": 0,
+  "itl_client_mean_s": 0.069,
+  "e2e_p50_s": 67.7973,
+  "e2e_p95_s": 91.103,
+  "e2e_p99_s": 101.1152,
+  "quality_pass": true,
+  "quality_empty": 0,
+  "quality_repetition_loops": 0,
+  "quality_sampled": 10,
+  "t_start": 1782850053.4517536,
+  "t_end": 1782850200.601174
+}
+tar: Removing leading `/' from member names
+[2026-06-30T20:10:59Z]   [tp4ep4-gpu-only-shared-prefix] c=256 done: tok/s=1781.5 err=0 ttft_p95=69.33333333333331 qpass=true
+[2026-06-30T20:11:00Z] === SWEEP COMPLETE: 6 runs, 2 configs. pareto=/Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2/results/pareto-2026-06-30.json traj=/Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2/results/optimization-trajectory-2026-06-30.json ===
+[2026-06-30T20:11:00Z] TRAP(EXIT(rc=0)): SKIP_SCALEDOWN=1 (orchestrated phase) -> leaving node up for the parent.

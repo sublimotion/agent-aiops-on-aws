@@ -1,0 +1,110 @@
+# Stage 4b observability — Prometheus + DCGM exporter on the GPU node, scraping the
+# vLLM engine histograms (TTFT/TPOT/E2E) + GPU telemetry. Must be up BEFORE the serving
+# pod starts, else engine histograms are lost on spot termination (Kimi-spec scar).
+# node-exporter omitted — cluster already runs one on :9100 (monitoring ns); we scrape that.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dcgm-metrics-prof-minimax
+  namespace: default
+data:
+  # Confirmed-available non-PROF gauges (power/temp/FB/XID/util) — health + cost + KV-capacity.
+  # PROF counters (DRAM_ACTIVE/PIPE_TENSOR_ACTIVE/NVLINK_TX/RX) are the ROOFLINE classifiers
+  # that answer "which resource bounds us at the knee" (HBM-BW vs tensor-compute vs transfer).
+  # They were NOT enabled on the first attempt (lessons stage-4b; kimi-k2.6-nvfp4 L11), so the
+  # runner ALSO tries `dcgmi profile --resume` before the sweep. We LIST them here so that IF
+  # the profiling module is live, the exporter emits them; if not, DCGM logs a warning + skips
+  # (the gauges simply never appear in Prometheus) and the runner records PROF as unavailable.
+  metrics.csv: |
+    DCGM_FI_DEV_POWER_USAGE,         gauge, power draw W
+    DCGM_FI_DEV_GPU_TEMP,            gauge, gpu temp C
+    DCGM_FI_DEV_FB_USED,             gauge, framebuffer used MiB
+    DCGM_FI_DEV_GPU_UTIL,            gauge, gpu utilization
+    DCGM_FI_DEV_XID_ERRORS,          gauge, xid errors
+    DCGM_FI_PROF_DRAM_ACTIVE,        gauge, HBM bandwidth active ratio (decode-BW-bound signal)
+    DCGM_FI_PROF_PIPE_TENSOR_ACTIVE, gauge, tensor-core active ratio (prefill-compute-bound signal)
+    DCGM_FI_PROF_SM_ACTIVE,          gauge, SM active ratio
+    DCGM_FI_PROF_NVLINK_TX_BYTES,    counter, NVLink TX bytes (TP collective + KV transfer)
+    DCGM_FI_PROF_NVLINK_RX_BYTES,    counter, NVLink RX bytes
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-bench-config-minimax
+  namespace: default
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s
+      scrape_timeout: 4s
+      evaluation_interval: 15s
+      external_labels:
+        blueprint: minimax-m2
+        session: session-2026-06-27
+    scrape_configs:
+      - job_name: vllm
+        static_configs:
+          - targets: ["localhost:8000"]
+            labels: {engine: vllm, role: serving}
+        metrics_path: /metrics
+      - job_name: dcgm
+        static_configs:
+          - targets: ["localhost:9400"]
+            labels: {role: gpu}
+      - job_name: node
+        static_configs:
+          - targets: ["localhost:9100"]
+            labels: {role: host}
+      - job_name: prometheus
+        static_configs:
+          - targets: ["localhost:9090"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: observability-bench
+  namespace: default
+  labels: {app: observability-bench}
+spec:
+  restartPolicy: Always
+  nodeSelector: {blueprint: minimax-m2}
+  tolerations:
+    - {key: ai-infra/b200, operator: Exists, effect: NoSchedule}
+    - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+  hostNetwork: true
+  hostPID: true
+  containers:
+    - name: dcgm-exporter
+      image: nvcr.io/nvidia/k8s/dcgm-exporter:3.3.9-3.6.1-ubuntu22.04
+      args: ["-f", "/etc/dcgm-prof/metrics.csv", "--address", ":9400"]
+      env:
+        - {name: DCGM_EXPORTER_KUBERNETES, value: "false"}
+      securityContext:
+        privileged: true
+      resources:
+        requests: {cpu: "500m", memory: 512Mi}
+      volumeMounts:
+        - {name: dcgm-prof, mountPath: /etc/dcgm-prof}
+    - name: prometheus
+      image: prom/prometheus:v2.54.1
+      args:
+        - --config.file=/etc/prometheus/prometheus.yml
+        - --storage.tsdb.path=/prometheus
+        - --storage.tsdb.retention.time=7d
+        - --web.enable-admin-api
+        - --web.enable-lifecycle
+        - --web.listen-address=:9090
+      volumeMounts:
+        - {name: prom-config, mountPath: /etc/prometheus}
+        - {name: prom-data, mountPath: /prometheus}
+      resources:
+        requests: {cpu: "500m", memory: 1Gi}
+        limits: {memory: 4Gi}
+      # Run as root: /mnt/nvme/prom-data is a host hostPath; avoids the uid-65534
+      # "permission denied: /prometheus/queries.active" crash on a fresh host dir.
+      securityContext: {runAsUser: 0}
+  volumes:
+    - {name: dcgm-prof, configMap: {name: dcgm-metrics-prof-minimax}}
+    - {name: prom-config, configMap: {name: prometheus-bench-config-minimax}}
+    - {name: prom-data, hostPath: {path: /mnt/nvme/prom-data, type: DirectoryOrCreate}}

@@ -45,66 +45,65 @@ class WorkerConfig:
     # start them lower; raise per the throttle-rate telemetry (spec §throttle handling).
     concurrency: int = 10
     api_quirks: tuple = ()      # e.g. ("no-temperature",) for some Anthropic frontier ids
+    # Home region — _query_converse tries this FIRST, then rotates REGIONS for TPM
+    # headroom. Critical: qwen/deepseek open flagships are us-west-2-only; without a
+    # home-region hint every call wastes attempt-0 failing in us-east-1 (lessons #57).
+    region: str = "us-east-1"
     notes: str = ""
 
 
 # ---------------------------------------------------------------------------
-# POOL — ord order IS the head's worker-logit order. Mirrors es_log.json
-# llm_names (gpt-5, claude-sonnet, gemini-pro, deepseek-r1, gemma, qwen-reason,
-# qwen-direct) one-for-one on role class, substituting verified Bedrock ids.
+# POOL v2 — DIFFERENTIATED-8 (2026-06-26). ord order IS the head's worker-logit
+# order; this is a FRESH pool (head re-widened 7→8, no warm-start from the old
+# 7-ckpt). Composition chosen from the differentiation probe (results/
+# diff_probe_v2.json, n=30 LiveCodeBench): keep the high-capability open
+# flagships + a frontier anchor + a cheap tier; drop redundant/weak (sonnet≈haiku,
+# nova 0.43, deepseek-r1 priciest+866s/run). Pass@1 / $-per-prob from the probe.
 # ---------------------------------------------------------------------------
 POOL: list[WorkerConfig] = [
     WorkerConfig(
-        0, "claude-opus-4-8", "closed-frontier",
-        "us.anthropic.claude-opus-4-8",
-        concurrency=6,
-        api_quirks=("no-temperature",),  # Opus 4.8 deprecates `temperature` (verified live 2026-06-24)
-        notes="Frontier anchor (replaces upstream GPT-5). IAM-invokable via Converse. "
-              "Rejects `temperature` (reasoning model) → api_quirks no-temperature. "
-              "GPT-5.5 is an optional ord-0 swap (transport=openai_compat) gated on the "
-              "operator bearer token — see bedrock_clients.py GPT-5.5 path.",
+        0, "deepseek-v3", "open-flagship",
+        "deepseek.v3-v1:0", region="us-west-2", concurrency=8,
+        notes="Probe BEST: pass 0.87 @ $0.0022/prob. Open flagship, us-west-2 only. "
+              "Returns prose+```python (not <answer> tags) — extraction must isolate the fence.",
     ),
     WorkerConfig(
-        1, "claude-sonnet-4-6", "closed-frontier",
-        "us.anthropic.claude-sonnet-4-6",
-        concurrency=8,
-        notes="Replaces upstream Claude-4-Sonnet.",
+        1, "qwen3-235b", "open-flagship",
+        "qwen.qwen3-235b-a22b-2507-v1:0", region="us-west-2", concurrency=10,
+        notes="Probe 0.77 @ $0.0009. Open flagship, us-west-2 only.",
     ),
     WorkerConfig(
-        2, "nova-pro", "closed-frontier",
-        "us.amazon.nova-pro-v1:0",
-        concurrency=10,
-        notes="Distinct-provider frontier slot (replaces upstream Gemini-2.5-pro). "
-              "Nova Premier was provider-marked Legacy/access-denied on-demand "
-              "2026-06-24, so Nova Pro is the live Amazon substitute.",
-    ),
-    # ord 3/4 MUST match the checkpoint's semantic positions (es_log llm_names):
-    # ord 3 = DeepSeek-R1-class (reasoning-distill), ord 4 = Gemma. The head learned
-    # per-position capability, so the eval is only faithful if these align.
-    WorkerConfig(
-        3, "deepseek-r1", "open-reasoning",
-        "us.deepseek.r1-v1:0",
-        reasoning=True, concurrency=8,
-        notes="ord 3 = upstream DeepSeek-R1-Distill-Qwen-32B position. "
-              "Bare id rejects on-demand; us. inference profile required; reasons natively (no reasoning_effort flag).",
+        2, "qwen3-coder-480b", "open-flagship",
+        "qwen.qwen3-coder-480b-a35b-v1:0", region="us-west-2", concurrency=8,
+        notes="Probe 0.73 @ $0.0009. Coding-specialized 480B MoE, open, us-west-2 only.",
     ),
     WorkerConfig(
-        4, "gemma-3-27b", "open-mid",
-        "google.gemma-3-27b-it",
-        concurrency=10,
-        notes="ord 4 = upstream Gemma-3-27B position. Mid open generalist.",
+        3, "gpt-oss-120b", "open-flagship",
+        "openai.gpt-oss-120b-1:0", region="us-east-1", concurrency=10,
+        notes="Probe 0.73 @ $0.00065 — cheapest of the strong tier. OpenAI open-weight.",
     ),
     WorkerConfig(
-        5, "qwen3-32b-reasoning", "open-reasoning",
-        "qwen.qwen3-32b-v1:0",
-        reasoning=True, concurrency=10,
-        notes="Qwen3-32B reasoning mode (additionalModelRequestFields.reasoning_effort).",
+        4, "claude-opus-4-8", "closed-frontier",
+        "us.anthropic.claude-opus-4-8", region="us-east-1", concurrency=6,
+        api_quirks=("no-temperature",),
+        notes="Frontier anchor / escalation target. Probe 0.73 @ $0.0106 (10-50× the "
+              "open flagships). Rejects `temperature` → no-temperature quirk.",
     ),
     WorkerConfig(
-        6, "qwen3-32b-direct", "open-direct",
-        "qwen.qwen3-32b-v1:0",
-        reasoning=False, concurrency=10,
-        notes="Same weights as ord 5, direct (no-thinking) mode. Distinct pool slot.",
+        5, "claude-haiku-4-5", "closed-cheap-frontier",
+        "us.anthropic.claude-haiku-4-5-20251001-v1:0", region="us-east-1", concurrency=10,
+        notes="Probe 0.67 @ $0.0041. Anthropic cheap tier — a closed-model mid option.",
+    ),
+    WorkerConfig(
+        6, "qwen3-32b-direct", "open-cheap",
+        "qwen.qwen3-32b-v1:0", region="us-east-1", reasoning=False, concurrency=10,
+        notes="Probe 0.67 @ $0.0002 — CHEAPEST in the pool. Direct (no-thinking) mode.",
+    ),
+    WorkerConfig(
+        7, "gemma-3-27b", "open-cheap",
+        "google.gemma-3-27b-it", region="us-east-1", concurrency=10,
+        notes="Probe 0.47 @ $0.0010. Weak cheap floor — gives the router a low-cost "
+              "low-capability option to trade against.",
     ),
 ]
 

@@ -1,0 +1,55 @@
+catalog_id: external-parity-fixed-seq
+use_case: external-baseline-parity
+description: >
+  Controlled fixed-sequence baseline used to compare a deployment against public
+  benchmark suites such as InferenceX before production-specific tuning.
+  This is a cold synthetic benchmark: prefix/radix cache should be disabled when
+  the external reference disables it, and fixed ISL/OSL pairs should be used so
+  deltas are attributable to engine, precision, kernels, hardware, and
+  parallelism rather than cache policy or trace mix.
+
+  This card is NOT production-representative. It answers only: "is our stack in
+  family with the public reference on the same model/hardware/engine/precision
+  and sequence shape?" Production claims require a representative workload card
+  such as coding-agent, rag-long-context, production-mix, or a custom trace.
+
+modality: text
+
+dataset:
+  type: synthetic-fixed-seq
+  sequence_pairs:
+    - {input_tokens: 1024, output_tokens: 1024}
+    - {input_tokens: 8192, output_tokens: 1024}
+    - {input_tokens: 1024, output_tokens: 8192}
+  random_range_ratio: 0.0
+  prefix_reuse: none
+
+load:
+  type: concurrency-sweep
+  levels: [1, 4, 8, 16, 32, 64, 128, 256]
+  num_prompts_per_level: 256
+  warmup_requests: 16
+  stop_condition:
+    error_rate_max: 0.001
+    p99_ttft_ms: null
+
+slo:
+  error_rate_max: 0.001
+
+validation:
+  required_config:
+    cache_policy: external-reference-matched
+    fixed_isl_osl: true
+  required_metrics:
+    - output_toks_per_s
+    - ttft_p50_p99
+    - tpot_or_itl_p50_p99
+    - error_rate
+  comparison_fields:
+    - external_source
+    - external_model_key
+    - external_hardware
+    - external_engine
+    - external_precision
+    - external_sequence_pair
+    - external_cache_policy

@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cost-Aware Routing — Spec Review</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d2e;
+    --surface-2: #242740;
+    --border: #2e3151;
+    --text: #e2e8f0;
+    --text-muted: #8892a4;
+    --accent: #6366f1;
+    --green: #22c55e; --green-soft: rgba(34,197,94,0.12);
+    --red: #ef4444; --red-soft: rgba(239,68,68,0.12);
+    --yellow: #f59e0b; --yellow-soft: rgba(245,158,11,0.12);
+    --blue: #3b82f6; --blue-soft: rgba(59,130,246,0.12);
+    --purple: #a78bfa; --purple-soft: rgba(167,139,250,0.14);
+  }
+  [data-theme="light"] {
+    --bg: #f8fafc; --surface: #ffffff; --surface-2: #f1f5f9; --border: #e2e8f0;
+    --text: #0f172a; --text-muted: #64748b;
+    --green-soft: rgba(34,197,94,0.10); --red-soft: rgba(239,68,68,0.10);
+    --yellow-soft: rgba(245,158,11,0.10); --blue-soft: rgba(59,130,246,0.10);
+    --purple-soft: rgba(167,139,250,0.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.45;
+  }
+  code, .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; }
+
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  header h1 { font-size: 1.05rem; font-weight: 600; }
+  .meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem; }
+  button {
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+    padding: 0.4rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem;
+    font-family: inherit;
+  }
+  button:hover { background: var(--border); }
+  main { max-width: 1180px; margin: 0 auto; padding: 1.75rem 2rem 4rem; }
+
+  /* Verdict + headline goal */
+  .verdict {
+    padding: 1.25rem 1.75rem; border-radius: 10px; margin-bottom: 1.75rem;
+    background: var(--purple-soft); border: 1px solid var(--purple);
+  }
+  .verdict-label { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--purple); font-weight: 700; margin-bottom: 0.5rem; }
+  .verdict h2 { font-size: 1.4rem; font-weight: 600; margin-bottom: 0.5rem; line-height: 1.3; }
+  .verdict p { color: var(--text-muted); font-size: 0.92rem; }
+
+  /* Sections */
+  section { margin-bottom: 2.5rem; }
+  section > h2 {
+    font-size: 1.05rem; font-weight: 600; margin-bottom: 0.85rem;
+    padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .sec-num { color: var(--text-muted); font-weight: 400; font-size: 0.85rem; }
+  section > p { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1rem; }
+
+  /* Tables */
+  .table-wrap {
+    overflow-x: auto; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  thead { background: var(--surface-2); }
+  th {
+    padding: 0.65rem 0.85rem; text-align: left; font-weight: 600;
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-muted); border-bottom: 1px solid var(--border);
+  }
+  td { padding: 0.6rem 0.85rem; border-top: 1px solid var(--border); font-size: 0.83rem; }
+  tr:hover td { background: rgba(99,102,241,0.05); }
+  td.num { text-align: right; font-family: "JetBrains Mono", monospace; }
+
+  /* Cost spread bar */
+  .cost-bar {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1.1rem 1.25rem; margin-bottom: 1rem;
+  }
+  .cost-bar-row { display: flex; align-items: center; gap: 0.75rem; margin: 0.4rem 0; font-size: 0.78rem; }
+  .cost-bar-name { width: 130px; flex-shrink: 0; }
+  .cost-bar-track { flex: 1; height: 8px; background: var(--surface-2); border-radius: 4px; position: relative; }
+  .cost-bar-fill { height: 100%; border-radius: 4px; }
+  .cost-bar-val { width: 90px; text-align: right; color: var(--text-muted); font-family: "JetBrains Mono", monospace; }
+  .cost-callout {
+    margin-top: 0.85rem; padding: 0.6rem 0.9rem; background: var(--blue-soft);
+    border-left: 3px solid var(--blue); border-radius: 4px; font-size: 0.84rem;
+  }
+
+  /* Reward heatmap */
+  .heatmap-wrap { overflow-x: auto; }
+  .heatmap { font-size: 0.78rem; border-collapse: collapse; }
+  .heatmap th, .heatmap td {
+    padding: 0.45rem 0.6rem; text-align: center; min-width: 60px;
+    border: 1px solid var(--border); font-family: "JetBrains Mono", monospace;
+  }
+  .heatmap th:first-child, .heatmap td:first-child { text-align: left; min-width: 180px; }
+
+  /* Gates */
+  .gate-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 0.75rem;
+  }
+  .gate-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.9rem 1rem; border-left: 3px solid var(--red);
+  }
+  .gate-id { font-size: 0.7rem; letter-spacing: 0.05em; color: var(--red); font-weight: 700; }
+  .gate-title { font-size: 0.92rem; font-weight: 600; margin: 0.25rem 0; }
+  .gate-prevents { font-size: 0.78rem; color: var(--text-muted); }
+  .gate-prevents strong { color: var(--text); font-weight: 500; }
+
+  /* Phase timeline */
+  .phases {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.5rem; position: relative;
+  }
+  .phase {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.85rem 0.9rem; position: relative;
+  }
+  .phase.active { border-color: var(--accent); background: linear-gradient(135deg, var(--surface), rgba(99,102,241,0.08)); }
+  .phase.conditional { opacity: 0.7; }
+  .phase-id { font-size: 0.7rem; color: var(--text-muted); letter-spacing: 0.05em; text-transform: uppercase; }
+  .phase-title { font-size: 0.85rem; font-weight: 600; margin: 0.3rem 0; }
+  .phase-dur { font-size: 0.74rem; color: var(--accent); font-weight: 500; }
+  .phase-detail { font-size: 0.74rem; color: var(--text-muted); margin-top: 0.4rem; }
+
+  /* alpha sweep */
+  .alpha-row {
+    display: flex; align-items: center; gap: 1rem; padding: 0.6rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .alpha-row:last-child { border-bottom: none; }
+  .alpha-val {
+    width: 70px; flex-shrink: 0; font-family: "JetBrains Mono", monospace;
+    font-weight: 600; color: var(--accent);
+  }
+  .alpha-label { width: 130px; flex-shrink: 0; font-size: 0.84rem; font-weight: 500; }
+  .alpha-behavior { flex: 1; font-size: 0.82rem; color: var(--text-muted); }
+
+  /* Pareto sketch */
+  .pareto {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1rem; position: relative; height: 280px;
+  }
+  .pareto svg { width: 100%; height: 100%; }
+
+  /* Risk register */
+  .risk-row { display: grid; grid-template-columns: 80px 1fr 1fr 220px; gap: 0.6rem; align-items: start; padding: 0.7rem 0; border-bottom: 1px solid var(--border); font-size: 0.83rem; }
+  .risk-row:last-child { border-bottom: none; }
+  .severity { font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 3px; font-weight: 700; letter-spacing: 0.05em; text-align: center; }
+  .severity.high { background: var(--red-soft); color: var(--red); }
+  .severity.med { background: var(--yellow-soft); color: var(--yellow); }
+  .severity.low { background: var(--blue-soft); color: var(--blue); }
+  .risk-mitigation { color: var(--text-muted); }
+
+  /* Score pills */
+  .score-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+  .score-pill {
+    padding: 0.35rem 0.75rem; border-radius: 16px; font-size: 0.78rem; font-weight: 600;
+    background: var(--surface-2);
+  }
+  .score-pill.green { background: var(--green-soft); color: var(--green); }
+  .score-pill.red { background: var(--red-soft); color: var(--red); }
+  .score-pill.yellow { background: var(--yellow-soft); color: var(--yellow); }
+  .score-pill.blue { background: var(--blue-soft); color: var(--blue); }
+
+  /* Side-by-side base model */
+  .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .compare-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.95rem 1.1rem; }
+  .compare-card h3 { font-size: 0.92rem; font-weight: 600; margin-bottom: 0.4rem; }
+  .compare-card.winner { border-color: var(--green); background: linear-gradient(135deg, var(--surface), var(--green-soft)); }
+  .compare-card.winner h3::after { content: " ✓"; color: var(--green); }
+  .compare-card ul { list-style: none; padding: 0; }
+  .compare-card li { font-size: 0.8rem; color: var(--text-muted); padding: 0.2rem 0; }
+
+  footer {
+    text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.75rem;
+    border-top: 1px solid var(--border); margin-top: 3rem;
+  }
+
+  @media (max-width: 900px) {
+    .phases { grid-template-columns: 1fr 1fr; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .risk-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Cost-Aware Routing — Spec Review</h1>
+    <div class="meta">domains/autoresearch/specs/cost-aware-routing.md · 2026-05-25</div>
+  </div>
+  <div style="display:flex;gap:0.5rem;">
+    <button onclick="toggleTheme()">Toggle theme</button>
+  </div>
+</header>
+
+<main>
+
+<!-- ========== HEADLINE ========== -->
+<div class="verdict">
+  <div class="verdict-label">Headline goal</div>
+  <h2>Don't always use Opus 4.7. Train a router that picks the cheapest <em>capable</em> worker per question.</h2>
+  <p>If a learned router can match Always-Opus quality at &lt;20% of the cost, the production claim is: smart routing &gt; brand discipline. Headline exit criterion is <strong>quality/$ ≥ 5× Always-Opus</strong> at α=1 or α=3.</p>
+</div>
+
+<div class="score-row">
+  <div class="score-pill blue">11 workers</div>
+  <div class="score-pill blue">3.2 OOM cost spread</div>
+  <div class="score-pill green">5 α values</div>
+  <div class="score-pill green">7 Phase 0 gates</div>
+  <div class="score-pill yellow">~$1,950 total Phase 1</div>
+  <div class="score-pill yellow">~4 weeks Phase 1a + 1b</div>
+</div>
+
+<!-- ========== 1. COST SPREAD ========== -->
+<section>
+  <h2><span class="sec-num">1.</span> Cost spread (the lever)</h2>
+  <p>Workers span 3.2 orders of magnitude per query. The α sweep maps each "exchange rate" between cost and quality onto a different operating point on the Pareto frontier.</p>
+  <div class="cost-bar">
+    <div class="cost-bar-row"><div class="cost-bar-name mono">Nova Micro</div><div class="cost-bar-track"><div class="cost-bar-fill" style="background:#22c55e;width:0.06%"></div></div><div class="cost-bar-val">$0.0001</div></div>
+    <div class="cost-bar-row"><div class="cost-bar-name mono">Llama 4 Scout</div><div class="cost-bar-track"><div class="cost-bar-fill" style="background:#22c55e;width:0.32%"></div></div><div class="cost-bar-val">$0.0005</div></div>
+    <div class="cost-bar-row"><div class="cost-bar-name mono">MiniMax M2.5</div><div class="cost-bar-track"><div class="cost-bar-fill" style="background:#3b82f6;width:0.52%"></div></div><div class="cost-bar-val">$0.0008</div></div>
+    <div class="cost-bar-row"><div class="cost-bar-name mono">Mistral Large 3</div><div class="cost-bar-track"><div class="cost-bar-fill" style="background:#3b82f6;width:0.71%"></div></div><div class="cost-bar-val">$0.0011</div></div>
+    <div class="cost-bar-row"><div class="cost-bar-name mono">DeepSeek V3.2</div><div class="cost-bar-track"><div class="cost-bar-fill" style="background:#3b82f6;width:0.84%"></div></div><div class="cost-bar-val">$0.0013</div></div>
+    <div class="cost-bar-row"><div class="cost-bar-name mono">Kimi K2.5</div><div class="cost-bar-track"><div class="cost-bar-fill" style="background:#3b82f6;width:1.30%"></div></div><div class="cost-bar-val">$0.0020</div></div>
+    <div class="cost-bar-row"><div class="cost-bar-name mono">GLM 5</div><div class="cost-bar-track"><div class="cost-bar-fill" style="background:#3b82f6;width:1.43%"></div></div><div class="cost-bar-val">$0.0022</div></div>
+    <div class="cost-bar-row"><div class="cost-bar-name mono">Haiku 4.5</div><div class="cost-bar-track"><div class="cost-bar-fill" style="background:#a78bfa;width:2.13%"></div></div><div class="cost-bar-val">$0.0033</div></div>
+    <div class="cost-bar-row"><div class="cost-bar-name mono">Kimi K2 Thinking</div><div class="cost-bar-track"><div class="cost-bar-fill" style="background:#a78bfa;width:2.55%"></div></div><div class="cost-bar-val">$0.0040</div></div>
+    <div class="cost-bar-row"><div class="cost-bar-name mono">Sonnet 4.6</div><div class="cost-bar-track"><div class="cost-bar-fill" style="background:#f59e0b;width:6.40%"></div></div><div class="cost-bar-val">$0.0099</div></div>
+    <div class="cost-bar-row"><div class="cost-bar-name mono">Opus 4.7</div><div class="cost-bar-track"><div class="cost-bar-fill" style="background:#ef4444;width:100%"></div></div><div class="cost-bar-val">$0.1545</div></div>
+    <div class="cost-callout">
+      <strong>1,545× spread (Nova Micro → Opus 4.7).</strong> Always-Opus costs as much as 1,545 routed calls to the cost floor. Even at α=3 the Pareto frontier should include workers across all four cost tiers (cyan/blue/purple/red).
+    </div>
+  </div>
+</section>
+
+<!-- ========== 2. WORKER POOL ========== -->
+<section>
+  <h2><span class="sec-num">2.</span> Worker pool — verified Bedrock pricing (us-east-1, 2026-05-25)</h2>
+  <p>All 11 workers reachable via Bedrock single-account billing. <strong>Real model names never appear in the router prompt</strong> — workers are exposed as <code>worker_alpha</code>…<code>worker_kappa</code>. Mapping in <code>configs/pool.yaml</code>.</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ord</th>
+          <th>Neutral code</th>
+          <th>Real model</th>
+          <th>Bedrock model_id</th>
+          <th class="num">$/1M in</th>
+          <th class="num">$/1M out</th>
+          <th class="num">$/query</th>
+          <th>Capability</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>0</td><td><code>worker_alpha</code></td><td>Nova Micro</td><td class="mono">amazon.nova-micro-v1:0</td><td class="num">$0.04</td><td class="num">$0.14</td><td class="num">$0.0001</td><td>cost floor; chat, weak reasoning</td></tr>
+        <tr><td>1</td><td><code>worker_beta</code></td><td>Llama 4 Scout 17B</td><td class="mono">meta.llama4-scout-17b-instruct-v1:0</td><td class="num">$0.17</td><td class="num">$0.66</td><td class="num">$0.0005</td><td>multimodal vision, decent generalist</td></tr>
+        <tr><td>2</td><td><code>worker_gamma</code></td><td>MiniMax M2.5</td><td class="mono">minimax.minimax-m2.5</td><td class="num">$0.30</td><td class="num">$1.20</td><td class="num">$0.0008</td><td>205K ctx, agentic, multilingual</td></tr>
+        <tr><td>3</td><td><code>worker_delta</code></td><td>Mistral Large 3</td><td class="mono">mistral.mistral-large-3-675b-instruct</td><td class="num">$0.50</td><td class="num">$1.50</td><td class="num">$0.0011</td><td>multilingual generalist</td></tr>
+        <tr><td>4</td><td><code>worker_epsilon</code></td><td>DeepSeek V3.2</td><td class="mono">deepseek.v3.2</td><td class="num">$0.62</td><td class="num">$1.85</td><td class="num">$0.0013</td><td>strong reasoning, good value</td></tr>
+        <tr><td>5</td><td><code>worker_zeta</code></td><td>Kimi K2.5</td><td class="mono">moonshotai.kimi-k2.5</td><td class="num">$0.60</td><td class="num">$3.00</td><td class="num">$0.0020</td><td>256K ctx, agentic</td></tr>
+        <tr><td>6</td><td><code>worker_eta</code></td><td>GLM 5</td><td class="mono">zai.glm5</td><td class="num">$1.00</td><td class="num">$3.20</td><td class="num">$0.0022</td><td>hybrid reasoning</td></tr>
+        <tr><td>7</td><td><code>worker_theta</code></td><td>Kimi K2 Thinking</td><td class="mono">moonshot.kimi-k2-thinking</td><td class="num">$0.60</td><td class="num">$2.50</td><td class="num">$0.0040</td><td>extended-thinking specialist</td></tr>
+        <tr><td>8</td><td><code>worker_iota</code></td><td>Haiku 4.5</td><td class="mono">anthropic.claude-haiku-4-5-20251001</td><td class="num">$1.00</td><td class="num">$5.00</td><td class="num">$0.0033</td><td>fast generalist, 200K ctx</td></tr>
+        <tr><td>9</td><td><code>worker_kappa</code></td><td>Sonnet 4.6</td><td class="mono">anthropic.claude-sonnet-4-6</td><td class="num">$3.00</td><td class="num">$15.00</td><td class="num">$0.0099</td><td>mid-frontier, 1M ctx</td></tr>
+        <tr style="background:rgba(239,68,68,0.04);"><td>10</td><td><code>worker_lambda</code></td><td><strong>Opus 4.7</strong></td><td class="mono">anthropic.claude-opus-4-7</td><td class="num">$15.00</td><td class="num">$75.00</td><td class="num"><strong>$0.1545</strong></td><td>frontier reasoning; the always-Opus baseline</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ========== 2b. DATASET DIVERSITY ========== -->
+<section>
+  <h2><span class="sec-num">2b.</span> Dataset diversity — stratified across capability axes</h2>
+  <p>Pre-existing spec biased toward reasoning-only (MATH/MMLU/GPQA/AIME), making the headline cost claim hollow — Opus dominates a hard-math-only mix by construction. Phase 1a now stratifies across <strong>8 capability axes</strong>: easy factual, easy/mid math, mid factual, mid/hard code, long-context RC, and mid-hard reasoning. Phase 1b adds tool-use, multilingual, hard-factual, and chat-as-eval. Datasets drawn from the routing literature (FrugalGPT, RouteLLM, AutoMix) for direct comparability.</p>
+  <div class="table-wrap" style="margin-bottom:1rem;">
+    <table>
+      <thead>
+        <tr><th>Phase</th><th>Bucket</th><th>Source</th><th>Capability axis</th><th class="num">Train</th><th class="num">Eval</th><th>License</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1a</td><td>Easy factual</td><td>TriviaQA</td><td>cheap chat / lookup</td><td class="num">200</td><td class="num">100</td><td>CC-BY-SA</td></tr>
+        <tr><td>1a</td><td>Easy math</td><td>GSM8K</td><td>school-level math (Conductor base)</td><td class="num">200</td><td class="num">100</td><td>MIT</td></tr>
+        <tr><td>1a</td><td>Mid math</td><td>MATH500</td><td>hs competition math</td><td class="num">300</td><td class="num">100</td><td>MIT</td></tr>
+        <tr><td>1a</td><td>Mid code</td><td>MBPP</td><td>functional Python</td><td class="num">200</td><td class="num">100</td><td>CC-BY-4.0</td></tr>
+        <tr><td>1a</td><td>Hard code</td><td>LiveCodeBench (cutoff ≤2025-01)</td><td>competition code</td><td class="num">100</td><td class="num">—</td><td>MIT</td></tr>
+        <tr><td>1a</td><td>Mid factual</td><td>MMLU</td><td>broad mid-difficulty factual</td><td class="num">200</td><td class="num">100</td><td>MIT</td></tr>
+        <tr><td>1a</td><td>Mid code (eval-only)</td><td>HumanEval (full)</td><td>functional Python eval</td><td class="num">—</td><td class="num">164</td><td>MIT</td></tr>
+        <tr><td>1a</td><td>Long-context RC</td><td>LongBench-v2 <em>(QuALITY if licensed)</em></td><td>tests MiniMax / Kimi K2.5 256K-ctx</td><td class="num">100</td><td class="num">50</td><td>Apache-2.0</td></tr>
+        <tr><td>1a</td><td>Hard reasoning</td><td>BIG-Bench Hard (BBH)</td><td>23 reasoning sub-tasks</td><td class="num">200</td><td class="num">—</td><td>Apache-2.0</td></tr>
+        <tr><td>1a</td><td>OOD reasoning</td><td>GPQA-Diamond</td><td>OOD eval</td><td class="num">—</td><td class="num">100</td><td>CC-BY-4.0</td></tr>
+        <tr><td>1a</td><td>Hard math (descriptive)</td><td>AIME25</td><td>n=30, descriptive only</td><td class="num">—</td><td class="num">30</td><td>MIT</td></tr>
+        <tr style="background:rgba(99,102,241,0.04);"><td><strong>1b</strong></td><td>Tool-use</td><td>BFCL v3</td><td>tests Mistral / Qwen tool-call specialty</td><td class="num">200</td><td class="num">80</td><td>Apache-2.0</td></tr>
+        <tr style="background:rgba(99,102,241,0.04);"><td><strong>1b</strong></td><td>Multilingual</td><td>MGSM (10 langs)</td><td>tests Mistral L3 multilingual claim</td><td class="num">100</td><td class="num">60</td><td>MIT</td></tr>
+        <tr style="background:rgba(99,102,241,0.04);"><td><strong>1b</strong></td><td>Hard factual</td><td>MMLU-Pro</td><td>10-option mid-hard factual</td><td class="num">100</td><td class="num">100</td><td>MIT</td></tr>
+        <tr style="background:rgba(99,102,241,0.04);"><td><strong>1b</strong></td><td>Chat (eval-only)</td><td>MTBench single-turn</td><td>RouteLLM-comparable; judge-only</td><td class="num">—</td><td class="num">80</td><td>Apache-2.0</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="cost-callout" style="background:var(--purple-soft);border-left-color:var(--purple);">
+    <strong>Phase 1a totals:</strong> 1,500 train · 814 eval (8 axes). <strong>Phase 1b adds:</strong> 400 train · 320 eval (4 more axes). <strong>Plus Phase 1b ablation:</strong> single α=1.0 run trains on Phase 1a only, evals on Phase 1b full → tests downward generalization (Conductor-style transfer claim, isolated from the main story).
+  </div>
+</section>
+
+<!-- ========== 3. REWARD FUNCTION ========== -->
+<section>
+  <h2><span class="sec-num">3.</span> Reward function</h2>
+  <p>
+    <code>reward = is_correct ? max(0.01, exp(−α · cost_norm_log)) : 0</code> + 0.05 format-validity bonus.
+    Bounded in [0.01, 1.05] when correct; zero on wrong answer (with format bonus retained as +0.05).
+    Log-cost normalization gives every OOM equal weight, so workers in the $0.001–$0.01 band produce real gradients.
+  </p>
+  <div class="heatmap-wrap">
+    <table class="heatmap">
+      <thead>
+        <tr>
+          <th>Worker (sorted by cost)</th>
+          <th>$/q</th>
+          <th>cost_norm_log</th>
+          <th>α=0.1</th>
+          <th>α=0.3</th>
+          <th>α=1.0</th>
+          <th>α=3.0</th>
+          <th>α=5.0</th>
+        </tr>
+      </thead>
+      <tbody id="heatmap-body"></tbody>
+    </table>
+  </div>
+  <div class="cost-callout">
+    <strong>What the experiment teaches the router:</strong> at α=3, picking <em>Haiku correctly</em> is worth <strong>0.24</strong> reward; picking <em>Opus correctly</em> is worth <strong>0.05</strong>. The router learns to avoid Opus unless the question genuinely demands it. <em>This is the experiment.</em>
+  </div>
+</section>
+
+<!-- ========== 4. PHASE 0 GATES ========== -->
+<section>
+  <h2><span class="sec-num">4.</span> Phase 0 — pre-flight gates (BLOCKING)</h2>
+  <p>Each gate is a script that exits non-zero on failure. <strong>No training run launches until all green.</strong> Every gate cites the rl-conductor failure it prevents.</p>
+  <div class="gate-grid">
+    <div class="gate-card">
+      <div class="gate-id">GATE 0.1</div>
+      <div class="gate-title">Setup audit (apply_chat_template)</div>
+      <div class="gate-prevents"><strong>Prevents:</strong> ~10 days lost on rl-conductor to "ordinal bias" symptom-chasing — root cause was <code>tokenizer(raw_text)</code> instead of <code>apply_chat_template</code> on a chat-tuned Qwen.</div>
+    </div>
+    <div class="gate-card">
+      <div class="gate-id">GATE 0.2</div>
+      <div class="gate-title">Reward unit tests</div>
+      <div class="gate-prevents"><strong>Prevents:</strong> 4 silent reward bugs (HumanEval string-match, MCQ regex, MATH normalization, wrong answer extraction) — worth ~25-40pp plateau, unrecoverable without retraining.</div>
+    </div>
+    <div class="gate-card">
+      <div class="gate-id">GATE 0.2b</div>
+      <div class="gate-title">Per-worker output-format audit</div>
+      <div class="gate-prevents"><strong>Prevents:</strong> new workers (Kimi K2 Thinking, Opus extended, GLM 5, MiniMax M2.5, DeepSeek) emit <code>&lt;thinking&gt;</code> blocks that break naive extractors silently. Audit matrix per (worker, dataset) cell.</div>
+    </div>
+    <div class="gate-card">
+      <div class="gate-id">GATE 0.3</div>
+      <div class="gate-title">Judge calibration</div>
+      <div class="gate-prevents"><strong>Prevents:</strong> mis-calibrated Haiku-as-judge silently mislabeling rewards. Requires Haiku↔human ≥90% on 30 hand-graded math items; escalate to Sonnet judge if &lt;90%.</div>
+    </div>
+    <div class="gate-card">
+      <div class="gate-id">GATE 0.4</div>
+      <div class="gate-title">Brand-bias diagnostic at iter-0</div>
+      <div class="gate-prevents"><strong>Prevents:</strong> Qwen2.5-7B picks Opus 52% at iter-0 (project_qwen25_brand_bias.md). Mitigated here by Qwen3-8B + neutral codes; Gate 0.4 verifies entropy ≥1.8 nats before launch.</div>
+    </div>
+    <div class="gate-card">
+      <div class="gate-id">GATE 0.5</div>
+      <div class="gate-title">Raw artifact capture</div>
+      <div class="gate-prevents"><strong>Prevents:</strong> per feedback_log_raw_artifacts.md, aggregate-only logging meant rl-conductor reward bugs were unrecoverable post-hoc. Full per-rollout JSONL → S3 (~5GB total, negligible).</div>
+    </div>
+    <div class="gate-card">
+      <div class="gate-id">GATE 0.6</div>
+      <div class="gate-title">Synthetic output sanity</div>
+      <div class="gate-prevents"><strong>Prevents:</strong> aggregate metrics looking fine while output is degenerate (synthetic-random spec-decode case). Manual visual inspection of 20 rollouts before each training launch.</div>
+    </div>
+    <div class="gate-card">
+      <div class="gate-id">GATE 0.7</div>
+      <div class="gate-title">Resume protocol locked</div>
+      <div class="gate-prevents"><strong>Prevents:</strong> cross-region GRPO resume catastrophically broke a 70% MATH500 run (format_fail 0%→27%). RNG state + LR÷10 warmup + KL β&gt;0 warmup + same-AZ constraint.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 5. BASE MODEL ========== -->
+<section>
+  <h2><span class="sec-num">5.</span> Base model decision</h2>
+  <p>Drop-in upgrade from rl-conductor's Qwen2.5-7B. Same family, same chat template, same training stack — newer corpus, expected lower brand bias.</p>
+  <div class="compare-grid">
+    <div class="compare-card">
+      <h3>Qwen2.5-7B-Instruct (rl-conductor)</h3>
+      <ul>
+        <li>Paper-faithful — Sakana Conductor used this</li>
+        <li>Documented 52% Opus skew at iter-0 (brand bias)</li>
+        <li>ChatML template, 8 GPUs ample at bf16</li>
+        <li>Older training corpus (mid-2024)</li>
+      </ul>
+    </div>
+    <div class="compare-card winner">
+      <h3>Qwen3-8B-Instruct (this spec)</h3>
+      <ul>
+        <li>Same ChatML family — Gate 0.1 logic carries over verbatim</li>
+        <li>Newer corpus (March 2026) → expected lower brand bias</li>
+        <li>Better instruction-following + structured-output adherence</li>
+        <li>Same parameter class, same GPU footprint</li>
+        <li>Honest improvement: we are <em>building on</em> the paper, not reproducing</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 6. ANONYMIZATION ========== -->
+<section>
+  <h2><span class="sec-num">6.</span> Worker anonymization — <code>mask_style='neutral_codes'</code></h2>
+  <p>The router sees <code>worker_alpha</code> not "Opus 4.7". Provider names redacted from capability strings too. Code→ord mapping shuffled per training run (seeded).</p>
+  <div class="cost-callout" style="background:var(--purple-soft);border-left-color:var(--purple);">
+    <strong>Why this matters:</strong> Qwen2.5-7B's 52% Opus-skew prior comes from pretraining on Anthropic-flavored data — "Opus" is statistically the most-mentioned strong model in the corpus. With <code>worker_alpha</code> the router has no surface area to brand-pattern-match. Capability strings carry the actual routing signal (cost, specialty, ctx, weakness) — provider name has no causal role in "is this worker right for this question." Trade-off: lose any "Anthropic Haiku is fast" pretraining transfer; net positive because brand prior would actively interfere with cost-aware learning.
+  </div>
+</section>
+
+<!-- ========== 7. PHASES ========== -->
+<section>
+  <h2><span class="sec-num">7.</span> Phases timeline</h2>
+  <div class="phases">
+    <div class="phase active">
+      <div class="phase-id">Phase 0</div>
+      <div class="phase-title">Gates</div>
+      <div class="phase-dur">3 days · BLOCKING</div>
+      <div class="phase-detail">7 gates pass green before any training.</div>
+    </div>
+    <div class="phase active">
+      <div class="phase-id">Phase 1a</div>
+      <div class="phase-title">Single-pick × 5α (core mix)</div>
+      <div class="phase-dur">3 weeks · core</div>
+      <div class="phase-detail">8 capability axes, stratified. 5 routers along the Pareto frontier. Headline result.</div>
+    </div>
+    <div class="phase conditional">
+      <div class="phase-id">Phase 1b</div>
+      <div class="phase-title">Capability extension</div>
+      <div class="phase-dur">1 week · conditional</div>
+      <div class="phase-detail">+BFCL/MGSM/MMLU-Pro/MTBench. Stratified retrain + 1α downward-generalization ablation.</div>
+    </div>
+    <div class="phase conditional">
+      <div class="phase-id">Phase 1.5</div>
+      <div class="phase-title">Action-space transition</div>
+      <div class="phase-dur">3 days · conditional</div>
+      <div class="phase-detail">Curriculum warm-transfer of Phase 1b trunk → multi-step. KL-anchor + LR÷10 warmup.</div>
+    </div>
+    <div class="phase conditional">
+      <div class="phase-id">Phase 2</div>
+      <div class="phase-title">Multi-step delegation</div>
+      <div class="phase-dur">1 week · conditional</div>
+      <div class="phase-detail">Resumes from Phase-1-final + new system prompt. ~67% cheaper than from-scratch.</div>
+    </div>
+    <div class="phase conditional">
+      <div class="phase-id">Phase 3</div>
+      <div class="phase-title">Pool robustness</div>
+      <div class="phase-dur">3 days · conditional</div>
+      <div class="phase-detail">Worker removal/swap/upgrade tests. Validates metadata-grounded routing.</div>
+    </div>
+    <div class="phase conditional">
+      <div class="phase-id">Phase 4</div>
+      <div class="phase-title">SWE-bench transfer</div>
+      <div class="phase-dur">3 days · optional</div>
+      <div class="phase-detail">Apply best router to SWE-bench Lite. Compare to 8-harness ensemble (36% pass).</div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 8. ALPHA SWEEP ========== -->
+<section>
+  <h2><span class="sec-num">8.</span> α sweep — five operating points</h2>
+  <p>Each α is a separate training run that materializes a different "exchange rate" between cost and quality. The Pareto frontier is the union of all five.</p>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:0.75rem 1.25rem;">
+    <div class="alpha-row">
+      <div class="alpha-val">α=0.1</div>
+      <div class="alpha-label">Quality-dominant</div>
+      <div class="alpha-behavior">Opus-heavy. Cost barely matters.</div>
+    </div>
+    <div class="alpha-row">
+      <div class="alpha-val">α=0.3</div>
+      <div class="alpha-label">Quality-biased</div>
+      <div class="alpha-behavior">Prefers Sonnet / Kimi K2 Thinking; escalates to Opus on hard questions only.</div>
+    </div>
+    <div class="alpha-row">
+      <div class="alpha-val">α=1.0</div>
+      <div class="alpha-label">Balanced</div>
+      <div class="alpha-behavior">Trades 1% quality for 1% cost reduction. Most likely production sweet spot.</div>
+    </div>
+    <div class="alpha-row">
+      <div class="alpha-val">α=3.0</div>
+      <div class="alpha-label">Cost-biased</div>
+      <div class="alpha-behavior">Prefers Haiku / MiniMax / DeepSeek. Escalates only when necessary. Headline test.</div>
+    </div>
+    <div class="alpha-row">
+      <div class="alpha-val">α=5.0</div>
+      <div class="alpha-label">Cost-dominant</div>
+      <div class="alpha-behavior">Nova Micro / Llama Scout heavy. Rare escalation. ε-floor active to prevent gradient collapse.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 9. PARETO + EXIT ========== -->
+<section>
+  <h2><span class="sec-num">9.</span> Headline exit criterion — quality/$ ≥ 5× Always-Opus</h2>
+  <p>Sketch of expected Pareto curve: the router family (red dots) should beat the convex hull of always-X baselines (gray dots) in hypervolume gain over a $0.30 × quality=0 reference point.</p>
+  <div class="pareto">
+    <svg viewBox="0 0 600 280" preserveAspectRatio="xMidYMid meet">
+      <!-- axes -->
+      <line x1="60" y1="240" x2="560" y2="240" stroke="#2e3151" stroke-width="1"/>
+      <line x1="60" y1="240" x2="60" y2="20" stroke="#2e3151" stroke-width="1"/>
+      <text x="310" y="270" text-anchor="middle" fill="#8892a4" font-size="11" font-family="Inter, sans-serif">$/query (log scale, $0.0001 → $0.30)</text>
+      <text x="20" y="130" text-anchor="middle" fill="#8892a4" font-size="11" font-family="Inter, sans-serif" transform="rotate(-90 20 130)">quality (correct rate)</text>
+
+      <!-- baseline curve (gray) -->
+      <polyline points="100,210 180,150 320,90 480,55" fill="none" stroke="#8892a4" stroke-width="1.5" stroke-dasharray="4,4"/>
+      <circle cx="100" cy="210" r="4" fill="#8892a4"/><text x="106" y="206" fill="#8892a4" font-size="10" font-family="Inter, sans-serif">Always-Nova</text>
+      <circle cx="180" cy="150" r="4" fill="#8892a4"/><text x="186" y="146" fill="#8892a4" font-size="10" font-family="Inter, sans-serif">Always-Haiku</text>
+      <circle cx="320" cy="90" r="4" fill="#8892a4"/><text x="326" y="86" fill="#8892a4" font-size="10" font-family="Inter, sans-serif">Always-Sonnet</text>
+      <circle cx="480" cy="55" r="4" fill="#8892a4"/><text x="486" y="51" fill="#8892a4" font-size="10" font-family="Inter, sans-serif">Always-Opus</text>
+
+      <!-- router family (red) -->
+      <polyline points="120,150 200,90 280,60 380,52 470,48" fill="none" stroke="#ef4444" stroke-width="2"/>
+      <circle cx="470" cy="48" r="5" fill="#ef4444"/><text x="476" y="44" fill="#ef4444" font-size="10" font-family="Inter, sans-serif">α=0.1</text>
+      <circle cx="380" cy="52" r="5" fill="#ef4444"/><text x="386" y="48" fill="#ef4444" font-size="10" font-family="Inter, sans-serif">α=0.3</text>
+      <circle cx="280" cy="60" r="5" fill="#ef4444"/><text x="286" y="56" fill="#ef4444" font-size="10" font-family="Inter, sans-serif">α=1.0</text>
+      <circle cx="200" cy="90" r="5" fill="#ef4444"/><text x="206" y="86" fill="#ef4444" font-size="10" font-family="Inter, sans-serif">α=3.0</text>
+      <circle cx="120" cy="150" r="5" fill="#ef4444"/><text x="126" y="146" fill="#ef4444" font-size="10" font-family="Inter, sans-serif">α=5.0</text>
+
+      <!-- callout -->
+      <text x="310" y="200" fill="#ef4444" font-size="11" font-family="Inter, sans-serif" font-weight="600">router family (target)</text>
+      <text x="310" y="216" fill="#8892a4" font-size="11" font-family="Inter, sans-serif">always-X baselines</text>
+    </svg>
+  </div>
+  <div class="cost-callout" style="background:var(--green-soft);border-left-color:var(--green);">
+    <strong>Pre-registered hypothesis:</strong> at α=3.0, router achieves quality/$ ≥ 5× Always-Opus, p&lt;0.01 by paired bootstrap. Means: same-or-better quality at &lt;20% of Opus cost. <em>That's the production claim.</em>
+  </div>
+</section>
+
+<!-- ========== 10. COMPUTE ========== -->
+<section>
+  <h2><span class="sec-num">10.</span> Compute plan</h2>
+  <p>Live spot pricing checked 2026-05-25 in us-east-1. The old <code>infra_p4de_rl_conductor.md</code> memory is stale; p4de spot is now $16.30/hr and p5 is cheaper at $9.63 in us-east-1a.</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Item</th><th>Detail</th><th class="num">Cost</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Training instance</td><td>p5.48xlarge (8× H200 141GB) spot · us-east-1a</td><td class="num">$9.63/hr</td></tr>
+        <tr><td>Phase 1a training (5 α × ~$115/run)</td><td>200 iters × ~3.6min/iter ≈ 12h per α</td><td class="num">~$575</td></tr>
+        <tr><td>Phase 1a Bedrock + eval + judge</td><td>worker rollouts + 814-q eval × 8 baselines + Haiku-judge</td><td class="num">~$265</td></tr>
+        <tr><td><strong>Phase 1a subtotal</strong></td><td>5α stratified single-pick</td><td class="num"><strong>~$840</strong></td></tr>
+        <tr><td>Phase 1b stratified retrain (5 α, ~25% longer)</td><td>+400 q train items</td><td class="num">~$700</td></tr>
+        <tr><td>Phase 1b downward-gen ablation (1 α)</td><td>train Phase 1a only, eval Phase 1b full</td><td class="num">~$140</td></tr>
+        <tr><td>Phase 1b Bedrock + eval + judge</td><td>longer tool-use trajectories ~+30%</td><td class="num">~$267</td></tr>
+        <tr><td><strong>Phase 1b subtotal</strong></td><td>capability extension + ablation</td><td class="num"><strong>~$1,107</strong></td></tr>
+        <tr style="background:rgba(167,139,250,0.06);"><td><strong>Total Phase 1 (1a + 1b)</strong></td><td>compute + Bedrock + judge</td><td class="num"><strong>~$1,950</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ========== 11. RISK REGISTER ========== -->
+<section>
+  <h2><span class="sec-num">11.</span> Risk register from rl-conductor lessons</h2>
+  <p>Each entry maps a documented rl-conductor failure to its mitigation in this spec.</p>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:0.5rem 1.25rem;">
+    <div class="risk-row" style="font-weight:600;color:var(--text-muted);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border);padding-bottom:0.4rem;">
+      <div>Severity</div><div>Risk</div><div>Source / lesson</div><div>Mitigation</div>
+    </div>
+    <div class="risk-row">
+      <div><span class="severity high">HIGH</span></div>
+      <div>Chat template missing → autocomplete-of-prompt</div>
+      <div class="risk-mitigation">feedback_paper_repro_setup_audit.md · cost rl-conductor 10 days</div>
+      <div class="risk-mitigation">Gate 0.1: assert ChatML opener; ban response anchors</div>
+    </div>
+    <div class="risk-row">
+      <div><span class="severity high">HIGH</span></div>
+      <div>Brand bias toward Opus (52% iter-0 skew)</div>
+      <div class="risk-mitigation">project_qwen25_brand_bias.md</div>
+      <div class="risk-mitigation">Qwen3-8B base + neutral_codes anonymization + Gate 0.4 entropy ≥1.8 nats</div>
+    </div>
+    <div class="risk-row">
+      <div><span class="severity high">HIGH</span></div>
+      <div>Reward function bugs (silent, 25-40pp plateau)</div>
+      <div class="risk-mitigation">feedback_log_raw_artifacts.md (4 bugs found post-hoc)</div>
+      <div class="risk-mitigation">Gate 0.2 unit tests + Gate 0.5 raw rollout capture for re-grade</div>
+    </div>
+    <div class="risk-row">
+      <div><span class="severity high">HIGH</span></div>
+      <div>Output extraction breaks on new workers (thinking blocks)</div>
+      <div class="risk-mitigation">Untested for Kimi K2 Thinking, Opus extended, GLM 5, MiniMax, DeepSeek</div>
+      <div class="risk-mitigation">Gate 0.2b per-(worker,dataset) audit; strip_reasoning() pipeline</div>
+    </div>
+    <div class="risk-row">
+      <div><span class="severity med">MED</span></div>
+      <div>RNG state lost on resume → policy collapse</div>
+      <div class="risk-mitigation">feedback_grpo_resume_state.md · cost 70%→4% MATH500</div>
+      <div class="risk-mitigation">Gate 0.7: rng.pt + LR÷10 warmup + KL β&gt;0 warmup; same-AZ resume only</div>
+    </div>
+    <div class="risk-row">
+      <div><span class="severity med">MED</span></div>
+      <div>Spot reclaim mid-training</div>
+      <div class="risk-mitigation">p5.48xlarge spot</div>
+      <div class="risk-mitigation">CheckpointManager every 25 iters + SIGTERM handler + S3 sync</div>
+    </div>
+    <div class="risk-row">
+      <div><span class="severity med">MED</span></div>
+      <div>Aggregate metrics mask degenerate output</div>
+      <div class="risk-mitigation">feedback_synthetic_specdec_repetition.md</div>
+      <div class="risk-mitigation">Gate 0.6: visual inspection of 20 rollouts before each launch</div>
+    </div>
+    <div class="risk-row">
+      <div><span class="severity med">MED</span></div>
+      <div>α=5 reward collapse → "always cheapest"</div>
+      <div class="risk-mitigation">exp(−α·c) advantage variance explodes at high α</div>
+      <div class="risk-mitigation">α capped at 5.0; ε=0.01 floor; histogram entropy halt at &lt;0.5 nats</div>
+    </div>
+    <div class="risk-row">
+      <div><span class="severity low">LOW</span></div>
+      <div>Anthropic 4.5+ pricing changes between API verify and training</div>
+      <div class="risk-mitigation">Pricing API doesn't expose Anthropic 4.5+ yet</div>
+      <div class="risk-mitigation">Gate 0.0: snapshot pricing JSON at training-start; halt if any rate Δ &gt;10%</div>
+    </div>
+    <div class="risk-row">
+      <div><span class="severity low">LOW</span></div>
+      <div>Mid-tier worker reward gap too small (M2.5 / Mistral L3 / DeepSeek)</div>
+      <div class="risk-mitigation">Caught by reward_landscape.py at min-gap 0.01</div>
+      <div class="risk-mitigation">Acceptable; if Phase 1 shows redundancy, drop one in Phase 3</div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== READINESS ========== -->
+<section>
+  <h2><span class="sec-num">12.</span> Readiness for execution</h2>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.25rem 1.5rem;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:0.75rem;">
+      <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;"><span style="color:var(--green);">✓</span> Pool YAML verified via AWS Pricing API</div>
+      <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;"><span style="color:var(--green);">✓</span> Reward function + 89 unit tests passing (8 datasets × extractors + graders)</div>
+      <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;"><span style="color:var(--green);">✓</span> Reward landscape gate green (min gap 0.0102)</div>
+      <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;"><span style="color:var(--green);">✓</span> CheckpointManager (RNG + S3 + resume)</div>
+      <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;"><span style="color:var(--green);">✓</span> Worker proxy (Anthropic-thinking-block aware)</div>
+      <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;"><span style="color:var(--green);">✓</span> bootstrap.sh for p5 spot provisioning</div>
+      <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;"><span style="color:var(--green);">✓</span> train.py with Gate 0.7 resume protocol wired</div>
+      <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;"><span style="color:var(--green);">✓</span> Data builder (12 datasets, stratified, license-gated) — dry-run clean</div>
+      <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;"><span style="color:var(--yellow);">◌</span> Gate 0.2b parser audit run on real Bedrock outputs — pending</div>
+      <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;"><span style="color:var(--yellow);">◌</span> Gate 0.3 Haiku-as-judge calibration run — pending</div>
+      <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;"><span style="color:var(--yellow);">◌</span> pareto_eval.py + plotting — added in Phase 1 after first training run</div>
+      <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;"><span style="color:var(--text-muted);">—</span> SWE-bench transfer harness — Phase 4, optional</div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  Generated by visual-explainer · agent-aiops-on-aws · cost-aware-routing spec review · 2026-05-25
+</footer>
+
+<script>
+  // Render reward landscape heatmap
+  const workers = [
+    {name: 'worker_alpha (Nova Micro)', cost: 0.0001, norm: 0.000},
+    {name: 'worker_beta (Llama 4 Scout)', cost: 0.0005, norm: 0.219},
+    {name: 'worker_gamma (MiniMax M2.5)', cost: 0.0008, norm: 0.290},
+    {name: 'worker_delta (Mistral Large 3)', cost: 0.0011, norm: 0.327},
+    {name: 'worker_epsilon (DeepSeek V3.2)', cost: 0.0013, norm: 0.354},
+    {name: 'worker_zeta (Kimi K2.5)', cost: 0.0020, norm: 0.411},
+    {name: 'worker_eta (GLM 5)', cost: 0.0022, norm: 0.427},
+    {name: 'worker_theta (Kimi K2 Thinking)', cost: 0.0040, norm: 0.504},
+    {name: 'worker_iota (Haiku 4.5)', cost: 0.0033, norm: 0.480},
+    {name: 'worker_kappa (Sonnet 4.6)', cost: 0.0099, norm: 0.629},
+    {name: 'worker_lambda (Opus 4.7) ⚠', cost: 0.1545, norm: 1.000},
+  ];
+  const alphas = [0.1, 0.3, 1.0, 3.0, 5.0];
+  const EPS = 0.01;
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function rewardColor(r) {
+    // Map reward [0,1] to a green→yellow→red gradient
+    // High reward = green, low = red
+    const t = Math.max(0, Math.min(1, r));
+    let r_, g, b;
+    if (t > 0.5) {
+      // green to yellow
+      const u = (t - 0.5) * 2;
+      r_ = Math.round(lerp(245, 34, u));
+      g = Math.round(lerp(158, 197, u));
+      b = Math.round(lerp(11, 94, u));
+    } else {
+      // red to yellow
+      const u = t * 2;
+      r_ = Math.round(lerp(239, 245, u));
+      g = Math.round(lerp(68, 158, u));
+      b = Math.round(lerp(68, 11, u));
+    }
+    return `rgba(${r_}, ${g}, ${b}, 0.55)`;
+  }
+
+  const tbody = document.getElementById('heatmap-body');
+  workers.forEach(w => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${w.name}</td><td>$${w.cost.toFixed(4)}</td><td>${w.norm.toFixed(3)}</td>`;
+    alphas.forEach(a => {
+      const r = Math.max(EPS, Math.exp(-a * w.norm));
+      const td = document.createElement('td');
+      td.style.background = rewardColor(r);
+      td.textContent = r.toFixed(3);
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+
+  function toggleTheme() {
+    const html = document.documentElement;
+    html.setAttribute('data-theme',
+      html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  }
+</script>
+</body>
+</html>

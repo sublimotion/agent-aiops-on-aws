@@ -1,0 +1,139 @@
+# Cost-aware-routing worker pool — verified pricing (us-east-1, 2026-05-25)
+# Source: AWS Pricing API for non-Anthropic; Anthropic pricing page for 4.5+ models.
+# Re-verify with scripts/verify_prices.py before training-start (Gate 0.0).
+#
+# $/1M rates are list prices. $/query is computed in cost.py from
+# (input_tok_assumed × $/in + output_tok_assumed × $/out) / 1e6.
+# Workers with extended reasoning (Kimi K2 Thinking, Opus extended) emit
+# longer outputs naturally; output_tok reflects that.
+
+input_tok_assumed: 300
+
+# Neutral codes (mask_style='neutral_codes'): the router never sees real model
+# names or providers, only `worker_alpha` ... `worker_kappa` aliases + the
+# capability_summary string below. The mapping code → real model is shuffled
+# per training run via `seed`, and lives only in worker_proxy.WorkerPool.
+# Decision rationale: spec §"Worker anonymization".
+
+neutral_codes:
+  [worker_alpha, worker_beta, worker_gamma, worker_delta, worker_epsilon,
+   worker_zeta, worker_eta, worker_theta, worker_iota, worker_kappa, worker_lambda]
+
+# Base model for the router. Drop-in upgrade from Qwen2.5-7B (rl-conductor); same
+# ChatML chat template, same training stack, same parameter class. Newer corpus
+# expected to reduce Anthropic-brand pretraining bias. Measured in Gate 0.4.
+router_base_model: "Qwen/Qwen3-8B"
+
+workers:
+  - ord: 0
+    name: nova-micro
+    bedrock_id: amazon.nova-micro-v1:0
+    needs_us_prefix: true
+    in_per_1m: 0.035
+    out_per_1m: 0.14
+    output_tok_assumed: 4000
+    capability_summary: "~$0.0001/q, cost floor, short chat, weak reasoning"
+    concurrency: 60
+
+  - ord: 1
+    name: llama-4-scout-17b
+    bedrock_id: meta.llama4-scout-17b-instruct-v1:0
+    needs_us_prefix: true
+    in_per_1m: 0.17
+    out_per_1m: 0.66
+    output_tok_assumed: 4000
+    capability_summary: "~$0.0005/q, multimodal vision, decent generalist"
+    concurrency: 60
+
+  - ord: 2
+    name: minimax-m2.5
+    bedrock_id: minimax.minimax-m2.5
+    needs_us_prefix: false
+    in_per_1m: 0.30
+    out_per_1m: 1.20
+    output_tok_assumed: 4000
+    capability_summary: "~$0.0008/q, 205K context, agentic, multilingual"
+    concurrency: 45
+
+  - ord: 3
+    name: mistral-large-3
+    bedrock_id: mistral.mistral-large-3-675b-instruct
+    needs_us_prefix: false
+    in_per_1m: 0.50
+    out_per_1m: 1.50
+    output_tok_assumed: 4000
+    capability_summary: "~$0.0011/q, multilingual generalist, structured output"
+    concurrency: 45
+
+  - ord: 4
+    name: deepseek-v3.2
+    bedrock_id: deepseek.v3.2
+    needs_us_prefix: false
+    in_per_1m: 0.62
+    out_per_1m: 1.85
+    output_tok_assumed: 4000
+    capability_summary: "~$0.0013/q, strong reasoning, good value"
+    concurrency: 30
+
+  - ord: 5
+    name: kimi-k2.5
+    bedrock_id: moonshotai.kimi-k2.5
+    needs_us_prefix: false
+    in_per_1m: 0.60
+    out_per_1m: 3.00
+    output_tok_assumed: 4000
+    capability_summary: "~$0.0020/q, 256K context, agentic, strong generalist"
+    concurrency: 30
+
+  - ord: 6
+    name: glm-5
+    bedrock_id: zai.glm-5
+    needs_us_prefix: false
+    in_per_1m: 1.00
+    out_per_1m: 3.20
+    output_tok_assumed: 4000
+    capability_summary: "~$0.0022/q, strong generalist, hybrid reasoning"
+    concurrency: 30
+
+  - ord: 7
+    name: kimi-k2-thinking
+    bedrock_id: moonshot.kimi-k2-thinking
+    needs_us_prefix: false
+    in_per_1m: 0.60
+    out_per_1m: 2.50
+    output_tok_assumed: 4000     # extended reasoning
+    capability_summary: "~$0.004/q, extended-thinking specialist, hard problems"
+    concurrency: 20
+
+  - ord: 8
+    name: haiku-4.5
+    bedrock_id: anthropic.claude-haiku-4-5-20251001-v1:0
+    needs_us_prefix: true
+    in_per_1m: 1.00       # source: anthropic pricing page; reverify in Gate 0.0
+    out_per_1m: 5.00
+    output_tok_assumed: 4000
+    capability_summary: "~$0.003/q, fast generalist, 200K context"
+    concurrency: 60
+    supports_temperature: true
+
+  - ord: 9
+    name: sonnet-4.6
+    bedrock_id: anthropic.claude-sonnet-4-6
+    needs_us_prefix: true
+    in_per_1m: 3.00       # source: anthropic pricing page; reverify
+    out_per_1m: 15.00
+    output_tok_assumed: 4000
+    capability_summary: "~$0.010/q, mid-frontier, 1M context"
+    concurrency: 30
+    supports_temperature: true
+
+  - ord: 10
+    name: opus-4.7
+    bedrock_id: anthropic.claude-opus-4-7
+    needs_us_prefix: true
+    in_per_1m: 15.00      # source: anthropic pricing page; reverify
+    out_per_1m: 75.00
+    output_tok_assumed: 2000     # extended thinking
+    capability_summary: "~$0.155/q, frontier reasoning specialist; expensive"
+    concurrency: 12
+    supports_temperature: false   # Opus extended thinking rejects temperature param

@@ -2,6 +2,8 @@
 
 ## Status: DRAFT | IN_PROGRESS | DEPLOYED | COMPLETED
 
+> **Write gates as outcomes, not tool names.** State requirements as verifiable end-states ("Stage 4a GPU health passes", "config resolver exits 0"), not as "call skill/agent X". Domain routing picks the deployer agent; name a specific tool only when that tool *is* the gate (a fail-closed check). See `project-structure.md` §Spec Structure for why.
+
 ## Overview
 Brief description of what this deployment does.
 
@@ -102,6 +104,11 @@ optimization_objective:
     invariants: [ all_modalities_intact, error_rate_max: 0.001 ]
   budget: { max_configs: ____, max_wall_clock_min: ____, max_usd: ____ }
   plateau: { min_improvement: ____, patience: ____ }
+  collaborative_search:              # required when max_configs >= 8
+    mode: greedy | portfolio
+    waves: ____
+    allocation: { explorer: ____, exploiter: ____, blocker_checker: ____ }
+    novelty_gate: config_hash + regime_dead_end + expected_delta
 ```
 
 - [ ] Regime predicted with one-line reasoning
@@ -110,6 +117,7 @@ optimization_objective:
 - [ ] **Any deferral that cites an engine blocker ("BLOCKED by PR #X", "incompatible with …", "not supported in <engine> yet") is re-verified against the live tracker** — `mdc prs <model>` plus `gh pr view <N> --repo <vllm-project/vllm|sgl-project/sglang>` / `gh issue list --repo <repo> --search "<feature> in:title" --state all`. A merged PR or newer release may have lifted the blocker. Record the blocker's `validated: YYYY-MM-DD` next to the deferral; a blocker carried from a card/lessons.md without re-check is not a valid deferral reason for a high-priority lever
 - [ ] The same tier list will be filled with measured deltas in the Stage 6 Tier Stack Table (this ledger is the *plan*; Stage 6 is the *result*)
 - [ ] If the spec will tune past the first working config: `optimization_objective` is declared with all four blocks (maximize / subject_to / budget / plateau), and the `quality_gate` is `held_out: true` (reward-hacking guard — a loop must not see the eval it optimizes against)
+- [ ] If `optimization_objective.budget.max_configs >= 8`: collaborative/portfolio search plan is declared (waves, explore/exploit/blocker allocation, novelty gate, critic merge) per `standards/benchmark-commons/OPTIMIZATION-LOOP.md`
 
 ### Stage 0c — Serving-Config Resolver (fail-closed)
 - [ ] `python3 standards/serving-commons/resolver/validate-serving-config.py --sidecar blueprints/<name>/benchmark.yaml --corpus-root .` exits 0 (no hard-rule FAILs)
@@ -136,12 +144,14 @@ optimization_objective:
 | Workload | When to use | Catalog file |
 |----------|-------------|-------------|
 | `concurrency-sweep` | Always — find SLO-max operating point | `workloads/concurrency-sweep.yaml` |
+| `external-parity-fixed-seq` | Default when a comparable public baseline exists — cold fixed-seq parity against InferenceX / vendor references before production tuning | `workloads/external-parity-fixed-seq.yaml` |
 | `chatbot-short` | Interactive serving validation | `workloads/chatbot-short.yaml` |
 | `coding-agent` | Agentic / tool-calling workloads | `workloads/coding-agent.yaml` |
 | `batch-throughput` | Max throughput ceiling | `workloads/batch-throughput.yaml` |
 | `rag-long-context` | Prefix caching / long-doc workloads | `workloads/rag-long-context.yaml` |
 
 **Required measurements** (minimum for any deployment):
+- [ ] If a comparable public baseline exists (InferenceX, model card, vendor recipe, or prior internal card), external parity baseline completed first: fixed ISL/OSL, matched model/hardware/engine/precision where possible, and matched cache policy. Store the source URL/query and the external result next to our result.
 - [ ] Concurrency sweep completed (1 → saturation, power-of-2 steps)
 - [ ] TTFT P50 < _____ ms, P99 < _____ ms at target concurrency
 - [ ] Throughput > _____ tok/s at target concurrency
@@ -160,6 +170,7 @@ optimization_objective:
 - [ ] Speculative decode acceptance rate (if MTP/spec decode enabled)
 
 **Tier Stack Table** (required — closes the Stage 0b ledger): fill the table from `docs/optimization-stack.md` with the **measured** Δ each tier delivered vs T0, and mark any tier blocked. This is the *result* half of the Stage 0b *plan*; `compound-learner` reads it to refresh the catalog's delta cells.
+- [ ] T0 identifies whether it is an `external-parity` baseline (cache policy and fixed sequence matched to public reference), a `production` baseline (representative trace / cache policy), or both. Do not compare an external-parity T0 directly against a production-optimized result without labeling the regime mismatch.
 - [ ] One row per tier T0–T6: config landed, Δ tok/s vs T0, Δ TTFT p99 vs T0, blocked? (with reason). T6 is expected empty unless the loop reached a T0–T5 plateau.
 - [ ] Every tier marked `deferred` in Stage 0b is reconciled here (still deferred, or applied + measured)
 - [ ] Any tier that underperformed its `optimization-stack.md` typical-Δ range is noted in `lessons.md`
@@ -168,6 +179,7 @@ optimization_objective:
 - [ ] Each kept config is a single-variable change vs its parent (so the measured Δ is attributable to one lever)
 - [ ] Every config ran the held-out quality gate *before* its objective was measured; `quality_breach` nodes recorded, not silently dropped
 - [ ] Loop terminated on a declared budget or plateau condition (not an arbitrary stop)
+- [ ] For portfolio runs: each wave recorded role allocation, rejected duplicate/dead-end candidates, and critic merge notes before the next wave launched
 
 **Enriched artifact output**: Store in `blueprints/<name>/results/` following the schema from `standards/benchmark-commons/PROPOSAL.md`. Each artifact includes: model metadata, engine config, infrastructure, workload, core metrics, SLO evaluation, and optional extensions.
 
