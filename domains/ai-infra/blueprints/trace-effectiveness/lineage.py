@@ -87,12 +87,65 @@ def load_session(fp):
                           "Edit": "edit", "NotebookEdit": "edit"}[name]
                 seq += 1
                 events.append({"seq": seq, "ts": ts, "action": action,
-                               "path": path, "uuid": d.get("uuid")})
+                               "path": path, "uuid": d.get("uuid"),
+                               "old_string": inp.get("old_string"),
+                               "new_string": inp.get("new_string")})
             elif name in SEARCH_TOOLS:
                 seq += 1
                 events.append({"seq": seq, "ts": ts, "action": "search",
                                "path": inp.get("pattern") or inp.get("glob") or "?",
                                "uuid": d.get("uuid")})
+    return events
+
+
+def load_session_streamjson(fp):
+    """Adapter for agent-runner's `run.log` (Claude Code --output-format stream-json).
+
+    Same tool_use shape as projects-JSONL, but: no `isSidechain`/`timestamp`
+    fields, some events nest `type` under `msg`, and the file has non-JSON lines
+    (git clone / install-deps output) that must be skipped. This is the
+    execution-substrate path (agent-runtime); the projects-JSONL path is local.
+    """
+    events = []
+    seq = 0
+    for line in open(fp, errors="ignore"):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            d = json.loads(line)
+        except Exception:
+            continue  # raw non-JSON log line (git/install output) — not a trace event
+        if not isinstance(d, dict):
+            continue
+        t = d.get("type") or (d.get("msg") or {}).get("type")
+        if t not in ("assistant", "agent_message", "message"):
+            continue
+        m = d.get("message")
+        if not isinstance(m, dict):
+            m = d.get("msg") if isinstance(d.get("msg"), dict) else {}
+        ts = parse_ts(d.get("timestamp"))  # usually None in stream-json — seq order is what matters
+        for b in (m.get("content") or []):
+            if not (isinstance(b, dict) and b.get("type") == "tool_use"):
+                continue
+            name = b.get("name", "")
+            inp = b.get("input") or {}
+            if name in FILE_TOOLS:
+                path = norm_path(inp, name)
+                if not path:
+                    continue
+                action = {"Read": "read", "Write": "write",
+                          "Edit": "edit", "NotebookEdit": "edit"}[name]
+                seq += 1
+                events.append({"seq": seq, "ts": ts, "action": action,
+                               "path": path, "uuid": b.get("id"),
+                               "old_string": inp.get("old_string"),
+                               "new_string": inp.get("new_string")})
+            elif name in SEARCH_TOOLS:
+                seq += 1
+                events.append({"seq": seq, "ts": ts, "action": "search",
+                               "path": inp.get("pattern") or inp.get("glob") or "?",
+                               "uuid": b.get("id")})
     return events
 
 
@@ -206,8 +259,115 @@ def detect_drift(per_file):
                 "last_seq": b_last,
                 "references_changed": sorted({a for _, a in stale_against}),
                 "latest_change_seq": latest,
+                "kind": "reference",
             })
     return sorted(flags, key=lambda f: f["last_seq"])
+
+
+# Only treat distinctive value replacements as coupling signals — a 1-char or
+# ultra-common change ("a"→"b", "0"→"1") would false-positive everywhere.
+_MIN_VALUE_LEN = 2
+
+
+def _is_wordish(c):
+    return c.isalnum() or c in "._-"
+
+
+def _minimal_change(old, new):
+    """Reduce a full-line Edit (old_string/new_string carry surrounding context)
+    to the differing token, snapped to WORD boundaries so e.g. `"v1"`→`"v2"`
+    yields `v1`/`v2` (not the bare `1`/`2`, which would be uselessly noisy).
+    Returns (old_token, new_token) or (None, None)."""
+    if not old or not new or old == new:
+        return None, None
+    # minimal differing span (strip common prefix/suffix)
+    i = 0
+    while i < len(old) and i < len(new) and old[i] == new[i]:
+        i += 1
+    j = 0
+    while (j < len(old) - i and j < len(new) - i
+           and old[-1 - j] == new[-1 - j]):
+        j += 1
+    # expand left/right over word-ish chars so the token isn't cut mid-word
+    lo = i
+    while lo > 0 and _is_wordish(old[lo - 1]):
+        lo -= 1
+    ro = len(old) - j
+    while ro < len(old) and _is_wordish(old[ro]):
+        ro += 1
+    rn = len(new) - j
+    while rn < len(new) and _is_wordish(new[rn]):
+        rn += 1
+    old_tok = old[lo:ro].strip()
+    new_tok = new[lo:rn].strip()
+    return old_tok or None, new_tok or None
+
+
+def _iter_repo_files(root, max_files=2000):
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in
+                       (".git", "node_modules", "__pycache__", ".claude")]
+        for fn in filenames:
+            yield os.path.join(dirpath, fn)
+            max_files -= 1
+            if max_files <= 0:
+                return
+
+
+def detect_value_drift(events, repo_root=None):
+    """Flag files that still contain a value the agent REPLACED elsewhere.
+
+    The agent's Edit events carry old_string/new_string. When a distinctive
+    token was consistently swapped old→new in the files it touched, any OTHER
+    file under repo_root that still contains `old` (and not `new`) is likely a
+    forgotten coupled site — value-level drift (constant/config propagation),
+    complementary to reference-level drift. Mechanical: substring check only.
+
+    repo_root defaults to the common directory of the edited files.
+    """
+    # Collect (old_token -> new_token) pairs the agent actually applied.
+    edited_paths = set()
+    pairs = {}  # old -> new (last wins; seeded tasks use one token/task)
+    for e in events:
+        if e.get("action") != "edit":
+            continue
+        edited_paths.add(os.path.realpath(e["path"]))
+        # old/new_string carry full-line context; reduce to the minimal changed
+        # token so we match the VALUE, not surrounding text.
+        old_tok, new_tok = _minimal_change(e.get("old_string"), e.get("new_string"))
+        if old_tok and new_tok and old_tok != new_tok and len(old_tok) <= 40:
+            pairs[old_tok] = new_tok
+
+    pairs = {o: n for o, n in pairs.items()
+             if len(o) >= _MIN_VALUE_LEN and o not in ("", " ")}
+    if not pairs or not edited_paths:
+        return []
+
+    if repo_root is None:
+        repo_root = os.path.commonpath(list(edited_paths)) if len(edited_paths) > 1 \
+            else os.path.dirname(next(iter(edited_paths)))
+    if not os.path.isdir(repo_root):
+        return []
+
+    flags = []
+    for fpath in _iter_repo_files(repo_root):
+        rp = os.path.realpath(fpath)
+        if rp in edited_paths:
+            continue  # agent already touched it
+        content = _read_text(fpath)
+        if not content:
+            continue
+        stale_tokens = [o for o, n in pairs.items()
+                        if o in content and n not in content]
+        if stale_tokens:
+            flags.append({
+                "path": fpath,
+                "last_action": "untouched",
+                "stale_values": sorted(set(stale_tokens)),
+                "propagated_elsewhere_to": sorted({pairs[o] for o in stale_tokens}),
+                "kind": "value",
+            })
+    return flags
 
 
 def render(fp, events, per_file, flags, as_json=False):
@@ -238,13 +398,19 @@ def render(fp, events, per_file, flags, as_json=False):
         p("> None. No file was left un-revisited after a sibling in its "
           "directory changed later in the session.\n")
     else:
-        p(f"**{len(flags)}** file(s) may be stale — they reference a file that "
-          "changed later, and were never revisited before session end:\n")
+        p(f"**{len(flags)}** file(s) may be stale (never revisited before session end):\n")
         for f in flags:
-            refs = ", ".join(f"`{os.path.basename(s)}`" for s in f["references_changed"])
-            p(f"- **`{f['path']}`** — last {f['last_action']} at step {f['last_seq']}; "
-              f"it references {refs} which changed afterward (step {f['latest_change_seq']}); "
-              f"never re-read/re-edited. *Check it's still consistent.*")
+            if f.get("kind") == "value":
+                vals = ", ".join(f"`{v}`" for v in f["stale_values"])
+                to = ", ".join(f"`{v}`" for v in f["propagated_elsewhere_to"])
+                p(f"- **`{f['path']}`** (untouched) still contains {vals}, which was "
+                  f"changed to {to} in files the agent edited. *Likely a forgotten "
+                  f"coupled site — propagate or confirm it should differ.*")
+            else:
+                refs = ", ".join(f"`{os.path.basename(s)}`" for s in f["references_changed"])
+                p(f"- **`{f['path']}`** — last {f['last_action']} at step {f['last_seq']}; "
+                  f"it references {refs} which changed afterward (step {f['latest_change_seq']}); "
+                  f"never re-read/re-edited. *Check it's still consistent.*")
         p("")
 
     # ---- Per-file timeline (the graph, as a readable table) ----
@@ -278,7 +444,15 @@ def main():
     ap.add_argument("--session", default=None, help="explicit .jsonl path")
     ap.add_argument("--project", default=None, help="pick newest session(s) whose path matches")
     ap.add_argument("--last", type=int, default=1, help="how many newest sessions to audit (with --project)")
+    ap.add_argument("--stream-json", action="store_true",
+                    help="parse agent-runner run.log (Claude Code stream-json) instead of projects-JSONL. Use with --session <run.log>.")
     ap.add_argument("--json", default=None, help="dump graph+drift JSON (single session only)")
+    ap.add_argument("--repo-root", default=None,
+                    help="root to scan for value-drift (default: common dir of edited files)")
+    ap.add_argument("--no-value-drift", action="store_true",
+                    help="disable value-level drift detection (reference-coupling only)")
+    ap.add_argument("--no-reference-drift", action="store_true",
+                    help="disable reference-coupling drift (value-level only). Use for value-propagation tasks where reference-drift is noisy.")
     args = ap.parse_args()
 
     sessions = pick_sessions(args.root, args.project, args.session, args.last)
@@ -286,10 +460,13 @@ def main():
         print("No matching sessions found.")
         return
 
+    loader = load_session_streamjson if args.stream_json else load_session
     for i, fp in enumerate(sessions):
-        events = load_session(fp)
+        events = loader(fp)
         per_file = build_lineage(events)
-        flags = detect_drift(per_file)
+        flags = [] if args.no_reference_drift else detect_drift(per_file)
+        if not args.no_value_drift:
+            flags = flags + detect_value_drift(events, repo_root=args.repo_root)
         if args.json and len(sessions) == 1:
             with open(args.json, "w") as f:
                 f.write(render(fp, events, per_file, flags, as_json=True))
