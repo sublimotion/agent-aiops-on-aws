@@ -62,7 +62,7 @@ Run each arm at ≥2 tiers: **short** (task alone, ~few turns) and **long** (tas
 | Arm | control, advisory, reflect-informational, reflect-mandatory |
 | Trajectory tier | short (no compaction), long (≥1 compaction triggered) |
 | Coupling K | small (K=3), larger (K=6–8) — does harder propagation widen the gap |
-| Model | one held fixed for the main result (e.g. via vLLM endpoint or Haiku for cost); note model, don't sweep in v1 |
+| Model | **Sonnet 4.6** (`claude-sonnet-4-6`) via Bedrock, held fixed for v1. Chosen for headroom: Opus 4.8 (agent-runner's default) risks a **ceiling effect** — if the model self-corrects without the drift flag, reflect−control collapses to noise (the trinity-coordinator saturation pattern: strong model + task → no headroom → signal invisible). Haiku risks the opposite (task failure noise drowns the drift signal). Sonnet is the altitude where a capable-but-unsaturated agent leaves room for the flag to move the metric. Override agent-runner's Opus default via `ANTHROPIC_MODEL`. **v2 axis:** sweep Haiku/Sonnet/Opus to *measure* where the layer helps most (hypothesis: more on weaker/unsaturated models) — deferred from v1. |
 | Trials per cell | ≥20 seeded tasks (mechanical oracle → cheap to scale; power for a 15pp effect) |
 
 State which cells run vs exploratory before launch. Main result = arm × length at fixed K=3, then K as a secondary sweep.
