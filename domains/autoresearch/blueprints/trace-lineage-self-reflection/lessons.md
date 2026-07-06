@@ -87,3 +87,24 @@ Continued the search for a substrate that BOTH drifts AND is realistic. Result: 
 
 ### Pivot decision
 Recommended: reuse the **SWE-bench** infra already standing (verification-primitives-swebench: Docker-from-Hub working, 175/300 baseline, m7i EC2). **PASS_TO_PASS regressions = mechanical drift oracle** (agent broke a coupled site) on real file tasks that lineage.py CAN observe. Turns "multi-week rebuild" into "reuse what exists." Alternative: Aider refactor benchmark (AST-graded, no Docker, lighter, but saturates on top models).
+
+## Offline drift-vs-outcome on 301 real SWE-bench traces (2026-07-06) — the free gate
+
+Ran lineage's detectors over 301 real Claude Code SWE-bench sessions (pivot-analysis blueprint) with known pass/fail. No new runs, no spend. This is the retrospective gate before any live experiment.
+
+**Results (301 labeled, base fail rate 35.9%):**
+| | drift detected | no drift |
+|---|---|---|
+| **failed** | 1 | 107 |
+| **passed** | 0 | 193 |
+
+- `P(fail | drift) = 1.0` — every drift-flagged trace failed. **Zero false positives across 193 passing traces.** Odds ratio 5.4. mean val_drift: 0.556 (fail) vs 0.000 (pass).
+- **BUT recall ≈ 0**: only **1 of 108 failures** carried a detectable drift flag.
+- Not a Bash-editing artifact: only 1% of sessions edited via Bash-only; 95% used file Edit/Write. The detector *could* see the edits — the coupled-site value-drift pattern simply **wasn't present** in the failures.
+
+**Verdict — qualified NO-GO for the naive experiment:**
+- ✅ Detector PRECISION confirmed on real data (1.0), corroborating the synthetic pilot.
+- ❌ COVERAGE too low on SWE-bench: catches ~1% of failures. Feeding it back would help almost no runs. Not worth a live reflect experiment on this benchmark.
+- 🔑 **Core finding:** coupled-site value-drift is a REAL but RARE failure mode in general bug-fixing. SWE-bench agents fail mostly from wrong logic / incomplete fix / wrong location — not from propagating a value to some sites and forgetting others. The reliability layer's correctness value is **narrow and task-dependent**: it pays off on propagation-heavy work (migrations, renames, mass config edits), NOT general single-bug fixing.
+
+**Convergent conclusion across the whole investigation:** the detector is sound (high precision, both synthetic and real) but addresses a failure mode that is rare in the dominant coding-agent benchmark. Two defensible next moves: (a) target a propagation-heavy substrate where the mode is common (migrations/refactors — but those need heavy env infra, see PyMigBench note); or (b) accept the boundary and ship the detector as a precise, low-recall *advisory* tripwire (its original form), NOT an in-loop reflect layer. Recommend (b) unless a propagation-heavy use case becomes a priority. Artifact: results/offline-drift-swebench.json (per-session rows).
