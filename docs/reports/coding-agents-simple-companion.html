@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beyond Tokenmaxing - Coding Agent Endpoint Companion</title>
+<style>
+:root{
+  --bg:#f7f7f2;--surface:#ffffff;--surface2:#eeefe8;--border:#d8dacd;--text:#1d2119;
+  --muted:#63695c;--green:#15803d;--blue:#2563eb;--amber:#b45309;--red:#b91c1c;--ink:#111827;
+  --navbg:rgba(247,247,242,.95);--hero:#111827;--heroText:#ffffff;--heroMuted:#cbd5e1;--calloutBg:#eff6ff;--calloutText:#1e3a8a;
+}
+[data-theme="dark"]{
+  --bg:#10130f;--surface:#191d16;--surface2:#24291f;--border:#3a4235;--text:#edf1e8;
+  --muted:#abb4a4;--green:#4ade80;--blue:#60a5fa;--amber:#fbbf24;--red:#f87171;--ink:#05070a;
+  --navbg:rgba(16,19,15,.95);--hero:#05070a;--heroText:#ffffff;--heroMuted:#cbd5e1;--calloutBg:#10243f;--calloutText:#dbeafe;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+header{background:var(--ink);color:white;padding:28px 22px}
+.inner{max-width:1180px;margin:0 auto}
+.header-row{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+h1{font-size:1.85rem;margin:0 0 6px;font-weight:780;letter-spacing:0}
+.dek{color:#cbd5e1;max-width:780px}
+nav{position:sticky;top:0;background:var(--navbg);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);z-index:10}
+nav .inner{display:flex;gap:6px;overflow:auto;padding:10px 22px}
+nav a{white-space:nowrap;text-decoration:none;color:var(--muted);border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:7px 10px;font-size:.82rem;font-weight:700}
+main{padding:22px}
+section{max-width:1180px;margin:0 auto 18px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px}
+h2{font-size:1.15rem;margin:0 0 4px;font-weight:780}
+h3{font-size:.96rem;margin:0 0 7px;font-weight:760}
+.sub{color:var(--muted);font-size:.86rem;margin-bottom:14px}
+.grid{display:grid;gap:14px}.cols2{grid-template-columns:1fr 1fr}.cols3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:860px){.cols2,.cols3{grid-template-columns:1fr}header{padding:22px 18px}main{padding:14px}}
+.card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.kpi{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:13px}
+.kpi .label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:760}
+.kpi .value{font-size:1.35rem;font-weight:800;margin-top:3px}
+.kpi .note{font-size:.78rem;color:var(--muted)}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0}
+label{display:flex;flex-direction:column;gap:5px;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;font-weight:760}
+input,select{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:6px;padding:8px;font:inherit;text-transform:none;letter-spacing:0}
+table{width:100%;border-collapse:collapse;font-size:.84rem}
+th{background:var(--surface2);color:var(--muted);text-align:left;text-transform:uppercase;letter-spacing:.04em;font-size:.68rem;padding:8px;border-bottom:1px solid var(--border)}
+td{padding:8px;border-bottom:1px solid var(--border);vertical-align:top}
+.num{text-align:right;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.tag{display:inline-block;border-radius:999px;padding:2px 7px;font-size:.68rem;font-weight:760}
+.tag.green{background:#dcfce7;color:var(--green)}.tag.blue{background:#dbeafe;color:var(--blue)}
+.tag.amber{background:#fef3c7;color:var(--amber)}.tag.red{background:#fee2e2;color:var(--red)}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:860px){.flow{grid-template-columns:1fr}}
+.step{border:1px solid var(--border);border-radius:8px;padding:13px;background:var(--surface)}
+.arrow{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
+.small{font-size:.8rem;color:var(--muted)}
+.callout{border-left:4px solid var(--blue);background:var(--calloutBg);padding:12px 14px;border-radius:6px;color:var(--calloutText)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.warn{color:var(--amber);font-weight:700}.pass{color:var(--green);font-weight:700}.fail{color:var(--red);font-weight:700}
+.tablewrap{overflow:auto;border:1px solid var(--border);border-radius:8px}
+.traffic-input{width:72px}
+.hero-calc{display:grid;grid-template-columns:minmax(300px,.78fr) 1.22fr;gap:16px;align-items:start}
+.primary-panel{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px}
+.result-panel{background:var(--hero);color:var(--heroText);border-radius:8px;padding:18px}
+.result-panel .sub,.result-panel .small{color:var(--heroMuted)}
+.big-number{font-size:2.35rem;font-weight:820;letter-spacing:0;margin:4px 0}
+.result-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.result-tile{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:7px;padding:11px}
+.result-tile .label{font-size:.68rem;color:#cbd5e1;text-transform:uppercase;letter-spacing:.04em;font-weight:760}
+.result-tile .value{font-size:1.18rem;font-weight:800;margin-top:3px}
+.util-wrap{margin-top:14px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:12px}
+.util-head{display:flex;justify-content:space-between;gap:12px;align-items:baseline;margin-bottom:8px}
+.util-head b{font-size:.84rem}.util-head span{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:800}
+.util-bar{height:12px;background:rgba(255,255,255,.16);border-radius:999px;overflow:hidden}
+.util-bar i{display:block;height:100%;background:var(--green);width:0}
+.util-bar i.hot{background:var(--amber)}.util-bar i.over{background:var(--red)}
+.strategy{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.strategy button{border:1px solid var(--border);background:var(--surface);border-radius:7px;padding:10px;text-align:left;cursor:pointer;color:var(--text)}
+.strategy button.active{border-color:var(--blue);box-shadow:0 0 0 2px rgba(37,99,235,.22);background:var(--calloutBg)}
+.strategy b{display:block;font-size:.84rem}.strategy span{display:block;color:var(--muted);font-size:.74rem;margin-top:2px}
+details{border:1px solid var(--border);background:var(--surface);border-radius:8px;padding:12px;margin-top:12px}
+summary{cursor:pointer;font-weight:780;color:var(--text)}
+@media(max-width:980px){.hero-calc{grid-template-columns:1fr}.result-grid,.strategy{grid-template-columns:1fr}}
+.theme-btn{border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:white;border-radius:6px;padding:8px 11px;cursor:pointer;font-weight:760;white-space:nowrap}
+.theme-btn:hover{background:rgba(255,255,255,.14)}
+.arch{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:14px}
+.arch-col{border:1px solid var(--border);background:var(--surface2);border-radius:8px;padding:13px}
+.arch-col h3{font-size:.86rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.arch-node{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:10px;margin:8px 0}
+.arch-node b{display:block;font-size:.86rem}.arch-node span{display:block;font-size:.78rem;color:var(--muted);margin-top:2px}
+.arch-arrow{text-align:center;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:8px 0}
+.link-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.link-btn{display:inline-block;text-decoration:none;border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:6px;padding:8px 10px;font-weight:760;font-size:.82rem}
+.link-btn.primary{background:var(--ink);color:white;border-color:var(--ink)}
+@media(max-width:900px){.arch{grid-template-columns:1fr}}
+@media(max-width:700px){.header-row{flex-direction:column}.theme-btn{align-self:flex-start}}
+</style>
+</head>
+<body>
+<header>
+  <div class="inner header-row">
+    <div>
+      <h1>Beyond Tokenmaxing</h1>
+      <div class="dek">A simple companion to the coding-agent endpoint story: quota walls, fleet demand, cost per shipped task, model routing, and why owning the endpoint changes the curve.</div>
+    </div>
+    <button class="theme-btn" onclick="toggleTheme()">Toggle theme</button>
+  </div>
+</header>
+
+<nav>
+  <div class="inner">
+    <a href="#calculator">Calculator</a>
+    <a href="#wall">1. Wall</a>
+    <a href="#fleet">2. Fleet Demand</a>
+    <a href="#economics">3. Economics</a>
+    <a href="#routing">4. Routing</a>
+    <a href="#endpoint">5. Endpoint</a>
+    <a href="#models">6. Models</a>
+    <a href="#deploy">7. Deploy</a>
+  </div>
+</nav>
+
+<main>
+  <section id="calculator">
+    <h2>Coding Agent Capacity Calculator</h2>
+    <div class="sub">Start with the business shape of the agent fleet. Benchmark assumptions stay available, but they are no longer the first thing a user has to understand.</div>
+    <div class="hero-calc">
+      <div class="primary-panel">
+        <h3>1. Workload</h3>
+        <div class="controls">
+          <label>Engineers
+            <input id="calcEngineers" type="number" min="1" value="200" oninput="render()">
+          </label>
+          <label>Agents / engineer
+            <input id="calcAgents" type="number" min="1" value="10" oninput="render()">
+          </label>
+          <label>Tasks / agent / day
+            <input id="calcTasksAgentDay" type="number" min="0.1" step="0.1" value="8" oninput="render()">
+          </label>
+          <label>Task profile
+            <select id="taskProfile" onchange="applyProfile()">
+              <option value="normal" selected>Normal coding agent</option>
+              <option value="light">Light maintenance</option>
+              <option value="heavy">Heavy repo agent</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+          <label>Model / instance
+            <select id="refModel" onchange="applyReferenceModel()">
+              <option value="glm" selected>GLM-5.2 on B300</option>
+              <option value="qwen3">Qwen3-235B on B300</option>
+              <option value="kimi">Kimi K2.6 on B300</option>
+              <option value="devstral">Devstral Small 2 on g7e</option>
+            </select>
+          </label>
+          <label>Pricing mode
+            <select id="calcBasis" onchange="render()">
+              <option value="list" selected>List / ODCR</option>
+              <option value="spot">Spot</option>
+              <option value="blend">HyperPod blend</option>
+              <option value="api">API compare</option>
+            </select>
+          </label>
+        </div>
+
+        <h3>2. Routing strategy</h3>
+        <div class="strategy" id="strategyButtons">
+          <button class="active" data-strategy="balanced" onclick="setStrategy(event,'balanced')"><b>Balanced</b><span>Bulk local, strong local for hard work, small API tail.</span></button>
+          <button data-strategy="cost" onclick="setStrategy(event,'cost')"><b>Cost efficient</b><span>Push more work to cheap endpoints, escalate failures.</span></button>
+          <button data-strategy="capability" onclick="setStrategy(event,'capability')"><b>Capability first</b><span>Use GLM/Kimi/frontier for more of the workload.</span></button>
+        </div>
+        <input id="routeStrategy" type="hidden" value="balanced">
+
+        <details>
+          <summary>Advanced assumptions</summary>
+          <div class="controls">
+            <label>Output tokens / task
+              <input id="calcOutTok" type="number" min="100" value="6832" oninput="markCustomProfile();render()">
+            </label>
+            <label>Working days / year
+              <input id="calcWorkDays" type="number" min="1" value="260" oninput="render()">
+            </label>
+            <label>Target latency SLO (ms)
+              <input id="calcLatencySlo" type="number" min="100" value="15000" oninput="markCustomProfile();render()">
+            </label>
+            <label>HyperPod spot share (%)
+              <input id="spotShare" type="number" min="0" max="100" value="50" oninput="render()">
+            </label>
+            <label>B300 list $ / hr
+              <input id="b300ListHr" type="number" min="0" step="0.01" value="142.42" oninput="render()">
+            </label>
+            <label>B300 spot $ / hr
+              <input id="b300SpotHr" type="number" min="0" step="0.01" value="23.00" oninput="render()">
+            </label>
+            <label>B200 list $ / hr
+              <input id="b200ListHr" type="number" min="0" step="0.01" value="113.93" oninput="render()">
+            </label>
+            <label>B200 spot $ / hr
+              <input id="b200SpotHr" type="number" min="0" step="0.01" value="23.00" oninput="render()">
+            </label>
+            <label>g7e list $ / hr
+              <input id="g7eListHr" type="number" min="0" step="0.01" value="16.57" oninput="render()">
+            </label>
+            <label>g7e spot $ / hr
+              <input id="g7eSpotHr" type="number" min="0" step="0.01" value="4.14" oninput="render()">
+            </label>
+            <label>Frontier API $ / M out
+              <input id="frontierDpm" type="number" min="0" step="0.01" value="25" oninput="render()">
+            </label>
+          </div>
+        </details>
+      </div>
+
+      <div class="result-panel">
+        <div class="sub">Capacity result</div>
+        <div class="big-number" id="heroAgents">-</div>
+        <div class="small" id="heroExplain">Agents supported on the annual basis for the selected reference model.</div>
+        <div class="result-grid" id="heroTiles"></div>
+        <div class="util-wrap">
+          <div class="util-head"><b>Utilization for your entered workload</b><span id="utilPct">-</span></div>
+          <div class="util-bar"><i id="utilBar"></i></div>
+          <div class="small" id="utilExplain" style="margin-top:8px">Average output-token load divided by selected model goodput.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpis" id="moneyKpis" style="margin-top:14px"></div>
+    <div class="callout" style="margin:12px 0">Capacity anchor: for GLM-5.2, <span class="mono">9,271 tok/s * 86,400 / 6,832 out-tok/task</span> gives about 117K tasks/day. Dividing by 8 tasks/agent/day gives about 14.7K agents on a daily basis. The annual basis is internally consistent: about 43M tasks/year divided by <span class="mono">8 * 260 = 2,080</span> tasks/agent/year, or about 20K agents.</div>
+    <div class="kpis" id="calcKpis"></div>
+    <div class="callout" style="margin-bottom:12px">For self-hosted rows, cost is GPU instance cost, not model cost: <span class="mono">daily cost = endpoints * instance $/hr * 24</span>. HyperPod blend interpolates between editable spot and list prices. For the frontier fallback row, cost is token API price.</div>
+    <div class="sub">The routing table is generated from the selected strategy. Edit traffic percentages only when you need custom routing.</div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th>Model endpoint</th><th>Role</th><th>Instance</th><th>Evidence</th><th class="num">Traffic %</th><th class="num">Tasks / day</th><th class="num">Req tok/s</th><th class="num">Goodput tok/s</th><th class="num">Endpoints</th><th class="num">Latency</th><th>SLO</th><th class="num">Cost / task</th><th class="num">Daily cost</th>
+        </tr></thead>
+        <tbody id="calcModelRows"></tbody>
+      </table>
+    </div>
+    <div class="callout" style="margin-top:12px">Interpretation: required tok/s is average daily output load. Real production needs headroom for bursts, retries, prefill contention, and cache misses. Use the endpoint count as a first sizing pass, not a reservation plan.</div>
+  </section>
+
+  <section id="wall">
+    <h2>1. The Tokenmaxing Wall</h2>
+    <div class="sub">Coding agents shifted the unit of work from one prompt at a time to many autonomous loops running in parallel.</div>
+    <div class="grid cols3">
+      <div class="card">
+        <h3>Quota failure</h3>
+        <p class="small">Human-rate plans hit rolling caps, monthly fast-request limits, or org TPM/RPM limits when used by an agent fleet.</p>
+      </div>
+      <div class="card">
+        <h3>Workflow failure</h3>
+        <p class="small">When a cap hits mid-flow, the team loses context, waits, swaps tools, or restarts the agent run.</p>
+      </div>
+      <div class="card">
+        <h3>Planning failure</h3>
+        <p class="small">The budget conversation cannot stop at tokens. It has to account for resolved PRs, retries, review, and infra utilization.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="fleet">
+    <h2>2. What the Agent Fleet Actually Needs</h2>
+    <div class="sub">Adjust the simple demand model from the deck. This is deliberately high-level: it sizes the problem before picking a model.</div>
+    <div class="controls">
+      <label>Engineers
+        <input id="engineers" type="number" min="1" value="200" oninput="render()">
+      </label>
+      <label>Agents per engineer
+        <input id="agentsPerEngineer" type="number" min="1" value="10" oninput="render()">
+      </label>
+      <label>Tokens per engineer / day
+        <input id="tokensPerEngineerDay" type="number" min="1000" value="4500000" oninput="render()">
+      </label>
+      <label>Working days / year
+        <input id="workDays" type="number" min="1" value="260" oninput="render()">
+      </label>
+    </div>
+    <div class="kpis" id="fleetKpis"></div>
+  </section>
+
+  <section id="economics">
+    <h2>3. Cost per Shipped Task, Not Cost per Token</h2>
+    <div class="sub">Per-token price is only one input. A model that is cheap but fails often can be expensive per resolved PR.</div>
+    <div class="controls">
+      <label>Output tokens / task
+        <input id="outTokTask" type="number" min="100" value="6800" oninput="render()">
+      </label>
+      <label>Frontier API $ / M output tokens
+        <input id="apiDpm" type="number" min="1" value="25" oninput="render()">
+      </label>
+      <label>Local node $ / hour
+        <input id="nodeHr" type="number" min="1" value="142.42" oninput="render()">
+      </label>
+      <label>Local output tok / sec
+        <input id="localTps" type="number" min="1" value="9271" oninput="render()">
+      </label>
+    </div>
+    <div class="kpis" id="econKpis"></div>
+    <div class="callout">The default B300 reference uses GLM-5.2 at 9,271 output tok/s and B300 ODCR at $142.42/hr. The point is not that every workload gets this exact number; the point is that utilization drives endpoint economics.</div>
+  </section>
+
+  <section id="routing">
+    <h2>4. Route by Task Difficulty</h2>
+    <div class="sub">The operating model is not "one best model." It is cheap bulk handling plus escalation for the hard tail.</div>
+    <table>
+      <thead><tr><th>Tier</th><th>Typical tasks</th><th class="num">Default floor</th><th>Default endpoint type</th><th>Escalate when</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tag green">T0</span></td><td>Lint, docs, formatting, tiny edits</td><td class="num">50</td><td>Small coder endpoint</td><td>Tests fail twice or diff grows unexpectedly.</td></tr>
+        <tr><td><span class="tag green">T1</span></td><td>Localized bug fix, simple test repair</td><td class="num">60</td><td>Devstral / Qwen Coder class</td><td>No patch, repeated tool errors, or context overflow.</td></tr>
+        <tr><td><span class="tag blue">T2</span></td><td>Multi-file changes, repo navigation</td><td class="num">70</td><td>Mid or large open-weight endpoint</td><td>Unclear ownership, low verifier confidence, failed CI.</td></tr>
+        <tr><td><span class="tag amber">T3</span></td><td>Hard repo issue, ambiguous design/debugging</td><td class="num">78</td><td>GLM / Kimi / DeepSeek class</td><td>Agent stalls, reviewer rejects, or tests are inconclusive.</td></tr>
+        <tr><td><span class="tag red">T4</span></td><td>High-risk or unresolved tail</td><td class="num">82</td><td>Frontier API fallback</td><td>Keep for recovery, not default volume.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="endpoint">
+    <h2>5. Owning the Endpoint Changes the Curve</h2>
+    <div class="sub">Once the node is reserved, each additional useful task lowers effective cost until the endpoint saturates.</div>
+    <div class="controls">
+      <label>Coding agents
+        <input id="codingAgents" type="number" min="1" value="10000" oninput="render()">
+      </label>
+      <label>Tasks per agent / year
+        <input id="tasksPerAgentYear" type="number" min="1" value="2080" oninput="render()">
+      </label>
+      <label>Nodes
+        <input id="nodes" type="number" min="1" value="1" oninput="render()">
+      </label>
+    </div>
+    <div class="kpis" id="endpointKpis"></div>
+  </section>
+
+  <section id="models">
+    <h2>6. Models We Carded</h2>
+    <div class="sub">Simple roles, not a flat leaderboard. Capability, serving, and cost evidence are not equally strong for every model.</div>
+    <table>
+      <thead><tr><th>Model</th><th>Role</th><th>Evidence posture</th><th class="num">ODCR $/M out</th><th>Use first for</th></tr></thead>
+      <tbody>
+        <tr><td><b>Devstral Small 2</b></td><td>Cheap bulk endpoint</td><td>Strong tool/function evidence; hard-task pass needs calibration</td><td class="num">est.</td><td>T0/T1 routine work</td></tr>
+        <tr><td><b>Qwen2.5-Coder 32B</b></td><td>Cheap coder baseline</td><td>Harness-sensitive; needs rerun</td><td class="num">est.</td><td>Controlled SERA-style loops</td></tr>
+        <tr><td><b>Qwen3-235B-A22B</b></td><td>License and throughput pick</td><td>Serving measured; coding capability less documented</td><td class="num">$2.85</td><td>Apache-2.0, high-throughput mid tier</td></tr>
+        <tr><td><b>GLM-5.2</b></td><td>Measured workhorse</td><td>Measured fix-rate and measured B300 serving</td><td class="num">$4.27</td><td>T2/T3 self-hosted default</td></tr>
+        <tr><td><b>Kimi K2.6</b></td><td>Capability leader candidate</td><td>Strong official capability; needs same-harness eval</td><td class="num">$3.17</td><td>Capability-first open-weight trial</td></tr>
+        <tr><td><b>Claude Opus / GPT-5.x</b></td><td>Frontier fallback</td><td>Managed, high capability, high token price</td><td class="num">$25+</td><td>Hard-tail recovery</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="deploy">
+    <h2>7. Deployment Path</h2>
+    <div class="sub">Same developer harness, but pointed at your own endpoint and router.</div>
+    <div class="arch">
+      <div class="arch-col">
+        <h3>Developer surface</h3>
+        <div class="arch-node"><b>Amazon SageMaker Studio</b><span>IAM, VPC, in-account developer workspace</span></div>
+        <div class="arch-node"><b>Code Editor</b><span>Managed VS Code in Studio</span></div>
+        <div class="arch-node"><b>Claude Code / coding harness</b><span>Agent points at your endpoint URL</span></div>
+        <div class="arch-node"><b>Jupyter notebooks</b><span>Experimentation, eval, and data work</span></div>
+      </div>
+      <div class="arch-col">
+        <h3>Routing layer</h3>
+        <div class="arch-node"><b>Gateway / router</b><span>LiteLLM or proxy exposes one base URL</span></div>
+        <div class="arch-arrow">routes by task tier</div>
+        <div class="arch-node"><b>Routine work</b><span>Cheap local coder endpoints</span></div>
+        <div class="arch-node"><b>Hard tail</b><span>GLM/Kimi local workhorse or frontier API fallback</span></div>
+      </div>
+      <div class="arch-col">
+        <h3>Owned endpoint</h3>
+        <div class="arch-node"><b>SageMaker HyperPod on EKS</b><span>Optimized inference endpoint</span></div>
+        <div class="arch-node"><b>vLLM / SGLang</b><span>FP8, prefix cache, tuned parallel layout</span></div>
+        <div class="arch-node"><b>B200 / B300 / g7e pool</b><span>Managed GPU nodes and autoscaling pool</span></div>
+        <div class="arch-node"><b>Trace capture flywheel</b><span>PR diffs, review accepts, CI signal</span></div>
+      </div>
+    </div>
+    <div class="link-row">
+      <a class="link-btn primary" href="https://github.com/sublimotion/agent-aiops-on-aws">Open workshop repo</a>
+      <a class="link-btn" href="https://sublimotion.github.io/agent-aiops-on-aws/coding-agent-calculator/">Open calculator page</a>
+    </div>
+    <p class="small" style="margin-top:12px">Trace capture is the compounding asset: PR diffs, review accepts, CI pass/fail, verifier confidence, and escalation outcomes.</p>
+  </section>
+</main>
+
+<script>
+const ROUTE_MODELS = [
+  {id:"devstral", name:"Devstral Small 2", role:"bulk T0/T1", hw:"g7e", traffic:35, goodput:161, latency:12844, apiDpm:5.00, evidence:"Measured g7e/vLLM swarm; strong BFCL and functional eval; hard-task pass needs calibration."},
+  {id:"qwen3", name:"Qwen3-235B", role:"license / throughput", hw:"B300", traffic:25, goodput:13877, latency:2080, apiDpm:8.00, evidence:"Measured B300 goodput; no matched SWE-bench Verified in this report."},
+  {id:"glm", name:"GLM-5.2", role:"local workhorse", hw:"B300", traffic:25, goodput:9271, latency:8100, apiDpm:6.47, evidence:"Measured 89% fix-rate on n=46 plus measured B300 FP8 c320 knee."},
+  {id:"kimi", name:"Kimi K2.6", role:"capability open", hw:"B300", traffic:10, goodput:12478, latency:6179, apiDpm:1.18, evidence:"Measured B300 serving; capability is vendor-reported in this report."},
+  {id:"frontier", name:"Opus / GPT-5.x", role:"fallback tail", hw:"API", traffic:5, goodput:999999, latency:5000, apiDpm:25.00, evidence:"Managed frontier API; token-priced fallback and quality ceiling."}
+];
+const TASK_PROFILES = {
+  light:{outTok:2500, latency:8000, tasks:12},
+  normal:{outTok:6832, latency:15000, tasks:8},
+  heavy:{outTok:14000, latency:30000, tasks:4}
+};
+const ROUTING_STRATEGIES = {
+  cost:{devstral:50,qwen3:25,glm:15,kimi:5,frontier:5},
+  balanced:{devstral:35,qwen3:25,glm:25,kimi:10,frontier:5},
+  capability:{devstral:15,qwen3:20,glm:35,kimi:20,frontier:10}
+};
+function $(id){return document.getElementById(id)}
+function n(id){return +$(id).value || 0}
+function money(v){return "$" + (v >= 1000 ? Math.round(v).toLocaleString() : v >= 10 ? v.toFixed(2) : v.toFixed(3))}
+function compact(v){
+  if (v >= 1e12) return (v/1e12).toFixed(2) + "T";
+  if (v >= 1e9) return (v/1e9).toFixed(2) + "B";
+  if (v >= 1e6) return (v/1e6).toFixed(1) + "M";
+  if (v >= 1e3) return (v/1e3).toFixed(1) + "K";
+  return String(Math.round(v));
+}
+function kpi(label,value,note){return `<div class="kpi"><div class="label">${label}</div><div class="value">${value}</div><div class="note">${note}</div></div>`}
+function resultTile(label,value,note){return `<div class="result-tile"><div class="label">${label}</div><div class="value">${value}</div><div class="small">${note}</div></div>`}
+function utilizationLabel(pct){
+  if (pct > 100) return "over capacity";
+  if (pct > 75) return "busy";
+  if (pct > 35) return "healthy";
+  return "under-used";
+}
+function selectedRefModel(){ return ROUTE_MODELS.find(m=>m.id===$("refModel").value) || ROUTE_MODELS.find(m=>m.id==="glm"); }
+function instanceHr(hw){
+  if (hw==="API") return 0;
+  const prefix = hw.toLowerCase();
+  const list = n(prefix + "ListHr");
+  const spot = n(prefix + "SpotHr");
+  const basis = $("calcBasis").value;
+  if (basis==="spot") return spot;
+  if (basis==="blend") {
+    const spotShare = Math.min(100, Math.max(0, n("spotShare"))) / 100;
+    return spot * spotShare + list * (1 - spotShare);
+  }
+  return list;
+}
+function derivedDpm(m){
+  if (m.hw==="API" || $("calcBasis").value==="api") return m.id==="frontier" ? n("frontierDpm") : m.apiDpm;
+  return instanceHr(m.hw) * 1e6 / (m.goodput * 3600);
+}
+function applyReferenceModel(){
+  const m = selectedRefModel();
+  $("calcOutTok").value = m.id==="glm" ? 6832 : $("calcOutTok").value;
+  render();
+}
+function applyProfile(){
+  const profile = TASK_PROFILES[$("taskProfile").value];
+  if (profile) {
+    $("calcOutTok").value = profile.outTok;
+    $("calcLatencySlo").value = profile.latency;
+    $("calcTasksAgentDay").value = profile.tasks;
+  }
+  render();
+}
+function markCustomProfile(){
+  $("taskProfile").value = "custom";
+}
+function setStrategy(e, strategy){
+  if (e) e.preventDefault();
+  $("routeStrategy").value = strategy;
+  document.querySelectorAll("#strategyButtons button").forEach(btn=>btn.classList.toggle("active", btn.dataset.strategy===strategy));
+  const mix = ROUTING_STRATEGIES[strategy];
+  if (mix) {
+    ROUTE_MODELS.forEach(m=>{
+      const el = $("traffic_" + m.id);
+      if (el) el.value = mix[m.id] ?? 0;
+    });
+  }
+  render();
+}
+function toggleTheme(){
+  const html = document.documentElement;
+  const next = html.getAttribute("data-theme")==="dark" ? "light" : "dark";
+  html.setAttribute("data-theme", next);
+  try { localStorage.setItem("codingAgentCalcTheme", next); } catch (_e) {}
+}
+function initTheme(){
+  try {
+    const saved = localStorage.getItem("codingAgentCalcTheme");
+    if (saved) document.documentElement.setAttribute("data-theme", saved);
+  } catch (_e) {}
+}
+function render(){
+  renderCalculator();
+  const engineers = n("engineers");
+  const tokensDay = engineers * n("tokensPerEngineerDay");
+  const tokensYear = tokensDay * n("workDays");
+  $("fleetKpis").innerHTML = [
+    kpi("Concurrent agents", compact(engineers * n("agentsPerEngineer")), "fleet size at workday peak"),
+    kpi("Tokens / day", compact(tokensDay), "all engineers"),
+    kpi("Tokens / year", compact(tokensYear), `${n("workDays")} working days`),
+    kpi("API exposure", money(tokensYear / 1e6 * n("apiDpm")), "if all output-priced, upper-bound view")
+  ].join("");
+
+  const outTok = n("outTokTask");
+  const apiTask = outTok / 1e6 * n("apiDpm");
+  const localDpm = n("nodeHr") * 1e6 / (n("localTps") * 3600);
+  const localTask = outTok / 1e6 * localDpm;
+  $("econKpis").innerHTML = [
+    kpi("API task", money(apiTask), "output-token-only"),
+    kpi("Local $ / M out", money(localDpm), "node cost / measured tok/s"),
+    kpi("Local task", money(localTask), "output-token-only"),
+    kpi("Token price gap", Math.round(apiTask / Math.max(.0001, localTask)) + "x", "before success/retry effects")
+  ].join("");
+
+  const nodeYear = n("nodeHr") * 24 * 365 * n("nodes");
+  const yearlyTasks = n("codingAgents") * n("tasksPerAgentYear");
+  const endpointTask = nodeYear / Math.max(1, yearlyTasks);
+  const capacityTasks = n("localTps") * 3600 * 24 * 365 * n("nodes") / Math.max(1, outTok);
+  const util = Math.min(100, yearlyTasks / Math.max(1, capacityTasks) * 100);
+  $("endpointKpis").innerHTML = [
+    kpi("Node cost / year", money(nodeYear), `${n("nodes")} node(s)`),
+    kpi("Tasks / year", compact(yearlyTasks), "requested by agent fleet"),
+    kpi("Endpoint $ / task", money(endpointTask), "fixed asset view"),
+    kpi("Approx utilization", util.toFixed(0) + "%", "against token capacity")
+  ].join("");
+}
+function modelTraffic(m){
+  const el = $("traffic_" + m.id);
+  if (el) return +el.value || 0;
+  const strategy = ROUTING_STRATEGIES[$("routeStrategy").value] || ROUTING_STRATEGIES.balanced;
+  return strategy[m.id] ?? m.traffic;
+}
+function renderCalculator(){
+  const engineers = n("calcEngineers");
+  const agents = n("calcAgents");
+  const tasksAgentDay = n("calcTasksAgentDay");
+  const outTok = n("calcOutTok");
+  const basis = $("calcBasis").value;
+  const latencySlo = n("calcLatencySlo");
+  const workDays = n("calcWorkDays");
+  const ref = selectedRefModel();
+  const totalAgents = engineers * agents;
+  const totalTasksDay = totalAgents * tasksAgentDay;
+  const totalOutTokDay = totalTasksDay * outTok;
+  const refOutputDay = ref.goodput >= 999999 ? 0 : ref.goodput * 86400;
+  const refTasksDay = refOutputDay / Math.max(1, outTok);
+  const refAgentsDay = refTasksDay / Math.max(.01, tasksAgentDay);
+  const refTasksYear = ref.goodput >= 999999 ? 0 : ref.goodput * 86400 * 365 / Math.max(1, outTok);
+  const refAgentsYear = refTasksYear / Math.max(1, tasksAgentDay * workDays);
+  const selectedReqTps = totalOutTokDay / 86400;
+  const selectedUtil = ref.goodput >= 999999 ? 0 : selectedReqTps / Math.max(1, ref.goodput);
+  const selectedNodes = ref.goodput >= 999999 ? 0 : Math.max(1, Math.ceil(selectedUtil));
+  const selectedUtilPct = selectedUtil * 100;
+  const refHr = instanceHr(ref.hw);
+  const refYearCost = ref.hw==="API" ? 0 : refHr * 24 * 365;
+  $("heroAgents").textContent = compact(refAgentsYear) + " agents / node";
+  $("heroExplain").textContent = `${ref.name} on ${ref.hw}, annual basis: ${compact(refTasksYear)} tasks/year divided by ${compact(tasksAgentDay * workDays)} tasks/agent/year.`;
+  $("heroTiles").innerHTML = [
+    resultTile("Agent fleet demand", compact(totalAgents), `${engineers} engineers x ${agents} agents`),
+    resultTile("Daily tasks", compact(totalTasksDay), `${tasksAgentDay} tasks / agent / day`),
+    resultTile("Reference capacity", compact(refTasksDay) + " tasks/day", `${compact(refOutputDay)} out tok/day`),
+    resultTile("Nodes needed", ref.hw==="API" ? "managed" : selectedNodes.toLocaleString(), `${selectedReqTps.toFixed(1)} required tok/s`),
+    resultTile("Reference node cost", ref.hw==="API" ? "-" : money(refYearCost) + "/yr", `${money(refHr)} / hr`),
+    resultTile("Utilization state", utilizationLabel(selectedUtilPct), `${selectedUtilPct.toFixed(1)}% average load`)
+  ].join("");
+  $("utilPct").textContent = selectedUtilPct.toFixed(1) + "%";
+  const bar = $("utilBar");
+  bar.style.width = Math.min(100, selectedUtilPct).toFixed(1) + "%";
+  bar.className = selectedUtilPct > 100 ? "over" : selectedUtilPct > 75 ? "hot" : "";
+  $("utilExplain").textContent = ref.hw==="API"
+    ? "Managed API fallback is not capacity-sized here."
+    : `${selectedReqTps.toFixed(1)} required tok/s against ${ref.goodput.toLocaleString()} tok/s measured goodput on one ${ref.hw} endpoint.`;
+  $("moneyKpis").innerHTML = [
+    kpi("Selected model / instance", ref.name, `${ref.goodput.toLocaleString()} tok/s on ${ref.hw}`),
+    kpi("Node output / day", compact(refOutputDay), `${ref.goodput.toLocaleString()} tok/s * 86,400`),
+    kpi("Tasks / day capacity", compact(refTasksDay), `${outTok.toLocaleString()} output tok / task`),
+    kpi("Agents / node / day", compact(refAgentsDay), `${tasksAgentDay} tasks / agent / day`),
+    kpi("Agents / node / year", compact(refAgentsYear), `${workDays} working days basis`),
+    kpi("Node cost / year", ref.hw==="API" ? "-" : money(refYearCost), `${money(refHr)} / hr ${basis}`)
+  ].join("");
+  const rawTraffic = ROUTE_MODELS.map(m=>modelTraffic(m));
+  const trafficTotal = rawTraffic.reduce((a,b)=>a+b,0) || 1;
+  let totalDailyCost = 0;
+  let totalEndpoints = 0;
+  const rows = ROUTE_MODELS.map((m,i)=>{
+    const pct = rawTraffic[i] / trafficTotal;
+    const tasksDay = totalTasksDay * pct;
+    const tokDay = tasksDay * outTok;
+    const reqTps = tokDay / 86400;
+    const endpoints = m.goodput >= 999999 ? 0 : Math.max(1, Math.ceil(reqTps / Math.max(1, m.goodput)));
+    const dpm = derivedDpm(m);
+    const dailyCost = (m.hw==="API" || basis==="api") ? (tokDay / 1e6 * dpm) : (endpoints * instanceHr(m.hw) * 24);
+    const costTask = dailyCost / Math.max(1, tasksDay);
+    const sloPass = m.latency <= latencySlo;
+    totalDailyCost += dailyCost;
+    totalEndpoints += endpoints;
+    return `<tr>
+      <td><b>${m.name}</b></td>
+      <td>${m.role}</td>
+      <td>${m.hw==="API" ? "managed API" : m.hw + " " + money(instanceHr(m.hw)) + "/hr"}</td>
+      <td>${m.evidence}</td>
+      <td class="num"><input class="traffic-input" id="traffic_${m.id}" type="number" min="0" value="${rawTraffic[i]}" oninput="render()">%</td>
+      <td class="num">${Math.round(tasksDay).toLocaleString()}</td>
+      <td class="num">${reqTps.toFixed(1)}</td>
+      <td class="num">${m.goodput >= 999999 ? "managed" : m.goodput.toLocaleString()}</td>
+      <td class="num">${m.goodput >= 999999 ? "-" : endpoints}</td>
+      <td class="num">${m.latency.toLocaleString()} ms</td>
+      <td>${sloPass ? '<span class="pass">pass</span>' : '<span class="fail">fail</span>'}</td>
+      <td class="num">${money(costTask)}</td>
+      <td class="num">${money(dailyCost)}</td>
+    </tr>`;
+  }).join("");
+  $("calcModelRows").innerHTML = rows;
+  $("calcKpis").innerHTML = [
+    kpi("Agent fleet", compact(totalAgents), `${engineers} engineers x ${agents} agents`),
+    kpi("Tasks / day", compact(totalTasksDay), `${tasksAgentDay} tasks / agent / day`),
+    kpi("Output tokens / day", compact(totalOutTokDay), `${outTok.toLocaleString()} output tok / task`),
+    kpi("Avg required tok/s", (totalOutTokDay/86400).toFixed(1), "before burst headroom"),
+    kpi("Local endpoints", totalEndpoints.toLocaleString(), "from average goodput"),
+    kpi("Daily GPU/API cost", money(totalDailyCost), `${basis.toUpperCase()} pricing mode`)
+  ].join("");
+}
+initTheme();
+render();
+</script>
+</body>
+</html>
