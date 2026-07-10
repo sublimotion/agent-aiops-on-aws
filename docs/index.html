@@ -15,6 +15,7 @@
     --accent-green: #3fb950;
     --accent-purple: #bc8cff;
     --accent-orange: #d29922;
+    --accent-cyan: #39c5cf;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -87,6 +88,7 @@
   .badge-agent-runtime { background: rgba(188, 140, 255, 0.15); color: var(--accent-purple); }
   .badge-research { background: rgba(63, 185, 80, 0.15); color: var(--accent-green); }
   .badge-overview { background: rgba(210, 153, 34, 0.15); color: var(--accent-orange); }
+  .badge-ai-infra { background: rgba(57, 197, 207, 0.15); color: var(--accent-cyan); }
   .subgroup-label {
     grid-column: 1 / -1;
     font-size: 0.75rem;
@@ -200,6 +202,7 @@
     <button class="filter-btn active" data-filter="all">All</button>
     <button class="filter-btn active" data-filter="gpu-serving">GPU Serving</button>
     <button class="filter-btn active" data-filter="autoresearch">Autoresearch</button>
+    <button class="filter-btn active" data-filter="ai-infra">AI Infra</button>
     <button class="filter-btn active" data-filter="overview">Cross-Domain</button>
   </div>
 </header>
@@ -211,15 +214,30 @@
   </div>
   <div class="cards">
     <div class="subgroup-label">Inference benchmarks</div>
+    <a class="card" data-id="coding-agents-modelcards" href="reports/coding-agents-modelcards-20260629.html">
+      <div class="card-title">Open-Weight Coding Agents on Blackwell &mdash; Cost vs Opus / GPT-5.x</div>
+      <div class="card-desc">Consolidated model cards: GLM-5.2, Kimi K2.6, DeepSeek V4 Flash, Nemotron, MiniMax-M2, Qwen3-235B &mdash; capability (official), serving (measured), and $/Mtok at current spot &amp; on-demand prices</div>
+      <div class="card-meta"><span>2026-06-29</span><span>consolidated</span></div>
+    </a>
     <a class="card" data-id="kimi-k2.6-nvfp4" href="reports/benchmark-visual-kimi-k2.6-nvfp4-20260617.html">
       <div class="card-title">Kimi K2.6 NVFP4 on B200 + B300</div>
       <div class="card-desc">NVFP4 quantization benchmark &mdash; throughput and cost across B200 and B300</div>
       <div class="card-meta"><span>2026-06-17</span><span>kimi-k2.6-nvfp4</span></div>
     </a>
+    <a class="card" data-id="glm5.2-b300" href="reports/benchmark-visual-glm5.2-b300-20260627.html">
+      <div class="card-title">GLM-5.2-FP8 on B300 &mdash; Optimization Loop</div>
+      <div class="card-desc">Full T0&ndash;T6 goodput@TTFT-SLO loop on p6-b300 &mdash; prefix cache +347%, TP4+DP2 +28%, MNBT &amp; NVFP4 arms, fleet sizing</div>
+      <div class="card-meta"><span>2026-06-27</span><span>glm5.2</span></div>
+    </a>
     <a class="card" data-id="glm5.2" href="reports/benchmark-visual-glm5.2-20260623.html">
       <div class="card-title">GLM-5.2-FP8 on B200</div>
       <div class="card-desc">GLM-5.2-FP8 serving benchmark on p6-b200 &mdash; baseline and NVFP4 sweep</div>
       <div class="card-meta"><span>2026-06-23</span><span>glm5.2</span></div>
+    </a>
+    <a class="card" data-id="minimax-m2" href="reports/benchmark-visual-minimax-m2-20260628.html">
+      <div class="card-title">MiniMax-M2 on B200 &mdash; Serving Study</div>
+      <div class="card-desc">230B MoE / 10B active &mdash; v0.23 deployable (TP4 parity w/ 0.19); EP +40% lever lost on 0.23; CPU KV-offload no benefit (0 tier-hit)</div>
+      <div class="card-meta"><span>2026-07-01</span><span>minimax-m2</span></div>
     </a>
     <a class="card" data-id="deepseek-v4-flash" href="reports/benchmark-visual-deepseek-v4-flash-20260519.html">
       <div class="card-title">DeepSeek V4 Flash on B300</div>
@@ -390,6 +408,25 @@
       <div class="card-title">Finetuning Recipes</div>
       <div class="card-desc">Finetuning configuration benchmarks</div>
       <div class="card-meta"><span>finetuning-recipes</span></div>
+    </a>
+  </div>
+</section>
+
+<section class="domain" data-domain="ai-infra">
+  <div class="domain-header">
+    <h2>AI Infra</h2>
+    <span class="domain-badge badge-ai-infra">ai-infra</span>
+  </div>
+  <div class="cards">
+    <a class="card" data-id="cold-start-progress" href="reports/cold-start-progress-report.html">
+      <div class="card-title">Cold-Start Optimization Lab</div>
+      <div class="card-desc">Six experiments measured &mdash; EBS-snapshot compile cache survives node termination and delivers AOT HIT on a fresh B200 in &lt;25s of attach overhead</div>
+      <div class="card-meta"><span>2026-05-31</span><span>ai-infra</span></div>
+    </a>
+    <a class="card" data-id="cold-start-explainer" href="reports/cold-start-explainer.html">
+      <div class="card-title">Cold Start, Explained</div>
+      <div class="card-desc">A tutorial on GPU LLM serving latency &mdash; why a 700&nbsp;GB redeploy makes the first user wait 16 minutes, and which lever attacks each bottleneck</div>
+      <div class="card-meta"><span>2026-06-01</span><span>ai-infra</span></div>
     </a>
   </div>
 </section>

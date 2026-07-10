@@ -209,6 +209,15 @@ Concrete, testable outcomes
 What this does NOT need to do
 ```
 
+### Enforce gates, not mechanisms
+
+A spec states **what must be true** (invariants and fail-closed gates), not **which tool to run**. Write "Stage 4a GPU health passes", "`validate-serving-config.py` exits 0", "lessons captured and compounded" — not "you MUST call the `deployment-orchestrator` skill". Two reasons:
+
+1. **Mandating the mechanism backfires.** The verification-primitives experiment measured this directly: "You MUST use tools" prompting gave 40% tool adoption and a *lower* fix rate, while outcome-framed checkpoint guidance reached 83% adoption and the first statistically-significant gold-pass lift. Enforce the result; let the agent choose how.
+2. **Mechanism names rot; invariants don't.** Domain routing already auto-selects the deployer agent from the spec path, and tools get renamed, merged, or replaced (e.g. iteration loops migrating from the `ralph-loop` plugin toward native `/goal`). A spec that named the tool breaks on refactor; a spec that named the outcome survives.
+
+**When naming a tool IS correct:** when the tool *is* the gate — a fail-closed check whose specific invocation is the guarantee (`serving-commons` resolver at Stage 0c, the `carryover-auditor` spec-design gate). There the mechanism and the invariant are the same thing, so name it. This is also why skills/subagents earn their keep as *consistency contracts* — but that value comes from the workflow they guarantee, not from being name-dropped in every spec.
+
 ## Steering Files
 
 `.claude/steering/` contains persistent context loaded on demand by Claude Code.

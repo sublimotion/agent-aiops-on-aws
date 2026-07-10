@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Inference Optimization — Tiered Decision Framework</title>
+<style>
+:root {
+  --beam: #00e5ff; --pulse: #a855f7; --heat: #f97316;
+  --green: #22c55e; --warn: #eab308; --fail: #ef4444;
+  --bg: #050810; --card: #0a1018; --card2: #0d1520;
+  --border: #142035; --text: #c0cde0; --dim: #4a5e78;
+  --bright: #e8f0ff;
+
+  --st-image: #1f6feb;
+  --st-init: #00b4d8;
+  --st-container: #2dd4bf;
+  --st-modelload: #a855f7;
+  --st-jit: #f97316;
+  --st-cudagraph: #f43f5e;
+  --st-firsttoken: #22c55e;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; padding: 0; }
+
+.container { max-width: 1080px; margin: 0 auto; padding: 0 28px; }
+
+.hero { text-align: center; padding: 72px 20px 48px; }
+.hero h1 { font-size: 2rem; font-weight: 300; letter-spacing: 5px; text-transform: uppercase; color: var(--text); margin-bottom: 4px; }
+.hero h1 span { font-weight: 800; color: var(--beam); text-shadow: 0 0 30px rgba(0,229,255,0.35); }
+.hero .sub { font-size: 0.78rem; color: var(--dim); letter-spacing: 2.5px; margin-bottom: 28px; }
+.hero .thesis { max-width: 760px; margin: 0 auto; font-size: 1rem; color: #8aa4c0; line-height: 1.9; }
+.hero .thesis em { color: var(--beam); font-style: normal; font-weight: 600; }
+.hero .promise { display: inline-block; margin-top: 18px; padding: 10px 16px; background: rgba(168,85,247,0.08); border: 1px solid rgba(168,85,247,0.25); border-radius: 22px; font-size: 0.82rem; color: var(--bright); }
+.hero .promise strong { color: var(--pulse); }
+
+.cross-link { max-width: 760px; margin: 22px auto 0; padding: 10px 16px; background: var(--card2); border: 1px solid var(--border); border-radius: 22px; font-size: 0.78rem; color: var(--text); }
+.cross-link a { color: var(--beam); text-decoration: none; font-weight: 600; }
+.cross-link a:hover { text-decoration: underline; }
+
+.section { padding: 48px 0 32px; border-top: 1px solid var(--border); }
+.section-label { font-size: 0.65rem; color: var(--dim); text-transform: uppercase; letter-spacing: 3px; margin-bottom: 8px; }
+.section h2 { font-size: 1.5rem; font-weight: 700; color: var(--bright); margin-bottom: 12px; }
+.section .lead { font-size: 0.92rem; color: #7a99b8; max-width: 820px; margin-bottom: 24px; }
+
+.tbl { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.85rem; }
+.tbl th { text-align: left; padding: 10px 12px; font-size: 0.68rem; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
+.tbl td { padding: 10px 12px; border-bottom: 1px solid rgba(20,32,53,0.5); vertical-align: top; }
+.tbl tr:hover td { background: rgba(0,229,255,0.03); }
+.tbl .mono { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; }
+.tbl .g { color: var(--green); font-weight: 700; }
+.tbl .w { color: var(--warn); font-weight: 700; }
+.tbl .r { color: var(--fail); font-weight: 700; }
+.tbl .c { color: var(--beam); font-weight: 700; }
+.tbl .p { color: var(--pulse); font-weight: 700; }
+.tbl .h { color: var(--heat); font-weight: 700; }
+
+.chip { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+.chip-g { background: rgba(34,197,94,0.15); color: var(--green); }
+.chip-w { background: rgba(234,179,8,0.15); color: var(--warn); }
+.chip-r { background: rgba(239,68,68,0.15); color: var(--fail); }
+.chip-c { background: rgba(0,229,255,0.1); color: var(--beam); }
+.chip-p { background: rgba(168,85,247,0.15); color: var(--pulse); }
+.chip-h { background: rgba(249,115,22,0.15); color: var(--heat); }
+
+.why-box { background: var(--card2); border-left: 3px solid var(--pulse); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 16px 0; }
+.why-box .wt { font-size: 0.72rem; color: var(--pulse); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; font-weight: 700; }
+.why-box p { font-size: 0.84rem; color: var(--text); margin-bottom: 6px; }
+.why-box p:last-child { margin-bottom: 0; }
+
+.cards { display: grid; gap: 14px; margin: 16px 0; }
+.cards-2 { grid-template-columns: 1fr 1fr; }
+.cards-3 { grid-template-columns: 1fr 1fr 1fr; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+.card h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 4px; color: var(--bright); }
+.card .cd { font-size: 0.78rem; color: var(--dim); margin-bottom: 12px; }
+.card ul { list-style: none; padding: 0; }
+.card li { font-size: 0.82rem; padding: 3px 0 3px 14px; position: relative; color: var(--text); }
+.card li::before { content: '→'; position: absolute; left: 0; color: var(--beam); font-size: 0.7rem; }
+.card .num { font-size: 1.4rem; font-weight: 800; color: var(--beam); }
+
+/* ============ STAIRCASE ============ */
+.staircase-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 28px 18px 22px; margin: 18px 0; overflow-x: auto; }
+.staircase { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; align-items: stretch; min-width: 820px; }
+.step { position: relative; border-radius: 10px 10px 4px 4px; padding: 16px 14px 16px; display: flex; flex-direction: column; gap: 8px; transition: transform 0.18s ease; min-height: 240px; }
+.step:hover { transform: translateY(-3px); }
+.step .tnum { font-size: 0.65rem; color: var(--dim); letter-spacing: 2px; font-weight: 700; }
+.step .tname { font-size: 0.95rem; font-weight: 800; color: var(--bright); line-height: 1.25; }
+.step .tdesc { font-size: 0.74rem; color: var(--text); line-height: 1.5; }
+.step .tpct { font-size: 1.5rem; font-weight: 800; line-height: 1.05; margin-top: 4px; }
+.step .tpct .tpct-l { display: block; font-size: 0.55rem; color: var(--dim); font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; margin-top: 4px; line-height: 1.2; }
+.step .tfoot { margin-top: auto; padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.step .tcost { font-size: 0.66rem; color: var(--dim); font-family: 'JetBrains Mono', monospace; }
+
+/* Top accent stripe encodes operational complexity (replaces variable step heights) */
+.step::before { content: ''; position: absolute; top: 0; left: 0; right: 0; border-radius: 10px 10px 0 0; }
+.step.t1 { background: linear-gradient(180deg, rgba(34,197,94,0.10) 0%, rgba(34,197,94,0.04) 100%); border: 1px solid rgba(34,197,94,0.35); }
+.step.t1::before { height: 4px; background: var(--green); }
+.step.t2 { background: linear-gradient(180deg, rgba(0,229,255,0.10) 0%, rgba(0,229,255,0.04) 100%); border: 1px solid rgba(0,229,255,0.35); }
+.step.t2::before { height: 8px; background: var(--beam); }
+.step.t3 { background: linear-gradient(180deg, rgba(234,179,8,0.10) 0%, rgba(234,179,8,0.04) 100%); border: 1px solid rgba(234,179,8,0.40); }
+.step.t3::before { height: 14px; background: var(--warn); }
+.step.t4 { background: linear-gradient(180deg, rgba(249,115,22,0.10) 0%, rgba(249,115,22,0.04) 100%); border: 1px solid rgba(249,115,22,0.42); }
+.step.t4::before { height: 22px; background: var(--heat); }
+.step.t5 { background: linear-gradient(180deg, rgba(239,68,68,0.12) 0%, rgba(239,68,68,0.04) 100%); border: 1px solid rgba(239,68,68,0.48); }
+.step.t5::before { height: 32px; background: var(--fail); }
+/* Push first content row below the accent stripe */
+.step.t1 .tnum { margin-top: 8px; }
+.step.t2 .tnum { margin-top: 12px; }
+.step.t3 .tnum { margin-top: 18px; }
+.step.t4 .tnum { margin-top: 26px; }
+.step.t5 .tnum { margin-top: 36px; }
+
+.step.t1 .tpct { color: var(--green); }
+.step.t2 .tpct { color: var(--beam); }
+.step.t3 .tpct { color: var(--warn); }
+.step.t4 .tpct { color: var(--heat); }
+.step.t5 .tpct { color: var(--fail); }
+
+.staircase-axis { display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--dim); letter-spacing: 2px; text-transform: uppercase; margin-top: 14px; padding: 0 4px; }
+
+.cumul { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 18px; }
+.cumul .cu { background: var(--card2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
+.cumul .cu .cl { font-size: 0.6rem; color: var(--dim); text-transform: uppercase; letter-spacing: 1.4px; }
+.cumul .cu .cv { font-size: 0.95rem; font-weight: 800; color: var(--bright); margin-top: 2px; }
+.cumul .cu .cb { height: 4px; border-radius: 2px; margin-top: 6px; background: var(--border); overflow: hidden; }
+.cumul .cu .cb i { display: block; height: 100%; background: linear-gradient(90deg, var(--green), var(--heat) 60%, var(--fail)); }
+
+/* ============ DECISION TREE ============ */
+.tree { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 22px; margin: 18px 0; }
+.tree-node { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 12px 14px; background: var(--card2); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; position: relative; }
+.tree-node .q { font-size: 0.9rem; color: var(--bright); }
+.tree-node .q .qn { display: block; font-size: 0.62rem; color: var(--dim); letter-spacing: 1.4px; text-transform: uppercase; margin-bottom: 2px; }
+.tree-node .yes-arrow { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--green); }
+.tree-node .leaf { font-size: 0.78rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; white-space: nowrap; }
+.tree-node.l1 { border-left: 3px solid var(--beam); }
+.tree-node.l5 { border-left: 3px solid var(--fail); }
+.tree-node.l3 { border-left: 3px solid var(--warn); }
+.tree-node.l4 { border-left: 3px solid var(--heat); }
+.tree-node.l4b { border-left: 3px solid var(--heat); }
+.tree-fall { font-size: 0.84rem; color: var(--text); padding: 14px 16px; background: rgba(34,197,94,0.06); border: 1px dashed rgba(34,197,94,0.4); border-radius: 8px; margin-top: 8px; }
+.tree-fall strong { color: var(--green); }
+
+/* ============ TIER CARDS ============ */
+.tier-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 22px; margin: 14px 0; }
+.tier-card .tch { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; flex-wrap: wrap; }
+.tier-card .tch h3 { font-size: 1.05rem; font-weight: 800; color: var(--bright); }
+.tier-card .tch .tm { font-size: 0.7rem; color: var(--dim); letter-spacing: 2px; text-transform: uppercase; font-weight: 700; }
+.tier-card p.mech { font-size: 0.86rem; color: #8aa4c0; margin: 8px 0 14px; line-height: 1.7; }
+.tier-card .uw { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+.tier-card .uw .uwc { padding: 10px 12px; border-radius: 8px; font-size: 0.82rem; }
+.tier-card .uw .uwc.use { background: rgba(34,197,94,0.06); border: 1px solid rgba(34,197,94,0.25); }
+.tier-card .uw .uwc.no  { background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.25); }
+.tier-card .uw .uwc .ul { font-size: 0.62rem; letter-spacing: 1.4px; text-transform: uppercase; font-weight: 700; margin-bottom: 4px; }
+.tier-card .uw .uwc.use .ul { color: var(--green); }
+.tier-card .uw .uwc.no .ul { color: var(--fail); }
+.tier-card ul.wins { list-style: none; padding: 0; margin: 8px 0; }
+.tier-card ul.wins li { font-size: 0.84rem; padding: 4px 0 4px 18px; position: relative; color: var(--text); }
+.tier-card ul.wins li::before { content: '◆'; position: absolute; left: 0; color: var(--beam); font-size: 0.65rem; top: 7px; }
+.tier-card .refs { font-size: 0.72rem; color: var(--dim); margin-top: 12px; font-family: 'JetBrains Mono', monospace; padding-top: 10px; border-top: 1px dashed var(--border); }
+
+.tier-card.t1 { border-left: 4px solid var(--green); }
+.tier-card.t2 { border-left: 4px solid var(--beam); }
+.tier-card.t3 { border-left: 4px solid var(--warn); }
+.tier-card.t4 { border-left: 4px solid var(--heat); }
+.tier-card.t5 { border-left: 4px solid var(--fail); }
+
+/* ============ HARD-TRUTH CALLOUT ============ */
+.hard-truth { background: linear-gradient(180deg, rgba(239,68,68,0.10) 0%, rgba(168,85,247,0.06) 100%); border: 1px solid rgba(239,68,68,0.4); border-radius: 12px; padding: 24px 26px; margin: 20px 0; }
+.hard-truth .ht-tag { display: inline-block; font-size: 0.62rem; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: var(--fail); padding: 3px 10px; background: rgba(239,68,68,0.15); border-radius: 14px; margin-bottom: 10px; }
+.hard-truth h3 { font-size: 1.2rem; font-weight: 800; color: var(--bright); margin-bottom: 8px; }
+.hard-truth p { font-size: 0.88rem; color: var(--text); margin-bottom: 10px; line-height: 1.75; }
+.ht-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+.ht-grid .htc { padding: 14px 16px; border-radius: 8px; }
+.ht-grid .htc.need { background: rgba(34,197,94,0.07); border: 1px solid rgba(34,197,94,0.3); }
+.ht-grid .htc.trap { background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.32); }
+.ht-grid .htc h4 { font-size: 0.78rem; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; margin-bottom: 8px; }
+.ht-grid .htc.need h4 { color: var(--green); }
+.ht-grid .htc.trap h4 { color: var(--fail); }
+.ht-grid .htc ul { list-style: none; padding: 0; }
+.ht-grid .htc li { font-size: 0.82rem; padding: 4px 0 4px 16px; position: relative; }
+.ht-grid .htc.need li::before { content: '✓'; position: absolute; left: 0; color: var(--green); font-weight: 800; }
+.ht-grid .htc.trap li::before { content: '✗'; position: absolute; left: 0; color: var(--fail); font-weight: 800; }
+.ht-cost { margin-top: 14px; padding: 12px 16px; background: rgba(0,0,0,0.25); border-radius: 8px; font-size: 0.84rem; color: var(--bright); border-left: 3px solid var(--heat); }
+.ht-cost strong { color: var(--heat); }
+
+/* ============ FOOTER ============ */
+.footer-links { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 22px 0; }
+.fl-card { padding: 12px 16px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; transition: border-color 0.15s ease; }
+.fl-card:hover { border-color: var(--beam); }
+.fl-card a { color: var(--beam); text-decoration: none; font-weight: 700; font-size: 0.88rem; }
+.fl-card .fld { font-size: 0.74rem; color: var(--dim); margin-top: 3px; }
+
+.footer { text-align: center; padding: 40px 20px; font-size: 0.7rem; color: var(--dim); border-top: 1px solid var(--border); margin-top: 40px; }
+
+@media (max-width: 800px) {
+  .cards-2, .cards-3 { grid-template-columns: 1fr; }
+  .tier-card .uw { grid-template-columns: 1fr; }
+  .ht-grid { grid-template-columns: 1fr; }
+  .footer-links { grid-template-columns: 1fr; }
+  .tree-node { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Optimization <span>Tier Ladder</span></h1>
+  <div class="sub">AI Inference Infrastructure · Tiered Decision Framework · v1 · 2026-06-01</div>
+  <p class="thesis">
+    Where does <em>your</em> workload actually belong? <strong>80% of production GPU LLM workloads</strong> need only Tier&nbsp;1 + Tier&nbsp;2.
+    Roughly <em>15%</em> need Tier&nbsp;3 (cold-start) or Tier&nbsp;4 (routing). <em>Less than 5%</em> need Tier&nbsp;5
+    (disagg P/D, request migration, multi-node TP). Reach for Tier&nbsp;5 before Tier&nbsp;1 is solid and you are buying complexity you cannot operate.
+  </p>
+  <div class="promise">
+    By the end of this page you will know <strong>which tier your workload sits at</strong> and what NOT to invest in.
+  </div>
+  <div class="cross-link">
+    Want measured numbers? See the <a href="cold-start-progress-report.html">Cold-Start Optimization Lab progress report</a>.
+    New to cold start? Start with the <a href="cold-start-explainer.html">Cold Start, Explained</a> tutorial.
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============================ STAIRCASE ============================ -->
+<div class="section">
+  <div class="section-label">The centerpiece</div>
+  <h2>The Five-Tier Ladder</h2>
+  <p class="lead">
+    Each step adds capability — and complexity. The height of the step encodes the operational tax.
+    Read it left-to-right: cheap defaults at the bottom, frontier patterns at the top. Most workloads should never climb past step two.
+  </p>
+
+  <div class="staircase-wrap">
+    <div class="staircase">
+      <div class="step t1">
+        <div class="tnum">TIER 1</div>
+        <div class="tname">Engine defaults</div>
+        <div class="tdesc">Chunked prefill, prefix cache, continuous batching, right TP, FP8.</div>
+        <div class="tpct">100%<span class="tpct-l">all workloads</span></div>
+        <div class="tfoot"><span class="chip chip-g">Trivial</span><span class="tcost">config flags only</span></div>
+      </div>
+      <div class="step t2">
+        <div class="tnum">TIER 2</div>
+        <div class="tname">Production basics</div>
+        <div class="tdesc">Slim image, AMI match, health-check tuning, min-1-replica.</div>
+        <div class="tpct">~80%<span class="tpct-l">production floor</span></div>
+        <div class="tfoot"><span class="chip chip-g">Low</span><span class="tcost">~1 engineer-week</span></div>
+      </div>
+      <div class="step t3">
+        <div class="tnum">TIER 3</div>
+        <div class="tname">Cold-start</div>
+        <div class="tdesc">Compile cache (C-EBS), MX/B weights, snapshot (E), warm pool.</div>
+        <div class="tpct">~15%<span class="tpct-l">spiky autoscale</span></div>
+        <div class="tfoot"><span class="chip chip-w">Medium</span><span class="tcost">~1 engineer-month</span></div>
+      </div>
+      <div class="step t4">
+        <div class="tnum">TIER 4</div>
+        <div class="tname">Capacity &amp; routing</div>
+        <div class="tdesc">GAIE EPP, Dynamo Router, multi-region capacity-aware routing.</div>
+        <div class="tpct">~10%<span class="tpct-l">multi-replica + variance</span></div>
+        <div class="tfoot"><span class="chip chip-w">High</span><span class="tcost">~1 engineer-quarter</span></div>
+      </div>
+      <div class="step t5">
+        <div class="tnum">TIER 5</div>
+        <div class="tname">Frontier patterns</div>
+        <div class="tdesc">Disagg P/D, request migration, multi-node TP, KV offload, MTP.</div>
+        <div class="tpct">&lt;5%<span class="tpct-l">frontier MoE only</span></div>
+        <div class="tfoot"><span class="chip chip-r">Very high</span><span class="tcost">~1+ engineer-quarters</span></div>
+      </div>
+    </div>
+    <div class="staircase-axis">
+      <span>Cheap · safe · always-on</span>
+      <span>Expensive · gated · workload-specific</span>
+    </div>
+
+    <div class="cumul">
+      <div class="cu"><div class="cl">Cumul. tax · T1</div><div class="cv">~0</div><div class="cb"><i style="width:5%"></i></div></div>
+      <div class="cu"><div class="cl">Cumul. tax · T2</div><div class="cv">1 wk</div><div class="cb"><i style="width:18%"></i></div></div>
+      <div class="cu"><div class="cl">Cumul. tax · T3</div><div class="cv">1 mo</div><div class="cb"><i style="width:38%"></i></div></div>
+      <div class="cu"><div class="cl">Cumul. tax · T4</div><div class="cv">1 qtr</div><div class="cb"><i style="width:65%"></i></div></div>
+      <div class="cu"><div class="cl">Cumul. tax · T5</div><div class="cv">2 qtr+</div><div class="cb"><i style="width:100%"></i></div></div>
+    </div>
+  </div>
+
+  <div class="why-box">
+    <div class="wt">How to read the ladder</div>
+    <p>The <strong>thickness of each top stripe</strong> encodes operational complexity, and the bars beneath quantify the cumulative engineering tax. Tier 5 is not "5× better than Tier 1" — it is <strong>5× harder to operate</strong> and only pays off on a narrow band of frontier-model workloads. Climbing higher than your workload pattern justifies produces <em>negative</em> ROI: the ranges in this doc are typical, not guarantees.</p>
+  </div>
+</div>
+
+<!-- ============================ DECISION TREE ============================ -->
+<div class="section">
+  <div class="section-label">Pick your tier</div>
+  <h2>Workload pattern → tier ceiling</h2>
+  <p class="lead">
+    Walk this top-to-bottom. The first "yes" determines your tier ceiling. Ambition does not move the ceiling — workload pattern does.
+  </p>
+
+  <div class="tree">
+    <div class="tree-node l1">
+      <div class="q"><span class="qn">Q1</span>Is this single-replica, always-on production?</div>
+      <div class="yes-arrow">YES →</div>
+      <div class="leaf chip chip-c">Tier 2 · the deployment IS the warm pool</div>
+    </div>
+    <div class="tree-node l5">
+      <div class="q"><span class="qn">Q2</span>Is the model genuinely too big for one-node TP fit (&gt;200B activations, &gt;700B total)?</div>
+      <div class="yes-arrow">YES →</div>
+      <div class="leaf chip chip-r">Tier 5 path · multi-node TP, disagg P/D candidate</div>
+    </div>
+    <div class="tree-node l3">
+      <div class="q"><span class="qn">Q3</span>Is the autoscale event rate &gt; 1/day per pool?</div>
+      <div class="yes-arrow">YES →</div>
+      <div class="leaf chip chip-w">Tier 3 · cold-start strategies pay off</div>
+    </div>
+    <div class="tree-node l4">
+      <div class="q"><span class="qn">Q4</span>Does the workload have prefix-sharing structure (multi-turn chat, agent harness, shared system prompts)?</div>
+      <div class="yes-arrow">YES →</div>
+      <div class="leaf chip chip-h">Tier 4 · GAIE EPP prefix scorer</div>
+    </div>
+    <div class="tree-node l4b">
+      <div class="q"><span class="qn">Q5</span>Multi-region or capacity-event resilience required?</div>
+      <div class="yes-arrow">YES →</div>
+      <div class="leaf chip chip-h">Tier 4 · GAIE + Dynamo global_router</div>
+    </div>
+    <div class="tree-fall">
+      <strong>Otherwise → stay at Tier 2.</strong> The complexity tax of higher tiers will eat your engineering budget. This is the right answer for the majority of production workloads.
+    </div>
+  </div>
+
+  <div class="why-box" style="border-left-color: var(--beam);">
+    <div class="wt" style="color: var(--beam);">Cross-links to lab specs</div>
+    <p>Q2 / Tier 5 paths land in <code>domains/gpu-serving/blueprints/{glm5-llmd, dynamo-hyperpod, kimi-k2.6-speculative}</code>. Q3 / Tier 3 lands in <code>domains/ai-infra/blueprints/{spec-c-ebs-snapshot, spec-a-image-pull, dynamo-snapshot}</code>. Q4 / Tier 4 lands in <code>domains/ai-infra/specs/{global-inference-gateway-research, cold-start-autoscaler-policy}</code>.</p>
+  </div>
+</div>
+
+<!-- ============================ TIER CARDS ============================ -->
+<div class="section">
+  <div class="section-label">Tier-by-tier</div>
+  <h2>Five tier cards · what each layer actually does</h2>
+  <p class="lead">
+    Each card answers the same five questions: how it works, when to use, when NOT to use, what wins look like, and which lab specs implement it.
+  </p>
+
+  <!-- TIER 1 -->
+  <div class="tier-card t1">
+    <div class="tch">
+      <h3>Tier 1 — Engine-level defaults</h3>
+      <span class="chip chip-g">Trivial</span>
+      <span class="tm">Always on · zero infra cost</span>
+    </div>
+    <p class="mech">
+      Modern serving engines (vLLM, SGLang, TensorRT-LLM) ship with a small set of feature flags that are
+      strictly Pareto-better than their alternatives but are not always on by default. Chunked prefill splits
+      long prefills into chunks interleaved with decode batches, shrinking request-cost variance the rest of the
+      stack would otherwise have to work around. Continuous batching replaces static-batch padding with
+      token-level batching. Prefix caching hashes shared prompt prefixes and reuses their KV. FP8 halves
+      memory on Blackwell where the MoE TP divisibility rule (<code>moe_intermediate_size / TP % 128 == 0</code>) holds.
+    </p>
+    <div class="uw">
+      <div class="uwc use"><div class="ul">When to use</div>Every workload. There is no exception. Skipping Tier 1 invalidates every higher-tier measurement because you are optimizing on top of an unfair baseline.</div>
+      <div class="uwc no"><div class="ul">When NOT to use</div>Never &mdash; though check FP8 against the MoE divisibility rule before flipping it on, and pin the right TP for your fit (TP=1 wherever possible).</div>
+    </div>
+    <ul class="wins">
+      <li><strong>Chunked prefill</strong> — 2-3× improvement in p99 TTFT under mixed prompt-length workloads (Sarathi-Serve, OSDI '24)</li>
+      <li><strong>Prefix caching</strong> — 20-50% prefill saving on multi-turn / shared-system-prompt workloads (Preble)</li>
+      <li><strong>Continuous batching</strong> — ~3× throughput vs static batching (Orca / vLLM)</li>
+      <li><strong>FP8 where supported</strong> — 2× memory, ~1.5× throughput on Blackwell</li>
+      <li><strong>Right TP</strong> — TP=1 wherever weights fit avoids unnecessary NCCL allreduce overhead</li>
+    </ul>
+    <div class="refs">Implicit in every blueprint. Methodology gotcha: vendor "5× routing" claims usually have chunked prefill OFF in baseline.</div>
+  </div>
+
+  <!-- TIER 2 -->
+  <div class="tier-card t2">
+    <div class="tch">
+      <h3>Tier 2 — Production basics</h3>
+      <span class="chip chip-g">Low</span>
+      <span class="tm">Bounded, well-known costs</span>
+    </div>
+    <p class="mech">
+      The minimum viable production deployment: an image small enough to pull in under two minutes, a hardware
+      tuple (driver, AMI, NCCL, engine) that has been seen working before, health-check timeouts wide enough
+      to not kill a JIT-heavy first start, and at least one always-on replica per region. Image-prepull
+      DaemonSets on warm-pool nodes eliminate image-pull from the cold-start path entirely for replicas landing
+      on already-warm nodes.
+    </p>
+    <div class="uw">
+      <div class="uwc use"><div class="ul">When to use</div>Every production workload. If users will be unhappy when it falls over, you are at Tier 2.</div>
+      <div class="uwc no"><div class="ul">When NOT to use</div>Throwaway dev/test, single-shot batch jobs that tolerate 5-10 min cold start, research notebooks. Everywhere else, this is non-negotiable.</div>
+    </div>
+    <ul class="wins">
+      <li><strong>Slim image (Spec A)</strong> — 1.87× faster image pull (77 s vs 144 s measured, Spec A baselines)</li>
+      <li><strong>Hardware-match pinning</strong> — NCCL 2.26.2+ on Blackwell PCIe; AL2023 AMI on B200; FP8 MoE TP rule</li>
+      <li><strong>Health-check tuning</strong> — <code>readinessProbe.initialDelaySeconds ≥ 900s</code> for DeepGEMM-heavy stacks</li>
+      <li><strong>Min-1-replica-per-region</strong> — codified in <code>warm-node-pool.md</code></li>
+      <li><strong>Image pre-pull DaemonSet</strong> — eliminates image-pull from cold-start for warm-node replicas</li>
+    </ul>
+    <div class="refs">Spec A + warm-node-pool steering rule + tech-stack.md hardware tuples. Lessons survive in MEMORY.md.</div>
+  </div>
+
+  <!-- TIER 3 -->
+  <div class="tier-card t3">
+    <div class="tch">
+      <h3>Tier 3 — Cold-start strategies</h3>
+      <span class="chip chip-w">Medium</span>
+      <span class="tm">Workload-shape dependent</span>
+    </div>
+    <p class="mech">
+      Cold-start is the stage where workload pattern starts dominating the decision. Three composable layers:
+      slim image (Tier 2 already), MX / RunAI streamer for weights, and EBS-snapshotted compile cache (Spec C-EBS).
+      A fused snapshot (Spec E) fuses env + weights + compiled state + process state into one binary and
+      restores it on a fresh node — useful only when the stack is frozen, vLLM, and autoscale events are frequent
+      enough that 25-40 s vs 50-120 s is load-bearing.
+    </p>
+    <div class="uw">
+      <div class="uwc use"><div class="ul">When to use</div>Spiky autoscale (&gt;5 events/day), multi-tenant model-per-tenant fleets, capacity-resilient deployments, scale-to-zero with infrequent events.</div>
+      <div class="uwc no"><div class="ul">When NOT to use</div>Single-replica always-on (the deployment IS the warm pool — you are double-paying). Steady-state autoscale &lt;1 event/day cannot amortize the bake cost.</div>
+    </div>
+    <ul class="wins">
+      <li><strong>Spec C-EBS</strong> — 386 s on a brand-new B200, ~25 s attach overhead, ~$30/mo per volume (production pattern)</li>
+      <li><strong>MX warm pool (regional)</strong> — N=2 cross-AZ floor for spot-reclaim recovery</li>
+      <li><strong>Three-tier (A+B+C-EBS)</strong> — <strong>16</strong> artifacts for a 10-model × 3-vLLM × 2-hw fleet</li>
+      <li><strong>Fused snapshot (E)</strong> — 25-40 s replica-N restore, <strong>60</strong> artifacts for the same fleet (full produce-path on any layer change)</li>
+      <li><strong>Cudagraph trim + prefetch</strong> — combined ~50% of warm-path time, single CLI flag changes</li>
+    </ul>
+    <div class="refs">Specs A · B · C-EBS · E · regional-mx-warm-pool. Default to three-tier; add snapshot only if vLLM + frozen stack + frequent autoscale.</div>
+  </div>
+
+  <!-- TIER 4 -->
+  <div class="tier-card t4">
+    <div class="tch">
+      <h3>Tier 4 — Capacity &amp; routing</h3>
+      <span class="chip chip-w">High</span>
+      <span class="tm">Multi-replica + variance-sensitive</span>
+    </div>
+    <p class="mech">
+      Pull-based / capacity-aware routing only matters when you have backends to route between AND the workload
+      has request-cost variance OR prefix locality OR SLO tiers. Round-robin is correct for single-replica or
+      fully-fungible-request workloads. Above that, GAIE EPP scorers (prefix, KV-utilization, SLO-headroom),
+      Dynamo's global router, and custom heterogeneous-fleet scorers each address a specific pattern.
+    </p>
+    <div class="uw">
+      <div class="uwc use"><div class="ul">When to use</div>Multi-replica with shared prompts (Preble territory, 2-3× p99 TTFT win), SLO tiers (interactive vs batch), multi-region resilience, heterogeneous fleets.</div>
+      <div class="uwc no"><div class="ul">When NOT to use</div>Single replica or fully fungible requests &mdash; routing is theatrical. AWS ALB does NOT implement Inference Extension; do not reach for it.</div>
+    </div>
+    <ul class="wins">
+      <li><strong>GAIE EPP v1.5.0 with prefix + kvcacheutilization</strong> — 2-3× p99 TTFT on prefix-heavy slices</li>
+      <li><strong>SLO-tiered admission</strong> — prevents batch from blowing interactive p99</li>
+      <li><strong>Dynamo global_router</strong> — &lt;30 s automatic multi-region failover vs minutes manual</li>
+      <li><strong>Heterogeneous-fleet scorer</strong> — open research; lab uniquely positioned to measure</li>
+      <li><strong>Online-learned latency predictors</strong> — sparse literature, opportunity for measurement</li>
+    </ul>
+    <div class="refs">global-inference-gateway-research · cold-start-autoscaler-policy · GAIE EPP InferencePool GA API.</div>
+  </div>
+
+  <!-- TIER 5 -->
+  <div class="tier-card t5">
+    <div class="tch">
+      <h3>Tier 5 — Frontier-model patterns</h3>
+      <span class="chip chip-r">Very high</span>
+      <span class="tm">Engineer-quarter-per-technique</span>
+    </div>
+    <p class="mech">
+      Disagg P/D (DistServe / NIXL / Mooncake), request migration (Llumnix), multi-node TP, KV cache offload,
+      and speculative decoding. Each has real wins on a narrow band of frontier-model workloads, and each costs
+      an engineer-quarter to operate. The 80/20 cutoff is steep — most workloads should never reach for Tier 5.
+      Half of these techniques have known traps: speculative decoding degrades on PCIe interconnects and produces
+      degenerate "hello hello" output on synthetic random workloads.
+    </p>
+    <div class="uw">
+      <div class="uwc use"><div class="ul">When to use</div>Frontier MoE (&gt;200B activations) on multi-node TP, RL/agent harnesses with extreme tail latency, KV-bound &gt;32K-context workloads.</div>
+      <div class="uwc no"><div class="ul">When NOT to use</div>Anything that fits TP≤8 on one node. Anything &lt;200B activations. Short-context, short-response, or PCIe-interconnected GPUs.</div>
+    </div>
+    <ul class="wins">
+      <li><strong>Disagg P/D</strong> — only when single-node fit fails AND prefill/decode SLOs differ AND KV transfer beats re-prefill</li>
+      <li><strong>Multi-node TP</strong> — GLM-5 744B, Kimi K2.6 1T, Qwen3-235B beyond TP=8 fit</li>
+      <li><strong>KV cache offload (Mooncake-style)</strong> — long-context (&gt;32K) where re-fetch latency &lt; offload latency</li>
+      <li><strong>Llumnix request migration</strong> — RL/agent harnesses with &gt;10-min generations and severe tail</li>
+      <li><strong>Spec decoding (MTP / draft-target)</strong> — single-replica large-model decode-dominated workloads on NVSwitch fabrics</li>
+    </ul>
+    <div class="refs">dynamo-hyperpod · glm5-llmd · kimi-k2.6-speculative · glm5-lmcache. Gotchas tracked in MEMORY.md.</div>
+  </div>
+</div>
+
+<!-- ============================ HARD TRUTH ============================ -->
+<div class="section">
+  <div class="section-label">The single most-misadopted technique</div>
+  <h2>Disagg P/D — the hard truth</h2>
+
+  <div class="hard-truth">
+    <span class="ht-tag">Trap warning</span>
+    <h3>Disagg prefill / decode is only really needed for frontier workloads.</h3>
+    <p>
+      Pretending you need it when you do not is the most expensive complexity tax in the lab. NIXL disables
+      <code>cuda_ipc</code> by default to avoid NVSwitch contention, and TP=1 ends up as the sweet spot for the
+      KV transport — the very pattern you do not get to use if you have multi-node TP. If your workload is
+      "Ministral-3B / Qwen3-30B / Mistral-Small fits TP≤4 on one node," you do not need disagg.
+    </p>
+
+    <div class="ht-grid">
+      <div class="htc need">
+        <h4>Signs you actually need it</h4>
+        <ul>
+          <li>Model is too big for any single-node TP fit (GLM-5 744B, Kimi K2.6 1T, frontier MoE)</li>
+          <li>Prefill SLO and decode SLO are <em>explicitly different</em> (e.g., interactive prefill ≤200ms, streaming throughput dominant)</li>
+          <li>KV transfer over NIXL/RDMA is faster than re-prefilling — only true at very long contexts</li>
+        </ul>
+      </div>
+      <div class="htc trap">
+        <h4>Signs it is a trap</h4>
+        <ul>
+          <li>Anything that fits TP≤8 on a single node — multi-node NCCL overhead dominates</li>
+          <li>Mixing P/D at small scale costs latency you do not recover</li>
+          <li>You read a vendor blog with "5× routing improvement" baselined against chunked-prefill-OFF</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="ht-cost">
+      <strong>Cost framing:</strong> an engineer-quarter to operate. Each of disagg P/D, request migration, multi-node TP,
+      and KV offload imposes its own engineer-quarter. Stacking them naively imposes the union, not the intersection.
+      Budget accordingly.
+    </div>
+  </div>
+</div>
+
+<!-- ============================ THREE-TIER VS FUSED ============================ -->
+<div class="section">
+  <div class="section-label">Architectural choice within Tier 3</div>
+  <h2>Three-tier (A + B + C-EBS) vs fused snapshot (E)</h2>
+  <p class="lead">
+    The single biggest decision inside Tier 3. The 60-vs-16 artifact-count math is the headline: a fused snapshot
+    grows multiplicatively across (model × vLLM × hardware), while three-tier separation grows additively.
+  </p>
+
+  <table class="tbl">
+    <tr>
+      <th>Dimension</th>
+      <th>Three-tier (A + B + C-EBS)</th>
+      <th>Fused snapshot (E)</th>
+    </tr>
+    <tr>
+      <td>Artifact count <span class="mono">10 models × 3 vLLM × 2 hw</span></td>
+      <td class="g"><strong>16</strong> (10 weights + 6 env images)</td>
+      <td class="r"><strong>60</strong> snapshots</td>
+    </tr>
+    <tr>
+      <td>Invalidation surface</td>
+      <td class="g">Independent per layer</td>
+      <td class="w">Any layer triggers full rebake</td>
+    </tr>
+    <tr>
+      <td>Engine compatibility</td>
+      <td class="g">vLLM, SGLang, TensorRT-LLM</td>
+      <td class="w">vLLM only (preview)</td>
+    </tr>
+    <tr>
+      <td>Replica-N cold start (Ministral-class)</td>
+      <td class="mono w">50-120 s</td>
+      <td class="mono g">25-40 s</td>
+    </tr>
+    <tr>
+      <td>Operational complexity</td>
+      <td><span class="chip chip-g">Low</span></td>
+      <td><span class="chip chip-w">Medium-high</span></td>
+    </tr>
+    <tr>
+      <td>Best for</td>
+      <td>Default for any production workload</td>
+      <td>Spiky autoscale on frozen vLLM stack</td>
+    </tr>
+  </table>
+
+  <div class="why-box" style="border-left-color: var(--green);">
+    <div class="wt" style="color: var(--green);">Steering rule (codified in <code>.claude/steering/tech-stack.md</code>)</div>
+    <p>
+      Default to three-tier. Add snapshot only when <strong>all three</strong> conditions hold:
+      stack frozen ≥1 week, autoscale events frequent enough that 25-40 s vs 50-120 s is load-bearing,
+      engine is vLLM. Everywhere else, three-tier separation is cheaper to operate and degrades gracefully under fleet churn.
+    </p>
+  </div>
+
+  <div class="why-box" style="border-left-color: var(--beam);">
+    <div class="wt" style="color: var(--beam);">Cross-link</div>
+    <p>The stacked Pareto chart with measured numbers — image pull ‖ EBS volume-create ‖ CRIU restore — lives in the
+    <a href="cold-start-progress-report.html#" style="color: var(--beam); text-decoration: none; font-weight: 600;">Cold-Start Progress Report</a> v5 § "Stacked autoscale wall time."</p>
+  </div>
+</div>
+
+<!-- ============================ LAB FLEET RECOMMENDATIONS ============================ -->
+<div class="section">
+  <div class="section-label">Practical · this lab's fleet</div>
+  <h2>Per-workload tier recommendations</h2>
+  <p class="lead">
+    Based on the workloads in MEMORY.md. Read this as the working answer for "what tier is workload X at" — not as universal guidance.
+  </p>
+
+  <table class="tbl">
+    <tr>
+      <th>Workload</th>
+      <th>Pattern</th>
+      <th>Recommended tier</th>
+      <th>Why</th>
+    </tr>
+    <tr>
+      <td>Ministral-3B benchmarks</td>
+      <td class="mono">steady-state research, single-replica</td>
+      <td><span class="chip chip-c">Stay Tier 2</span></td>
+      <td>Cold start is amortized over the benchmark batch; routing is theatrical</td>
+    </tr>
+    <tr>
+      <td>Qwen3-next-fp8 (TP=4) on g7e</td>
+      <td class="mono">steady-state benchmarks</td>
+      <td><span class="chip chip-c">Stay Tier 2</span></td>
+      <td>Promote to Tier 3 only if production traffic emerges</td>
+    </tr>
+    <tr>
+      <td>GLM-5 / Kimi K2.6 (B200/B300)</td>
+      <td class="mono">frontier MoE, large context</td>
+      <td><span class="chip chip-r">Tier 5 candidate</span></td>
+      <td>Already partial via lmcache, llmd, hyperpod blueprints</td>
+    </tr>
+    <tr>
+      <td>Agent harness / verifier-reward</td>
+      <td class="mono">long-tail generations, multi-turn</td>
+      <td><span class="chip chip-h">Tier 4 + Tier 5 migration</span></td>
+      <td>Llumnix territory if tail is severe; routing for the multi-turn shape</td>
+    </tr>
+    <tr>
+      <td>RL Conductor (Sakana repro)</td>
+      <td class="mono">multi-worker, prefix-shareable</td>
+      <td><span class="chip chip-h">Tier 4 routing</span></td>
+      <td>Open research — prefix-aware routing wins not yet measured at this scale</td>
+    </tr>
+    <tr>
+      <td>Cost-aware-routing experiment</td>
+      <td class="mono">cross-region cost arbitrage</td>
+      <td><span class="chip chip-h">Tier 4 + cost dim</span></td>
+      <td>Composes with global-inference-gateway research</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ============================ DOES NOT PROMISE ============================ -->
+<div class="section">
+  <div class="section-label">Honest caveats</div>
+  <h2>What this framework does NOT promise</h2>
+  <p class="lead">Three honest caveats. Lifted directly from the source markdown — the framework is a decision aid, not a guarantee.</p>
+
+  <div class="cards cards-3">
+    <div class="card" style="border-left: 3px solid var(--warn);">
+      <h3 style="color: var(--warn);">No specific number for your workload</h3>
+      <div class="cd">workload pattern dominates</div>
+      <ul>
+        <li>The ranges in this doc are <strong>typical, not guarantees</strong></li>
+        <li>p50 / p99 split, prompt-length distribution, prefix locality each move the answer</li>
+        <li>Validate with your own measurement before committing engineering quarters</li>
+      </ul>
+    </div>
+    <div class="card" style="border-left: 3px solid var(--warn);">
+      <h3 style="color: var(--warn);">Higher tiers do not always help</h3>
+      <div class="cd">they help only when the pattern justifies them</div>
+      <ul>
+        <li>Tier 5 on small workloads <strong>costs more than it saves</strong></li>
+        <li>Tier 4 prefix routing on fungible-request workloads is theatrical</li>
+        <li>Tier 3 snapshot on engines other than vLLM is unsupported</li>
+      </ul>
+    </div>
+    <div class="card" style="border-left: 3px solid var(--warn);">
+      <h3 style="color: var(--warn);">Tiers compose sub-linearly</h3>
+      <div class="cd">stacked wins are not additive</div>
+      <ul>
+        <li>Snapshot's 25-40 s floor sits <em>on top of</em> EBS+FSR's ~19 s overhead</li>
+        <li>The lab's measurements show clean composition but compounding wins are sub-linear</li>
+        <li>Treat stacked Pareto numbers as <strong>best-case single-replica</strong>, not aggregate fan-out</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ FOOTER LINKS ============================ -->
+<div class="section">
+  <div class="section-label">Where to next</div>
+  <h2>Cross-references</h2>
+
+  <div class="footer-links">
+    <div class="fl-card">
+      <a href="cold-start-progress-report.html">Cold-Start Progress Report v5 →</a>
+      <div class="fld">Want results numbers? Measured cold-start data, stacked Pareto, three-tier vs fused.</div>
+    </div>
+    <div class="fl-card">
+      <a href="cold-start-explainer.html">Cold Start, Explained →</a>
+      <div class="fld">New to cold start? Tutorial with the four-lever framing and decision tree.</div>
+    </div>
+    <div class="fl-card">
+      <a href="dynamo-snapshot-recap.html">Dynamo Snapshot Deep-Dive →</a>
+      <div class="fld">Snapshot deep-dive? CRIU + cuda-checkpoint single-GPU PASS / multi-GPU bare-metal BLOCKED recap.</div>
+    </div>
+    <div class="fl-card">
+      <a href="../specs/global-inference-gateway-research.md">Routing Research Brief →</a>
+      <div class="fld">Routing research brief? GAIE EPP scorer literature snapshot and lab opportunities.</div>
+    </div>
+    <div class="fl-card" style="grid-column: 1 / -1;">
+      <a href="../specs/cold-start-autoscaler-policy.md">Operationalize tier selection →</a>
+      <div class="fld">A per-pool tier-selection controller — the autoscaler-side spec for picking the right tier per workload.</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  Generated 2026-06-01 from <code>domains/ai-infra/reports/optimization-tiers.md</code>.
+  Style sibling: <a href="cold-start-progress-report.html" style="color: var(--beam); text-decoration: none;">cold-start-progress-report.html</a>.
+  CSS variables and chip classes shared across the cold-start lab report family.
+</div>
+
+</div>
+</body>
+</html>

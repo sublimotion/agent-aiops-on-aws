@@ -57,10 +57,29 @@ optimization_objective:
 
 A loop with no single objective is a tinkerer; a loop with no budget/plateau runs forever; a loop with no held-out guardrail is a reward maximizer pointed at your benchmark. All four blocks are mandatory.
 
+## Search granularity
+
+Each candidate should either target an expected **>=5-10% objective movement**
+or answer a high-uncertainty blocker that decides a larger branch of the search
+tree. Micro-toggles below the benchmark noise floor are allowed only when they
+are batched into a declared factorial cell, with attribution preserved in the
+trajectory. Do not spend B300/H200 time on one-flag-at-a-time changes that would
+not alter the next decision even if they won.
+
+This is the practical limit of config-only tuning: after T0-T5 are in the right
+regime, most remaining flags are low-yield. Large deltas usually come from a
+wrong baseline, wrong parallelism shape, cache/SLO mismatch, quant/kernel
+maturity, speculative decoding in the right concurrency regime, or T6 artifact
+changes under a strict quality gate.
+
 ## The loop (greedy guided search)
 
 ```
-0. Seed = the working Stage 5 config (T0 honest baseline).
+0. Seed = the working Stage 5 config (T0 honest baseline). If a comparable
+   public baseline exists, run an external-parity T0 first (fixed ISL/OSL,
+   matched cache policy, matched model/hardware/engine/precision as closely as
+   possible) before production-specific tuning. Keep this as a separate lane
+   from the production T0 when cache policy or workload realism differs.
 1. Predict regime (Stage 0b, inference-first-principles.md).
 2. Rank candidate levers by regime-matched expected Δ from optimization-stack.md;
    prune any pruned by a conflict or a regime-tagged dead-end.
@@ -78,6 +97,65 @@ A loop with no single objective is a tinkerer; a loop with no budget/plateau run
 ```
 
 Single-variable discipline (step 3) is non-negotiable — it is what lets `compound-learner` attribute a +Δ to one lever. The Gemma corpus's most reusable negatives ("n-gram spec-decode regresses −29% at c=1", "Marlin atomic-add is +0.03 = noise") were only trustworthy because they were byte-identical A/Bs.
+
+## Collaborative / portfolio mode
+
+Use portfolio mode when `budget.max_configs >= 8`, when the search space spans
+multiple tier families, or when more than one agent/operator is available. The
+Gemma collaboration's main transferable lesson is not "let many agents mutate
+flags"; it is "make the shared state strong enough that many agents explore
+different branches without repeating each other."
+
+Portfolio mode runs the same quality gate and trajectory schema, but schedules
+candidates in waves:
+
+1. **Frontier seed**: start from the current best production T0/Tn and the
+   external-parity T0 if relevant. Mark these as separate lanes.
+2. **Role allocation**: assign each candidate slot a role before launch:
+   `explorer` (new tier/branch), `exploiter` (variant near current best),
+   `blocker-checker` (verify a claimed unsupported/broken lever), or `critic`
+   (dedupe, lineage, and guardrail review; no benchmark slot).
+3. **Novelty gate**: each proposed candidate must declare `hypothesis`,
+   `expected_regime`, `lever_delta`, `source_prior`, `expected_delta`, and
+   `stop_condition`. The scheduler rejects duplicate config hashes, known
+   dead-ends in the same regime, and deltas below the search-granularity rule.
+4. **Wave execution**: run 2-4 candidates per wave, bounded by available GPUs.
+   Keep single-variable discipline inside a lane. If a factorial cell is used,
+   declare it upfront and record every factor.
+5. **Critic merge**: after each wave, a critic updates the frontier, marks
+   dead-ends, checks that guardrails ran before objective measurement, and
+   chooses the next wave's explore/exploit split.
+6. **Exit**: stop on the declared budget/plateau. Do not keep launching agents
+   after the frontier has moved into sub-noise micro-toggles.
+
+Recommended initial split for 8-12 configs: 50% explorers, 25% exploiters, 25%
+blocker-checkers. Shift to exploiters only after one branch posts a measured
+gain above `plateau.min_improvement`.
+
+Portfolio artifacts live beside the normal trajectory:
+
+```json
+{
+  "wave_id": "20260627-wave-02",
+  "frontier_best": "20260627-T4-tp4-dp2",
+  "allocation": {
+    "explorer": 2,
+    "exploiter": 1,
+    "blocker_checker": 1
+  },
+  "rejected_candidates": [
+    {
+      "id": "candidate-flashinfer-toggle",
+      "reason": "duplicate config hash of 20260627-T5-flashinfer"
+    }
+  ],
+  "critic_notes": "T3 MTP helped c=1 but hurt aggregate c=512; next wave stays on production c=320 objective."
+}
+```
+
+This makes agent collaboration useful without letting the message board become
+the optimizer. Shared lineage, novelty checks, and critic merges are the
+optimizer.
 
 ## The trajectory record (the new artifact)
 

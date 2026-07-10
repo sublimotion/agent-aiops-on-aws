@@ -1,0 +1,35 @@
+[eval] no patch (evaluating base tree) — held-out tests should FAIL
+[eval] injected 1 held-out test file(s) from fix commit
+[eval] pr=13363 tier=low PASSED=False
+--- pytest tail ---
+ardDataclass], origin: type[StandardDataclass] | None
+    ) -> core_schema.CoreSchema:
+        """Generate schema for a dataclass."""
+        with (
+            self.model_type_stack.push(dataclass),
+            self.defs.get_schema_or_ref(dataclass) as (
+                dataclass_ref,
+                maybe_schema,
+            ),
+        ):
+            if maybe_schema is not None:
+                return maybe_schema
+    
+>           schema = dataclass.__dict__.get('__pydantic_core_schema__')
+                     ^^^^^^^^^^^^^^^^^^
+E           AttributeError: '_Pipeline' object has no attribute '__dict__'. Did you mean: '__dir__'?
+
+pydantic/_internal/_generate_schema.py:1848: AttributeError
+                              Summary of Failures                               
+┏━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃               ┃               ┃  Function     ┃              ┃               ┃
+┃  File         ┃  Function     ┃  Line         ┃  Error Line  ┃  Error        ┃
+┡━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│  tests/test…  │  test_neste…  │  472          │  473         │  AttributeE…  │
+└───────────────┴───────────────┴───────────────┴──────────────┴───────────────┘
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+Results (0.65s):
+         1 failed
+        63 passed
+
+{"pr": 13363, "passed": false, "tier": "low"}

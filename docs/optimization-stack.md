@@ -51,11 +51,43 @@ Why the order matters:
 - **T4 before T5**: kernel tuning is replica-local — need the final replica shape to tune against.
 - **T5 before T6**: surgery changes the artifact and carries quality risk + a re-validation cost. Exhaust the config-only levers (T0–T5) first; only reshape the model when they plateau and the regime says the remaining cost is weight-read or kernel-launch. T6 is also the only tier that can *invalidate* prior tier measurements (a pruned model is a new T0), so it goes last.
 
+## Search increment sizing
+
+Treat this catalog as a branch-and-bound space, not a bag of flags. A candidate
+run should be worth GPU time because it can change a decision:
+
+| Candidate type | Minimum useful expected value | Examples |
+|----------------|-------------------------------|----------|
+| **Structural lane** | >=10% expected objective movement or validates an external parity gap | T0 lane fix, TP/DP reshape, precision family, prefix-cache policy, spec decode on/off |
+| **Tier refinement** | >=5% expected movement after a structural lane is selected | CUDA graphs, compile mode, attention backend, batch scheduler setting |
+| **Micro-toggle** | Only run inside a declared factorial cell or when it unblocks a larger branch | minor chunk size, scheduler threshold, graph padding knob |
+| **Blocker-checker** | No speed threshold, but must decide whether a high-priority blocked lever is actually available | re-test a merged PR, engine support claim, cache connector compatibility |
+
+If a proposed run cannot plausibly beat the plateau threshold and does not
+resolve a blocker, skip it and record the skip reason. This prevents the common
+failure mode where the loop spends most of its budget on measurable-but-useless
+noise after the regime is already right.
+
 ## Canonical configuration per tier
 
 ### T0 — Baseline
 
 **Goal**: honest reference. Most specs underspecify this and every "X.Y× speedup" claim becomes slippery.
+
+T0 has two lanes:
+
+- **External-parity T0**: cold fixed-sequence baseline for comparing against
+  public references such as InferenceX. Match model family, hardware, engine,
+  precision, sequence shape, concurrency, and cache policy. If the reference
+  disables prefix/radix cache, disable it here too. This is a regression and
+  parity gate, not a production claim.
+- **Production T0**: representative workload baseline for the actual SLO
+  regime, including the cache policy and trace shape the deployment will use.
+  Production optimization deltas should be measured against this lane.
+
+Do not mix the lanes in one headline. A cache-off synthetic T0 can be compared
+to a cache-off public result; a cache-on production result can be compared to
+its own production T0.
 
 ```yaml
 engine:

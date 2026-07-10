@@ -61,7 +61,10 @@ data:
         if not comp: comp=OUT_TOK
         return {"dt":dt,"ttft":ttft,"comp":comp,"cached":cached or 0,"prompt":pt,"accept":accept}
     async def main():
-        conn=aiohttp.TCPConnector(limit=a.conc*2)
+        # limit=0 (unlimited): conc*2 caused spurious client-side conn failures at c384+ across
+        # back-to-back sweep runs (server was healthy, num_retracted=0) — looked like an SLO error
+        # wall but was a harness artifact. Concurrency is bounded by the semaphore, not the connector.
+        conn=aiohttp.TCPConnector(limit=0)
         async with aiohttp.ClientSession(connector=conn) as s:
             sem=asyncio.Semaphore(a.conc)
             async def g():

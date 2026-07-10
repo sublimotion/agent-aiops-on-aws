@@ -15,13 +15,17 @@ def main(
         print(f"Model already decomposed: {output_file}")
         return
 
-    model = AutoModelForCausalLM.from_pretrained(model_name)
+    # float32 load: original (older transformers) defaulted to fp32; transformers
+    # 5.x loads the checkpoint's native bf16, and torch.svd has no bf16 CPU/CUDA
+    # kernel ("linalg_svd_cpu not implemented for 'BFloat16'"). Decompose in fp32
+    # to reproduce the checkpoint's SVD basis faithfully.
+    model = AutoModelForCausalLM.from_pretrained(model_name, dtype=torch.float32)
     state_dict = model.state_dict()
     decomposed_weights = {}
     for k, v in state_dict.items():
         if v.ndim > 1 and all([d > 1 for d in v.shape]):
             print(f"Decomposing weight {k} with shape {v.shape}")
-            U, S, V = torch.svd(v)
+            U, S, V = torch.svd(v.float())
             decomposed_weights[f"{k}.U"] = U
             decomposed_weights[f"{k}.S"] = S
             decomposed_weights[f"{k}.V"] = V

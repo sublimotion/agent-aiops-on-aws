@@ -23,8 +23,15 @@ deliverable is (1) the SLO-max operating point for the coding-agent workload, (2
 
 | Profile | Shape | Why |
 |---------|-------|-----|
-| **coding-agent** (primary) | 12K system prompt + tool defs (prefix-cacheable), 4K first-turn / 1K subsequent input, 2K output, 8 turns/session, prefix reuse ON | The model's headline use case is agentic coding; tests prefix cache + KV retention across turns + decode under moderate concurrency |
-| **long-input-31k** (secondary) | 31,404-tok avg input, 1,024 output, ~74% prefix hit, byte-identical shared prefix | Carried from the kimi-k2.6-nvfp4 customer profile (long-context coding agent); a prefill-dominated stress point to compare GLM-5.2's DSA sparse attention against Kimi's MLA |
+| **coding-agent-small** | 12K system prompt + tool defs (prefix-cacheable), 4K first-turn / 1K subsequent input, 2K output, 8 turns/session, prefix reuse ON | Light end of agentic coding; tests prefix cache + KV retention across turns at modest ISL |
+| **coding-agent-large-ISL** (PRIMARY) | **~64K realistic ISL** (12K system/tool-def prefix + retrieved files + multi-turn history), 2K output, prefix reuse ON, ~70-80% cacheable prefix | The realistic coding-agent regime: retrieved-file context + long conversation history routinely push 30-100K ISL. This is the **TTFT-stressing, prefill-dominated** case that actually decides the goodput@TTFT-SLO objective, and it exercises GLM-5.2's DSA sparse-attention + 1M-context differentiator — under-testing it undersells the model. |
+| **long-input-31k** | 31,404-tok avg input, 1,024 output, ~74% prefix hit, byte-identical shared prefix | Carried from the kimi-k2.6-nvfp4 customer profile; apples-to-apples vs Kimi's MLA at a fixed long-input point. |
+
+> **ISL is a first-class loop axis, not just a fixed workload.** TTFT is prefill-bound → it scales with ISL,
+> so the goodput@TTFT-SLO objective and the per-node concurrency ceiling are *both* ISL-dependent. The loop's
+> winning config + the SLO-max concurrency MUST be reported per ISL (small ~16K, large ~64K, 31K), not at one
+> ISL — the kimi-k2.6-nvfp4 finding (16k held c512 within SLO but 31k broke at c512) proves the ceiling moves
+> with context. Pressure-test the large-ISL profile to the TTFT breach, like the Kimi 16k/31k sweep.
 
 ### Core questions
 
@@ -81,6 +88,15 @@ B300 (us-west-2 arm) is sm_103 + NVSwitch — same mature NCCL path; `-cu130` im
     acceptance length — verify, don't assume).
   - **Context**: `max_position_embeddings=1,048,576` (1M), `rope_theta=8e6`. We cap `max-model-len`
     at **65536** to widen the KV pool for the concurrency sweep (covers 31K input + output + headroom).
+    **⚠ Large-ISL admission check (kimi premature-teardown lesson — verify the pool BEFORE the paid sweep):**
+    `max-model-len` bounds a *single* sequence; the *KV-pool total* is what admits concurrency. At the
+    64K-ISL PRIMARY workload a single request nearly fills a 65536 window, so a pool sized only for one
+    such request admission-caps the concurrency sweep at ~c1 — you'd be measuring queueing, not
+    goodput@TTFT-SLO. At Stage 4-pre, read the engine's reported KV-pool token capacity (SGLang
+    `max_total_num_tokens` / vLLM `# GPU blocks × block_size`) and confirm it holds **≥ 8 × 64K ≈ 512K
+    tokens** before sweeping large-ISL concurrency. If it doesn't, that IS a finding (KV-capacity-bound on
+    this layout) — record it; don't silently sweep a capped pool. The TP4+DP2 / B300 arm exists partly to
+    widen this pool. Do NOT raise `max-model-len` above 65536 to fake headroom — that shrinks the pool further.
 - **Engine is the PRIMARY axis — run BOTH, pick the most performant**, then sweep on the winner:
   - **vLLM** (`vllm/vllm-openai` ≥ **v0.23.0**; `glm_moe_dsa` is native in `deepseek_v2.py` —
     `trust-remote-code` likely unneeded, confirm). Recipe args (8×B200 FP8):
@@ -94,7 +110,7 @@ B300 (us-west-2 arm) is sm_103 + NVSwitch — same mature NCCL path; `-cu130` im
     --cuda-graph-max-bs 32 --reasoning-parser glm45 --tool-call-parser glm47 --enable-metrics`.
     High-throughput: `--tp 8 --dp 8 --enable-dp-attention --moe-a2a-backend deepep
     --cuda-graph-max-bs 256 --max-running-requests 256 --enable-metrics` (no spec decode).
-    HiCache: `--enable-hierarchical-cache --hicache-ratio 2`.
+    HiCache: `--enable-hierarchical-cache --hicache-ratio 2 --enable-metrics`.
     **`--enable-metrics` is mandatory in every SGLang command** (qwen3-235b-spec L8 — without it
     `/metrics` 404s and all TTFT histograms are permanently lost; this was the exact Kimi data-loss bug).
     **`--max-running-requests` must be set explicitly** — MTP/EAGLE silently auto-resets it to 48 if unset.
@@ -127,8 +143,9 @@ FP8 weights ≈ **~750 GB**. Per-GPU weight residency by layout:
   kimi-k2.6-nvfp4 lesson (B200 c512 token_usage 0.95 vs B300 0.75 proved capacity was binding there).
 
 ### 2. Networking
-- Existing cluster VPC. Serving + bench-runner pods: `hostNetwork: true`, tolerate
-  `ai-infra/b200=true:NoSchedule` (NOT `nvidia.com/gpu` — kimi-k2.6-nvfp4 L2). In-cluster only.
+- Existing cluster VPC. Serving + bench-runner pods: `hostNetwork: true`, tolerate the node's custom taint
+  — `ai-infra/b300=true:NoSchedule` on the B300 arm (us-west-2, this run's primary), `ai-infra/b200=true:NoSchedule`
+  on the B200 arm (NOT `nvidia.com/gpu` on either — kimi-k2.6-nvfp4 L2). In-cluster only.
   Internet-facing pods (HF/pip) need `dnsPolicy: Default` (kimi L4).
 
 ### 3. Storage
@@ -142,7 +159,9 @@ FP8 weights ≈ **~750 GB**. Per-GPU weight residency by layout:
   **Sizing math**: `--hicache-ratio 2` on TP8 with ~85 GB device KV/rank ≈ 170 GB host/rank × 8 =
   ~1,360 GB → set pod `resources.limits.memory: 1600Gi` (1,360 + ~240 headroom; p6-b200 has 2 TB RAM ✓).
   On B300 TP4+DP2: per TP4 replica = 4 × 170 = 680 GB → set `900Gi` (p6-b300 has 4 TB ✓). Confirm node
-  RAM ≥ the limit at Stage 4-pre. vLLM has no HiCache.
+  RAM ≥ the limit at Stage 4-pre. vLLM has no HiCache. **This limit is load-bearing, not advisory**
+  (kimi L9 / qwen3-235b L9): HiCache allocates host memory ≈ `hicache_size × TP`; an undersized pod
+  limit either silently hangs at "Allocating … GB host memory" or gets OOM-killed on the first rank.
 - **DeepGEMM JIT cache**: persist to `/mnt/nvme/deepgemm-cache` so the ~15 min JIT cost is paid once
   per node, not per pod restart (optimization-stack T5 conflict).
 
@@ -224,7 +243,7 @@ FP8 weights ≈ **~750 GB**. Per-GPU weight residency by layout:
 | T2 | KV / prefix cache | **applied** — L1 prefix cache ON (both engines); SGLang HiCache (`--enable-hierarchical-cache --hicache-ratio 2`, pod mem sized per §3) swept on for the 12K shared prompt + 31K long input. vLLM: L1 prefix cache. **vLLM LMCache+MLA deferred — re-verify before attempting**: tech-stack.md flagged it blocked (PR #2629, validated 2026-03-07, now stale); optimization-stack says the vLLM path merged but with OPEN GLM bugs (#2774 FP8 shape, #2977 cache-hit 0). Confirm PR/issue status at Stage 0b before any LMCache run; if attempted, smoke-test cache-hit + output quality on glm_moe_dsa first. |
 | T3 | Speculative decode | **applied** — native **MTP** (vLLM `method:mtp`; SGLang **EAGLE** num-steps sweep). Compare MTP-vs-EAGLE accept length on coding-agent shape. Lever for low-concurrency latency; expect aggregate hit at high concurrency. |
 | T4 | Parallelism (TP/EP/DP shape) | **applied** — B200: TP8 (latency) vs **TP8 + `--enable-dp-attention` + `--moe-a2a-backend deepep`** (throughput). TP4+DP2 **deferred on B200 — does not fit** (~187 GB/GPU > 180, §1c), but **in scope on B300** (the layout that won +19–25% on kimi-k2.6-nvfp4). Wide-EP>8 deferred — no NVL72. |
-| T5 | Kernel / compile | **applied** — torch.compile + **FLASHINFER_MLA** (MLA model, optimization-stack 15–25% decode); CUDA graphs (`--cuda-graph-max-bs`); SGLang overlap scheduler for agent traffic. DeepGEMM JIT cached. |
+| T5 | Kernel / compile | **applied** — **FLASHINFER_MLA** (MLA model, optimization-stack 15–25% decode); CUDA graphs (`--cuda-graph-max-bs`); SGLang overlap scheduler for agent traffic; DeepGEMM JIT cached. **torch.compile DEFERRED — BLOCKED on glm_moe_dsa: cuda-graph capture crashes (B200 run, SGLang 0.5.13, STAGE6-REPORT.md). Re-verify on B300/current SGLang before attempting; do NOT spend a loop config on it until the upstream fix is confirmed.** |
 
 - [ ] Regime predicted with one-line reasoning ✓ (above)
 - [ ] Every tier `applied` or `deferred` with reason — no blank rows ✓
@@ -233,6 +252,46 @@ FP8 weights ≈ **~750 GB**. Per-GPU weight residency by layout:
       (SGLang DSA-CP FP8 rope kernel), LMCache+MLA-on-vLLM (#2951/#2774/#2977 status), NVFP4 full-size
       ckpt existence — `mdc prs glm-5.2` + `gh pr view`/`gh issue list`. Record `validated: YYYY-MM-DD`.
 - [ ] Stage 6 Tier Stack Table will carry the measured deltas for these rows.
+
+#### Optimization objective (in-spec loop — per `standards/benchmark-commons/OPTIMIZATION-LOOP.md`)
+Added 2026-06-27 (the spec predated the OPTIMIZATION-LOOP standard). The B300 loop hill-climbs this single
+scalar; never improvise it in the loop.
+```yaml
+optimization_objective:
+  maximize: goodput_tok_s_within_slo      # agg decode tok/s counting ONLY requests that met the SLO
+  subject_to:
+    slo:
+      ttft_p95_ms: 15000                  # customer primary SLO (avg 3.3s, p95 5.8-15s)
+      error_rate_max: 0.001
+    quality_gate:
+      eval: "coding-agent smoke: 3 SWE-bench-Lite issues drawn ONCE, frozen, never inspected during tuning + tool-calls parse"
+      baseline: "FP8 T0 fixes ≥2/3 and parses tool calls"
+      tolerance: "each config must match the T0 fix count (≥2/3) AND keep tool-calls parsing (binary); NVFP4 arms also pass NVIDIA-card accuracy parity"
+      held_out: true   # the 3 issues are fixed up-front and NOT among any issue used to tune/select a config — else the gate just rewards overfitting (reward-hacking guard, OPTIMIZATION-LOOP.md)
+    invariants:
+      - prefix_cache_functional        # token-fraction hit ≈ workload design (don't 'win' by disabling cache — disagg trap)
+      - tool_calling_intact            # glm47 parser still works
+  budget:
+    max_configs: 12
+    max_wall_clock_min: 360
+    max_usd: 250
+  plateau:
+    min_improvement: 0.03              # 3% goodput gain counts as progress
+    patience: 3                        # stop after 3 consecutive <3% configs
+```
+- [ ] **Goodput, not raw throughput** — a config that beats peak tok/s but breaches TTFT p95<15s does NOT
+      count (the kimi trap: pushing past the knee gained ~0 aggregate and wrecked TTFT). Measure tok/s of
+      SLO-passing requests only.
+- [ ] Single-variable discipline: each loop step is byte-identical to current-best except ONE lever (so
+      compound-learner can attribute the Δ). Trajectory → `results/optimization-trajectory-2026-06-27.json`.
+- [ ] **Capture the bottleneck class per config, not just at the final knee.** Each trajectory entry records
+      its regime (`DRAM_ACTIVE`, `TENSOR_ACTIVE`, `token_usage`, `num_queue_reqs` at that config's load) so the
+      NEXT lever is chosen from evidence, not the prior — e.g. don't try HiCache (KV-capacity lever) on a config
+      DCGM already shows HBM-BW-bound. A lever that doesn't move its target gauge is a dead-end; log it as such
+      (OPTIMIZATION-LOOP dead-end record) so the loop doesn't revisit it.
+- [ ] B300 seed = T0 FP8 TP8; the deferred-on-B200 arms (T4 TP4+DP2, T1 official NVFP4) are the high-rank
+      candidates the loop should try first (regime prior: shared-prefix agent traffic → T2/T5 high-leverage,
+      T4 layout is the open question B300 uniquely answers).
 
 ### Stage 0c — Serving-Config Resolver (fail-closed)
 - [ ] `python3 standards/serving-commons/resolver/validate-serving-config.py --sidecar blueprints/glm5.2/benchmark.yaml --corpus-root .` exits 0
@@ -256,6 +315,10 @@ Both clusters have no GFD/NFD + a custom taint (kimi-k2.6-nvfp4 L1–L7). **B200
       apply observability, then `curl localhost:9400/metrics | grep DCGM_FI_PROF_DRAM_ACTIVE` returns
       non-empty (the exporter `-f` arg must point at the mounted PROF CSV, not the default). If empty on
       this driver, record that the Stage 6 regime classification will use engine gauges (labeled `[gauge-inferred]`).
+      **Re-run this gate on the actual node of THIS run** — the driver-580/PROF-empty finding was on the
+      B200/us-east-2 cluster; the B300 arm (`qn-sglang-eks-cluster`, us-west-2) is a different driver/cluster
+      and must be re-verified, not assumed (either way). Without PROF, HBM-BW-bound vs compute-bound can only
+      be *inferred* — and that distinction is exactly what decides the B300 go/no-go, so resolve it here, not at the knee.
 - [ ] Node RAM ≥ the HiCache pod memory limit from §3 (p6-b200 2 TB ≥ 1600Gi ✓; p6-b300 4 TB ≥ 900Gi ✓).
 
 ### Stage 4a — GPU Health
@@ -275,6 +338,15 @@ Both clusters have no GFD/NFD + a custom taint (kimi-k2.6-nvfp4 L1–L7). **B200
       `/metrics` scrapes — vLLM `vllm:time_to_first_token_seconds_bucket` non-empty; **SGLang
       `--enable-metrics` set** and `curl localhost:30000/metrics` returns `sglang:*` (else TTFT data
       permanently lost). DCGM PROF fields non-empty (see Stage 6 regime gate) or fall back to engine gauges, labeled.
+- [ ] **TTFT measurement path — the P0 gate (kimi-k2.6-nvfp4: TTFT was measured WRONG for 2 sessions).**
+      The goodput@TTFT-SLO objective is meaningless if TTFT isn't really measured. MANDATORY:
+      (a) Use `standards/benchmark-commons/.../bench-standard.py` (Prometheus-first, streaming) — do NOT
+          hand-roll a non-streaming harness that times whole responses (that yields E2E, NOT TTFT).
+      (b) Verify the TTFT histogram is LIVE IN PROMETHEUS before the first paid sweep: fire a warmup
+          request, then `query=sglang_time_to_first_token_seconds_count` — **note UNDERSCORE, not colon**
+          (this Prometheus normalizes `sglang:`→`sglang_`; bench-standard.py ships the colon form and
+          returns empty TTFT until patched — kimi session-3 bug). If 0 samples, STOP and fix before spend.
+      (c) Confirm ttft_p95 is computed and non-zero on a ≤10-request smoke before the real loop.
 - [ ] **Tool-call + reasoning parse check**: one `glm47` tool-call request and one `glm45` reasoning
       request parse correctly before the agent workload runs (else functional results are invalid).
 
@@ -327,9 +399,16 @@ Both clusters have no GFD/NFD + a custom taint (kimi-k2.6-nvfp4 L1–L7). **B200
       DCGM_FI_PROF_DRAM_ACTIVE` non-empty BEFORE the sweep (kimi L8 — the PROF CSV must actually be
       loaded by the exporter `-f` arg, not just mounted). Else classification is `[gauge-inferred]`, labeled.
 - [ ] At the knee capture `DCGM_FI_PROF_PIPE_TENSOR_ACTIVE` (compute), `DCGM_FI_PROF_DRAM_ACTIVE`
-      (HBM BW), KV usage, queue depth. Classify: **prefill-compute-bound** (tune MNBT/chunked-prefill,
-      T5 kernel) / **KV-capacity-bound** (HiCache, then B300) / **HBM-BW-bound** (B300 won't help; spec
-      decode/kernel are the levers). Record the regime.
+      (HBM BW), KV usage, queue depth. Classify with numeric evidence (benchmark-analysis.md — a bottleneck
+      class is a *measured* claim, cite the gauge near saturation):
+      - **HBM-BW-bound** — `DRAM_ACTIVE ≳ 0.80` sustained while `TENSOR_ACTIVE` is low. **B300 won't lift peak**
+        (same HBM3e BW class); levers are spec decode / kernel. This is the finding that kills the B300 upsell.
+      - **prefill-compute-bound** — `TENSOR_ACTIVE ≳ 0.70` AND TTFT climbs with concurrency while agg tok/s
+        plateaus. Levers: MNBT / chunked-prefill, T5 MLA kernel. (DSA should soften the 31K case.)
+      - **KV-capacity-bound** — `token_usage ≳ 0.90` AND `num_queue_reqs` growing while neither pipe saturates.
+        Levers: HiCache, then B300 (wider pool / TP4+DP2). This is the regime where B300 genuinely pays.
+      - **launch/admission-bound** — none of the above saturated, throughput flat. Levers: cuda-graph bs, `--max-running-requests`.
+      Record the regime + the gauge values that decided it.
 - [ ] **TTFT-share check** (benchmark-analysis.md): TTFT share = median(TTFT)/median(E2E); high share
       (>20%) confirms prefill is on the critical path — don't call it decode-bound without this.
 
@@ -345,11 +424,37 @@ engine, with measured Δ tok/s and Δ TTFT p99 vs T0, plus blocked rows.
 
 **Enriched artifact**: store in `blueprints/glm5.2/results/` per `standards/benchmark-commons/PROPOSAL.md`.
 
+### Stage 6c — FOLLOW-UP: official NVIDIA NVFP4 vs FP8 re-benchmark (planned, not yet run)
+
+The original NVFP4 sweep used the **community `lukealonso/GLM-5.2-NVFP4`** (full blind conversion) and found
+**−55-60% batched throughput vs FP8** (see results/STAGE6-REPORT.md). NVIDIA released the **official
+`nvidia/GLM-5.2-NVFP4`** (modelopt v0.46.0, 2026-06-25) with a *different recipe* (only MoE-expert linears
+quantized; **shared expert preserved in higher precision**) and published **accuracy parity** but **no
+throughput**. So the batched-throughput verdict is OPEN on the official weights. Re-run ONLY if a customer's
+FP8-vs-NVFP4 choice is live.
+
+**Trigger:** customer NVFP4-vs-FP8 decision active, OR quoting the −55% finding externally.
+**Config delta from prior run** (update `k8s/sglang-glm52-nvfp4.yaml`):
+- `--model nvidia/GLM-5.2-NVFP4` (stage from HF; `HF_HUB_DISABLE_XET=1`, ~381 GB on-disk)
+- Image **`lmsysorg/sglang:dev-glm52-nvfp4`** (card-specified) — NOT the generic cu130 tag; needs `transformers>=5.3.0`
+- Keep `--quantization modelopt_fp4 --tp 8 --tool-call-parser glm47 --reasoning-parser glm45`
+**Measurement** (apples-to-apples with the FP8 numbers already in STAGE6-REPORT):
+- [ ] Batched: coding-agent c64, 16k c64, 31k c32 — vs FP8 3,004 / 2,200 / 831 tok/s
+- [ ] Single-stream c1 — vs FP8 99 (community NVFP4 was 114)
+- [ ] **Headline question:** does the official recipe (unquantized shared expert) narrow the −55-60% batched gap?
+- [ ] VRAM/GPU + TTFT p99 captured (use bench-standard.py, verify TTFT histogram live first — L8/metric-name underscore patch)
+- [ ] Label result official-checkpoint-specific; do NOT overwrite the community-checkpoint finding, add alongside.
+
 ### Stage 7 — Readiness Audit
 - [ ] All readiness categories pass; no unresolved HIGH-severity lessons.
 - [ ] Winning engine, SLO-max operating point, long-input-31k knee, DSA curve verdict, and full Tier
       Stack Table recorded with the $/Mtok recommendation.
 - [ ] `mdc get glm-5.2` recommendations followed or explicitly overridden with justification.
+- [ ] **Optimization-trajectory integrity** (OPTIMIZATION-LOOP.md): `results/optimization-trajectory-2026-06-27.json`
+      exists, has one entry per config actually run, and each non-seed entry names its `parent` + the single
+      `lever_delta` vs that parent. Every reported winner traces back to the T0 seed through measured steps —
+      a config with no lineage row is not citable. Confirm the held-out quality gate (3 frozen issues) was
+      evaluated on the *winning* config, not just the seed (reward-hacking guard).
 - [ ] All criteria above checked and recorded.
 
 ---

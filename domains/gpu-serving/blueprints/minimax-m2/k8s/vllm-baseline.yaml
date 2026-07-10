@@ -26,19 +26,21 @@ spec:
   hostNetwork: true
   containers:
     - name: vllm
-      image: vllm/vllm-openai:minimax27        # model-specific tag; falls back to recent stock sm_100/cu128 if unavailable
+      image: vllm/vllm-openai:v0.23.0        # model-specific tag; falls back to recent stock sm_100/cu128 if unavailable
       command:
         - bash
         - -c
         - |
+          rm -rf /mnt/nvme/hf-cache/modules/transformers_modules 2>/dev/null || true
+          ln -sfn /mnt/nvme/models/minimax-m2 /mnt/nvme/models/minimax_m2
           exec python3 -m vllm.entrypoints.openai.api_server \
-            --model /mnt/nvme/models/minimax-m2 \
+            --model /mnt/nvme/models/minimax_m2 \
             --served-model-name MiniMax-M2 \
             --tensor-parallel-size 4 \
             --enable-expert-parallel \
             --moe-backend triton \
             --tool-call-parser minimax_m2 \
-            --reasoning-parser minimax_m2_append_think \
+            --reasoning-parser minimax_m2 \
             --enable-auto-tool-choice \
             --enable-prefix-caching \
             --kv-cache-dtype fp8 \

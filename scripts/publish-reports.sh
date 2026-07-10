@@ -15,7 +15,7 @@ echo "==> Collecting reports into $REPORTS"
 BACKUP="$DOCS/reports.bak"
 rm -rf "$BACKUP"
 mkdir -p "$BACKUP"
-for f in pareto-frontier.html benchmark-visual-deepseek-v4-flash-20260519.html benchmark-visual-kimi-k2.6-nvfp4-20260617.html inference-bottleneck-migration-20260612.html; do
+for f in pareto-frontier.html benchmark-visual-deepseek-v4-flash-20260519.html benchmark-visual-kimi-k2.6-nvfp4-20260617.html inference-bottleneck-migration-20260612.html coding-agents-modelcards-20260629.html; do
   [[ -f "$REPORTS/$f" ]] && cp "$REPORTS/$f" "$BACKUP/$f"
 done
 rm -rf "$REPORTS"
@@ -40,6 +40,8 @@ copy_report() {
 # GPU Serving
 copy_report "domains/gpu-serving/blueprints/ray-serve-ft/results/ray-ft-visual-20260323.html" "ray-ft-visual-20260323.html"
 copy_report "domains/gpu-serving/blueprints/glm5.2/results/benchmark-visual-report.html" "benchmark-visual-glm5.2-20260623.html"
+copy_report "domains/gpu-serving/blueprints/glm5.2/results/benchmark-visual-report-b300.html" "benchmark-visual-glm5.2-b300-20260627.html"
+copy_report "domains/gpu-serving/blueprints/minimax-m2/results/report.html" "benchmark-visual-minimax-m2-20260628.html"
 copy_report "domains/gpu-serving/blueprints/qwen3-next-sglang/results/benchmark-visual-20260303.html" "benchmark-visual-qwen3-next-sglang-20260303.html"
 copy_report "domains/gpu-serving/blueprints/qwen3-next-custbench/results/session-20260226/benchmark-visual-report.html" "benchmark-visual-report-custbench-20260226.html"
 copy_report "domains/gpu-serving/blueprints/qwen3-next-g7e/results/benchmark-visual-20260225.html" "benchmark-visual-qwen3-next-g7e-20260225.html"
@@ -75,8 +77,16 @@ copy_report "domains/autoresearch/blueprints/pivot-analysis/results/pivot-visual
 copy_report "domains/autoresearch/blueprints/self-coding-agent-loop/spec-explainer.html" "self-coding-agent-loop-visual.html"
 copy_report "domains/autoresearch/blueprints/trinity-coordinator/docs/explainer.html" "trinity-coordinator-visual.html"
 
+# AI Infra — cold-start lab. Filenames kept bare because the reports cross-link
+# each other by bare filename; the recap + tiers pages ship so those links resolve
+# even though only the progress report and explainer have index cards.
+copy_report "domains/ai-infra/reports/cold-start-progress-report.html" "cold-start-progress-report.html"
+copy_report "domains/ai-infra/reports/cold-start-explainer.html" "cold-start-explainer.html"
+copy_report "domains/ai-infra/reports/dynamo-snapshot-recap.html" "dynamo-snapshot-recap.html"
+copy_report "domains/ai-infra/reports/optimization-tiers.html" "optimization-tiers.html"
+
 # Cross-domain (existing files in docs/reports/ — preserved across rebuilds)
-for f in pareto-frontier.html benchmark-visual-deepseek-v4-flash-20260519.html benchmark-visual-kimi-k2.6-nvfp4-20260617.html inference-bottleneck-migration-20260612.html; do
+for f in pareto-frontier.html benchmark-visual-deepseek-v4-flash-20260519.html benchmark-visual-kimi-k2.6-nvfp4-20260617.html inference-bottleneck-migration-20260612.html coding-agents-modelcards-20260629.html; do
   if [[ -f "$DOCS/reports.bak/$f" ]]; then cp "$DOCS/reports.bak/$f" "$REPORTS/$f"; copied=$((copied+1)); echo "  + $f (preserved)"; fi
 done
 

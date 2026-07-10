@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Session Lineage &amp; Consistency Drift</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #171a21; --panel2: #1e222b; --border: #2a2f3a;
+    --text: #e6e9ef; --muted: #9aa3b2; --accent: #6ea8fe;
+    --read: #4a9eff; --write: #35c98a; --edit: #f0a838; --drift: #ff5c5c;
+    --drift-glow: rgba(255,92,92,0.35);
+  }
+  [data-theme="light"] {
+    --bg: #f5f6f8; --panel: #ffffff; --panel2: #f0f2f5; --border: #d8dce3;
+    --text: #1a1d24; --muted: #5a6472; --accent: #2563eb;
+    --read: #2563eb; --write: #0f9d63; --edit: #d97706; --drift: #dc2626;
+    --drift-glow: rgba(220,38,38,0.25);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px; line-height: 1.5;
+  }
+  header {
+    padding: 20px 28px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; font-weight: 650; }
+  .sub { color: var(--muted); font-size: 12.5px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .stats { display: flex; gap: 10px; flex-wrap: wrap; }
+  .stat {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 8px 14px; min-width: 78px; text-align: center;
+  }
+  .stat .n { font-size: 20px; font-weight: 700; }
+  .stat .l { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .stat.drift .n { color: var(--drift); }
+  .toolbar { display: flex; gap: 14px; align-items: center; padding: 12px 28px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .legend { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+  .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  .swatch-line { width: 22px; height: 0; border-top: 3px solid var(--drift); display: inline-block; }
+  button {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 12.5px;
+  }
+  button:hover { border-color: var(--accent); }
+  #wrap { padding: 8px 28px 40px; overflow-x: auto; }
+  svg { display: block; }
+  .lane:hover .laneBg { fill: var(--panel2); }
+  .laneLabel { fill: var(--text); font-size: 12.5px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .laneLabel.drift { fill: var(--drift); font-weight: 600; }
+  .laneDir { fill: var(--muted); font-size: 10px; }
+  .gridline { stroke: var(--border); stroke-width: 1; }
+  .gridtext { fill: var(--muted); font-size: 10px; }
+  .ev { stroke: var(--bg); stroke-width: 1.5; cursor: pointer; }
+  .ev:hover { stroke: var(--text); }
+  .track { stroke: var(--border); stroke-width: 2; }
+  .driftEdge { fill: none; stroke: var(--drift); stroke-width: 2; marker-end: url(#arrow); filter: drop-shadow(0 0 4px var(--drift-glow)); }
+  .driftLabel { fill: var(--drift); font-size: 10.5px; font-weight: 600; }
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 10; opacity: 0;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; font-size: 12px; max-width: 420px; box-shadow: 0 8px 24px rgba(0,0,0,.4);
+    transition: opacity .1s;
+  }
+  .tooltip .tpath { font-family: ui-monospace, Menlo, monospace; color: var(--muted); font-size: 11px; word-break: break-all; margin-bottom: 6px; }
+  .tooltip .tseq { font-family: ui-monospace, Menlo, monospace; }
+  .tooltip .r { color: var(--read); } .tooltip .w { color: var(--write); } .tooltip .e { color: var(--edit); }
+  .driftNote {
+    margin: 0 28px 20px; padding: 14px 16px; background: var(--panel);
+    border: 1px solid var(--drift); border-left-width: 4px; border-radius: 8px;
+  }
+  .driftNote h2 { margin: 0 0 8px; font-size: 14px; color: var(--drift); }
+  .driftNote ul { margin: 0; padding-left: 18px; }
+  .driftNote li { margin-bottom: 5px; }
+  .fn { font-family: ui-monospace, Menlo, monospace; }
+  .foot { color: var(--muted); font-size: 12px; padding: 0 28px 30px; max-width: 900px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Session Lineage &amp; Consistency Drift</h1>
+    <div class="sub" id="sessionId">—</div>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="n" id="statEvents">—</div><div class="l">events</div></div>
+    <div class="stat"><div class="n" id="statFiles">—</div><div class="l">files</div></div>
+    <div class="stat drift"><div class="n" id="statDrift">—</div><div class="l">drift flags</div></div>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="legend">
+    <span><i class="dot" style="background:var(--read)"></i>read</span>
+    <span><i class="dot" style="background:var(--write)"></i>write</span>
+    <span><i class="dot" style="background:var(--edit)"></i>edit</span>
+    <span><i class="swatch-line"></i>drift edge (references a file that changed after)</span>
+  </div>
+  <button id="themeBtn" style="margin-left:auto">Toggle theme</button>
+</div>
+
+<div class="driftNote" id="driftNote"></div>
+<div id="wrap"><svg id="chart"></svg></div>
+<div class="tooltip" id="tip"></div>
+
+<div class="foot">
+  Each row is a file the main agent touched, ordered by first interaction. Dots are
+  actions along the session timeline (x = step order). A <b style="color:var(--drift)">red arc</b>
+  marks <b>consistency drift</b>: the source file was mutated, it <i>references</i> a file that
+  changed <i>later</i>, and it was never revisited — the "edited X, forgot to update the thing that
+  points at it" pattern. Content-based coupling (source text mentions the target); generic basenames
+  require a <span class="fn">parentdir/name</span> match. Main-agent JSONL only — subagent-internal
+  file ops are not captured on current Claude Code versions.
+</div>
+
+<script>
+const DATA = {
+  "session": "/Users/phi/.claude/projects/-Users-phi-Documents-workbench-agent-aiops-on-aws/07672c78-2464-4b92-859d-bfe87ec104e9.jsonl",
+  "event_count": 31,
+  "files": {
+    "/Users/phi/Documents/obsidian-notes/06_Metadata/automation/trace-analytics/friction.py": [{"seq":1,"action":"read"}],
+    "/Users/phi/Documents/workbench/agent-aiops-on-aws/domains/ai-infra/specs/_template.md": [{"seq":2,"action":"read"}],
+    "/Users/phi/Documents/workbench/agent-aiops-on-aws/domains/ai-infra/blueprints/trace-effectiveness/analyze.py": [{"seq":3,"action":"write"},{"seq":5,"action":"edit"},{"seq":14,"action":"read"},{"seq":15,"action":"read"},{"seq":17,"action":"edit"},{"seq":18,"action":"read"},{"seq":19,"action":"edit"},{"seq":20,"action":"read"},{"seq":21,"action":"edit"}],
+    "/Users/phi/Documents/workbench/agent-aiops-on-aws/domains/ai-infra/specs/trace-effectiveness.md": [{"seq":4,"action":"write"},{"seq":6,"action":"edit"},{"seq":28,"action":"read"},{"seq":29,"action":"read"},{"seq":30,"action":"edit"}],
+    "/Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/specs/_template.md": [{"seq":7,"action":"read"},{"seq":9,"action":"edit"}],
+    "/Users/phi/Documents/workbench/agent-aiops-on-aws/.claude/steering/project-structure.md": [{"seq":8,"action":"read"},{"seq":10,"action":"edit"}],
+    "/Users/phi/.claude/projects/-Users-phi-Documents-workbench-agent-aiops-on-aws/memory/feedback_gates_not_mechanisms.md": [{"seq":11,"action":"write"}],
+    "/Users/phi/.claude/projects/-Users-phi-Documents-workbench-agent-aiops-on-aws/memory/MEMORY.md": [{"seq":12,"action":"read"},{"seq":13,"action":"edit"}],
+    "/Users/phi/Documents/workbench/agent-aiops-on-aws/AGENTS.md": [{"seq":16,"action":"read"}],
+    "/Users/phi/Documents/workbench/agent-aiops-on-aws/domains/ai-infra/blueprints/trace-effectiveness/lineage.py": [{"seq":22,"action":"write"},{"seq":24,"action":"read"},{"seq":25,"action":"edit"},{"seq":26,"action":"edit"},{"seq":27,"action":"edit"}],
+    "/Users/phi/Documents/workbench/agent-aiops-on-aws/domains/ai-infra/blueprints/trace-effectiveness/README.md": [{"seq":23,"action":"write"},{"seq":31,"action":"edit"}]
+  },
+  "drift_flags": [
+    {"path":"/Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/specs/_template.md","last_action":"edit","last_seq":9,"references_changed":["/Users/phi/Documents/workbench/agent-aiops-on-aws/.claude/steering/project-structure.md"],"latest_change_seq":10},
+    {"path":"/Users/phi/Documents/workbench/agent-aiops-on-aws/domains/ai-infra/blueprints/trace-effectiveness/lineage.py","last_action":"edit","last_seq":27,"references_changed":["/Users/phi/Documents/workbench/agent-aiops-on-aws/domains/ai-infra/specs/trace-effectiveness.md"],"latest_change_seq":30}
+  ]
+};
+
+const base = p => p.split('/').pop();
+const ACT = { read:'r', write:'w', edit:'e' };
+const COL = { read:'var(--read)', write:'var(--write)', edit:'var(--edit)' };
+
+// header
+document.getElementById('sessionId').textContent = base(DATA.session);
+document.getElementById('statEvents').textContent = DATA.event_count;
+document.getElementById('statFiles').textContent = Object.keys(DATA.files).length;
+document.getElementById('statDrift').textContent = DATA.drift_flags.length;
+
+// order files by first-touch seq
+const files = Object.entries(DATA.files).map(([path, evs]) => ({
+  path, evs: evs.slice().sort((a,b)=>a.seq-b.seq),
+  first: Math.min(...evs.map(e=>e.seq)),
+  mutated: evs.some(e=>e.action!=='read')
+})).sort((a,b)=>a.first-b.first);
+
+const driftPaths = new Set(DATA.drift_flags.map(f=>f.path));
+files.forEach((f,i)=>f.row=i);
+const rowOf = {}; files.forEach(f=>rowOf[f.path]=f.row);
+
+// layout
+const maxSeq = DATA.event_count;
+const LEFT = 320, RIGHT = 90, TOP = 34, ROWH = 34;
+const W = 1180, plotW = W - LEFT - RIGHT;
+const H = TOP + files.length*ROWH + 20;
+const x = seq => LEFT + (plotW * (seq-0.5) / maxSeq);
+const y = row => TOP + row*ROWH + ROWH/2;
+
+const svg = document.getElementById('chart');
+svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+svg.setAttribute('width', W); svg.setAttribute('height', H);
+
+const NS='http://www.w3.org/2000/svg';
+const el=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
+
+// defs: arrow marker
+const defs=el('defs',{});
+const mk=el('marker',{id:'arrow',viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:7,markerHeight:7,orient:'auto-start-reverse'});
+mk.appendChild(el('path',{d:'M0,0 L10,5 L0,10 z',fill:'var(--drift)'}));
+defs.appendChild(mk); svg.appendChild(defs);
+
+// x gridlines every 5 steps
+for(let s=5;s<=maxSeq;s+=5){
+  svg.appendChild(el('line',{class:'gridline',x1:x(s),y1:TOP-6,x2:x(s),y2:H-16,'stroke-dasharray':'2 4'}));
+  const t=el('text',{class:'gridtext',x:x(s),y:TOP-12,'text-anchor':'middle'}); t.textContent='step '+s; svg.appendChild(t);
+}
+
+// lanes
+files.forEach(f=>{
+  const g=el('g',{class:'lane'});
+  g.appendChild(el('rect',{class:'laneBg',x:0,y:y(f.row)-ROWH/2,width:W,height:ROWH,fill:'transparent'}));
+  // label
+  const lbl=el('text',{class:'laneLabel'+(driftPaths.has(f.path)?' drift':''),x:LEFT-14,y:y(f.row)+1,'text-anchor':'end'});
+  lbl.textContent=(driftPaths.has(f.path)?'⚠ ':'')+base(f.path);
+  g.appendChild(lbl);
+  // parent dir hint
+  const parent=f.path.split('/').slice(-2,-1)[0]||'';
+  const dir=el('text',{class:'laneDir',x:LEFT-14,y:y(f.row)+13,'text-anchor':'end'}); dir.textContent=parent+'/'; g.appendChild(dir);
+  // track line spanning first→last event
+  const last=Math.max(...f.evs.map(e=>e.seq));
+  g.appendChild(el('line',{class:'track',x1:x(f.first),y1:y(f.row),x2:x(last),y2:y(f.row)}));
+  // event dots
+  f.evs.forEach(ev=>{
+    const c=el('circle',{class:'ev',cx:x(ev.seq),cy:y(f.row),r:ev.action==='read'?5:7,fill:COL[ev.action]});
+    c.addEventListener('mousemove',e=>showTip(e,f,ev));
+    c.addEventListener('mouseleave',hideTip);
+    g.appendChild(c);
+  });
+  svg.appendChild(g);
+});
+
+// drift edges (draw last, on top)
+DATA.drift_flags.forEach(fl=>{
+  const srcRow=rowOf[fl.path];
+  fl.references_changed.forEach(tp=>{
+    const dstRow=rowOf[tp]; if(dstRow===undefined) return;
+    const x1=x(fl.last_seq), y1=y(srcRow);
+    const x2=x(fl.latest_change_seq), y2=y(dstRow);
+    const midY=(y1+y2)/2;
+    const bow=Math.max(30, Math.abs(y2-y1)*0.4);
+    const cx=Math.max(x1,x2)+bow;
+    const d=`M ${x1} ${y1} C ${cx} ${y1}, ${cx} ${y2}, ${x2} ${y2}`;
+    svg.appendChild(el('path',{class:'driftEdge',d}));
+    const t=el('text',{class:'driftLabel',x:cx+6,y:midY,'text-anchor':'start'});
+    t.textContent='changed @'+fl.latest_change_seq; svg.appendChild(t);
+  });
+});
+
+// tooltip
+const tip=document.getElementById('tip');
+function showTip(e,f,ev){
+  const seq=f.evs.map(a=>`<span class="${a.action[0]}">${ACT[a.action]}${a.seq}</span>`).join(' → ');
+  tip.innerHTML=`<div class="tpath">${f.path}</div>`+
+    `<div><b>${ev.action}</b> at step ${ev.seq}${f.mutated?'':' (read-only)'}</div>`+
+    `<div class="tseq" style="margin-top:6px">${seq}</div>`;
+  tip.style.opacity=1;
+  const pad=14; let lx=e.clientX+pad, ly=e.clientY+pad;
+  const r=tip.getBoundingClientRect();
+  if(lx+r.width>innerWidth) lx=e.clientX-r.width-pad;
+  if(ly+r.height>innerHeight) ly=e.clientY-r.height-pad;
+  tip.style.left=lx+'px'; tip.style.top=ly+'px';
+}
+function hideTip(){tip.style.opacity=0;}
+
+// drift note
+const dn=document.getElementById('driftNote');
+if(DATA.drift_flags.length){
+  dn.innerHTML='<h2>⚠ '+DATA.drift_flags.length+' consistency-drift flag(s)</h2><ul>'+
+    DATA.drift_flags.map(f=>`<li><span class="fn">${base(f.path)}</span> was last ${f.last_action}ed at step ${f.last_seq}, `+
+      `but it references <span class="fn">${f.references_changed.map(base).join(', ')}</span> which changed at step ${f.latest_change_seq} — `+
+      `and was never revisited. <b>Check it's still consistent.</b></li>`).join('')+'</ul>';
+} else { dn.style.display='none'; }
+
+// theme
+document.getElementById('themeBtn').addEventListener('click',()=>{
+  document.documentElement.setAttribute('data-theme',
+    document.documentElement.getAttribute('data-theme')==='light'?'':'light');
+});
+</script>
+</body>
+</html>

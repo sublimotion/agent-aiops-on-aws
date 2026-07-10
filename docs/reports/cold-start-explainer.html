@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cold Start, Explained — A Tutorial on GPU LLM Serving Latency</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --beam: #00e5ff; --pulse: #a855f7; --heat: #f97316;
+  --green: #22c55e; --warn: #eab308; --fail: #ef4444;
+  --bg: #050810; --card: #0a1018; --card2: #0d1520;
+  --border: #142035; --text: #c0cde0; --dim: #4a5e78;
+  --bright: #e8f0ff;
+
+  --st-image: #1f6feb;
+  --st-init: #00b4d8;
+  --st-container: #2dd4bf;
+  --st-modelload: #a855f7;
+  --st-jit: #f97316;
+  --st-cudagraph: #f43f5e;
+  --st-firsttoken: #22c55e;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; padding: 0; }
+
+.container { max-width: 1080px; margin: 0 auto; padding: 0 28px; }
+
+.hero { text-align: center; padding: 72px 20px 48px; }
+.hero h1 { font-size: 2rem; font-weight: 300; letter-spacing: 5px; text-transform: uppercase; color: var(--text); margin-bottom: 4px; }
+.hero h1 span { font-weight: 800; color: var(--beam); text-shadow: 0 0 30px rgba(0,229,255,0.35); }
+.hero .sub { font-size: 0.78rem; color: var(--dim); letter-spacing: 2.5px; margin-bottom: 28px; }
+.hero .thesis { max-width: 740px; margin: 0 auto; font-size: 1rem; color: #8aa4c0; line-height: 1.9; }
+.hero .thesis em { color: var(--beam); font-style: normal; font-weight: 600; }
+.hero .thesis strong { color: var(--bright); }
+
+.cross-link { max-width: 740px; margin: 22px auto 0; padding: 12px 18px; background: var(--card2); border: 1px solid var(--border); border-radius: 10px; font-size: 0.82rem; color: var(--text); }
+.cross-link a { color: var(--beam); text-decoration: none; font-weight: 600; }
+.cross-link a:hover { text-decoration: underline; }
+
+.section { padding: 48px 0 32px; border-top: 1px solid var(--border); }
+.section-label { font-size: 0.65rem; color: var(--dim); text-transform: uppercase; letter-spacing: 3px; margin-bottom: 8px; }
+.section h2 { font-size: 1.5rem; font-weight: 700; color: var(--bright); margin-bottom: 12px; }
+.section h3.subhd { font-size: 1.05rem; font-weight: 700; color: var(--bright); margin: 24px 0 10px; }
+.section .lead { font-size: 0.92rem; color: #7a99b8; max-width: 820px; margin-bottom: 24px; }
+.section p { font-size: 0.9rem; color: var(--text); margin-bottom: 12px; max-width: 820px; }
+.section p code, .section li code, .why-box code { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--beam); background: rgba(0,229,255,0.06); padding: 1px 5px; border-radius: 3px; }
+
+.tbl { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.85rem; }
+.tbl th { text-align: left; padding: 10px 12px; font-size: 0.68rem; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
+.tbl td { padding: 10px 12px; border-bottom: 1px solid rgba(20,32,53,0.5); vertical-align: top; }
+.tbl tr:hover td { background: rgba(0,229,255,0.03); }
+.tbl .mono { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; }
+.tbl .g { color: var(--green); font-weight: 700; }
+.tbl .w { color: var(--warn); font-weight: 700; }
+.tbl .r { color: var(--fail); font-weight: 700; }
+.tbl .c { color: var(--beam); font-weight: 700; }
+.tbl .p { color: var(--pulse); font-weight: 700; }
+.tbl .h { color: var(--heat); font-weight: 700; }
+
+.chip { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+.chip-g { background: rgba(34,197,94,0.15); color: var(--green); }
+.chip-w { background: rgba(234,179,8,0.15); color: var(--warn); }
+.chip-r { background: rgba(239,68,68,0.15); color: var(--fail); }
+.chip-c { background: rgba(0,229,255,0.1); color: var(--beam); }
+.chip-p { background: rgba(168,85,247,0.15); color: var(--pulse); }
+.chip-h { background: rgba(249,115,22,0.15); color: var(--heat); }
+
+.why-box { background: var(--card2); border-left: 3px solid var(--pulse); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 16px 0; }
+.why-box .wt { font-size: 0.72rem; color: var(--pulse); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; font-weight: 700; }
+.why-box p { font-size: 0.84rem; color: var(--text); margin-bottom: 8px; }
+.why-box p:last-child { margin-bottom: 0; }
+
+.chart-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 20px 0; }
+.chart-wrap h3 { font-size: 0.95rem; color: var(--beam); font-weight: 700; margin-bottom: 4px; }
+.chart-wrap .ce { font-size: 0.76rem; color: var(--dim); margin-bottom: 16px; }
+
+.cards { display: grid; gap: 14px; margin: 16px 0; }
+.cards-2 { grid-template-columns: 1fr 1fr; }
+.cards-3 { grid-template-columns: 1fr 1fr 1fr; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+.card h3 { font-size: 0.92rem; font-weight: 700; margin-bottom: 4px; color: var(--bright); }
+.card .cd { font-size: 0.78rem; color: var(--dim); margin-bottom: 12px; }
+.card ul { list-style: none; padding: 0; }
+.card li { font-size: 0.82rem; padding: 4px 0 4px 14px; position: relative; color: var(--text); line-height: 1.55; }
+.card li::before { content: '→'; position: absolute; left: 0; color: var(--beam); font-size: 0.7rem; }
+.card .num { font-size: 1.4rem; font-weight: 800; color: var(--beam); }
+
+/* Stage diagram */
+.pipeline { display: grid; grid-template-columns: 1fr; gap: 12px; margin: 20px 0; }
+.stage { display: grid; grid-template-columns: 60px 1fr; gap: 16px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; align-items: start; }
+.stage .num-circle { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1rem; color: var(--bg); flex-shrink: 0; }
+.stage .body { flex: 1; }
+.stage .body h3 { font-size: 1rem; color: var(--bright); margin-bottom: 4px; }
+.stage .body .timing { font-size: 0.72rem; color: var(--dim); margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.stage .body p { font-size: 0.85rem; color: var(--text); margin-bottom: 6px; }
+.stage .body .analogy { font-size: 0.82rem; color: #8aa4c0; font-style: italic; }
+.stage .body .insight { background: rgba(0,229,255,0.05); border-left: 2px solid var(--beam); padding: 8px 12px; margin-top: 8px; font-size: 0.78rem; color: var(--text); border-radius: 0 4px 4px 0; }
+.stage .body .insight strong { color: var(--beam); }
+
+.s1 .num-circle { background: var(--st-init); }
+.s2 .num-circle { background: var(--st-image); }
+.s3 .num-circle { background: var(--st-container); }
+.s4 .num-circle { background: var(--st-modelload); }
+.s5 .num-circle { background: var(--st-jit); }
+.s6 .num-circle { background: var(--st-cudagraph); }
+.s7 .num-circle { background: var(--st-firsttoken); color: white; }
+
+/* Lever cards */
+.lever { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 22px; margin: 14px 0; }
+.lever h3 { font-size: 1.05rem; color: var(--bright); margin-bottom: 4px; }
+.lever .tag-row { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.lever .mech { font-size: 0.88rem; color: var(--text); margin-bottom: 10px; }
+.lever .analogy { font-size: 0.82rem; color: #8aa4c0; font-style: italic; margin-bottom: 10px; padding: 8px 12px; background: var(--card2); border-radius: 6px; border-left: 2px solid var(--pulse); }
+.lever .meta { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 0.78rem; }
+.lever .meta .lab { font-size: 0.6rem; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+.lever .meta .val { color: var(--text); }
+
+/* Architecture diagram */
+.arch-diag { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 20px 0; }
+.arch-side { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+.arch-side h3 { font-size: 1rem; color: var(--bright); margin-bottom: 10px; }
+.arch-side .layer { background: var(--card2); border: 1px solid var(--border); border-left: 3px solid var(--beam); border-radius: 6px; padding: 10px 12px; margin: 8px 0; font-size: 0.82rem; }
+.arch-side .layer-fused { border-left-color: var(--warn); background: rgba(234,179,8,0.06); }
+.arch-side .layer .lk { font-size: 0.65rem; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+.arch-side .arrow-down { text-align: center; color: var(--dim); font-size: 0.7rem; margin: 4px 0; }
+
+/* Decision tree */
+.dtree { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 22px; margin: 16px 0; }
+.dtree .q { padding: 12px 16px; background: var(--card2); border-left: 3px solid var(--beam); border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 0.88rem; }
+.dtree .q .ql { font-size: 0.62rem; color: var(--dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px; font-weight: 700; }
+.dtree .branch { padding-left: 24px; border-left: 1px dashed var(--border); margin-left: 8px; }
+.dtree .answer-yes { color: var(--green); font-weight: 700; }
+.dtree .answer-no { color: var(--warn); font-weight: 700; }
+.dtree .verdict { padding: 14px 18px; background: rgba(34,197,94,0.06); border-left: 3px solid var(--green); border-radius: 0 6px 6px 0; margin: 12px 0; font-size: 0.88rem; }
+.dtree .verdict-alt { padding: 14px 18px; background: rgba(0,229,255,0.06); border-left: 3px solid var(--beam); border-radius: 0 6px 6px 0; margin: 12px 0; font-size: 0.88rem; }
+
+/* Glossary */
+.gloss { display: grid; grid-template-columns: 1fr 2fr; gap: 8px 16px; margin: 12px 0; font-size: 0.85rem; }
+.gloss dt { color: var(--beam); font-weight: 700; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; }
+.gloss dd { color: var(--text); }
+
+.callout { background: linear-gradient(135deg, rgba(168,85,247,0.07), rgba(0,229,255,0.05)); border: 1px solid var(--border); border-radius: 12px; padding: 22px; margin: 20px 0; }
+.callout h3 { color: var(--bright); font-size: 1rem; margin-bottom: 8px; }
+.callout p { font-size: 0.88rem; color: var(--text); }
+
+.footer { text-align: center; padding: 40px 20px; font-size: 0.72rem; color: var(--dim); border-top: 1px solid var(--border); margin-top: 40px; }
+.footer a { color: var(--beam); text-decoration: none; }
+
+.toc { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 22px; margin: 20px 0; }
+.toc h4 { font-size: 0.7rem; color: var(--dim); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; }
+.toc ol { list-style: none; counter-reset: item; padding: 0; }
+.toc ol li { counter-increment: item; padding: 4px 0 4px 28px; position: relative; font-size: 0.85rem; }
+.toc ol li::before { content: counter(item); position: absolute; left: 0; top: 4px; width: 20px; height: 20px; border-radius: 50%; background: var(--card2); color: var(--beam); font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.toc a { color: var(--text); text-decoration: none; }
+.toc a:hover { color: var(--beam); }
+
+@media (max-width: 700px) {
+  .cards-2, .cards-3, .arch-diag, .lever .meta { grid-template-columns: 1fr; }
+  .stage { grid-template-columns: 50px 1fr; }
+  .gloss { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Cold Start, <span>Explained</span></h1>
+  <div class="sub">A tutorial on GPU LLM serving latency · 2026-06-01</div>
+  <p class="thesis">
+    When you redeploy a 700&nbsp;GB model, the first user waits <strong>16 minutes</strong> before getting a token back.
+    This page walks through <em>why</em>, stage by stage, and shows how four production techniques each attack a
+    different bottleneck. By the end you will know which lever to pull when your own deployment feels slow.
+  </p>
+  <div class="cross-link">
+    Already familiar with the basics and want measured numbers? Jump to the
+    <a href="cold-start-progress-report.html">Cold-Start Optimization Lab progress report</a>.
+  </div>
+  <div class="cross-link" style="background: rgba(168,85,247,0.06); border-color: rgba(168,85,247,0.25);">
+    Deciding which optimizations to invest in? See the <a href="optimization-tiers.html" style="color: var(--pulse);">Tiered Decision Framework</a>.
+  </div>
+</div>
+
+<div class="container">
+
+<div class="toc">
+  <h4>What you will learn</h4>
+  <ol>
+    <li><a href="#hook">The 16-minute problem</a></li>
+    <li><a href="#pipeline">The seven stages of a cold start</a></li>
+    <li><a href="#why">Why this matters in production</a></li>
+    <li><a href="#levers">The four levers</a></li>
+    <li><a href="#composition">Stacking the levers</a></li>
+    <li><a href="#arch">Three-tier vs fused architecture</a></li>
+    <li><a href="#decision">A decision tree for your stack</a></li>
+    <li><a href="#frontiers">Open frontiers</a></li>
+    <li><a href="#glossary">Glossary</a></li>
+  </ol>
+</div>
+
+<!-- ============================ 1. HOOK ============================ -->
+<div class="section" id="hook">
+  <div class="section-label">1 · The Problem</div>
+  <h2>What is "cold start," and why does it take 16 minutes for a 700&nbsp;GB model?</h2>
+
+  <p>
+    Open a chat with a hosted LLM and the first token comes back in milliseconds. That is because the model is
+    already loaded onto a GPU somewhere, with kernels compiled, caches warm, and weights pinned in HBM (the GPU's
+    on-package high-bandwidth memory). The path from your keystroke to the first token is short.
+  </p>
+
+  <p>
+    Now imagine that GPU pool just scaled up because traffic rose, or a spot instance got reclaimed and a fresh
+    node has to take over. The new node is bare metal: empty disk, no container, no Python interpreter, no
+    weights. Before it can serve a single token, it has to walk through a chain of seven distinct stages —
+    each one bottlenecked by a different physical resource (network, disk, PCIe bus, GPU silicon).
+  </p>
+
+  <p>
+    On real measurements from this lab, a brand-new B200 node loading <strong>GLM-5</strong> on SGLang takes
+    <strong>~15 minutes</strong> to first token; the same model on vLLM takes <strong>~16 minutes</strong>. A
+    cold pull of the much larger Kimi&nbsp;K2.6 (585&nbsp;GB) from S3 onto a fresh B300 took
+    <strong>46 minutes</strong> end-to-end. Even a tiny 1.7B-parameter Qwen3 model — small enough to fit in your
+    laptop's RAM — needs <strong>~100 seconds</strong> to first token on a B300.
+  </p>
+
+  <p>
+    The promise of this page: by the end, you will be able to look at any one of those numbers, decompose it
+    into its seven underlying stages, and tell me which optimization lever attacks which stage and why.
+  </p>
+</div>
+
+<!-- ============================ 2. PIPELINE ============================ -->
+<div class="section" id="pipeline">
+  <div class="section-label">2 · The Anatomy</div>
+  <h2>The seven stages of a cold start</h2>
+  <p class="lead">
+    Every cold start, on every framework, decomposes into the same canonical pipeline. The wall-clock budget
+    shifts between stages depending on model size and hardware, but the <em>order</em> and the <em>mechanisms</em>
+    are universal. Here is what actually happens, byte-for-byte, between "kubectl apply" and "first token."
+  </p>
+
+  <div class="chart-wrap">
+    <h3>Where the seconds go (logarithmic, 1&nbsp;s &mdash; 50&nbsp;min)</h3>
+    <p class="ce">Four real measurements from the lab. Each color is a stage. Notice how the dominant stage shifts with model size and cache state.</p>
+    <canvas id="stageBar" height="200"></canvas>
+    <div style="display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; font-size: 0.7rem; color: var(--dim);">
+      <span><span style="display:inline-block;width:10px;height:10px;background:var(--st-image);margin-right:5px;border-radius:2px;"></span>image pull</span>
+      <span><span style="display:inline-block;width:10px;height:10px;background:var(--st-init);margin-right:5px;border-radius:2px;"></span>S3/init</span>
+      <span><span style="display:inline-block;width:10px;height:10px;background:var(--st-container);margin-right:5px;border-radius:2px;"></span>container start</span>
+      <span><span style="display:inline-block;width:10px;height:10px;background:var(--st-modelload);margin-right:5px;border-radius:2px;"></span>weight load</span>
+      <span><span style="display:inline-block;width:10px;height:10px;background:var(--st-jit);margin-right:5px;border-radius:2px;"></span>JIT compile</span>
+      <span><span style="display:inline-block;width:10px;height:10px;background:var(--st-cudagraph);margin-right:5px;border-radius:2px;"></span>CUDA graph capture</span>
+      <span><span style="display:inline-block;width:10px;height:10px;background:var(--st-firsttoken);margin-right:5px;border-radius:2px;"></span>first token</span>
+    </div>
+  </div>
+
+  <div class="pipeline">
+
+    <div class="stage s1">
+      <div class="num-circle">1</div>
+      <div class="body">
+        <h3>Node provisioning</h3>
+        <div class="timing">Typical: 30&nbsp;s &mdash; 5&nbsp;min &middot; bottleneck: cloud control plane, capacity</div>
+        <p>EKS asks EC2 for a new instance. EC2 finds a host with free GPUs in the right AZ, boots an AMI (Amazon Machine Image), runs cloud-init, joins the Kubernetes cluster, and reports Ready. None of this involves your model.</p>
+        <p class="analogy">Like ordering a brand-new laptop and waiting for it to arrive at your door — the box is empty, you have not even installed anything yet.</p>
+        <div class="insight"><strong>Key insight:</strong> capacity blocks (rare hardware like B300) can take 10+ minutes to free up, because terminating instances actually have to release the slot. A "warm node pool" pre-provisions hot spares so you skip this stage entirely on autoscale.</div>
+      </div>
+    </div>
+
+    <div class="stage s2">
+      <div class="num-circle">2</div>
+      <div class="body">
+        <h3>Image pull</h3>
+        <div class="timing">Typical: 60&nbsp;s &mdash; 5&nbsp;min &middot; bottleneck: container registry bandwidth</div>
+        <p>Kubelet asks containerd to pull the serving image (vLLM, SGLang, Dynamo). For vLLM the upstream image is ~33&nbsp;GB compressed: CUDA toolkit, PyTorch wheels, NCCL, Triton, flashinfer kernels, every dependency. The image arrives in layers from ECR or Docker Hub.</p>
+        <p class="analogy">Like downloading the OS plus all your apps before you can boot. The 33&nbsp;GB is the operating environment for your model — not the model itself.</p>
+        <div class="insight"><strong>Key insight:</strong> only <strong>17.2% of those bytes</strong> are actually read on import. The other 83% is dead weight from CUDA samples, dev tools, alternate kernel libraries you don't use. This is the gap "lazy pull" techniques exploit.</div>
+      </div>
+    </div>
+
+    <div class="stage s3">
+      <div class="num-circle">3</div>
+      <div class="body">
+        <h3>Container start</h3>
+        <div class="timing">Typical: 5&nbsp;s &mdash; 30&nbsp;s &middot; bottleneck: filesystem overlay, init scripts</div>
+        <p>containerd unpacks layers, sets up the overlay filesystem, mounts volumes, runs init containers (which often sync model weights from S3 here), then starts the main process. Python interpreter cold-starts, vLLM imports, GPU drivers initialize.</p>
+        <p class="analogy">Like the seconds between double-clicking an app icon and seeing its window appear — the OS is wiring everything up.</p>
+        <div class="insight"><strong>Key insight:</strong> if your init container is doing <code>aws s3 sync</code> for a 700&nbsp;GB model, this stage absorbs 30+ minutes. Pulling weights here is a common antipattern; weights belong on a persistent volume or DaemonSet-managed local cache.</div>
+      </div>
+    </div>
+
+    <div class="stage s4">
+      <div class="num-circle">4</div>
+      <div class="body">
+        <h3>Model weight load</h3>
+        <div class="timing">Typical: 30&nbsp;s &mdash; 30&nbsp;min &middot; bottleneck: storage bandwidth and PCIe</div>
+        <p>vLLM reads the safetensors files from disk, deserializes each tensor, allocates HBM, and copies bytes across the PCIe bus into GPU memory. For an 8-way tensor-parallel deployment, every rank does a coordinated load of its shard.</p>
+        <p class="analogy">Imagine handing 700&nbsp;GB of data through a doorway one box at a time. PCIe Gen5 x16 tops out around 60&nbsp;GB/s per GPU; you can't go faster than the doorway is wide.</p>
+        <div class="insight"><strong>Key insight:</strong> on local NVMe with prefetch on, page cache fills in <strong>8.66 seconds</strong> for 585&nbsp;GB. But the loader still takes <strong>245 s</strong> after that — most of the time is per-tensor Python overhead and <code>cudaMemcpy</code> serialization, not raw bandwidth.</div>
+      </div>
+    </div>
+
+    <div class="stage s5">
+      <div class="num-circle">5</div>
+      <div class="body">
+        <h3>JIT compile and warmup</h3>
+        <div class="timing">Typical: 30&nbsp;s &mdash; 15&nbsp;min &middot; bottleneck: PyTorch compiler, DeepGEMM JIT</div>
+        <p>JIT stands for "just-in-time" — the compiler takes the abstract Python model definition and produces optimized GPU kernels for the exact hardware it is running on. <code>torch.compile</code> traces the forward pass, Dynamo lowers it, Inductor emits Triton kernels. DeepGEMM compiles fused matmul kernels per shape. flashinfer compiles attention sampling kernels on first invocation.</p>
+        <p class="analogy">Like compiling a program for THIS specific GPU's silicon — same source code, different binary on B200 vs H200 vs L4. The compiler is not cheap; for big MoE models it can run for 9 minutes.</p>
+        <div class="insight"><strong>Key insight:</strong> compile output is deterministic for a given <code>(model, vLLM version, TP, hardware, config)</code> tuple. If you save the artifact and restore it on the next node, you skip the compile entirely. That is what an "AOT" (ahead-of-time) compile cache does.</div>
+      </div>
+    </div>
+
+    <div class="stage s6">
+      <div class="num-circle">6</div>
+      <div class="body">
+        <h3>CUDA graph capture</h3>
+        <div class="timing">Typical: 10&nbsp;s &mdash; 3&nbsp;min &middot; bottleneck: GPU launch overhead, batch-shape coverage</div>
+        <p>A CUDA graph is a recorded sequence of GPU kernel launches that can be replayed in one step, eliminating CPU-side launch overhead. vLLM captures one graph per batch size it expects to see. The default config captures 51 sizes (1, 2, 4, &hellip;, 512), each requiring a real forward pass to record.</p>
+        <p class="analogy">Like rehearsing every choreography you might perform, before the show starts. More batch sizes = more rehearsal time.</p>
+        <div class="insight"><strong>Key insight:</strong> CUDA graphs are <em>not</em> persistent — they live in the running process and have to be re-captured every cold start. Trimming to ~10 production batch sizes (instead of 51) reclaims 60-80% of this stage with a single CLI flag.</div>
+      </div>
+    </div>
+
+    <div class="stage s7">
+      <div class="num-circle">7</div>
+      <div class="body">
+        <h3>First token</h3>
+        <div class="timing">Typical: 1&nbsp;s &mdash; 5&nbsp;s &middot; bottleneck: nothing, the model is now warm</div>
+        <p>The first real request arrives, runs the prefill phase, samples a token, returns it. The system is now in steady state — every subsequent request reuses compiled kernels, captured graphs, and KV cache pools.</p>
+        <p class="analogy">The doors finally open and the show begins. Everything before this was setup.</p>
+        <div class="insight"><strong>Key insight:</strong> from the user's perspective only this number matters. Everything else is invisible operational overhead. Cold-start optimization is the discipline of pushing stages 1&ndash;6 closer to zero.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ============================ 3. WHY IT MATTERS ============================ -->
+<div class="section" id="why">
+  <div class="section-label">3 · Why It Matters</div>
+  <h2>Three production scenarios where cold-start cost becomes a real bill</h2>
+  <p class="lead">
+    A 16-minute cold start sounds tolerable if it happens once at deploy time. The trouble is that in real
+    production it does not happen once — it happens every autoscale event, every spot reclaim, every replica
+    rotation. Three concrete scenarios illustrate the cost.
+  </p>
+
+  <div class="cards cards-3">
+    <div class="card" style="border-left: 3px solid var(--warn);">
+      <h3>Autoscale during a traffic spike</h3>
+      <div class="cd">replica-N goes from 1 → 4</div>
+      <ul>
+        <li>HPA observes p99 latency rising, asks for 3 more replicas</li>
+        <li>Each new pod walks through stages 1&ndash;7 from scratch</li>
+        <li>For Kimi K2.6 cold path, that is <strong>46 minutes</strong> per replica</li>
+        <li>Existing replica gets crushed under spike traffic the entire time</li>
+        <li>By the time replicas are ready, the spike is over</li>
+      </ul>
+    </div>
+    <div class="card" style="border-left: 3px solid var(--fail);">
+      <h3>Spot reclaim recovery</h3>
+      <div class="cd">8-GPU node dies mid-shift</div>
+      <ul>
+        <li>Spot price spikes; AWS reclaims the B200 instance with 2-min warning</li>
+        <li>Replacement node provisions, pulls image, loads 700&nbsp;GB of weights</li>
+        <li>Total recovery: <strong>~16 minutes</strong> on the warm-cache path</li>
+        <li>If weights weren't cached on the new node: ~46 minutes (full S3 sync)</li>
+        <li>If you were running 1 replica, you served <strong>zero requests</strong> for that window</li>
+      </ul>
+    </div>
+    <div class="card" style="border-left: 3px solid var(--pulse);">
+      <h3>Multi-tenant model fleet</h3>
+      <div class="cd">10 models &times; 3 vLLM versions &times; 2 hardware tiers</div>
+      <ul>
+        <li>Tenant A's model is cold; first request triggers a cold start</li>
+        <li>If you're running model-per-tenant, every tenant pays this on first hit</li>
+        <li>60 distinct (model, version, hw) combinations across the fleet</li>
+        <li>Without optimization: 60 × 16-min cold starts = <strong>16 hours of cumulative warmup</strong> per redeploy</li>
+        <li>This is why caching strategy matters more as the fleet grows</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="why-box" style="border-left-color: var(--beam);">
+    <div class="wt" style="color: var(--beam)">The economic argument</div>
+    <p>
+      A B300 instance costs ~$140/hour on spot. 16 minutes of cold start &times; 4 replicas =
+      <strong>~$150 of GPU-time spent on warmup</strong> per autoscale event. If autoscale fires twice an hour
+      during peak traffic, the daily bill from cold-start overhead alone runs into the thousands. Cutting cold
+      start from 16&nbsp;min to 40&nbsp;s does not just help latency — it directly recovers compute the user
+      already paid for.
+    </p>
+  </div>
+</div>
+
+<!-- ============================ 4. THE FOUR LEVERS ============================ -->
+<div class="section" id="levers">
+  <div class="section-label">4 · The Levers</div>
+  <h2>Four techniques, four different stages</h2>
+  <p class="lead">
+    Each of the lab's specifications attacks a specific stage of the pipeline. The point is not that one is
+    "best" — they compose. Understanding which stage each one targets is how you reason about whether to
+    adopt it for your own deployment.
+  </p>
+
+  <div class="lever">
+    <div class="tag-row">
+      <span class="chip chip-c">Spec A</span>
+      <span class="chip chip-g">measured</span>
+      <span class="chip chip-w">attacks: stage 2 (image pull)</span>
+    </div>
+    <h3>Make the OS download smaller</h3>
+    <p class="mech">
+      The default vLLM image is 33&nbsp;GB. The slim variant produced by this lab strips out CUDA samples,
+      alternate kernel libraries, dev toolchains, and unused PyTorch backends — leaving 15.3&nbsp;GB of bytes
+      that are actually needed at import time. A second technique, EBS prebake, ships the image already
+      unpacked onto a snapshot volume, so the new node mounts it instead of pulling from a registry.
+    </p>
+    <div class="analogy">
+      Imagine shipping someone a stripped-down toolbox containing only the tools they will use, instead of a
+      full workshop. The pull stage is bandwidth-bound, so smaller bytes = proportionally less time.
+    </div>
+    <div class="meta">
+      <div><div class="lab">Saves on stage</div><div class="val">Image pull (#2)</div></div>
+      <div><div class="lab">Measured win</div><div class="val">144&nbsp;s &rarr; 77&nbsp;s (1.87&times;)</div></div>
+      <div><div class="lab">Trade-off</div><div class="val">CI complexity to maintain a slim build</div></div>
+    </div>
+  </div>
+
+  <div class="lever">
+    <div class="tag-row">
+      <span class="chip chip-c">Spec B</span>
+      <span class="chip chip-w">conditional</span>
+      <span class="chip chip-w">attacks: stage 4 (weight load)</span>
+    </div>
+    <h3>Stream weights faster</h3>
+    <p class="mech">
+      Tools like RunAI Streamer and ModelExpress (MX) replace the default safetensors loader with a parallel
+      reader that overlaps S3 download with GPU memory copies. RunAI uses many concurrent threads on
+      configurable block sizes; MX adds peer-to-peer caching across replicas on the same node.
+    </p>
+    <div class="analogy">
+      Default loader is a single thread reading file-by-file. Streamer is dozens of threads reading the same
+      file in parallel chunks while the previous chunk's bytes are still copying to GPU. Same data, less idle
+      bandwidth.
+    </div>
+    <div class="meta">
+      <div><div class="lab">Saves on stage</div><div class="val">Weight load (#4)</div></div>
+      <div><div class="lab">Measured win</div><div class="val">0&nbsp;s on local NVMe; large on S3</div></div>
+      <div><div class="lab">Trade-off</div><div class="val">Only helps when source is bandwidth-bound (S3, network FS)</div></div>
+    </div>
+  </div>
+
+  <div class="lever">
+    <div class="tag-row">
+      <span class="chip chip-c">Spec C-EBS</span>
+      <span class="chip chip-g">production-ready</span>
+      <span class="chip chip-w">attacks: stages 5 + 6 (compile + capture)</span>
+    </div>
+    <h3>Save compiled kernels and restore them</h3>
+    <p class="mech">
+      vLLM produces a <code>torch_compile_cache/</code> directory containing every compiled kernel artifact
+      keyed by config hash. Bake this directory onto an EBS volume after a single warm boot, take an EBS
+      snapshot, and mount it on every new node. Volume creation from snapshot takes ~9&nbsp;s; attach takes
+      ~10&nbsp;s; the cache then HITs and the JIT stage drops from minutes to ~25&nbsp;s.
+    </p>
+    <div class="analogy">
+      Like a browser HTTP cache, but for compiled GPU kernels. The first node pays the compile cost so the
+      next 100 nodes don't have to. The artifact is portable across same-arch GPUs; you key it by config so
+      different deployments don't collide.
+    </div>
+    <div class="meta">
+      <div><div class="lab">Saves on stage</div><div class="val">JIT (#5), partially capture (#6)</div></div>
+      <div><div class="lab">Measured win</div><div class="val">~185&nbsp;s on Kimi K2.6 (32% of warm path)</div></div>
+      <div><div class="lab">Trade-off</div><div class="val">Cache invalidates on any config / version / hw change</div></div>
+    </div>
+  </div>
+
+  <div class="lever">
+    <div class="tag-row">
+      <span class="chip chip-c">Spec E</span>
+      <span class="chip chip-w">single-GPU PASS / multi-GPU blocked</span>
+      <span class="chip chip-w">attacks: stages 4 + 5 + 6</span>
+    </div>
+    <h3>Take a photograph of a fully-warmed worker</h3>
+    <p class="mech">
+      Use <code>cuda-checkpoint</code> (an NVIDIA tool that serializes GPU device state) and CRIU
+      (Checkpoint/Restore in Userspace, a Linux kernel feature) to capture the entire vLLM worker process —
+      including loaded weights, compiled graphs, pinned memory, and CUDA contexts — into a single binary
+      blob. To start a new replica, restore the blob; the process resumes as if it had never stopped.
+    </p>
+    <div class="analogy">
+      Like a VM snapshot, but for a process tree including its GPU state. Resuming a snapshot skips not just
+      compile but also <em>weight load</em> — the weights are already in HBM inside the snapshot.
+    </div>
+    <div class="meta">
+      <div><div class="lab">Saves on stages</div><div class="val">Model load (#4) + JIT (#5) + capture (#6)</div></div>
+      <div><div class="lab">Measured win</div><div class="val">1.69&nbsp;s restore on L4; 5-10&times; predicted on Ministral-class</div></div>
+      <div><div class="lab">Trade-off</div><div class="val">Multi-GPU bare metal blocked; vLLM-only; fragile artifact</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ 5. COMPOSITION ============================ -->
+<div class="section" id="composition">
+  <div class="section-label">5 · Composition</div>
+  <h2>What happens when you stack the levers</h2>
+  <p class="lead">
+    The levers are not alternatives — they are complements, each attacking a different stage. Watch the bar
+    shrink as each technique stacks on top of the previous ones. This is the realistic story of how a
+    Ministral-3B-class deployment goes from a 100&ndash;240&nbsp;s baseline to a 25&ndash;40&nbsp;s autoscale floor.
+  </p>
+
+  <div class="chart-wrap">
+    <h3>Stacked cold start, Ministral-3B class on EKS, replica-N&ge;2</h3>
+    <p class="ce">Each bar is the same workload with progressively more optimizations enabled. Lower is better.</p>
+    <canvas id="stackBar" height="220"></canvas>
+  </div>
+
+  <div class="why-box" style="border-left-color: var(--green);">
+    <div class="wt" style="color: var(--green)">Reading the chart</div>
+    <p>
+      <strong>Baseline (100&ndash;240&nbsp;s)</strong> is the unoptimized path: pull the upstream image, load
+      weights from S3, compile from scratch, capture every CUDA graph size.
+    </p>
+    <p>
+      <strong>+A only</strong> shaves about 60&nbsp;s by shrinking the image. Necessary but not sufficient — the
+      big stages (4, 5, 6) are still untouched.
+    </p>
+    <p>
+      <strong>+A+B</strong> adds streaming weight load. Helpful if your weights live on S3 or network storage;
+      a no-op if they are already on local NVMe. This is why the matrix shows a conditional win.
+    </p>
+    <p>
+      <strong>+A+B+C-EBS</strong> is the headline production stack. Compile cache mounted from an EBS
+      snapshot eliminates the JIT stage in ~25&nbsp;s of overhead. This is the floor for any model size, any
+      tensor-parallel degree, any engine.
+    </p>
+    <p>
+      <strong>+A+B+C-EBS+E</strong> additionally restores the process state (loaded weights, captured graphs)
+      from a CRIU snapshot. Drops the floor to 25&ndash;40&nbsp;s p50, but only on the narrow set of replicas
+      where the snapshot is valid.
+    </p>
+  </div>
+</div>
+
+<!-- ============================ 6. ARCHITECTURE ============================ -->
+<div class="section" id="arch">
+  <div class="section-label">6 · The Architecture Question</div>
+  <h2>Three-tier separation vs the fused snapshot</h2>
+  <p class="lead">
+    The hardest production decision is not <em>which</em> levers to use — it is <em>how to layer their
+    artifacts</em>. Spec C-EBS keeps the image, the compile cache, and the weights as three separate caches.
+    Spec E fuses all three (plus process state) into a single snapshot blob. Both work; they have very
+    different operating cost profiles.
+  </p>
+
+  <div class="arch-diag">
+    <div class="arch-side">
+      <h3 style="color: var(--green);">Three-tier (A + B + C-EBS)</h3>
+      <div class="layer">
+        <div class="lk">Tier 1 &middot; ~3&nbsp;GB &middot; invalidates on driver/CUDA bump</div>
+        Slim image (env: CUDA, vLLM, drivers)
+      </div>
+      <div class="arrow-down">independent</div>
+      <div class="layer">
+        <div class="lk">Tier 2 &middot; ~1&ndash;5&nbsp;GB/key &middot; invalidates on vLLM/config/hw bump</div>
+        Compile cache, EBS snapshot, keyed by config hash
+      </div>
+      <div class="arrow-down">independent</div>
+      <div class="layer">
+        <div class="lk">Tier 3 &middot; 6&nbsp;GB&ndash;700&nbsp;GB &middot; invalidates on weights update</div>
+        Model weights (S3 + MX/RunAI)
+      </div>
+      <div style="margin-top: 14px; padding: 10px 12px; background: rgba(34,197,94,0.06); border-radius: 6px; font-size: 0.78rem;">
+        <strong style="color: var(--green);">Property:</strong> a vLLM bump rebuilds tiers 1+2 but reuses all weights. A weights swap reuses tiers 1+2.
+      </div>
+    </div>
+
+    <div class="arch-side">
+      <h3 style="color: var(--warn);">Fused (Spec E snapshot)</h3>
+      <div class="layer layer-fused">
+        <div class="lk">One artifact &middot; weights + 4&nbsp;GiB host state + 1&nbsp;GiB&times;TP GPU state</div>
+        Env + compile cache + weights + process state, all fused
+      </div>
+      <div class="arrow-down" style="color: var(--warn);">single artifact, no internal layers</div>
+      <div style="margin-top: 14px; padding: 10px 12px; background: rgba(234,179,8,0.06); border-radius: 6px; font-size: 0.78rem;">
+        <strong style="color: var(--warn);">Property:</strong> ANY change &mdash; new vLLM, new weights, new driver, new config &mdash; invalidates the whole blob. Full produce path required to rebake.
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <h3>The fleet arithmetic</h3>
+    <p>
+      Suppose you operate 10 distinct models, each running on 3 vLLM versions (current, previous, canary), on
+      2 hardware tiers (B200 and H200). That is 60 deployment combinations.
+    </p>
+    <p style="margin-top: 8px;">
+      The <strong>three-tier path</strong> needs <strong>16 artifacts</strong> total: 6 env images (one per
+      vLLM&times;hw) + 10 weights stores. Compile caches are produced lazily and cached on EBS volumes shared
+      across keys.
+    </p>
+    <p style="margin-top: 8px;">
+      The <strong>fused snapshot path</strong> needs <strong>60 snapshots</strong> &mdash; one per
+      (model, version, hw) tuple &mdash; and a fresh produce path for any of those that go stale. The
+      snapshot's compile-cache contribution is reproducible by C-EBS at a fraction of the bake cost; the
+      unique value snapshot adds is the <em>process state</em>, not the compiled artifacts.
+    </p>
+  </div>
+</div>
+
+<!-- ============================ 7. DECISION TREE ============================ -->
+<div class="section" id="decision">
+  <div class="section-label">7 · Decision</div>
+  <h2>Which path should you choose?</h2>
+  <p class="lead">
+    Walk through this tree top to bottom. The default answer is the three-tier stack; snapshot is an opt-in
+    for the narrow case where its trade-offs make sense.
+  </p>
+
+  <div class="dtree">
+    <div class="q">
+      <div class="ql">Question 1</div>
+      Is your stack frozen for at least one week between version bumps?
+      (vLLM, driver, weights, config all stable.)
+    </div>
+    <div class="branch">
+      <p><span class="answer-no">No</span> &rarr; bumps invalidate snapshots faster than you can re-bake them. <strong>Use three-tier (A+B+C-EBS)</strong>. Stop here.</p>
+    </div>
+
+    <div class="q">
+      <div class="ql">Question 2</div>
+      Is your serving engine vLLM? (Not SGLang, not Dynamo runtime, not TGI.)
+    </div>
+    <div class="branch">
+      <p><span class="answer-no">No</span> &rarr; Dynamo Snapshot is vLLM-only in preview. SGLang fleets must use three-tier. <strong>Use three-tier (A+B+C-EBS)</strong>. Stop here.</p>
+    </div>
+
+    <div class="q">
+      <div class="ql">Question 3</div>
+      Is autoscale latency load-bearing for your SLO? Specifically, would shaving cold start from 50&ndash;120&nbsp;s to 25&ndash;40&nbsp;s materially improve user experience or recovery RTO?
+    </div>
+    <div class="branch">
+      <p><span class="answer-no">No</span> &rarr; the operational cost of maintaining 60 snapshots outweighs the benefit. <strong>Three-tier is fine</strong>.</p>
+    </div>
+
+    <div class="q">
+      <div class="ql">Question 4</div>
+      Is your deployment single-GPU, or single-node multi-GPU running inside a container with peer GPU device nodes hidden? (Multi-node TP &gt; 1 is currently unsupported.)
+    </div>
+    <div class="branch">
+      <p><span class="answer-no">No</span> &rarr; multi-node TP via Dynamo Snapshot is an open research area. <strong>Use three-tier</strong>.</p>
+    </div>
+
+    <div class="verdict">
+      <strong style="color: var(--green);">All four Yes:</strong> adopt Spec E snapshot <em>on top of</em> three-tier. Snapshot's value-add is process state (CUDA graphs, pinned memory, NCCL state), not compiled kernels &mdash; C-EBS handles those at a fraction of the bake cost. The combination delivers ~25&ndash;40&nbsp;s p50 on autoscale events that fire on a stable stack.
+    </div>
+
+    <div class="verdict-alt">
+      <strong style="color: var(--beam);">Default for everyone else:</strong> the three-tier stack &mdash; slim image (A), MX/RunAI weights (B), EBS-snapshotted compile cache (C-EBS). This is the rule encoded in <code>.claude/steering/tech-stack.md</code>: it's cheaper to operate, degrades gracefully under fleet churn, and works with both vLLM and SGLang.
+    </div>
+  </div>
+</div>
+
+<!-- ============================ 8. FRONTIERS ============================ -->
+<div class="section" id="frontiers">
+  <div class="section-label">8 · What's Next</div>
+  <h2>Open frontiers</h2>
+  <p class="lead">
+    Not everything is solved. These are the directions the field is moving in &mdash; useful context whether
+    you are choosing a stack today or watching to see what becomes practical next year.
+  </p>
+
+  <div class="cards cards-3">
+    <div class="card">
+      <h3>Multi-node TP &gt; 1 snapshot</h3>
+      <ul>
+        <li>Cross-node CRIU restore is unsolved &mdash; NCCL state, IB/EFA fds, peer GPU enumeration all break</li>
+        <li>NVIDIA's K8s snapshot-agent handles single-node only</li>
+        <li>Fallback today: full cold start for any TP &gt; 1 deployment that snapshot doesn't reach</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>SGLang process snapshot</h3>
+      <ul>
+        <li>Dynamo Snapshot is structurally vLLM-only in preview</li>
+        <li>SGLang's hierarchical cache and DeepGEMM JIT paths are not in the snapshot's scope</li>
+        <li>Models like GLM-5, Kimi K2.6, Nemotron-Super are bound to three-tier until upstream lands SGLang support</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>GPUDirect Storage path</h3>
+      <ul>
+        <li>True NIC-to-HBM DMA would skip the CPU bounce buffer that bottlenecks weight load</li>
+        <li>Requires a CUDA driver patch + RDMA NIC (only on p5/p5e InfiniBand today)</li>
+        <li>EFA is kernel-bypass but still bounces through CPU; not the same primitive</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="why-box" style="border-left-color: var(--beam);">
+    <div class="wt" style="color: var(--beam)">Where the floor goes from here</div>
+    <p>
+      The current measured floor on Kimi K2.6 (8&times;B200 TP=8) is <strong>245&nbsp;s of weight load</strong>
+      after page cache fills. That is not bandwidth-bound &mdash; the NVMe delivers 67&nbsp;GB/s. It's per-tensor
+      Python overhead and serialized <code>cudaMemcpy</code> calls. The two paths below it are
+      <strong>ModelExpress same-node P2P</strong> (replicas share weights via NVSwitch at 250&nbsp;GB/s, untested)
+      and <strong>vLLM-internal batched H2D copies with pinned memory</strong> (out of scope for this lab,
+      requires upstream work). Either gets the floor closer to ~30&nbsp;s.
+    </p>
+  </div>
+</div>
+
+<!-- ============================ 9. GLOSSARY ============================ -->
+<div class="section" id="glossary">
+  <div class="section-label">9 · Reference</div>
+  <h2>Glossary</h2>
+  <p class="lead">Quick definitions for the acronyms used above. Skip if you already know them.</p>
+
+  <dl class="gloss">
+    <dt>JIT</dt>
+    <dd>Just-In-Time compilation. The compiler runs at first invocation, producing GPU kernels tailored to the exact runtime shapes and hardware.</dd>
+
+    <dt>AOT</dt>
+    <dd>Ahead-Of-Time compilation. The compiler runs once, persists artifacts to disk, and subsequent runs load the prebuilt kernels instead of recompiling.</dd>
+
+    <dt>CUDA graph</dt>
+    <dd>A recorded sequence of GPU kernel launches that can be replayed in one CPU call, eliminating per-launch overhead. Captured at runtime, not persistent across processes.</dd>
+
+    <dt>CRIU</dt>
+    <dd>Checkpoint/Restore In Userspace. A Linux feature that serializes a running process tree (memory, file descriptors, threads) to disk and restores it later, possibly on a different machine.</dd>
+
+    <dt>cuda-checkpoint</dt>
+    <dd>NVIDIA tool that serializes GPU device state (HBM contents, CUDA contexts, streams) so CRIU can checkpoint the host-side process around it.</dd>
+
+    <dt>FSR</dt>
+    <dd>Fast Snapshot Restore. AWS feature that pre-warms an EBS snapshot in a target AZ so volumes created from it don't pay the lazy-load penalty on first read.</dd>
+
+    <dt>NCCL</dt>
+    <dd>NVIDIA Collective Communications Library. Implements all-reduce, broadcast, and other multi-GPU collectives used in tensor-parallel inference.</dd>
+
+    <dt>MTP</dt>
+    <dd>Multi-Token Prediction. Speculative decoding where a small drafter model predicts the next K tokens, then the main model verifies in one forward pass.</dd>
+
+    <dt>P/D disagg</dt>
+    <dd>Prefill/Decode disaggregation. Separates the compute-bound prefill stage (processing the prompt) from the memory-bound decode stage (generating tokens) onto different GPU pools for better utilization.</dd>
+
+    <dt>NVMe instance store</dt>
+    <dd>Local SSD attached directly to an EC2 instance via NVMe. Ephemeral &mdash; data is lost when the instance terminates &mdash; but delivers tens of GB/s read bandwidth.</dd>
+
+    <dt>EBS</dt>
+    <dd>Elastic Block Store. AWS network-attached block storage. Persists across instance termination, supports snapshots, attaches over the network at ~1&nbsp;GB/s.</dd>
+
+    <dt>HBM</dt>
+    <dd>High-Bandwidth Memory. The on-package DRAM stacks that supply GPU compute units. B300 has 275&nbsp;GB per GPU at ~8&nbsp;TB/s.</dd>
+
+    <dt>PCIe</dt>
+    <dd>The bus connecting CPU and GPU. PCIe Gen5 x16 tops out around 60&nbsp;GB/s &mdash; the doorway through which weight data travels from disk to HBM.</dd>
+  </dl>
+</div>
+
+</div>
+
+<div class="footer">
+  Cold-Start Optimization Lab &middot; tutorial companion to the
+  <a href="cold-start-progress-report.html">progress report (v5)</a> and the
+  <a href="dynamo-snapshot-recap.html">Dynamo Snapshot recap</a>.<br>
+  Source specs: <code>domains/ai-infra/specs/{image-pull-acceleration, model-decoupling-and-load, compile-cache-ebs-snapshot, dynamo-snapshot-coldstart, cold-start-stacked}.md</code>.
+</div>
+
+<script>
+const gridColor = 'rgba(20,32,53,0.9)';
+const textColor = '#7a99b8';
+const stageColors = {
+  image: '#1f6feb',
+  init: '#00b4d8',
+  container: '#2dd4bf',
+  modelload: '#a855f7',
+  jit: '#f97316',
+  cudagraph: '#f43f5e',
+  firsttoken: '#22c55e',
+};
+
+// ---------------- Stage breakdown bar (educational) ----------------
+const stageLabels = [
+  'Tiny model warm path\n(Qwen3-1.7B, B300)',
+  'GLM-5 vLLM cold\n(B200, no opts)',
+  'Kimi K2.6 warm-NVMe\n(B300 TP=8)',
+  'Kimi K2.6 cold-S3\n(B300 TP=8)',
+];
+const stages = {
+  image:      [0.12, 30,  30,    30],
+  init:       [0,    0,   0,     1936],
+  container:  [4,    10,  5,     5],
+  modelload:  [7,    180, 120,   120],
+  jit:        [70,   600, 250,   540],
+  cudagraph:  [14,   140, 130,   130],
+  firsttoken: [1,    2,   0.1,   12],
+};
+const stageDsets = [
+  { label: 'image pull',           color: stageColors.image,     data: stages.image },
+  { label: 'init / S3 sync',       color: stageColors.init,      data: stages.init },
+  { label: 'container start',      color: stageColors.container, data: stages.container },
+  { label: 'weight load',          color: stageColors.modelload, data: stages.modelload },
+  { label: 'JIT compile + warmup', color: stageColors.jit,       data: stages.jit },
+  { label: 'CUDA graph capture',   color: stageColors.cudagraph, data: stages.cudagraph },
+  { label: 'first token',          color: stageColors.firsttoken,data: stages.firsttoken },
+];
+new Chart(document.getElementById('stageBar'), {
+  type: 'bar',
+  data: {
+    labels: stageLabels,
+    datasets: stageDsets.map(d => ({
+      label: d.label,
+      data: d.data,
+      backgroundColor: d.color,
+      borderWidth: 0,
+      stack: 'cold',
+    })),
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw < 1 ? ctx.raw.toFixed(2) : ctx.raw.toFixed(0)} s`,
+          footer: (items) => {
+            const total = items.reduce((a,b) => a + b.raw, 0);
+            return `total: ${total.toFixed(0)} s`;
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        type: 'logarithmic',
+        ticks: {
+          color: textColor,
+          callback: (v) => {
+            if (v === 1) return '1 s';
+            if (v === 10) return '10 s';
+            if (v === 60) return '1 min';
+            if (v === 100) return '100 s';
+            if (v === 600) return '10 min';
+            if (v === 1000) return '1000 s';
+            if (v === 3000) return '50 min';
+            return null;
+          }
+        },
+        grid: { color: gridColor },
+        min: 1,
+        max: 5000,
+      },
+      y: { stacked: true, ticks: { color: '#c0cde0', font: { size: 10 } }, grid: { display: false } },
+    },
+  },
+});
+
+// ---------------- Stack journey (composition) ----------------
+new Chart(document.getElementById('stackBar'), {
+  type: 'bar',
+  data: {
+    labels: [
+      'baseline\n(no optimizations)',
+      '+ A (slim image)',
+      '+ A + B (streamed weights)',
+      '+ A + B + C-EBS\n(compile cache)',
+      '+ A + B + C-EBS + E\n(process snapshot)',
+    ],
+    datasets: [
+      { label: 'image pull',         data: [60, 15, 15, 15, 15], backgroundColor: stageColors.image,     stack: 's' },
+      { label: 'container start',    data: [10, 10, 10, 10, 10], backgroundColor: stageColors.container, stack: 's' },
+      { label: 'weight load',        data: [60, 60, 30, 30,  0], backgroundColor: stageColors.modelload, stack: 's' },
+      { label: 'JIT compile',        data: [50, 50, 50, 15,  0], backgroundColor: stageColors.jit,       stack: 's' },
+      { label: 'CUDA graph capture', data: [40, 40, 40, 10,  5], backgroundColor: stageColors.cudagraph, stack: 's' },
+      { label: 'EBS / restore overhead', data: [0, 0, 0, 19, 15], backgroundColor: '#5b8def',           stack: 's' },
+      { label: 'first token',        data: [3,  3,  3,  3,  3], backgroundColor: stageColors.firsttoken, stack: 's' },
+    ],
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { position: 'top', labels: { color: textColor, font: { size: 10 } } },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw} s`,
+          footer: (items) => {
+            const total = items.reduce((a, b) => a + b.raw, 0);
+            return `total: ${total.toFixed(0)} s`;
+          },
+        },
+      },
+    },
+    scales: {
+      x: { stacked: true, ticks: { color: textColor, font: { size: 10 } }, grid: { display: false } },
+      y: {
+        stacked: true,
+        ticks: { color: textColor, callback: (v) => `${v} s` },
+        grid: { color: gridColor },
+        title: { display: true, text: 'cold-start wall time (s)', color: textColor },
+      },
+    },
+  },
+});
+</script>
+
+</body>
+</html>
+</content>
+</invoke>

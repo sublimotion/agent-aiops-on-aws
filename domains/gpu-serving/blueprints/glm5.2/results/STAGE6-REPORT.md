@@ -37,6 +37,16 @@ weight-bandwidth (single-stream/VRAM: 56 vs 94 GB/GPU), but batched decode is co
 trtllm MoE kernel here. **Use FP8 for throughput; NVFP4 only for c=1 latency or VRAM-constrained.** Not a
 quality issue (gate passed: fixed bug correctly, tool-calls work) nor a backend fallback (same trtllm runner).
 
+> ⚠️ **CHECKPOINT-SPECIFIC — does NOT necessarily transfer to the official NVIDIA release.** The above was
+> measured on the **community `lukealonso/GLM-5.2-NVFP4`** (full 753B blind conversion). NVIDIA released an
+> **official `nvidia/GLM-5.2-NVFP4`** (modelopt v0.46.0) on **2026-06-25** with a *different recipe*: it
+> **quantizes only MoE-expert linears and leaves the shared expert unquantized** — a different compute/kernel
+> profile that could change the batched-throughput gap. NVIDIA's card publishes **accuracy parity vs FP8**
+> (GPQA 89.4 vs 89.5, etc.) but **NO throughput numbers** — so the batched-throughput question (the one that
+> decided FP8 here) is **OPEN on the official weights**. The "−55-60%" finding is [measured] for the community
+> checkpoint only; do NOT cite it for the official one. Re-benchmark needed (see PLAN below). Official stack
+> also differs: needs `transformers>=5.3.0` + image `lmsysorg/sglang:dev-glm52-nvfp4`.
+
 ## Long-context (MNBT=8192)
 | ctx | c=32 | c=64 | c=128 | SLO knee (15s TTFT) |
 |-----|------|------|-------|---------------------|
@@ -78,6 +88,22 @@ forced-TP8 on B200 is a real structural disadvantage. A B300 TP4+DP2 run would m
 - **Low-latency**: add EAGLE/MTP (+40% @ c1).
 - **Long-context**: MNBT=8192; SLO-safe to ~c64 (16k) / ~c32 (31k); scale out, not up (compute-bound).
 - **Avoid**: NVFP4 (batched regression), HiCache (compute-bound, −12%), torch.compile (blocked).
+
+## B300 optimization-loop addendum (2026-06-27) — see benchmark-visual-report-b300.html
+Fresh full T0–T6 goodput@TTFT-SLO loop on 8× **B300** (us-west-2), realistic coding-agent workload
+(12K byte-identical prefix, 2048 out, ~92% cacheable). Winner: **T4 = TP4+DP2 + prefix cache**.
+- **T0** (FP8 floor, cache off): 1,349 tok/s @ c32 knee, prefill-bound.
+- **T2** (+prefix cache): 6,025 tok/s @ c256 — **+347%**, dominant lever; flips regime to decode-bound.
+- **T1** (+fp8 KV): REJECT — **no-op**, fp8 KV is GLM-5.2's auto-default (T0/T2 already ran it). NOTE:
+  re-examine this report's own B200 "fp8 KV 1708→3004" claim for the same default-vs-explicit confound.
+- **T4** (TP4+DP2, B300-only layout): **9,271 tok/s @ c320 knee, TTFT p95 8.1s** — **+28% vs T2** AND
+  lower TTFT. Confirms+exceeds the kimi +19-25% layout finding. Certified to c384 (9,900 tok/s, p95 14.9s)
+  with a 2-client distributed driver.
+- **T3** (+NEXTN MTP): REJECT — accept-len only ~1.6; **−12% at the c256 knee** (draft overhead at batch).
+  MTP is a low-QPS latency lever, not for high-concurrency goodput.
+- **Quality gate**: PASS on T4 (3 frozen coding tasks + glm47 tool-calls).
+- **Fleet**: **4 B300 nodes** cover the 32,500 tok/s target ($60/hr spot, **$0.45/Mtok output**).
+- **DCGM**: profiling non-functional on B300/driver-580 (confirmed via dcgmi) — regime calls [gauge-inferred].
 
 ## Deferred / follow-up
 - vLLM/MTP engine arm (SGLang well-characterized; vLLM head-to-head not run).

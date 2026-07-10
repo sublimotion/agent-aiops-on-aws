@@ -1,0 +1,151 @@
+# SGLang + LMCache (IP mode) -> HyperPod ai-toolkit L2, Qwen3-0.6B on g6e.
+#
+# Stock lmsysorg/sglang (Py3.12/CUDA13) + runtime `pip install lmcache` (0.5.1, CUDA13
+# PyPI wheel matches). No custom image build. The container command:
+#   1. pip install lmcache (c_ops loads against CUDA13; SM adapter + sglang integ present)
+#   2. patch lmc_radix_cache.py: LMCacheMode.MP -> IP (IP forwards full config incl remote_url)
+#   3. render /tmp/lmcache.yaml from the template, substituting the node IP into remote_url
+#   4. launch sglang with --enable-lmcache --lmcache-config-file
+#
+# Carries ALL proven vLLM-path gotchas: type:File shm mount, PYTHONHASHSEED=0,
+# save_unfull_chunk, ai_toolkit_cache shm name, uid handling, dnsPolicy: Default.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sglang-hp-lmcache
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lmcache-config-tmpl
+  namespace: sglang-hp-lmcache
+data:
+  config.yaml: |
+    chunk_size: 256
+    local_cpu: true
+    max_local_cpu_size: 4
+    save_unfull_chunk: true
+    use_layerwise: true            # SGLang IP mode store_layer path asserts a layerwise GPU connector
+    remote_url: "sagemaker-hyperpod://PLACEHOLDER_NODE_IP:9200"
+    remote_serde: "naive"
+    extra_config:
+      sagemaker_hyperpod_shared_memory_name: ai_toolkit_cache
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sglang-lmcache
+  namespace: sglang-hp-lmcache
+spec:
+  type: ClusterIP
+  selector:
+    app: sglang-lmcache
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sglang-lmcache
+  namespace: sglang-hp-lmcache
+  labels:
+    app: sglang-lmcache
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate                    # clean L0/L1 wipe for the store->restart->replay proof
+  selector:
+    matchLabels:
+      app: sglang-lmcache
+  template:
+    metadata:
+      labels:
+        app: sglang-lmcache
+    spec:
+      dnsPolicy: Default              # resolve huggingface.co via node resolver
+      nodeSelector:
+        sagemaker.amazonaws.com/instance-group-name: g6e-workers
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: sglang
+          image: lmsysorg/sglang:latest
+          command: ["/bin/bash", "-lc"]
+          args:
+            - |
+              set -euo pipefail
+              echo "[1/4] pip install lmcache"
+              pip install -q lmcache
+              echo "[2/4] patch MP->IP in lmc_radix_cache.py"
+              F=$(python3 -c 'import sglang.srt.mem_cache.storage.lmcache.lmc_radix_cache as m; print(m.__file__)')
+              sed -i 's/self\._mode = LMCacheMode\.MP/self._mode = LMCacheMode.IP/' "$F"
+              grep -n 'self._mode = LMCacheMode' "$F" || true
+              echo "[3/4] render lmcache config with NODE_IP=$NODE_IP"
+              sed "s/PLACEHOLDER_NODE_IP/${NODE_IP}/" /etc/lmcache-tmpl/config.yaml > /tmp/lmcache.yaml
+              cat /tmp/lmcache.yaml
+              echo "[4/4] launch sglang"
+              exec python3 -m sglang.launch_server \
+                --model-path Qwen/Qwen3-0.6B \
+                --host 0.0.0.0 --port 8000 \
+                --mem-fraction-static 0.70 \
+                --context-length 8192 \
+                --enable-lmcache \
+                --lmcache-config-file /tmp/lmcache.yaml
+          env:
+            - name: NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: PYTHONHASHSEED
+              value: "0"
+            - name: HF_HUB_DISABLE_TELEMETRY
+              value: "1"
+          ports:
+            - containerPort: 8000
+              name: http
+          resources:
+            requests:
+              cpu: "500m"
+              memory: 12Gi
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "1500m"
+              memory: 26Gi
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: hp-tiered-cache
+              mountPath: /dev/shm/ai_toolkit_cache   # the FILE (type:File), not whole /dev/shm
+            - name: lmcache-tmpl
+              mountPath: /etc/lmcache-tmpl
+              readOnly: true
+            - name: hf-cache
+              mountPath: /root/.cache/huggingface
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 40
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 80          # pip install + model load + compile
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+      volumes:
+        - name: hp-tiered-cache
+          hostPath:
+            path: /dev/shm/ai_toolkit_cache
+            type: File
+        - name: lmcache-tmpl
+          configMap:
+            name: lmcache-config-tmpl
+        - name: hf-cache
+          emptyDir: {}

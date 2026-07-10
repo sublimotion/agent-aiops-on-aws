@@ -32,8 +32,10 @@ def _install_bedrock_once() -> None:
         import fugu.cost    # noqa: F401
         import bedrock_clients
         import cost_bedrock
+        import routing_policy
         bedrock_clients.install()
         cost_bedrock.install()
+        routing_policy.install()   # baseline routing override (no-op when policy=learned)
         sys.modules[__name__]._car_installed = True
     except Exception as e:  # never let a worker die on import; surface in stderr
         sys.stderr.write(f"[sitecustomize] Bedrock patch install failed: {e}\n")

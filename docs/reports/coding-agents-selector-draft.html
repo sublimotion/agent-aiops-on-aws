@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coding Agent Model Selector - Draft</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#f7f7f4;--surface:#ffffff;--surface-2:#f0f1ec;--surface-3:#e7e9df;--border:#d6d8cf;
+  --text:#1c1f1a;--muted:#62675d;--faint:#858b80;--green:#15803d;--teal:#0f766e;
+  --amber:#b45309;--red:#b91c1c;--indigo:#4f46e5;--plum:#7e22ce;--blue:#2563eb;
+  --shadow:0 10px 30px rgba(28,31,26,.08);
+}
+[data-theme="dark"]{
+  --bg:#11130f;--surface:#191c16;--surface-2:#22261f;--surface-3:#2d3329;--border:#3a4035;
+  --text:#edf0e8;--muted:#adb4a5;--faint:#8a9383;--green:#4ade80;--teal:#2dd4bf;
+  --amber:#f59e0b;--red:#f87171;--indigo:#818cf8;--plum:#c084fc;--blue:#60a5fa;
+  --shadow:0 10px 30px rgba(0,0,0,.22);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.48 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+button,input,select{font:inherit}
+header{position:sticky;top:0;z-index:20;background:rgba(247,247,244,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+[data-theme="dark"] header{background:rgba(17,19,15,.94)}
+.topbar{max-width:1480px;margin:0 auto;padding:14px 22px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+h1{font-size:1.06rem;margin:0;font-weight:740;letter-spacing:0}
+.sub{font-size:.78rem;color:var(--muted);margin-top:2px}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:6px;padding:7px 11px;cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.wrap{max-width:1480px;margin:0 auto;padding:22px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.tab{border:1px solid var(--border);background:var(--surface);color:var(--muted);border-radius:6px;padding:8px 13px;cursor:pointer;font-weight:650}
+.tab.active{background:var(--surface-3);color:var(--text);border-color:var(--muted)}
+.panel{display:none}.panel.active{display:block}
+.band{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:var(--shadow)}
+.band.flat{box-shadow:none}
+.grid{display:grid;gap:14px}.grid.cols-2{grid-template-columns:minmax(320px,.78fr) 1.22fr}.grid.cols-3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:1000px){.grid.cols-2,.grid.cols-3{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-direction:column}.chartbox{height:360px!important}}
+h2{font-size:1rem;margin:0 0 4px;font-weight:750}
+h3{font-size:.9rem;margin:0 0 10px;font-weight:740}
+.desc{font-size:.8rem;color:var(--muted);margin-bottom:12px}
+.controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media(max-width:680px){.controls{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:740}
+.field input,.field select{width:100%;border:1px solid var(--border);background:var(--surface-2);color:var(--text);border-radius:6px;padding:8px 9px}
+.seg{display:flex;gap:5px;background:var(--surface-2);border:1px solid var(--border);border-radius:7px;padding:4px}
+.seg button{flex:1;border:0;background:transparent;color:var(--muted);border-radius:5px;padding:6px 7px;cursor:pointer;font-size:.8rem;font-weight:700}
+.seg button.active{background:var(--surface);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.checks{display:flex;gap:8px;flex-wrap:wrap}
+.check{display:flex;gap:6px;align-items:center;border:1px solid var(--border);background:var(--surface-2);border-radius:6px;padding:7px 9px;color:var(--muted);font-size:.8rem}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}
+@media(max-width:900px){.summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px}
+.kpi .lab{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:760}
+.kpi .val{font-size:1.18rem;font-weight:780;margin-top:4px}
+.kpi .small{font-size:.75rem;color:var(--muted);margin-top:2px}
+.recommendations{display:grid;gap:10px}
+.rec{border:1px solid var(--border);background:var(--surface);border-radius:8px;padding:12px;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start}
+.rec.best{border-color:rgba(21,128,61,.5);background:linear-gradient(0deg,rgba(21,128,61,.06),rgba(21,128,61,.06)),var(--surface)}
+.rec h3{margin:0 0 4px;font-size:.98rem}
+.rec p{margin:0;color:var(--muted);font-size:.82rem}
+.score{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-align:right;font-weight:800}
+.score .num{font-size:1.25rem}
+.tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+.tag{display:inline-flex;align-items:center;border-radius:999px;padding:2px 7px;font-size:.68rem;font-weight:760;border:1px solid transparent}
+.tag.good{background:rgba(21,128,61,.1);color:var(--green);border-color:rgba(21,128,61,.18)}
+.tag.warn{background:rgba(180,83,9,.11);color:var(--amber);border-color:rgba(180,83,9,.2)}
+.tag.bad{background:rgba(185,28,28,.1);color:var(--red);border-color:rgba(185,28,28,.18)}
+.tag.info{background:rgba(37,99,235,.09);color:var(--blue);border-color:rgba(37,99,235,.18)}
+.tag.plum{background:rgba(126,34,206,.09);color:var(--plum);border-color:rgba(126,34,206,.18)}
+.chartbox{position:relative;height:500px}
+table{width:100%;border-collapse:collapse;font-size:.78rem}
+th{text-align:left;color:var(--muted);font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;background:var(--surface-2);padding:8px;border-bottom:1px solid var(--border)}
+td{padding:8px;border-bottom:1px solid var(--border);vertical-align:top}
+td.num,th.num{text-align:right;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.tablewrap{overflow:auto;border:1px solid var(--border);border-radius:8px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.muted{color:var(--muted)}
+.model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px}
+.model-card{border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:13px}
+.model-card h3{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.kv{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dotted var(--border);padding:4px 0;font-size:.78rem}
+.kv span:first-child{color:var(--muted)}.kv span:last-child{text-align:right;font-weight:650}
+.mix{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){.mix{grid-template-columns:1fr}}
+.barrow{display:grid;grid-template-columns:110px 1fr 64px;gap:9px;align-items:center;margin:9px 0;font-size:.82rem}
+.bar{height:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:999px;overflow:hidden}.bar i{display:block;height:100%;background:var(--teal)}
+.foot{font-size:.74rem;color:var(--muted);margin-top:12px}
+.method-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media(max-width:900px){.method-grid{grid-template-columns:1fr}}
+.method-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px}
+.method-card h3{margin-bottom:6px}
+.method-card p{margin:0 0 8px;color:var(--muted);font-size:.84rem}
+.formula{background:var(--surface-2);border:1px solid var(--border);border-radius:7px;padding:10px 12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.76rem;white-space:pre-wrap;color:var(--text)}
+.method-list{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:.84rem}
+.method-list li{margin:5px 0}
+.hint{font-size:.75rem;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:7px;padding:9px 10px;margin-top:10px}
+.hint b{color:var(--text)}
+</style>
+</head>
+<body>
+<header>
+  <div class="topbar">
+    <div>
+      <h1>Coding Agent Model Selector - Draft</h1>
+      <div class="sub">Interactive routing, cost, and evidence view for open-weight coding agents - source report: coding-agents-modelcards-20260629</div>
+    </div>
+    <button class="btn" onclick="toggleTheme()">Toggle theme</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="tabs">
+    <button class="tab active" onclick="showTab(event,'selector')">Selector</button>
+    <button class="tab" onclick="showTab(event,'frontier')">Frontier</button>
+    <button class="tab" onclick="showTab(event,'fleet')">Fleet mix</button>
+    <button class="tab" onclick="showTab(event,'methodology')">Methodology</button>
+    <button class="tab" onclick="showTab(event,'evidence')">Evidence</button>
+  </div>
+
+  <section class="panel active" id="panel-selector">
+    <div class="grid cols-2">
+      <div class="band">
+        <h2>Workload and Constraints</h2>
+        <div class="desc">The selector scores models for a coding-agent routing tier, then estimates local and escalated cost per solved task.</div>
+        <div class="controls">
+          <div class="field">
+            <label>Task tier</label>
+            <select id="taskTier" onchange="setTierDefaults()">
+              <option value="0">T0 small edits / lint</option>
+              <option value="1" selected>T1 localized bug fix</option>
+              <option value="2">T2 multi-file task</option>
+              <option value="3">T3 hard repo issue</option>
+              <option value="4">T4 frontier fallback</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Optimization preset</label>
+            <select id="preset" onchange="applyPreset()">
+              <option value="balanced" selected>Balanced</option>
+              <option value="cheap">Lowest cost</option>
+              <option value="capability">Best capability</option>
+              <option value="throughput">Highest throughput</option>
+              <option value="latency">Lowest latency</option>
+              <option value="safe">Production evidence</option>
+              <option value="license">Open license</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Capability floor</label>
+            <input id="capFloor" type="number" min="0" max="100" value="60" oninput="manualCapabilityFloor()">
+          </div>
+          <div class="field">
+            <label>Floor mode</label>
+            <div class="seg">
+              <button id="autoFloorBtn" class="active" onclick="toggleAutoFloor(event,true)">Auto by tier</button>
+              <button id="manualFloorBtn" onclick="toggleAutoFloor(event,false)">Manual</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Max latency p95 / E2E (ms)</label>
+            <input id="maxLatency" type="number" min="100" value="15000" oninput="renderAll()">
+          </div>
+          <div class="field">
+            <label>Input tokens per task</label>
+            <input id="inputTokens" type="number" min="0" value="180000" oninput="renderAll()">
+          </div>
+          <div class="field">
+            <label>Output tokens per task</label>
+            <input id="outputTokens" type="number" min="0" value="10000" oninput="renderAll()">
+          </div>
+          <div class="field">
+            <label>Prompt cache hit (%)</label>
+            <input id="cacheHit" type="number" min="0" max="100" value="60" oninput="renderAll()">
+          </div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="field">
+          <label>Cost basis</label>
+          <div class="seg" id="basisSeg">
+            <button class="active" data-basis="odcr" onclick="setBasis(event)">ODCR</button>
+            <button data-basis="spot" onclick="setBasis(event)">Spot</button>
+            <button data-basis="api" onclick="setBasis(event)">API compare</button>
+          </div>
+        </div>
+        <div class="hint"><b>Cost basis</b> changes the denominator for local endpoint cost. ODCR uses committed/on-demand node economics, Spot uses lower interruptible GPU pricing, and API compare prices every model as if it were a managed token API so you can compare against frontier list pricing.</div>
+        <div style="height:12px"></div>
+        <div class="field">
+          <label>Available platforms</label>
+          <div class="checks">
+            <label class="check"><input type="checkbox" value="B300" checked onchange="renderAll()"> B300</label>
+            <label class="check"><input type="checkbox" value="B200" checked onchange="renderAll()"> B200</label>
+            <label class="check"><input type="checkbox" value="g7e" checked onchange="renderAll()"> g7e</label>
+            <label class="check"><input type="checkbox" value="API" checked onchange="renderAll()"> API</label>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="summary" id="summaryKpis"></div>
+        <div class="band">
+          <h2>Recommended Routing</h2>
+          <div class="desc">Scores combine tier fit, capability, estimated task cost, latency, license fit, and evidence quality.</div>
+          <div class="recommendations" id="recommendations"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="band">
+      <h2>Candidate Models</h2>
+      <div class="desc">Rows that fail the current floor stay visible in the evidence table; this view focuses on viable choices for the selected tier.</div>
+      <div class="model-grid" id="modelCards"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-frontier">
+    <div class="band">
+      <h2>Capability vs Estimated Cost per Solved Task</h2>
+      <div class="desc">Up and left is better. Hollow points indicate weaker evidence on either capability or serving cost.</div>
+      <div class="chartbox"><canvas id="frontierChart"></canvas></div>
+    </div>
+    <div class="band flat">
+      <h2>Why this axis uses solved-task cost</h2>
+      <div class="desc">A cheap model that fails often is not cheap for production agent routing. The selector discounts local cost by expected success and adds the configured escalation tail.</div>
+      <div class="tablewrap">
+        <table id="frontierTable">
+          <thead><tr><th>Model</th><th>Role</th><th class="num">Capability</th><th class="num">Est. local task</th><th class="num">Est. solved task</th><th class="num">Escalation</th><th>Evidence</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-fleet">
+    <div class="grid cols-2">
+      <div class="band">
+        <h2>Single-Node / Small-Fleet Sketch</h2>
+        <div class="desc">This is a v1 planning approximation, useful for traffic-shaping before we add exact HBM placement and pod packing.</div>
+        <div class="controls">
+          <div class="field">
+            <label>B200 nodes</label>
+            <input id="b200Nodes" type="number" min="0" value="1" oninput="renderFleet()">
+          </div>
+          <div class="field">
+            <label>g7e nodes</label>
+            <input id="g7eNodes" type="number" min="0" value="1" oninput="renderFleet()">
+          </div>
+          <div class="field">
+            <label>B300 nodes</label>
+            <input id="b300Nodes" type="number" min="0" value="0" oninput="renderFleet()">
+          </div>
+          <div class="field">
+            <label>Frontier API fallback (%)</label>
+            <input id="apiTail" type="number" min="0" max="100" value="10" oninput="renderFleet()">
+          </div>
+          <div class="field">
+            <label>Monthly tasks</label>
+            <input id="monthlyTasks" type="number" min="1" value="10000" oninput="renderFleet()">
+          </div>
+        </div>
+        <div class="hint"><b>Monthly tasks</b> scales spend only: <span class="mono">monthly spend = blended solved-task cost * monthly tasks</span>. It does not change the per-task model fit score.</div>
+        <div class="foot">Assumption: B200/B300 host large open-weight endpoints; g7e hosts smaller coder endpoints or isolated replicas. Exact bin-packing needs model memory, KV reserve, and concurrency targets.</div>
+      </div>
+      <div class="band">
+        <h2>Suggested Traffic Mix</h2>
+        <div class="desc">The mix changes with selected task tier and available platforms.</div>
+        <div id="mixBars"></div>
+      </div>
+    </div>
+    <div class="band">
+      <h2>Fleet Economics</h2>
+      <div class="summary" id="fleetKpis"></div>
+      <div class="tablewrap">
+        <table id="fleetTable"><thead><tr><th>Tier</th><th>Default endpoint</th><th class="num">Traffic</th><th class="num">Cost/task</th><th>Reason</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-methodology">
+    <div class="band">
+      <h2>Methodology Companion</h2>
+      <div class="desc">This tab maps the presentation concepts into the selector: why per-token cost is incomplete, why routing matters, and how to interpret the evidence labels.</div>
+      <div class="method-grid">
+        <div class="method-card">
+          <h3>1. The tokenmaxing wall</h3>
+          <p>Coding agents consume tokens at agent-fleet rate, not headcount rate. One engineer can run foreground, review, debug, overnight, and continuous agents at the same time.</p>
+          <p>The practical failure mode is not only price. It is quota resets, 429s, degraded modes, context loss, and stalled autonomous work.</p>
+          <div class="formula">daily_tokens ~= engineers * agents_per_engineer * tokens_per_agent_day</div>
+        </div>
+
+        <div class="method-card">
+          <h3>2. The buying metric is shipped work</h3>
+          <p>The selector uses estimated cost per solved task because engineering managers buy resolved PRs, not raw output tokens.</p>
+          <p>A cheap model that fails often can be more expensive than a stronger model after retries, review time, and escalation are counted.</p>
+          <div class="formula">value = shipped_tasks * value_per_task
+        - (model_cost + harness_cost + infra_cost)</div>
+        </div>
+
+        <div class="method-card">
+          <h3>3. Why routing beats one-model thinking</h3>
+          <p>Not every task requires frontier capability. The selector treats the model stack as a router: cheap endpoints handle routine work, stronger open-weight models handle hard local work, and frontier APIs recover the tail.</p>
+          <ul class="method-list">
+            <li>T0: lint, formatting, docs, small mechanical edits.</li>
+            <li>T1: localized bug fixes and focused test repair.</li>
+            <li>T2: multi-file changes, repo navigation, tool-heavy work.</li>
+            <li>T3: ambiguous design/debugging and hard SWE-style tasks.</li>
+            <li>T4: fallback to frontier API when local confidence is low.</li>
+          </ul>
+        </div>
+
+        <div class="method-card">
+          <h3>4. Default capability floors</h3>
+          <p>The task tier auto-selects a starting capability floor. These are routing thresholds, not universal benchmark truths; they should be recalibrated with your own accepted PRs and CI outcomes.</p>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Tier</th><th class="num">Floor</th><th>Rationale</th></tr></thead>
+              <tbody>
+                <tr><td>T0 small edits</td><td class="num">50</td><td>Mechanical changes can use cheap coder endpoints with fast escalation.</td></tr>
+                <tr><td>T1 localized bug</td><td class="num">60</td><td>Admits Devstral-class endpoints that showed strong BFCL and simple functional task results.</td></tr>
+                <tr><td>T2 multi-file</td><td class="num">70</td><td>Requires stronger repo navigation, context handling, and tool-loop reliability.</td></tr>
+                <tr><td>T3 hard repo issue</td><td class="num">78</td><td>Near-frontier open models or strong official SWE-bench class results.</td></tr>
+                <tr><td>T4 fallback</td><td class="num">82</td><td>Reserved for frontier API or the strongest measured local workhorse.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="method-card">
+          <h3>5. How solved-task cost is estimated</h3>
+          <p>The current draft separates local task cost, expected model success, and fallback cost. This is intentionally approximate until every model has a matched fix-rate and serving-knee run.</p>
+          <div class="formula">local_task_cost =
+  output_tokens * output_cost
+  + input_tokens * input_cost_factor * (1 - cache_discount)
+
+solved_task_cost =
+  local_task_cost / expected_success
+  + fallback_rate * frontier_task_cost</div>
+        </div>
+
+        <div class="method-card">
+          <h3>6. Endpoint utilization changes the economics</h3>
+          <p>A B200 or B300 node is a fixed asset once reserved. The cost curve improves when many agents share the endpoint and push it toward its measured throughput knee.</p>
+          <p>This is why the fleet tab focuses on traffic mix and utilization before exact pod packing.</p>
+          <div class="formula">node_cost_per_task =
+  node_cost_per_hour / solved_tasks_per_hour_at_knee</div>
+        </div>
+
+        <div class="method-card">
+          <h3>7. Prompt cache and context strategy matter</h3>
+          <p>Agent traffic often repeats repo instructions, system prompts, coding standards, and stable codebase context. Prefix cache hit rate can materially change TTFT and effective cost.</p>
+          <p>High reuse favors replicas and cache-aware routing. Low reuse with long fresh context can require prefill/decode separation or a different endpoint shape.</p>
+        </div>
+
+        <div class="method-card">
+          <h3>8. Evidence labels are part of the result</h3>
+          <p>The selector does not treat all benchmark numbers as equally strong. Vendor-reported capability, our measured serving, and same-harness fix-rate are separate evidence axes.</p>
+          <ul class="method-list">
+            <li>High: same-harness task outcome plus measured serving cost.</li>
+            <li>Medium: one strong axis measured, the other vendor-reported or proxy-based.</li>
+            <li>Low: partial traces, harness issues, or missing serving-knee data.</li>
+          </ul>
+        </div>
+
+        <div class="method-card">
+          <h3>9. Owning the endpoint starts the flywheel</h3>
+          <p>The endpoint is not only a cheaper token source. It is where traces, PR diffs, review accepts, test pass/fail, and CI signals can compound into a domain-tuned coder.</p>
+          <div class="formula">open coder -> trace capture -> reward signals
+  -> distillation/fine-tune -> better local coder</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="band flat">
+      <h2>Reading the App Against the Presentation</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Presentation concept</th><th>Where it appears in the app</th><th>Decision it supports</th></tr></thead>
+          <tbody>
+            <tr><td>Tokenmaxing wall</td><td>Monthly tasks, input/output tokens, API fallback cost</td><td>Whether API-only plans can sustain the agent fleet.</td></tr>
+            <tr><td>Cost per shipped PR</td><td>Frontier tab cost per solved task</td><td>Which model is cheapest after success and fallback are counted.</td></tr>
+            <tr><td>Open-weight versus frontier</td><td>Selector recommendations and frontier chart</td><td>Which open model handles bulk work and which tasks still need frontier API.</td></tr>
+            <tr><td>Fixed asset economics</td><td>Fleet mix tab</td><td>How traffic pooling changes B200/B300 node economics.</td></tr>
+            <tr><td>Endpoint levers</td><td>Evidence ledger serving notes</td><td>Which next benchmark should test quantization, cache, layout, or throughput knee.</td></tr>
+            <tr><td>Trace flywheel</td><td>Methodology section and evidence next steps</td><td>What to collect after day one to improve future local model quality.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-evidence">
+    <div class="band">
+      <h2>Evidence Ledger</h2>
+      <div class="desc">The report treats capability, serving, and cost as separate evidence axes. Weak cells are candidates for the next benchmark run.</div>
+      <div class="tablewrap">
+        <table id="evidenceTable">
+          <thead><tr>
+            <th>Model</th><th>Role</th><th>Platform</th><th class="num">Capability</th><th>Capability evidence</th><th>Serving evidence</th><th class="num">ODCR $/M out</th><th class="num">Spot $/M out</th><th>Next measurement</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const MODELS = [
+  {
+    id:"devstral", name:"Devstral Small 2 24B", role:"cheap bulk endpoint", platform:"g7e", family:"small",
+    license:"Apache-2.0", tierMin:0, tierMax:2, capability:64, success:0.46, context:64, active:24, gpus:1,
+    dpmSpot:0.95, dpmOdcr:2.4, latency:12844, goodput:161,
+    capEvidence:"BFCL 91.7%; functional eval 5/5 with 97% SVG recall; agent-swarm traces show high patch generation but weak pass rate on harder OpenCode set.",
+    serveEvidence:"Measured on g7e/vLLM: 52.9 tok/s single stream; 4 isolated replicas hit 161 tok/s at 32 agents with 0 failures.",
+    confidence:"medium", serveConfidence:"measured", readiness:"ready", next:"Run matched SWE-mini fix-rate and saturated B200/g7e cost knee."
+  },
+  {
+    id:"qwen25coder", name:"Qwen2.5-Coder 32B", role:"cheap coder baseline", platform:"g7e", family:"small",
+    license:"Apache-2.0", tierMin:0, tierMax:2, capability:58, success:0.40, context:32, active:32, gpus:1,
+    dpmSpot:1.15, dpmOdcr:2.9, latency:540000, goodput:120,
+    capEvidence:"Agent-swarm SERA run: 4/50 pass, 24/50 fix generated; OpenCode run had harness/runtime problems and should not be used as a final quality estimate.",
+    serveEvidence:"Staged on g7e as TP1 endpoint; current traces are agent-harness outcomes rather than clean serving-knee measurements.",
+    confidence:"low", serveConfidence:"partial", readiness:"needs rerun", next:"Re-run with current harness, fixed timeouts, and normalized serving sweep."
+  },
+  {
+    id:"minimax", name:"MiniMax-M2", role:"light MoE contender", platform:"B200", family:"mid",
+    license:"Modified MIT", tierMin:1, tierMax:3, capability:69.4, success:0.64, context:128, active:10, gpus:4,
+    dpmSpot:2.96, dpmOdcr:14.67, latency:17254, goodput:2158,
+    capEvidence:"Official SWE-bench Verified 69.4; tau2-Bench 77.2; clean structured tool-call smoke.",
+    serveEvidence:"Measured B200 TP4+EP4: 2,158 tok/s in shared-prefix run; vLLM 0.23 regression noted for EP path.",
+    confidence:"medium", serveConfidence:"measured partial", readiness:"candidate", next:"Current vLLM knee plus own fix-rate eval."
+  },
+  {
+    id:"qwen3", name:"Qwen3-235B-A22B", role:"license and throughput pick", platform:"B300", family:"large",
+    license:"Apache-2.0", tierMin:1, tierMax:3, capability:72, success:0.68, context:262, active:22, gpus:8,
+    dpmSpot:0.46, dpmOdcr:2.85, latency:2080, goodput:13877,
+    capEvidence:"No official SWE-bench Verified in this report; Aider-Polyglot 57.3, BFCL-v3 70.9, strong measured throughput.",
+    serveEvidence:"Measured B300 FP8 TP2+DP4+EP: 13,877 tok/s; TTFT p99 2.08s.",
+    confidence:"medium", serveConfidence:"measured", readiness:"ready", next:"Run coding-agent fix-rate on same harness as GLM."
+  },
+  {
+    id:"deepseek", name:"DeepSeek V4 Flash", role:"efficiency play", platform:"B300", family:"large",
+    license:"MIT", tierMin:1, tierMax:3, capability:79, success:0.72, context:1000, active:13, gpus:8,
+    dpmSpot:2.70, dpmOdcr:16.73, latency:3336, goodput:2365,
+    capEvidence:"Official SWE-bench Verified 79.0 and LiveCodeBench 91.6; not independently verified here.",
+    serveEvidence:"Measured serving, but cost point is light-load QPS=8; shared-prefix total tok/s hit 57K.",
+    confidence:"medium", serveConfidence:"partial", readiness:"candidate", next:"Saturated throughput knee for coding-agent output lengths."
+  },
+  {
+    id:"nemotron", name:"Nemotron-3 Ultra", role:"NVIDIA stack option", platform:"B200", family:"large",
+    license:"OpenMDW", tierMin:2, tierMax:3, capability:70.7, success:0.64, context:1000, active:55, gpus:4,
+    dpmSpot:3.39, dpmOdcr:16.81, latency:9000, goodput:2008,
+    capEvidence:"Official SWE-bench Verified 70.7; LiveCodeBench v6 89.0.",
+    serveEvidence:"Measured B200 NVFP4 TP4 using 4/8 GPUs; cost overstated if idle GPUs cannot be packed.",
+    confidence:"medium", serveConfidence:"partial", readiness:"candidate", next:"Packed-node measurement and same-harness fix-rate."
+  },
+  {
+    id:"glm", name:"GLM-5.2", role:"measured workhorse", platform:"B300", family:"frontier-open",
+    license:"MIT", tierMin:2, tierMax:4, capability:89, success:0.89, context:1000, active:64, gpus:8,
+    dpmSpot:0.69, dpmOdcr:4.27, latency:8100, goodput:9271,
+    capEvidence:"Measured 89% fix rate on same 46 OpenCode/SWE-style issues as Claude baseline; official SWE-Pro 62.1.",
+    serveEvidence:"Measured B300 FP8 TP4+DP2: 9,271 tok/s within 8.1s TTFT p95 on coding-agent traffic.",
+    confidence:"high", serveConfidence:"measured", readiness:"ready", next:"Broaden same-harness eval beyond 46 issues."
+  },
+  {
+    id:"kimi", name:"Kimi K2.6", role:"highest open capability", platform:"B300", family:"frontier-open",
+    license:"Modified MIT", tierMin:2, tierMax:4, capability:80.2, success:0.80, context:256, active:32, gpus:8,
+    dpmSpot:0.51, dpmOdcr:3.17, latency:6179, goodput:12478,
+    capEvidence:"Official SWE-bench Verified 80.2, LiveCodeBench v6 89.6; no same-harness fix-rate run here.",
+    serveEvidence:"Measured B300 NVFP4/INT4 serving; best goodput 12,478 tok/s at c256.",
+    confidence:"medium", serveConfidence:"measured", readiness:"ready", next:"Own fix-rate eval on identical issue set."
+  },
+  {
+    id:"opus", name:"Claude Opus / GPT-5.x", role:"frontier fallback", platform:"API", family:"api",
+    license:"managed", tierMin:3, tierMax:4, capability:82, success:0.90, context:200, active:null, gpus:0,
+    dpmSpot:25, dpmOdcr:25, latency:5000, goodput:null,
+    capEvidence:"Vendor frontier capability reference; Opus/GPT-5.x SWE-bench range in report around 75-80+ depending tier.",
+    serveEvidence:"Managed API; no infra operations, highest per-token price.",
+    confidence:"medium", serveConfidence:"managed", readiness:"ready", next:"Keep as escalation and cost ceiling."
+  }
+];
+
+const API_OUTPUT_DPM = 25;
+const API_INPUT_DPM = 5;
+const TIER_DEFAULTS = {
+  0:{floor:50, latency:30000, label:"small edits / lint"},
+  1:{floor:60, latency:15000, label:"localized bug fix"},
+  2:{floor:70, latency:20000, label:"multi-file task"},
+  3:{floor:78, latency:25000, label:"hard repo issue"},
+  4:{floor:82, latency:30000, label:"frontier fallback"}
+};
+let basis = "odcr";
+let frontierChart;
+let autoFloor = true;
+
+function $(id){return document.getElementById(id)}
+function selectedPlatforms(){
+  return [...document.querySelectorAll(".checks input:checked")].map(x=>x.value);
+}
+function num(id){ return +$(id).value || 0; }
+function costDpm(m){ return basis==="spot" ? m.dpmSpot : m.dpmOdcr; }
+function evidenceScore(m){
+  const c = {high:1, medium:.7, low:.42}[m.confidence] || .5;
+  const s = m.serveConfidence==="measured" ? 1 : m.serveConfidence==="managed" ? .9 : m.serveConfidence.includes("partial") ? .58 : .7;
+  return (c+s)/2;
+}
+function taskCost(m){
+  const input = num("inputTokens"), output = num("outputTokens"), cache = Math.min(100, Math.max(0, num("cacheHit"))) / 100;
+  if (m.platform === "API" || basis === "api") {
+    return (output/1e6)*API_OUTPUT_DPM + (input/1e6)*API_INPUT_DPM*(1-cache*.55);
+  }
+  const dpm = costDpm(m);
+  const inputFactor = .18 * (1-cache*.75);
+  return (output/1e6)*dpm + (input/1e6)*dpm*inputFactor;
+}
+function solvedCost(m){
+  const local = taskCost(m);
+  const success = Math.max(.05, m.success);
+  const tail = m.platform === "API" ? 0 : escalationRate(m);
+  const retryCost = (1-success) * tail * apiTaskCost();
+  return (local / success) + retryCost;
+}
+function apiTaskCost(){
+  const input = num("inputTokens"), output = num("outputTokens"), cache = Math.min(100, Math.max(0, num("cacheHit"))) / 100;
+  return (output/1e6)*API_OUTPUT_DPM + (input/1e6)*API_INPUT_DPM*(1-cache*.55);
+}
+function escalationRate(m){
+  const tier = num("taskTier");
+  const gap = Math.max(0, tier - m.tierMax);
+  const weak = m.confidence==="low" ? .12 : m.confidence==="medium" ? .06 : .02;
+  return Math.min(.75, .06 + gap*.18 + weak + Math.max(0, num("capFloor")-m.capability)/100);
+}
+function tierFit(m){
+  const t = num("taskTier");
+  if (t >= m.tierMin && t <= m.tierMax) return 1;
+  const dist = t < m.tierMin ? m.tierMin - t : t - m.tierMax;
+  return Math.max(.15, 1 - dist*.32);
+}
+function latencyPass(m){ return m.latency <= num("maxLatency") || m.platform==="API"; }
+function viable(m){
+  const platforms = selectedPlatforms();
+  return platforms.includes(m.platform) && m.capability >= num("capFloor") && latencyPass(m);
+}
+function score(m){
+  const preset = $("preset").value;
+  const weights = {
+    balanced:{cap:.24,cost:.24,evidence:.18,tier:.16,license:.06,throughput:.07,latency:.05},
+    cheap:{cap:.14,cost:.43,evidence:.14,tier:.15,license:.04,throughput:.07,latency:.03},
+    capability:{cap:.46,cost:.12,evidence:.15,tier:.13,license:.03,throughput:.06,latency:.05},
+    throughput:{cap:.16,cost:.16,evidence:.12,tier:.12,license:.03,throughput:.36,latency:.05},
+    latency:{cap:.16,cost:.14,evidence:.14,tier:.12,license:.03,throughput:.06,latency:.35},
+    safe:{cap:.22,cost:.16,evidence:.35,tier:.12,license:.05,throughput:.05,latency:.05},
+    license:{cap:.18,cost:.2,evidence:.16,tier:.12,license:.24,throughput:.05,latency:.05}
+  }[preset];
+  const costs = MODELS.map(solvedCost).filter(Number.isFinite);
+  const minC = Math.min(...costs), maxC = Math.max(...costs);
+  const maxThroughput = Math.max(...MODELS.map(x=>x.goodput || 0));
+  const latencies = MODELS.map(x=>x.latency).filter(Number.isFinite);
+  const minLat = Math.min(...latencies), maxLat = Math.max(...latencies);
+  const costNorm = 1 - ((solvedCost(m)-minC) / Math.max(.01, maxC-minC));
+  const capNorm = Math.min(1, m.capability/90);
+  const throughputNorm = maxThroughput ? Math.min(1, (m.goodput || 0) / maxThroughput) : 0;
+  const latencyNorm = 1 - ((Math.log(m.latency)-Math.log(minLat)) / Math.max(.01, Math.log(maxLat)-Math.log(minLat)));
+  const lic = m.license==="Apache-2.0" || m.license==="MIT" ? 1 : m.license==="Modified MIT" ? .72 : m.platform==="API" ? .45 : .55;
+  const total = weights.cap*capNorm + weights.cost*costNorm + weights.evidence*evidenceScore(m) + weights.tier*tierFit(m) + weights.license*lic + weights.throughput*throughputNorm + weights.latency*latencyNorm;
+  return Math.round(total*100);
+}
+function sortedModels(){
+  return MODELS.filter(viable).sort((a,b)=>score(b)-score(a));
+}
+
+function renderSelector(){
+  const rows = sortedModels();
+  const best = rows[0];
+  $("summaryKpis").innerHTML = [
+    kpi("Viable models", rows.length, `${MODELS.length} in ledger`),
+    kpi("Best fit", best ? best.name : "None", best ? `${score(best)} fit score` : "Relax floor or platform"),
+    kpi("Best solved cost", best ? money(Math.min(...rows.map(solvedCost))) : "-", "estimated"),
+    kpi("API task cost", money(apiTaskCost()), "frontier fallback")
+  ].join("");
+  $("recommendations").innerHTML = rows.slice(0,5).map((m,i)=>`
+    <div class="rec ${i===0?'best':''}">
+      <div>
+        <h3>${m.name}</h3>
+        <p>${recommendationText(m)}</p>
+        <div class="tags">${badges(m)}</div>
+      </div>
+      <div class="score"><div class="num">${score(m)}</div><div class="muted">fit</div></div>
+    </div>`).join("") || `<div class="rec"><div><h3>No model clears the current constraints</h3><p>Lower the capability floor, raise latency, or enable another platform.</p></div></div>`;
+  $("modelCards").innerHTML = rows.map(m=>`
+    <div class="model-card">
+      <h3><span>${m.name}</span><span class="tag ${m.platform==='API'?'plum':'info'}">${m.platform}</span></h3>
+      <div class="desc">${m.role}</div>
+      <div class="kv"><span>Capability</span><span>${fmt(m.capability)} (${m.confidence})</span></div>
+      <div class="kv"><span>Estimated solved task</span><span>${money(solvedCost(m))}</span></div>
+      <div class="kv"><span>Local task cost</span><span>${money(taskCost(m))}</span></div>
+      <div class="kv"><span>Latency basis</span><span>${m.platform==='API'?'managed':fmt(m.latency)+' ms'}</span></div>
+      <div class="kv"><span>License</span><span>${m.license}</span></div>
+      <div class="tags">${badges(m)}</div>
+    </div>`).join("");
+}
+function recommendationText(m){
+  const t = num("taskTier");
+  if (m.id==="glm") return "Best measured workhorse when the task is too hard for bulk models but you still want self-hosted economics.";
+  if (m.id==="kimi") return "Strong capability-first open-weight candidate; serving is measured, fix-rate still needs same-harness validation.";
+  if (m.id==="devstral") return "Good bulk endpoint for low and mid-complexity agent work where cheap parallel replicas matter more than frontier reasoning.";
+  if (m.id==="qwen3") return "Best fit when Apache-2.0 and throughput are important, with coding capability still needing a matched eval.";
+  if (m.id==="opus") return "Use as the hard-tail fallback, not as the default path for every task.";
+  if (t <= 1) return "Viable lower-tier candidate if the task classifier can escalate failures quickly.";
+  return "Candidate for this tier, but review the evidence labels before production routing.";
+}
+function badges(m){
+  const e = m.confidence==="high" ? "good" : m.confidence==="medium" ? "warn" : "bad";
+  const s = m.serveConfidence==="measured" || m.serveConfidence==="managed" ? "good" : "warn";
+  return [
+    `<span class="tag ${e}">cap ${m.confidence}</span>`,
+    `<span class="tag ${s}">serving ${m.serveConfidence}</span>`,
+    `<span class="tag info">${m.license}</span>`,
+    m.readiness==="ready" ? `<span class="tag good">ready</span>` : `<span class="tag warn">${m.readiness}</span>`
+  ].join("");
+}
+function kpi(label,val,small){ return `<div class="kpi"><div class="lab">${label}</div><div class="val">${val}</div><div class="small">${small}</div></div>`; }
+function money(v){ return "$" + (v>=10 ? v.toFixed(2) : v>=1 ? v.toFixed(3) : v.toFixed(4)); }
+function fmt(v){ return Number.isInteger(v) ? v.toLocaleString() : v.toFixed(1); }
+function updateFloorButtons(){
+  $("autoFloorBtn").classList.toggle("active", autoFloor);
+  $("manualFloorBtn").classList.toggle("active", !autoFloor);
+}
+function setTierDefaults(){
+  const d = TIER_DEFAULTS[num("taskTier")];
+  if (autoFloor && d) {
+    $("capFloor").value = d.floor;
+    $("maxLatency").value = d.latency;
+  }
+  updateFloorButtons();
+  renderAll();
+}
+function manualCapabilityFloor(){
+  autoFloor = false;
+  updateFloorButtons();
+  renderAll();
+}
+function toggleAutoFloor(e, enabled){
+  if (e) e.preventDefault();
+  autoFloor = enabled;
+  setTierDefaults();
+}
+
+function renderFrontier(){
+  const rows = MODELS.filter(m=>selectedPlatforms().includes(m.platform));
+  $("frontierTable").querySelector("tbody").innerHTML = rows.sort((a,b)=>solvedCost(a)-solvedCost(b)).map(m=>`
+    <tr><td><b>${m.name}</b></td><td>${m.role}</td><td class="num">${fmt(m.capability)}</td><td class="num">${money(taskCost(m))}</td><td class="num">${money(solvedCost(m))}</td><td class="num">${Math.round(escalationRate(m)*100)}%</td><td>${badges(m)}</td></tr>
+  `).join("");
+  if (typeof Chart === "undefined") {
+    const chartBox = $("frontierChart").parentElement;
+    if (chartBox && !chartBox.querySelector(".chart-missing")) {
+      chartBox.insertAdjacentHTML("beforeend", '<div class="chart-missing muted" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px">Chart library unavailable. Selector, fleet mix, and evidence tables are still populated.</div>');
+    }
+    return;
+  }
+  const missing = $("frontierChart").parentElement?.querySelector(".chart-missing");
+  if (missing) missing.remove();
+  const colors = {g7e:"#0f766e",B200:"#b45309",B300:"#4f46e5",API:"#7e22ce"};
+  const datasets = Object.keys(colors).map(platform=>{
+    const pts = rows.filter(m=>m.platform===platform).map(m=>({
+      x: solvedCost(m), y: m.capability, r: Math.max(5, Math.min(17, (m.context||100)/60)),
+      model:m.name, role:m.role, confidence:m.confidence, evidence:evidenceScore(m), cost:solvedCost(m)
+    }));
+    return {label:platform,data:pts,backgroundColor:pts.map(p=>p.evidence>.75?colors[platform]:"transparent"),borderColor:colors[platform],borderWidth:2,pointRadius:pts.map(p=>p.r),pointHoverRadius:pts.map(p=>p.r+3)};
+  }).filter(d=>d.data.length);
+  if (frontierChart) frontierChart.destroy();
+  frontierChart = new Chart($("frontierChart"),{
+    type:"scatter",
+    data:{datasets},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:c=>{const p=c.raw;return [`${p.model}`,`${p.role}`,`capability ${p.y}`,`${money(p.cost)} / solved task`,`evidence ${Math.round(p.evidence*100)}%`];}}}},
+      scales:{x:{type:"logarithmic",title:{display:true,text:"Estimated $ / solved coding task (log)"}},y:{min:45,max:92,title:{display:true,text:"Coding capability / task success proxy"}}}
+    }
+  });
+}
+
+function renderFleet(){
+  const tier = num("taskTier");
+  const rows = sortedModels();
+  const bulk = rows.find(m=>m.tierMin<=0 && m.platform!=="API") || MODELS.find(m=>m.id==="devstral");
+  const mid = rows.find(m=>m.tierMin<=1 && m.tierMax>=2 && m.platform!=="API") || MODELS.find(m=>m.id==="qwen3");
+  const high = rows.find(m=>m.tierMin<=2 && m.tierMax>=4 && m.platform!=="API") || MODELS.find(m=>m.id==="glm");
+  const api = MODELS.find(m=>m.platform==="API");
+  const tail = Math.max(0,Math.min(100,num("apiTail")))/100;
+  const mix = tier<=0 ? [[bulk,.78],[mid,.14],[high,.04],[api,.04+tail*.4]]
+            : tier===1 ? [[bulk,.52],[mid,.28],[high,.12],[api,.08+tail*.4]]
+            : tier===2 ? [[bulk,.18],[mid,.42],[high,.28],[api,.12+tail*.5]]
+            : [[mid,.12],[high,.58],[api,.30+tail*.6]];
+  const total = mix.reduce((a,[_m,p])=>a+p,0);
+  const norm = mix.map(([m,p])=>[m,p/total]);
+  $("mixBars").innerHTML = norm.map(([m,p])=>`
+    <div class="barrow"><div>${m.name.split(" ").slice(0,2).join(" ")}</div><div class="bar"><i style="width:${Math.round(p*100)}%;background:${m.platform==='API'?'var(--plum)':m.platform==='g7e'?'var(--teal)':m.platform==='B200'?'var(--amber)':'var(--indigo)'}"></i></div><div class="num">${Math.round(p*100)}%</div></div>
+  `).join("");
+  const blended = norm.reduce((a,[m,p])=>a + p*solvedCost(m),0);
+  const tasks = num("monthlyTasks");
+  const b200 = num("b200Nodes"), b300 = num("b300Nodes"), g7e = num("g7eNodes");
+  const fleetHr = b200*113.93 + b300*142.42 + g7e*16.29;
+  $("fleetKpis").innerHTML = [
+    kpi("Blended solved task", money(blended), "routing estimate"),
+    kpi("Monthly task spend", money(blended*tasks), `${tasks.toLocaleString()} tasks`),
+    kpi("Provisioned $/hr", "$"+fleetHr.toFixed(2), "ODCR/list approximation"),
+    kpi("Useful next step", "bin-pack", "HBM + KV reserve")
+  ].join("");
+  $("fleetTable").querySelector("tbody").innerHTML = norm.map(([m,p],i)=>`
+    <tr><td>T${i}</td><td><b>${m.name}</b></td><td class="num">${Math.round(p*100)}%</td><td class="num">${money(solvedCost(m))}</td><td>${fleetReason(m)}</td></tr>
+  `).join("");
+}
+function fleetReason(m){
+  if (m.id==="devstral") return "Cheap isolated replicas for low-risk tool-heavy tasks.";
+  if (m.id==="qwen3") return "Throughput and license-friendly mid-tier path.";
+  if (m.id==="glm") return "Measured high-quality self-hosted workhorse.";
+  if (m.id==="kimi") return "High capability candidate when own eval confirms fit.";
+  if (m.platform==="API") return "Hard-tail recovery and quality ceiling.";
+  return m.role;
+}
+
+function renderEvidence(){
+  $("evidenceTable").querySelector("tbody").innerHTML = MODELS.map(m=>`
+    <tr>
+      <td><b>${m.name}</b></td><td>${m.role}</td><td>${m.platform}</td><td class="num">${fmt(m.capability)}</td>
+      <td>${m.capEvidence}</td><td>${m.serveEvidence}</td>
+      <td class="num">${money(m.dpmOdcr)}</td><td class="num">${money(m.dpmSpot)}</td><td>${m.next}</td>
+    </tr>
+  `).join("");
+}
+function renderAll(){ renderSelector(); renderFrontier(); renderFleet(); renderEvidence(); }
+function setBasis(e){
+  basis = e.currentTarget.dataset.basis;
+  document.querySelectorAll("#basisSeg button").forEach(b=>b.classList.toggle("active",b.dataset.basis===basis));
+  renderAll();
+}
+function applyPreset(){
+  const p = $("preset").value;
+  autoFloor = p==="balanced";
+  if (p==="cheap") {$("capFloor").value=55;$("maxLatency").value=30000;}
+  if (p==="capability") {$("capFloor").value=78;$("maxLatency").value=20000;}
+  if (p==="throughput") {$("capFloor").value=60;$("maxLatency").value=30000;}
+  if (p==="latency") {$("capFloor").value=60;$("maxLatency").value=5000;}
+  if (p==="safe") {$("capFloor").value=70;$("maxLatency").value=15000;}
+  if (p==="license") {$("capFloor").value=60;$("maxLatency").value=20000;}
+  if (p==="balanced") setTierDefaults();
+  updateFloorButtons();
+  renderAll();
+}
+function showTab(e,id){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  e.currentTarget.classList.add("active");
+  document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
+  $("panel-"+id).classList.add("active");
+  if (id==="frontier") renderFrontier();
+}
+function toggleTheme(){
+  const html=document.documentElement;
+  const dark=html.getAttribute("data-theme")==="dark";
+  html.setAttribute("data-theme",dark?"light":"dark");
+  if (typeof Chart !== "undefined") Chart.defaults.color = dark ? "#1c1f1a" : "#edf0e8";
+  renderFrontier();
+}
+if (typeof Chart !== "undefined") Chart.defaults.color = "#1c1f1a";
+renderAll();
+</script>
+</body>
+</html>

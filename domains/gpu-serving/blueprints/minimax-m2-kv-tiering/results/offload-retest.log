@@ -1,0 +1,332 @@
+[2026-06-30T10:05:25Z] === CPU-OFFLOAD RE-TEST START ===
+[2026-06-30T10:05:25Z] waiting for node Ready (up to 45min for spot join)...
+[2026-06-30T10:05:33Z] PREFLIGHT OK — scaledown ARMED (NG=ai-infra-use2-b200-spot-maz).
+job.batch/stage-minimax-m2 created
+[2026-06-30T10:05:41Z] staging weights (~25min)...
+[2026-06-30T10:26:24Z] staging done
+configmap/dcgm-metrics-prof-minimax unchanged
+configmap/prometheus-bench-config-minimax unchanged
+pod/observability-bench created
+[2026-06-30T10:26:26Z] observability applied
+[2026-06-30T10:26:26Z] EXIT rc=1
+[2026-06-30T10:26:28Z] scale-to-zero accepted (1)
+[2026-06-30T10:33:19Z] === CPU-OFFLOAD RE-TEST START ===
+[2026-06-30T10:33:20Z] waiting for node Ready (up to 45min for spot join)...
+[2026-06-30T10:33:28Z] PREFLIGHT OK — scaledown ARMED (NG=ai-infra-use2-b200-spot-maz).
+[2026-06-30T10:33:28Z] ensuring /mnt/nvme is mounted on the node...
+pod/nvme-prep created
+pod "nvme-prep" deleted from default namespace
+job.batch/stage-minimax-m2 created
+[2026-06-30T10:37:38Z] staging weights (~25min)...
+configmap/dcgm-metrics-prof-minimax unchanged
+configmap/prometheus-bench-config-minimax unchanged
+pod/observability-bench created
+[2026-06-30T11:29:22Z] observability applied
+No resources found
+pod/vllm-tp4-gpu-only created
+[2026-06-30T11:29:28Z] GATE gpu-only: pod=vllm-tp4-gpu-only; waiting boot (~35min cold)...
+[2026-06-30T11:29:31Z] GATE gpu-only: phase=Pending health=
+[2026-06-30T11:30:15Z] GATE gpu-only: phase=Pending health=
+[2026-06-30T11:30:58Z] GATE gpu-only: phase=Pending health=
+[2026-06-30T11:31:41Z] GATE gpu-only: phase=Pending health=
+[2026-06-30T11:32:23Z] GATE gpu-only: phase=Pending health=
+[2026-06-30T11:33:07Z] GATE gpu-only: phase=Running health=000
+[2026-06-30T11:33:51Z] GATE gpu-only: phase=Running health=000
+[2026-06-30T11:34:35Z] GATE gpu-only: phase=Running health=000
+[2026-06-30T11:35:18Z] GATE gpu-only: phase=Running health=000
+[2026-06-30T11:36:01Z] GATE gpu-only: phase=Running health=000
+[2026-06-30T11:36:45Z] GATE gpu-only: phase=Running health=000
+[2026-06-30T11:37:29Z] GATE gpu-only: phase=Running health=200
+[2026-06-30T11:37:29Z] GATE gpu-only PASS (health 200).
+pod "vllm-tp4-gpu-only" deleted from default namespace
+No resources found
+pod/vllm-tp4-cpu-offload created
+[2026-06-30T11:41:55Z] GATE cpu-offload: pod=vllm-tp4-cpu-offload; waiting boot (~35min cold)...
+[2026-06-30T11:42:01Z] GATE cpu-offload: phase=Pending health=000
+[2026-06-30T11:42:45Z] GATE cpu-offload: phase=Running health=000
+[2026-06-30T11:43:29Z] GATE cpu-offload: phase=Running health=000
+[2026-06-30T11:44:13Z] GATE cpu-offload: phase=Running health=000
+[2026-06-30T11:44:57Z] GATE cpu-offload: phase=Running health=000
+[2026-06-30T11:45:41Z] GATE cpu-offload: phase=Running health=000
+[2026-06-30T11:46:25Z] GATE cpu-offload: phase=Running health=000
+[2026-06-30T11:47:08Z] GATE cpu-offload: phase=Running health=000
+[2026-06-30T11:47:53Z] GATE cpu-offload: phase=Running health=000
+[2026-06-30T11:48:37Z] GATE cpu-offload: phase=Running health=000
+[2026-06-30T11:49:21Z] GATE cpu-offload: phase=Running health=000
+[2026-06-30T11:50:05Z] GATE cpu-offload: phase=Running health=000
+[2026-06-30T11:50:48Z] GATE cpu-offload: phase=Running health=000
+[2026-06-30T11:51:31Z] GATE cpu-offload: phase=Running health=000
+[2026-06-30T11:52:15Z] GATE cpu-offload: phase=Running health=000
+[2026-06-30T11:52:58Z] GATE cpu-offload: phase=Running health=000
+[2026-06-30T11:53:42Z] GATE cpu-offload: phase=Running health=000
+[2026-06-30T11:54:26Z] GATE cpu-offload: phase=Running health=000
+[2026-06-30T11:55:13Z] GATE cpu-offload: phase=Running health=000
+[2026-06-30T11:55:58Z] GATE cpu-offload: phase=Running health=000
+[2026-06-30T11:59:06Z] GATE cpu-offload: phase=Running health=
+[2026-06-30T11:59:48Z] GATE cpu-offload: phase=Running health=
+[2026-06-30T12:00:31Z] GATE cpu-offload: phase=Running health=
+[2026-06-30T12:01:15Z] GATE cpu-offload: phase=Running health=
+[2026-06-30T12:01:59Z] GATE cpu-offload: phase=Running health=
+[2026-06-30T12:02:43Z] GATE cpu-offload: phase=Running health=
+[2026-06-30T12:03:25Z] GATE cpu-offload FAILED phase=Failed — capturing WORKER trace (deep tail).
+(EngineCore pid=974) INFO 06-30 11:56:20 [multiproc_executor.py:428] [shutdown] Executor: waiting for worker exit count=4
+(EngineCore pid=974) Process EngineCore:
+(EngineCore pid=974) Traceback (most recent call last):
+(EngineCore pid=974)   File "/usr/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+(EngineCore pid=974)     self.run()
+(EngineCore pid=974)   File "/usr/lib/python3.12/multiprocessing/process.py", line 108, in run
+(EngineCore pid=974)     self._target(*self._args, **self._kwargs)
+(EngineCore pid=974)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core.py", line 1199, in run_engine_core
+(EngineCore pid=974)     raise e
+(EngineCore pid=974)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core.py", line 1164, in run_engine_core
+(EngineCore pid=974)     engine_core = EngineCoreProc(*args, engine_index=dp_rank, **kwargs)
+(EngineCore pid=974)                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=974)   File "/usr/local/lib/python3.12/dist-packages/vllm/tracing/otel.py", line 178, in sync_wrapper
+(EngineCore pid=974)     return func(*args, **kwargs)
+(EngineCore pid=974)            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=974)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core.py", line 930, in __init__
+(EngineCore pid=974)     super().__init__(
+(EngineCore pid=974)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core.py", line 132, in __init__
+(EngineCore pid=974)     kv_cache_config = self._initialize_kv_caches(vllm_config)
+(EngineCore pid=974)                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=974)   File "/usr/local/lib/python3.12/dist-packages/vllm/tracing/otel.py", line 178, in sync_wrapper
+(EngineCore pid=974)     return func(*args, **kwargs)
+(EngineCore pid=974)            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=974)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core.py", line 290, in _initialize_kv_caches
+(EngineCore pid=974)     self.model_executor.initialize_from_config(kv_cache_configs)
+(EngineCore pid=974)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/executor/abstract.py", line 123, in initialize_from_config
+(EngineCore pid=974)     self.collective_rpc("initialize_from_config", args=(kv_cache_configs,))
+(EngineCore pid=974)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/executor/multiproc_executor.py", line 404, in collective_rpc
+(EngineCore pid=974)     return future if non_block else future.result()
+(EngineCore pid=974)                                     ^^^^^^^^^^^^^^^
+(EngineCore pid=974)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/executor/multiproc_executor.py", line 91, in result
+(EngineCore pid=974)     return super().result()
+(EngineCore pid=974)            ^^^^^^^^^^^^^^^^
+(EngineCore pid=974)   File "/usr/lib/python3.12/concurrent/futures/_base.py", line 449, in result
+(EngineCore pid=974)     return self.__get_result()
+(EngineCore pid=974)            ^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=974)   File "/usr/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result
+(EngineCore pid=974)     raise self._exception
+(EngineCore pid=974)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/executor/multiproc_executor.py", line 95, in _wait_for_response
+(EngineCore pid=974)     response = self.aggregate(self.get_response())
+(EngineCore pid=974)                               ^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=974)   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/executor/multiproc_executor.py", line 391, in get_response
+(EngineCore pid=974)     raise RuntimeError(
+(EngineCore pid=974) RuntimeError: Worker failed with error 'cpu_bytes_to_use must be specified in kv_connector_extra_config', please check the stack trace above for the root cause
+(APIServer pid=1) Traceback (most recent call last):
+(APIServer pid=1)     await run_server_worker(listen_address, sock, args, **uvicorn_kwargs)
+(APIServer pid=1)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 679, in run_server_worker
+(APIServer pid=1)     self.engine_core = EngineCoreClient.make_async_mp_client(
+(APIServer pid=1)     raise RuntimeError(
+(APIServer pid=1) RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+pod "vllm-tp4-cpu-offload" deleted from default namespace
+[2026-06-30T12:03:29Z] === CPU-OFFLOAD STILL FAILS TO BOOT even with fixed flags — worker trace captured above. ===
+[2026-06-30T12:03:29Z] Do NOT run the sweep (it would be all gpu-only). The offload boot is the blocker; diagnose from the WORKER trace.
+bad kv_arm: tp4ep4
+[2026-06-30T12:03:29Z] GATE gen-manifest FAILED tp4ep4
+[2026-06-30T12:03:29Z] === tp4ep4 FAILS TO BOOT on 0.23 — the +40% EP lever from 0.19 is GONE on this engine (worker trace above). ===
+[2026-06-30T12:03:29Z] This is a material 0.23 REGRESSION vs 0.19 for throughput headroom — flag it.
+[2026-06-30T12:03:29Z] === RE-TEST DONE ===
+[2026-06-30T12:03:29Z] EXIT rc=0
+[2026-06-30T12:03:32Z] scale-to-zero accepted (1)
+[2026-06-30T12:10:09Z] === CPU-OFFLOAD RE-TEST START ===
+[2026-06-30T12:10:09Z] waiting for node Ready (up to 45min for spot join)...
+[2026-06-30T12:10:15Z] PREFLIGHT OK — scaledown ARMED (NG=ai-infra-use2-b200-spot-maz).
+[2026-06-30T12:10:15Z] ensuring /mnt/nvme is mounted on the node...
+pod/nvme-prep created
+[2026-06-30T12:10:36Z] NVMe mounted OK
+pod "nvme-prep" deleted from default namespace
+job.batch/stage-minimax-m2 created
+[2026-06-30T12:10:45Z] staging weights (~25min)...
+[2026-06-30T12:12:51Z] staging done
+configmap/dcgm-metrics-prof-minimax unchanged
+configmap/prometheus-bench-config-minimax unchanged
+pod/observability-bench created
+[2026-06-30T12:12:54Z] observability applied
+No resources found
+pod/vllm-tp4-gpu-only created
+[2026-06-30T12:13:00Z] GATE tp4-gpu-only: pod=vllm-tp4-gpu-only; waiting boot (~35min cold)...
+[2026-06-30T12:13:04Z] GATE tp4-gpu-only: phase=Pending health=
+[2026-06-30T12:13:47Z] GATE tp4-gpu-only: phase=Pending health=
+[2026-06-30T12:14:30Z] GATE tp4-gpu-only: phase=Pending health=
+[2026-06-30T12:15:13Z] GATE tp4-gpu-only: phase=Pending health=
+[2026-06-30T12:15:57Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T12:16:40Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T12:17:24Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T12:18:08Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T12:18:52Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T12:19:36Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T12:20:21Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T12:21:04Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T12:21:47Z] GATE tp4-gpu-only: phase=Running health=200
+[2026-06-30T12:21:47Z] GATE tp4-gpu-only PASS (health 200).
+pod "vllm-tp4-gpu-only" deleted from default namespace
+No resources found
+pod/vllm-tp4-cpu-offload created
+[2026-06-30T12:22:02Z] GATE tp4-cpu-offload: pod=vllm-tp4-cpu-offload; waiting boot (~35min cold)...
+[2026-06-30T12:22:05Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T12:22:49Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T12:23:32Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T12:24:16Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T12:25:00Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T12:25:43Z] GATE tp4-cpu-offload: phase=Running health=200
+[2026-06-30T12:25:43Z] GATE tp4-cpu-offload PASS (health 200).
+pod "vllm-tp4-cpu-offload" deleted from default namespace
+[2026-06-30T12:26:09Z] === CPU-OFFLOAD BOOTS (cpu_bytes_to_use fix). Running scoped knee sweep incl nvme-tiering (fs disk tier, supported on 0.23). ===
+pareto: 3 points -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2-kv-tiering/results/pareto-2026-06-30.json
+trajectory: 5 nodes -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2-kv-tiering/results/optimization-trajectory-2026-06-30.json
+[2026-06-30T12:55:34Z] OFFLOAD SWEEP complete
+No resources found
+pod/vllm-tp4ep4-gpu-only created
+[2026-06-30T12:55:39Z] GATE tp4ep4-gpu-only: pod=vllm-tp4ep4-gpu-only; waiting boot (~35min cold)...
+[2026-06-30T12:55:42Z] GATE tp4ep4-gpu-only: phase=Running health=000
+[2026-06-30T12:56:25Z] GATE tp4ep4-gpu-only: phase=Running health=000
+[2026-06-30T12:57:08Z] GATE tp4ep4-gpu-only: phase=Running health=000
+[2026-06-30T12:57:51Z] GATE tp4ep4-gpu-only: phase=Running health=000
+[2026-06-30T12:58:34Z] GATE tp4ep4-gpu-only: phase=Running health=200
+[2026-06-30T12:58:34Z] GATE tp4ep4-gpu-only PASS (health 200).
+pod "vllm-tp4ep4-gpu-only" deleted from default namespace
+[2026-06-30T12:58:43Z] === tp4ep4 BOOTS on 0.23. Running EP-vs-TP throughput comparison (shared-prefix, gpu-only). ===
+pareto: 2 points -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2/results/pareto-2026-06-30.json
+trajectory: 2 nodes -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2/results/optimization-trajectory-2026-06-30.json
+[2026-06-30T13:05:49Z] EP-COMPARE complete
+[2026-06-30T13:05:49Z] === RE-TEST DONE ===
+[2026-06-30T13:05:49Z] EXIT rc=0
+[2026-06-30T13:05:51Z] scale-to-zero accepted (1)
+[2026-06-30T16:18:08Z] === CPU-OFFLOAD RE-TEST START ===
+[2026-06-30T16:18:08Z] waiting for node Ready (up to 45min for spot join)...
+[2026-06-30T16:18:14Z] PREFLIGHT OK — scaledown ARMED (NG=ai-infra-use2-b200-spot-maz).
+[2026-06-30T16:18:14Z] ensuring /mnt/nvme is mounted on the node...
+pod/nvme-prep created
+[2026-06-30T16:18:39Z] NVMe mounted OK
+pod "nvme-prep" deleted from default namespace
+job.batch/stage-minimax-m2 created
+[2026-06-30T16:18:54Z] staging weights (~25min)...
+[2026-06-30T16:21:02Z] staging done
+configmap/dcgm-metrics-prof-minimax unchanged
+configmap/prometheus-bench-config-minimax unchanged
+pod/observability-bench created
+[2026-06-30T16:21:06Z] observability applied
+No resources found
+pod/vllm-tp4-gpu-only created
+[2026-06-30T16:21:14Z] GATE tp4-gpu-only: pod=vllm-tp4-gpu-only; waiting boot (~35min cold)...
+[2026-06-30T16:21:19Z] GATE tp4-gpu-only: phase=Pending health=
+[2026-06-30T16:22:02Z] GATE tp4-gpu-only: phase=Pending health=
+[2026-06-30T16:22:47Z] GATE tp4-gpu-only: phase=Pending health=
+[2026-06-30T16:23:31Z] GATE tp4-gpu-only: phase=Pending health=
+[2026-06-30T16:24:17Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T16:25:02Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T16:25:46Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T16:26:31Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T16:27:15Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T16:27:59Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T16:28:43Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T16:29:28Z] GATE tp4-gpu-only: phase=Running health=200
+[2026-06-30T16:29:28Z] GATE tp4-gpu-only PASS (health 200).
+pod "vllm-tp4-gpu-only" deleted from default namespace
+No resources found
+pod/vllm-tp4-cpu-offload created
+[2026-06-30T16:29:45Z] GATE tp4-cpu-offload: pod=vllm-tp4-cpu-offload; waiting boot (~35min cold)...
+[2026-06-30T16:29:48Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T16:30:32Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T16:31:16Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T16:32:00Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T16:32:45Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T16:33:30Z] GATE tp4-cpu-offload: phase=Running health=200
+[2026-06-30T16:33:30Z] GATE tp4-cpu-offload PASS (health 200).
+pod "vllm-tp4-cpu-offload" deleted from default namespace
+[2026-06-30T16:33:55Z] === CPU-OFFLOAD BOOTS (cpu_bytes_to_use fix). Running scoped knee sweep incl nvme-tiering (fs disk tier, supported on 0.23). ===
+pareto: 4 points -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2-kv-tiering/results/pareto-2026-06-30.json
+trajectory: 5 nodes -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2-kv-tiering/results/optimization-trajectory-2026-06-30.json
+[2026-06-30T16:51:17Z] OFFLOAD SWEEP complete
+No resources found
+pod/vllm-tp4ep4-gpu-only created
+[2026-06-30T16:51:23Z] GATE tp4ep4-gpu-only: pod=vllm-tp4ep4-gpu-only; waiting boot (~35min cold)...
+[2026-06-30T16:51:27Z] GATE tp4ep4-gpu-only: phase=Running health=000
+[2026-06-30T16:52:11Z] GATE tp4ep4-gpu-only: phase=Running health=000
+[2026-06-30T16:52:54Z] GATE tp4ep4-gpu-only: phase=Running health=000
+[2026-06-30T16:53:37Z] GATE tp4ep4-gpu-only: phase=Running health=000
+[2026-06-30T16:54:21Z] GATE tp4ep4-gpu-only: phase=Running health=200
+[2026-06-30T16:54:21Z] GATE tp4ep4-gpu-only PASS (health 200).
+pod "vllm-tp4ep4-gpu-only" deleted from default namespace
+[2026-06-30T16:54:30Z] === tp4ep4 BOOTS on 0.23. Running EP-vs-TP throughput comparison (shared-prefix, gpu-only). ===
+pareto: 2 points -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2/results/pareto-2026-06-30.json
+trajectory: 2 nodes -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2/results/optimization-trajectory-2026-06-30.json
+[2026-06-30T17:03:31Z] EP-COMPARE complete
+[2026-06-30T17:03:31Z] === RE-TEST DONE ===
+[2026-06-30T17:03:31Z] EXIT rc=0
+[2026-06-30T17:03:35Z] scale-to-zero accepted (1)
+[2026-06-30T17:08:36Z] === CPU-OFFLOAD RE-TEST START ===
+[2026-06-30T17:08:36Z] waiting for node Ready (up to 45min for spot join)...
+[2026-06-30T17:08:51Z] PREFLIGHT OK — scaledown ARMED (NG=ai-infra-use2-b200-spot-maz).
+[2026-06-30T17:08:51Z] ensuring /mnt/nvme is mounted on the node...
+pod/nvme-prep created
+pod "nvme-prep" deleted from default namespace
+job.batch/stage-minimax-m2 created
+[2026-06-30T17:13:57Z] staging weights (~25min)...
+configmap/dcgm-metrics-prof-minimax unchanged
+configmap/prometheus-bench-config-minimax unchanged
+pod/observability-bench created
+[2026-06-30T18:06:57Z] observability applied
+No resources found
+pod/vllm-tp4-gpu-only created
+[2026-06-30T18:07:04Z] GATE tp4-gpu-only: pod=vllm-tp4-gpu-only; waiting boot (~35min cold)...
+[2026-06-30T18:07:07Z] GATE tp4-gpu-only: phase=Pending health=
+[2026-06-30T18:07:51Z] GATE tp4-gpu-only: phase=Pending health=
+[2026-06-30T18:08:37Z] GATE tp4-gpu-only: phase=Pending health=
+[2026-06-30T18:09:24Z] GATE tp4-gpu-only: phase=Pending health=
+[2026-06-30T18:10:11Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T18:10:58Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T18:11:41Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T18:12:27Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T18:13:11Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T18:13:57Z] GATE tp4-gpu-only: phase=Running health=000
+[2026-06-30T18:14:42Z] GATE tp4-gpu-only: phase=Running health=200
+[2026-06-30T18:14:42Z] GATE tp4-gpu-only PASS (health 200).
+pod "vllm-tp4-gpu-only" deleted from default namespace
+No resources found
+pod/vllm-tp4-cpu-offload created
+[2026-06-30T18:18:40Z] GATE tp4-cpu-offload: pod=vllm-tp4-cpu-offload; waiting boot (~35min cold)...
+[2026-06-30T18:18:46Z] GATE tp4-cpu-offload: phase=Pending health=000
+[2026-06-30T18:19:32Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T18:20:20Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T18:21:06Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T18:21:52Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T18:22:39Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T18:23:25Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T18:24:11Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T18:24:56Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T18:25:40Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T18:26:27Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T18:27:12Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T18:27:56Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T18:28:41Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T18:29:28Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T18:30:15Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T18:31:05Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T18:31:49Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T18:32:34Z] GATE tp4-cpu-offload: phase=Running health=000
+[2026-06-30T18:33:20Z] GATE tp4-cpu-offload: phase=Running health=200
+[2026-06-30T18:33:20Z] GATE tp4-cpu-offload PASS (health 200).
+pod "vllm-tp4-cpu-offload" deleted from default namespace
+[2026-06-30T18:39:58Z] === CPU-OFFLOAD BOOTS (cpu_bytes_to_use fix). Running scoped knee sweep incl nvme-tiering (fs disk tier, supported on 0.23). ===
+pareto: 5 points -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2-kv-tiering/results/pareto-2026-06-30.json
+trajectory: 6 nodes -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2-kv-tiering/results/optimization-trajectory-2026-06-30.json
+[2026-06-30T19:45:27Z] OFFLOAD SWEEP complete
+No resources found
+pod/vllm-tp4ep4-gpu-only created
+[2026-06-30T19:45:36Z] GATE tp4ep4-gpu-only: pod=vllm-tp4ep4-gpu-only; waiting boot (~35min cold)...
+[2026-06-30T19:45:40Z] GATE tp4ep4-gpu-only: phase=Running health=000
+[2026-06-30T19:46:29Z] GATE tp4ep4-gpu-only: phase=Running health=000
+[2026-06-30T19:47:14Z] GATE tp4ep4-gpu-only: phase=Running health=000
+[2026-06-30T19:48:00Z] GATE tp4ep4-gpu-only: phase=Running health=000
+[2026-06-30T19:48:47Z] GATE tp4ep4-gpu-only: phase=Running health=200
+[2026-06-30T19:48:47Z] GATE tp4ep4-gpu-only PASS (health 200).
+pod "vllm-tp4ep4-gpu-only" deleted from default namespace
+[2026-06-30T19:48:57Z] === tp4ep4 BOOTS on 0.23. Running EP-vs-TP throughput comparison (shared-prefix, gpu-only). ===
+pareto: 6 points -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2/results/pareto-2026-06-30.json
+trajectory: 6 nodes -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2/results/optimization-trajectory-2026-06-30.json
+[2026-06-30T20:11:00Z] EP-COMPARE complete
+[2026-06-30T20:11:00Z] === RE-TEST DONE ===
+[2026-06-30T20:11:00Z] EXIT rc=0
+[2026-06-30T20:11:04Z] scale-to-zero accepted (1)

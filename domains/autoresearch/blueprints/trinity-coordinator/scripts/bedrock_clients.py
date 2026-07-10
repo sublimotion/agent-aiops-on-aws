@@ -70,6 +70,45 @@ class _Telemetry:
     def _inc(self, field: str, n: int = 1) -> None:
         with self._lock:
             setattr(self, field, getattr(self, field) + n)
+        self._flush()
+
+    # Spawn-isolation bridge (lessons #20): counters live per-interpreter, so the
+    # main process can't see throttling inside spawned Pool workers. Each worker
+    # flushes its cumulative counters to <dir>/throttle_<pid>.json; the main proc
+    # sums all PID files via aggregate_throttle(). Monotonic per-PID totals →
+    # last-write-wins is exact, no cross-process lock needed.
+    def _flush(self) -> None:
+        d = os.environ.get("CAR_TRINITY_TELEMETRY_DIR")
+        if not d:
+            return
+        try:
+            os.makedirs(d, exist_ok=True)
+            snap = self.snapshot()
+            tmp = os.path.join(d, f"throttle_{os.getpid()}.json.tmp")
+            dst = os.path.join(d, f"throttle_{os.getpid()}.json")
+            with open(tmp, "w") as f:
+                json.dump(snap, f)
+            os.replace(tmp, dst)
+        except Exception:
+            pass
+
+
+def aggregate_throttle() -> dict:
+    """Main-process view: sum throttle counters across all worker PID files."""
+    d = os.environ.get("CAR_TRINITY_TELEMETRY_DIR")
+    agg = {"calls": 0, "throttles": 0, "dropped": 0, "region_advances": 0}
+    if d and os.path.isdir(d):
+        for fn in os.listdir(d):
+            if fn.startswith("throttle_") and fn.endswith(".json"):
+                try:
+                    with open(os.path.join(d, fn)) as f:
+                        s = json.load(f)
+                except Exception:
+                    continue
+                for k in agg:
+                    agg[k] += int(s.get(k, 0))
+    agg["dropped_rate"] = (agg["dropped"] / agg["calls"]) if agg["calls"] else 0.0
+    return agg
 
 
 THROTTLE_TELEMETRY = _Telemetry()
@@ -130,24 +169,106 @@ def _to_converse(messages: List[Dict]) -> tuple[Optional[list], list]:
     return system_blocks, converted
 
 
+def _reasoning_text(block: dict) -> str:
+    """Pull the thinking text out of a Bedrock reasoningContent block.
+    Shape (live-verified Qwen3/DeepSeek-R1): {"reasoningContent":
+    {"reasoningText": {"text": "..."}}}."""
+    rc = block.get("reasoningContent")
+    if isinstance(rc, dict):
+        rt = rc.get("reasoningText")
+        if isinstance(rt, dict):
+            return rt.get("text", "") or ""
+        if isinstance(rt, str):
+            return rt
+    return ""
+
+
 def _extract_text(content_blocks: list) -> str:
-    """Join visible text, dropping reasoningContent (thinking) blocks.
+    """Join visible text, preferring the answer block over thinking.
 
     Bedrock returns reasoning as a separate {"reasoningContent": {...}} block
     (confirmed live for Qwen3 reasoning + DeepSeek-R1). Trinity's role parsers
     (<suggestion>/<suggested_role>, ACCEPT/REJECT, <answer>) operate on the
-    visible answer only, so we strip thinking exactly like cost-aware-routing's
-    worker_proxy did. Any literal <think>...</think> the model emits inline is
-    left for fugu/core.py's tag handling, which already strips it.
+    visible answer, so we normally drop thinking.
+
+    CRITICAL anti-hang (lessons): when a reasoning worker hits maxTokens it can
+    emit ONLY a reasoningContent block and an EMPTY text block (stopReason=
+    max_tokens). Returning "" then trips fugu's `_should_retry_response` → a 15×
+    tenacity backoff (~5 min) that froze the smoke. So if there is no visible
+    answer text, FALL BACK to the reasoning text (non-empty) rather than "". The
+    parsers may not find their markers, but the episode completes instead of
+    hanging — and bumping the reasoning token budget (run_trinity_agent) makes
+    the truncation rare in the first place.
     """
-    out: list[str] = []
+    visible: list[str] = []
+    reasoning: list[str] = []
     for b in content_blocks:
         if not isinstance(b, dict):
             continue
         if "text" in b:
-            out.append(b["text"])
-        # reasoningContent / toolUse / etc. intentionally ignored
-    return "".join(out)
+            visible.append(b["text"])
+        elif "reasoningContent" in b:
+            reasoning.append(_reasoning_text(b))
+    joined = "".join(visible)
+    rsn = "".join(reasoning)
+    if joined.strip():
+        repaired = _repair_leading_tag(joined)
+        return _recover_clipped_verdict(repaired, rsn)
+    return rsn   # fallback: never return empty when the model spoke
+
+
+def _recover_clipped_verdict(visible: str, reasoning: str) -> str:
+    """Recover an ACCEPT/REJECT verdict clipped at the reasoning→text boundary.
+
+    Bedrock qwen3 reasoning mode clips the first word of the answer ~75-83% of the
+    time (live-verified, all regions): the verifier's leading "ACCEPT"/"REJECT" is
+    eaten, leaving e.g. ". The response correctly...". core.py's verifier parser
+    then finds NEITHER word → defaults to REJECT — silently flipping accept→reject
+    and breaking the verifier early-halt. When the visible text carries no verdict
+    but the reasoning's FINAL stated intent does ("...I should accept it."), prepend
+    the recovered verdict so the parser sees it. Only fires when the verdict is
+    genuinely absent from visible text, so non-clipped responses are untouched.
+    """
+    low = visible.lower()
+    if "accept" in low or "reject" in low:
+        return visible   # verdict present; leave as-is
+    if not reasoning:
+        return visible
+    # Take the LAST stated intent in the reasoning (the model's conclusion).
+    rl = reasoning.lower()
+    ia, ir = rl.rfind("accept"), rl.rfind("reject")
+    if ia == -1 and ir == -1:
+        return visible
+    verdict = "ACCEPT" if ia > ir else "REJECT"
+    return f"{verdict}. {visible.lstrip()}"
+
+
+# Known Trinity tags the role-parsers key on. At the reasoning→text boundary,
+# Bedrock (qwen3 reasoning, live-verified) can CLIP the first 1-2 chars of the
+# answer, so a response that should start "<suggestion>..." arrives as
+# "uggestion>..." — the opening tag is unrecoverable by core.py's regex (needs
+# BOTH <suggestion> and </suggestion>), wasting the thinker turn. We repair the
+# leading tag by matching the known suffixes. This fixes a transport artifact;
+# it does NOT lower the parser bar (Gate 0.2b). (lessons #19/#22)
+_LEADING_TAG_FIXUPS = [
+    ("uggestion>", "<s"), ("suggestion>", "<"),
+    ("uggested_role>", "<s"), ("suggested_role>", "<"),
+    ("answer>", "<"), ("nswer>", "<a"),
+    ("think>", "<"), ("hink>", "<t"),
+]
+
+
+def _repair_leading_tag(text: str) -> str:
+    s = text.lstrip()
+    # Only repair when the text opens with a '>'-terminated fragment BEFORE any '<'
+    # (i.e. a clipped opening tag), never when a real '<' tag is already present.
+    head = s[:20]
+    if "<" in head:
+        return text
+    for suffix, prefix in _LEADING_TAG_FIXUPS:
+        if s.startswith(suffix):
+            return prefix + s
+    return text
 
 
 # ---------------------------------------------------------------------------
@@ -163,6 +284,7 @@ def _query_converse(
     temperature: float,
     max_attempts: int = 8,
     no_temperature: bool = False,
+    home_region: Optional[str] = None,
 ) -> str:
     system_blocks, converted = _to_converse(messages)
 
@@ -186,16 +308,36 @@ def _query_converse(
         base_params["additionalModelRequestFields"] = {"reasoning_effort": reasoning_effort}
 
     THROTTLE_TELEMETRY._inc("calls")
-    n_regions = len(REGIONS)
+    # Home-region-first ordering: try the worker's home region (where the model is
+    # actually offered) before rotating the rest for TPM headroom. Without this, a
+    # us-west-2-only flagship (qwen/deepseek) wastes attempt-0 failing in us-east-1
+    # every single call (lessons #57).
+    if home_region and home_region in REGIONS:
+        region_order = [home_region] + [r for r in REGIONS if r != home_region]
+    else:
+        region_order = list(REGIONS)
+    n_regions = len(region_order)
 
     for attempt in range(max_attempts):
-        region = REGIONS[attempt % n_regions]
+        region = region_order[attempt % n_regions]
         if attempt > 0 and (attempt % n_regions) == 0:
             pass  # wrapped around regions; backoff below still applies
         sem = _semaphore(friendly_name, region, concurrency)
         with sem:
             try:
                 resp = _client(region).converse(**base_params)
+                # Provider-agnostic token counter: Converse returns usage in an
+                # identical schema for every provider (Anthropic/Amazon/Qwen/
+                # DeepSeek/Gemma). Record REAL tokens; pricing is applied separately
+                # in cost_bedrock so raw counts stay reconcilable. (user: "have a
+                # token counter and map pricing onto it; provider-agnostic")
+                try:
+                    u = resp.get("usage", {}) or {}
+                    import cost_bedrock as _cb
+                    _cb.record_usage(friendly_name, u.get("inputTokens", 0),
+                                     u.get("outputTokens", 0))
+                except Exception:
+                    pass
                 return _extract_text(resp["output"]["message"]["content"])
             except ClientError as exc:
                 code = exc.response.get("Error", {}).get("Code", "")
@@ -332,13 +474,14 @@ def query_bedrock_dispatch(
     w = by_friendly_name.get(model)
     concurrency = w.concurrency if w else 10
     no_temperature = bool(w and "no-temperature" in getattr(w, "api_quirks", ()))
+    home_region = getattr(w, "region", None) if w else None
 
     if transport == "openai_compat":
         return _query_openai_compat(model_id, messages, max_tokens, temperature)
     return _query_converse(
         model_id, model, concurrency, reasoning_effort,
         messages, max_tokens, temperature,
-        no_temperature=no_temperature,
+        no_temperature=no_temperature, home_region=home_region,
     )
 
 
@@ -372,8 +515,19 @@ def install() -> None:
         _bedrock_any(model, messages, max_tokens, temperature, **kw)
     )
 
-    # Force the cloud-API branch in _query_llm (server/port None) by ensuring our
-    # AGENT_CONFIGS carry no port. Nothing to patch here — documented invariant.
+    # CRITICAL: _query_llm dispatches by NAME PREDICATE *before* reaching the
+    # provider funcs above — `_is_oai_model` ("gpt"), `_is_anthropic_model`
+    # ("claude"), `_is_gemini_model`, `_is_deepseek_model`. Our Bedrock friendly
+    # names nova-pro / gemma-3-27b / qwen3-32b-* match NONE → fall to the
+    # "Unsupported model" else-branch → return "" → tenacity retries 15× (≈330s/ep,
+    # the smoke hang). Rebinding the provider funcs alone is not enough; a predicate
+    # must select one of them. Make `_is_oai_model` a catch-all for any registered
+    # worker so every friendly name takes the (now-Bedrock) oai branch. claude /
+    # deepseek still match their own predicates first — harmless, same _bedrock_any.
+    _orig_is_oai = U._is_oai_model
+    def _is_oai_or_bedrock(model: str) -> bool:
+        return (model in by_friendly_name) or _orig_is_oai(model)
+    U._is_oai_model = _is_oai_or_bedrock
 
 
 if __name__ == "__main__":

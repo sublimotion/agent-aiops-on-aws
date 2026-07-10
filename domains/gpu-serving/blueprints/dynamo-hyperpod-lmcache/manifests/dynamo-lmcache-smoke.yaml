@@ -1,0 +1,182 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dynamo-hp-lmcache
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dynamo-lmcache-frontend
+  namespace: dynamo-hp-lmcache
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+    - name: metrics
+      port: 8081
+      targetPort: 8081
+  selector:
+    app: dynamo-lmcache-worker
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dynamo-lmcache-worker
+  namespace: dynamo-hp-lmcache
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+    - name: metrics
+      port: 8081
+      targetPort: 8081
+  selector:
+    app: dynamo-lmcache-worker
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lmcache-hyperpod-config
+  namespace: dynamo-hp-lmcache
+data:
+  config.yaml: |
+    chunk_size: 256
+    local_cpu: true
+    max_local_cpu_size: 4
+    save_unfull_chunk: true
+    extra_config:
+      sagemaker_hyperpod_shared_memory_name: ai_toolkit_cache
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dynamo-lmcache-worker
+  namespace: dynamo-hp-lmcache
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: dynamo-lmcache-worker
+  template:
+    metadata:
+      labels:
+        app: dynamo-lmcache-worker
+    spec:
+      dnsPolicy: Default
+      nodeSelector:
+        sagemaker.amazonaws.com/instance-group-name: g6e-workers
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: vllm
+          image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.0.1
+          command: ["/bin/bash", "-lc"]
+          args:
+            - |
+              set -euo pipefail
+              rm -rf /tmp/dynamo-store
+              mkdir -p /tmp/dynamo-store
+              export DYN_FILE_KV=/tmp/dynamo-store
+
+              python3 -m dynamo.frontend \
+                --namespace dynamo-hp-lmcache \
+                --http-port 8000 \
+                --discovery-backend file \
+                --request-plane tcp \
+                --event-plane zmq \
+                --router-mode round-robin \
+                --model-name Qwen/Qwen3-0.6B &
+              frontend_pid=$!
+
+              python3 -m dynamo.vllm \
+                --namespace dynamo-hp-lmcache \
+                --discovery-backend file \
+                --request-plane tcp \
+                --event-plane zmq \
+                --model Qwen/Qwen3-0.6B \
+                --enable-prefix-caching \
+                --max-model-len 8192 \
+                --gpu-memory-utilization 0.70 \
+                --kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both","kv_connector_extra_config":{"sagemaker_hyperpod_shared_memory_name":"ai_toolkit_cache"}}' &
+              worker_pid=$!
+
+              trap 'kill "${frontend_pid}" "${worker_pid}" 2>/dev/null || true' TERM INT
+              wait -n "${frontend_pid}" "${worker_pid}"
+          env:
+            - name: NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: LMCACHE_USE_EXPERIMENTAL
+              value: "True"
+            - name: LMCACHE_LOCAL_CPU
+              value: "True"
+            - name: LMCACHE_MAX_LOCAL_CPU_SIZE
+              value: "4"
+            - name: LMCACHE_CHUNK_SIZE
+              value: "256"
+            - name: LMCACHE_REMOTE_URL
+              value: "sagemaker-hyperpod://$(NODE_IP):9200"
+            - name: DYN_SYSTEM_PORT
+              value: "8081"
+            - name: LMCACHE_CONFIG_FILE
+              value: "/etc/lmcache/config.yaml"
+            - name: HF_HUB_DISABLE_TELEMETRY
+              value: "1"
+            - name: PYTHONHASHSEED
+              value: "0"
+          ports:
+            - containerPort: 8000
+              name: http
+            - containerPort: 8081
+              name: metrics
+          resources:
+            requests:
+              cpu: "500m"
+              memory: 10Gi
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "1500m"
+              memory: 24Gi
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: hp-tiered-cache
+              mountPath: /dev/shm/ai_toolkit_cache
+            - name: hf-cache
+              mountPath: /root/.cache/huggingface
+            - name: lmcache-config
+              mountPath: /etc/lmcache
+              readOnly: true
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /v1/models
+              port: 8000
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+      volumes:
+        - name: hp-tiered-cache
+          hostPath:
+            path: /dev/shm/ai_toolkit_cache
+            type: File
+        - name: hf-cache
+          emptyDir: {}
+        - name: lmcache-config
+          configMap:
+            name: lmcache-hyperpod-config

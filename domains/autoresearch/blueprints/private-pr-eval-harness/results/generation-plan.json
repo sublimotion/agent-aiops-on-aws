@@ -1,0 +1,129 @@
+{
+  "topology": "A: in-image loop, one Job per harness cell",
+  "cluster": "qn-sglang-eks-cluster",
+  "n_tasks": 10,
+  "cells": [
+    {
+      "cell": "claude-code",
+      "harness": "claude-code",
+      "model_route": "bedrock:us.anthropic.claude-opus-4-8",
+      "note": "closed-model cell; run role already scoped for Bedrock",
+      "dry_run_job_renders": true,
+      "example_run_id": "private-pr-eval-harness-9fcbc6f-20260710-104402",
+      "per_task_cmd": "claude -p \"{prompt}\" --output-format json --max-turns 30 --allowedTools Bash,Read,Write,Edit,Glob,Grep",
+      "tasks": [
+        {
+          "pr": 13391,
+          "base_commit": "9dc25d6b97303ad9587051e90584489b16fa54c5",
+          "tier": "medium"
+        },
+        {
+          "pr": 13363,
+          "base_commit": "8e168dee8afa69f00c775bdf535b25c3287667b1",
+          "tier": "low"
+        },
+        {
+          "pr": 13362,
+          "base_commit": "e5307dba1fcf50cc896d04c10de7cd83effc03b5",
+          "tier": "low"
+        },
+        {
+          "pr": 13276,
+          "base_commit": "e01b13b459a2249e804cde549a16a6b96cefaf85",
+          "tier": "medium"
+        },
+        {
+          "pr": 13248,
+          "base_commit": "5f89299ac68309cdc20e8d74bd72b55607bba280",
+          "tier": "low"
+        },
+        {
+          "pr": 13243,
+          "base_commit": "a20c0ee267150c3bb0f82bf05e0806fa65b1e70c",
+          "tier": "medium"
+        },
+        {
+          "pr": 13206,
+          "base_commit": "92208bf84df18f606df8c69f7043b4cc0673e34c",
+          "tier": "low"
+        },
+        {
+          "pr": 13129,
+          "base_commit": "ff956060c16a4f4b497ac27affd5f9343c83198e",
+          "tier": "medium"
+        },
+        {
+          "pr": 13068,
+          "base_commit": "46bf4fa648af3a1fbf4603a37f210e9d9c618357",
+          "tier": "medium"
+        },
+        {
+          "pr": 13062,
+          "base_commit": "17a35e371bdff348c0690651d324c91fc7c9ff9e",
+          "tier": "low"
+        }
+      ]
+    },
+    {
+      "cell": "opencode",
+      "harness": "opencode",
+      "model_route": "vllm:glm5.2-endpoint",
+      "note": "open-model cell; harness points at self-hosted SGLang/vLLM",
+      "dry_run_job_renders": true,
+      "example_run_id": "private-pr-eval-harness-9fcbc6f-20260710-104402",
+      "per_task_cmd": "opencode run --model vllm/glm5.2 --prompt-file task.txt (headless)",
+      "tasks": [
+        {
+          "pr": 13391,
+          "base_commit": "9dc25d6b97303ad9587051e90584489b16fa54c5",
+          "tier": "medium"
+        },
+        {
+          "pr": 13363,
+          "base_commit": "8e168dee8afa69f00c775bdf535b25c3287667b1",
+          "tier": "low"
+        },
+        {
+          "pr": 13362,
+          "base_commit": "e5307dba1fcf50cc896d04c10de7cd83effc03b5",
+          "tier": "low"
+        },
+        {
+          "pr": 13276,
+          "base_commit": "e01b13b459a2249e804cde549a16a6b96cefaf85",
+          "tier": "medium"
+        },
+        {
+          "pr": 13248,
+          "base_commit": "5f89299ac68309cdc20e8d74bd72b55607bba280",
+          "tier": "low"
+        },
+        {
+          "pr": 13243,
+          "base_commit": "a20c0ee267150c3bb0f82bf05e0806fa65b1e70c",
+          "tier": "medium"
+        },
+        {
+          "pr": 13206,
+          "base_commit": "92208bf84df18f606df8c69f7043b4cc0673e34c",
+          "tier": "low"
+        },
+        {
+          "pr": 13129,
+          "base_commit": "ff956060c16a4f4b497ac27affd5f9343c83198e",
+          "tier": "medium"
+        },
+        {
+          "pr": 13068,
+          "base_commit": "46bf4fa648af3a1fbf4603a37f210e9d9c618357",
+          "tier": "medium"
+        },
+        {
+          "pr": 13062,
+          "base_commit": "17a35e371bdff348c0690651d324c91fc7c9ff9e",
+          "tier": "low"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+{
+  "objective": "pareto_map: output_tokens_per_sec vs concurrency (TTFT/ITL reported, not gated)",
+  "regime": "prefill-heavy huge-context MoE | B200 SM100 NVSwitch | KV-capacity/reuse + prefill-latency",
+  "guardrail": "lightweight garbage screen: no repetition loop / empty / broken tool-parse; error_rate<=0.01",
+  "nodes": [
+    {
+      "id": "tp4-gpu-only-shared-prefix-c64",
+      "parent": "tp4-gpu-only-baseline",
+      "lever_delta": [
+        "shape=tp4",
+        "kv_arm=gpu-only",
+        "scenario=shared-prefix",
+        "conc=64"
+      ],
+      "confidence": "code-confirmed",
+      "objective_value": 1308.8,
+      "guardrail_value": "quality_pass=true err=0",
+      "regime": "prefill-heavy huge-context MoE | B200 SM100 | KV-reuse",
+      "status": "kept",
+      "ttft_p95_s": 17.866666666666667,
+      "itl_p95_s": 0.04857392249470306,
+      "prefix_hit_rate": 0.9959481336924391
+    },
+    {
+      "id": "tp4-gpu-only-shared-prefix-c128",
+      "parent": "tp4-gpu-only-baseline",
+      "lever_delta": [
+        "shape=tp4",
+        "kv_arm=gpu-only",
+        "scenario=shared-prefix",
+        "conc=128"
+      ],
+      "confidence": "code-confirmed",
+      "objective_value": 1572.9,
+      "guardrail_value": "quality_pass=true err=0",
+      "regime": "prefill-heavy huge-context MoE | B200 SM100 | KV-reuse",
+      "status": "kept",
+      "ttft_p95_s": 35.93650793650793,
+      "itl_p95_s": 0.07413056157553795,
+      "prefix_hit_rate": 0.996076419546693
+    },
+    {
+      "id": "tp4-gpu-only-shared-prefix-c256",
+      "parent": "tp4-gpu-only-baseline",
+      "lever_delta": [
+        "shape=tp4",
+        "kv_arm=gpu-only",
+        "scenario=shared-prefix",
+        "conc=256"
+      ],
+      "confidence": "code-confirmed",
+      "objective_value": 1848.1,
+      "guardrail_value": "quality_pass=true err=0",
+      "regime": "prefill-heavy huge-context MoE | B200 SM100 | KV-reuse",
+      "status": "kept",
+      "ttft_p95_s": 69.33333333333331,
+      "itl_p95_s": 0.07460435285631312,
+      "prefix_hit_rate": 0.9960104894792248
+    },
+    {
+      "id": "tp4ep4-gpu-only-shared-prefix-c64",
+      "parent": "tp4-gpu-only-baseline",
+      "lever_delta": [
+        "shape=tp4ep4",
+        "kv_arm=gpu-only",
+        "scenario=shared-prefix",
+        "conc=64"
+      ],
+      "confidence": "code-confirmed",
+      "objective_value": 1243.7,
+      "guardrail_value": "quality_pass=true err=0",
+      "regime": "prefill-heavy huge-context MoE | B200 SM100 | KV-reuse",
+      "status": "kept",
+      "ttft_p95_s": 17.866666666666667,
+      "itl_p95_s": 0.04866850900398664,
+      "prefix_hit_rate": 0.9960326076825845
+    },
+    {
+      "id": "tp4ep4-gpu-only-shared-prefix-c128",
+      "parent": "tp4-gpu-only-baseline",
+      "lever_delta": [
+        "shape=tp4ep4",
+        "kv_arm=gpu-only",
+        "scenario=shared-prefix",
+        "conc=128"
+      ],
+      "confidence": "code-confirmed",
+      "objective_value": 1486.3,
+      "guardrail_value": "quality_pass=true err=0",
+      "regime": "prefill-heavy huge-context MoE | B200 SM100 | KV-reuse",
+      "status": "kept",
+      "ttft_p95_s": 36,
+      "itl_p95_s": 0.07426649694171458,
+      "prefix_hit_rate": 0.9960391695080706
+    },
+    {
+      "id": "tp4ep4-gpu-only-shared-prefix-c256",
+      "parent": "tp4-gpu-only-baseline",
+      "lever_delta": [
+        "shape=tp4ep4",
+        "kv_arm=gpu-only",
+        "scenario=shared-prefix",
+        "conc=256"
+      ],
+      "confidence": "code-confirmed",
+      "objective_value": 1781.5,
+      "guardrail_value": "quality_pass=true err=0",
+      "regime": "prefill-heavy huge-context MoE | B200 SM100 | KV-reuse",
+      "status": "kept",
+      "ttft_p95_s": 69.33333333333331,
+      "itl_p95_s": 0.0746824195663499,
+      "prefix_hit_rate": 0.9960169590384342
+    }
+  ]
+}

@@ -303,6 +303,112 @@ When model weights consume most GPU VRAM (e.g., GLM-5 FP8 using 175 GB / 183 GB 
 
 System nodes (e.g., m5.xlarge) often lack sufficient CPU or memory for auxiliary services like Redis. Adding `tolerations: [{key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}]` to Redis (or other non-GPU workloads) allows them to schedule on GPU nodes, which typically have abundant CPU and RAM beyond what serving workloads use. For example, on p6-b200.48xlarge nodes running vLLM, 80% of CPU and 90% of memory remain free. This pattern applies to any Kubernetes cluster where auxiliary services need more resources than the system node pool provides. Use resource requests/limits to ensure the auxiliary service does not starve the GPU workload.
 
+### Cold-Start Optimization
+
+#### EBS-snapshot compile cache survives node termination — use for cross-node AOT HIT on EKS
+<!-- stack: vllm=0.20.0+, ebs-csi-driver=2.x | validated: 2026-05-30 -->
+
+Baking vLLM's `torch_compile_cache` directory onto an EBS volume, snapshotting it, and mounting per-node via the EBS CSI driver delivers AOT compile-cache HIT on any fresh node (not just same-node warm restarts). Measured on B200 TP=8: 569s baseline cold start → 386s with EBS-cache HIT (32% reduction). Spec C-EBS snapshots the cache as a block-storage artifact; volumes created from the snapshot attach in ~10s + FSR overhead (~9.7s measured). The cache survives node termination and supports multi-variant coexistence (vLLM auto-keys by config hash in `/root/.cache/vllm/torch_compile_cache/<hash>/`). **This is the production-ready pattern** for Modal-style AOT compile speedup on EKS without proprietary infrastructure. The measured weight-load floor after compile-cache elimination is ~245s (PCIe bandwidth-bound, post-page-cache). This attacks the torch.compile/CUDA-graph floor that node-local weight caching (e.g. HyperPod MDC/MIC, which floors out at ~compile) cannot touch.
+
+**Do not conflate with Spec E Dynamo Snapshot** (see below) — Spec C-EBS eliminates JIT/compile + CUDA-graph stages only; Spec E is process-level C/R that also collapses weight-load + first-token warmup.
+
+#### CRIU + cuda-checkpoint single-GPU primitive works — artifact sizing is fixed-overhead ~3 GiB
+<!-- stack: criu=4.2+pr3021, cuda-checkpoint=595.71.05+, vllm=0.20.0+ | validated: 2026-05-30 -->
+
+NVIDIA Dynamo Snapshot (CRIU + `cuda-checkpoint`) restores a fully warmed-up single-GPU inference worker with byte-identical token IDs. Measured on g6.xlarge L4 with Qwen3-0.6B: 1.69s restore wall-clock for a 4.14 GiB artifact (~1.95 GiB/s effective NVMe bandwidth). **Artifact sizing is fixed-overhead**: ~3 GiB Python/torch/CUDA process state independent of model size, so the `artifact ≤ 2× weights` threshold is inappropriate for sub-3-GiB models (process overhead dominates). Use size-tiered gates: `weights < 3 GiB → artifact ≤ weights + 4 GiB`; `weights ≥ 3 GiB → artifact ≤ 2× weights`. Extrapolation: Ministral-3B (~6 GiB) predicts ~9 GiB artifact (1.50× ratio, PASS); Mistral-Small-4 (~12 GiB) predicts ~15 GiB (1.25× ratio, PASS).
+
+**Critical**: vLLM `sleep(level=1)` is the ONLY correctness-preserving level. `level=2` reloads weights on a different CUDA context post-restore and breaks token-ID equality (Gate 1 fail). Driver requirement: 580.xx+ (R555 does not suffice; validated with 595.71.05). CRIU needs PR #3021 (parallel-memfd) for restore performance. **restore-to-first-token on a production-sized model is not yet measured** — blocked on the multi-GPU gap below.
+
+#### CRIU multi-GPU bare-metal blocked by device-fd gap — containerized execution required
+<!-- stack: criu=4.2+pr3021, nvidia-driver=595.71.05+, nvidia-container-runtime=3.x | validated: 2026-05-30 -->
+
+On multi-GPU instances (p5e, g7e, p6), the NVIDIA driver opens ~51 fds across ALL `/dev/nvidiaN` device nodes regardless of `CUDA_VISIBLE_DEVICES` — for NVLink/NVSwitch topology discovery. CRIU's `cuda_plugin.so` registers `HANDLE_DEVICE_VMA` but NOT `HANDLE_DEVICE_FD`, so bare-fd opens to peer GPU device nodes fail the dump (`Error: Can't dump file N of that type (chr 195:255)`). This is a **multi-GPU instance** issue, not a GPU-architecture (sm_XX) limitation — single-GPU nodes (g6.xlarge) don't hit it because the driver opens only 3 nvidia fds and they happen to be VMA-backed.
+
+**Workaround**: containerized execution with `nvidia-container-runtime --gpus '"device=0"'`. The container's mount namespace has only `/dev/nvidia0` + `/dev/nvidiactl` + `/dev/nvidia-uvm` — the 51-fd flood never appears. This is exactly what NVIDIA Dynamo's K8s-native `snapshot-agent` does. Multi-GPU bare-EC2 (no container) is a dead end. Single-TP-on-multi-GPU-host requires either containerized execution or an upstream cuda_plugin patch adding `HANDLE_DEVICE_FD` (not in any public CRIU fork as of 2026-05-30).
+
+**Do not conflate Spec C-EBS and Spec E** — they attack different stages and compose. Spec C-EBS = block storage snapshot of compile cache (works on any TP, production-ready today). Spec E = process-level C/R of a warmed worker (single-GPU only today, needs containerization for multi-GPU hosts). Both techniques use the word "snapshot" but are completely different primitives.
+
+### SageMaker HyperPod
+
+#### ai-toolkit managed L2 tiered storage requires type:File shm mount — Directory mount silently poisons stores
+<!-- stack: lmcache>=0.3.14, ai-dynamo/vllm-runtime=1.0.1, gaie=1.5.0, llm-d-router-standalone=0.9.0 | validated: 2026-07-09 (dynamo), 2026-07-10 (llm-d) -->
+
+When using SageMaker HyperPod ai-toolkit managed tiered storage (L2 KV cache) with vLLM's `LMCacheConnectorV1`, mount ONLY the shared memory FILE `/dev/shm/ai_toolkit_cache` with `hostPath type: File`, NOT the whole `/dev/shm` directory. A Directory mount lets a terminating LMCache client pod's `shm_unlink` propagate to the host and destroy the daemon-owned segment — the daemon (which opens with `create=False`) never recreates it, so LMCache's ~30s health-monitor re-init fails with `Shared memory segment 'ai_toolkit_cache' not found`, marks the backend unhealthy, and **silently skips ALL store AND lookup operations** (`LMCache WARNING: LMCache is unhealthy, skipping store operation`). The connector "connects" successfully at startup, requests succeed, but nothing ever persists to L2 and every replay misses (`external_prefix_cache_hits_total=0`).
+
+**Correct mount (isolates client's unlink from host segment):**
+
+```yaml
+volumeMounts:
+  - name: hp-tiered-cache
+    mountPath: /dev/shm/ai_toolkit_cache  # the FILE, not /dev/shm
+volumes:
+  - name: hp-tiered-cache
+    hostPath:
+      path: /dev/shm/ai_toolkit_cache
+      type: File                          # File, NOT Directory
+```
+
+**Recovery sequence** (if already poisoned — the `type: File` mount fails if the segment doesn't exist):
+
+1. `kubectl scale deploy/<decode> --replicas=0` (detach all clients)
+2. `kubectl delete pod -n aws-hyperpod -l app=ai-toolkit` (daemon's `setup` init container recreates the 1 GiB segment; wait for Ready)
+3. `kubectl scale deploy/<decode> --replicas=1` (segment now exists → File mount passes and is protected)
+
+Additional L2 config requirements (from dynamo-hyperpod-lmcache + llmd-hyperpod-lmcache):
+
+- **shm name mismatch**: LMCache defaults to `shared_memory`; ai-toolkit uses `ai_toolkit_cache`. Set `sagemaker_hyperpod_shared_memory_name` in BOTH vLLM `kv_connector_extra_config` AND the LMCache `LMCACHE_CONFIG_FILE` (the SageMaker adapter reads it from `extra_config`).
+- **Worker uid**: the daemon creates the segment `0600` as uid 1000. Run the worker as uid 1000 (`ai-dynamo/vllm-runtime:1.0.1` does) or add an init container to `chmod 666`.
+- **Deterministic cross-restart hits**: set `PYTHONHASHSEED=0` + `save_unfull_chunk: true` in `LMCACHE_CONFIG_FILE` for stable keys.
+- **Node IP ordering**: define `NODE_IP` env before `LMCACHE_REMOTE_URL=sagemaker-hyperpod://$(NODE_IP):9200` so the substitution resolves.
+- **DNS**: if HuggingFace model pulls fail, set `dnsPolicy: Default` to use the node resolver.
+
+Applies to vLLM + LMCache on SageMaker HyperPod with tiered storage enabled. Observed on NVIDIA Dynamo (2026-07-09) and llm-d (2026-07-10) orchestrators with `ai-dynamo/vllm-runtime:1.0.1` (vLLM 0.16.0 + LMCache 0.3.14, includes `SageMakerHyperPodConnectorAdapter`).
+
+#### HyperPod GPU nodes and vanilla EKS nodes may have cross-node pod networking blocked
+<!-- validated: 2026-07-10 -->
+
+On EKS clusters with both SageMaker HyperPod-managed GPU nodes and vanilla EKS node groups, pod-to-pod data-plane traffic from the vanilla EKS nodes to the HyperPod GPU nodes may be blocked (control plane / K8s API is fine — EPP/control-plane services still discover pods via the API, but HTTP requests from a vanilla-node pod to a HyperPod-node pod time out with HTTP 000 or connection refused). Root cause: the HyperPod GPU node's ENI security group does not allow the EKS node group's pod CIDR. This gap is not obvious because the two node groups were created separately and SG-for-pods was not unified.
+
+**Symptoms:**
+- In-pod `localhost` requests succeed (HTTP 200)
+- Same-node pod-to-pod requests succeed (1ms latency)
+- Cross-node (vanilla EKS node → HyperPod GPU node) requests timeout
+- Control-plane actions (e.g., llm-d EPP discovering decode pods, Kubernetes service routing) work fine — only the data plane across the boundary is blocked
+
+**Workarounds:**
+- **Recipe/smoke path**: co-locate both services on the GPU node. For llm-d, `kubectl patch` the router Deployment to add `nodeSelector: {sagemaker.amazonaws.com/instance-group-name: <gpu-group>}` + `tolerations: [{key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}]`, and shrink epp/proxy CPU requests (e.g., 150m each) to fit the GPU node's spare CPU.
+- **Production path**: open the HyperPod GPU node security group to allow traffic from the EKS pod CIDR (`10.X.0.0/16`), or run all workloads on HyperPod-managed GPU nodes.
+
+Observed on the reused `dynamo-hyperpod-lmcache` cluster (us-west-2, EKS `qn-sglang-eks-cluster` K8s 1.32, HyperPod GPU node `ml.g6e.xlarge` + 2 vanilla EKS system nodes). Applies to any mixed HyperPod+vanilla-EKS cluster where the node groups' security groups were not unified at creation time.
+
+#### llm-d upstream repo restructured — router-standalone chart replaces old helmfile layout
+<!-- stack: llm-d=main, gaie=1.5.0, llm-d-router-standalone=0.9.0 | validated: 2026-07-10 -->
+
+The llm-d GitHub repo (`main` branch as of 2026-07-10) no longer uses the old helmfile layout (`guides/prereq/gateway-provider`, `guides/inference-scheduling`, `ms-inference-scheduling/values.yaml`, image `ghcr.io/llm-d/llm-d-cuda:v0.5.1`). Current structure:
+
+- **GAIE CRDs**: `kubectl apply -f https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/${GAIE_VERSION}/v1-manifests.yaml` (GA API `inference.networking.k8s.io/v1`, `endpointPickerRef`). `GAIE_VERSION=v1.5.0` from `guides/env.sh`.
+- **Router**: Helm chart `oci://ghcr.io/llm-d/charts/llm-d-router-standalone` (or `-router-gateway`), `ROUTER_CHART_VERSION=v0.9.0`, EPP image `ghcr.io/llm-d/llm-d-router-endpoint-picker:v0.9.0`. Values from `guides/recipes/router/base.values.yaml` + a guide-specific values file (e.g., `tiered-prefix-cache/router/tiered-prefix-cache-cpu.values.yaml`). The chart auto-provisions EPP SA + Role/RoleBinding + InferencePool + Envoy ConfigMap/Deployment — no manual RBAC/InferencePool YAML.
+- **Model server**: Deploy your own Deployment or `kubectl apply -k` a `guides/tiered-prefix-cache/modelserver/gpu/vllm/...` overlay. Upstream overlays hardwire Qwen3-32B / TP2 / H100 / 500Gi + stock `vllm/vllm-openai` (which lacks the SageMaker HyperPod adapter) — override all of that. The decode pod MUST carry the InferencePool selector label (default `llm-d.ai/guide: tiered-prefix-cache`).
+- **Versions centralized**: all in `guides/env.sh` (GAIE, router, EPP image).
+
+**Standalone vs gateway**: `llm-d-router-standalone` bundles Envoy proxy + EPP in one Deployment (no separate Istio/Envoy Gateway). The `-router-gateway` variant uses Envoy Gateway with `EnvoyExtensionPolicy` for ext-proc (requires `messageTimeout≥30s` + `failOpen: true` as in prior glm5-llmd notes).
+
+Before deploying an llm-d spec written against the old layout, verify the current repo structure at `guides/env.sh` and adapt to the chart-based flow. Applies to all llm-d deployments after the `main` branch restructure.
+
+#### SGLang reaches ai-toolkit L2 via LMCache IP mode — needs MP→IP patch + use_layerwise:true (NOT HiCache)
+<!-- stack: sglang=lmsysorg/sglang:latest (py3.12/cu13), lmcache=0.5.1 | validated: 2026-07-10 -->
+
+To use the HyperPod ai-toolkit managed L2 daemon (`sagemaker-hyperpod://<node-ip>:9200`) from SGLang, go through **LMCache** (`--enable-lmcache`), NOT SGLang HiCache. HiCache's `--hicache-storage-backend` (file/mooncake/hf3fs/nixl/aibrix) is a separate stack that cannot speak the `ai_toolkit_cache` shared-memory protocol; LMCache is the documented "alternative to HiCache" and carries the engine-agnostic `SageMakerHyperPodConnectorAdapter`.
+
+No custom image needed: stock `lmsysorg/sglang:latest` (Python 3.12, CUDA 13) + `pip install lmcache` at container start → lmcache **0.5.1**, whose default PyPI wheel is the **CUDA-13** build, so `import lmcache.c_ops` loads against the image's CUDA 13. Do NOT graft another image's compiled lmcache tree (e.g. the CUDA-12 build in `ai-dynamo/vllm-runtime`) — it fails `ImportError: libcudart.so.12`. `pip install lmcache` has no wheel for Python 3.13/3.14, so the stock SGLang 3.12 image is required.
+
+Two SGLang-specific requirements beyond the shared HyperPod-L2 gotchas (type:File shm mount, PYTHONHASHSEED=0, save_unfull_chunk, daemon-recreate recovery):
+
+1. **MP→IP mode patch (mandatory).** `python/sglang/srt/mem_cache/storage/lmcache/lmc_radix_cache.py` hardcodes `self._mode = LMCacheMode.MP` (~line 139). MP mode dials a standalone `lmcache server` over ZMQ and reads ONLY `mp_host`/`mp_port` — it never forwards `remote_url`, so it cannot reach ai-toolkit directly. IP mode (`LMCacheLayerwiseConnector(config_file=...)`) forwards the FULL config incl. `remote_url`. Patch at container start: `sed -i 's/self._mode = LMCacheMode.MP/self._mode = LMCacheMode.IP/' <file>` and verify the line changed.
+2. **`use_layerwise: true` in the lmcache config (mandatory, subtle).** SGLang IP `store_layer` calls `assert_layerwise_gpu_connector(self.gpu_connector)` (`lmcache/v1/cache_engine.py`). With the default `use_layerwise: false`, `CreateGPUConnector` builds a non-layerwise connector and EVERY store fails `AssertionError: LMCache store_kv failed` — the connector connects and serving works, so it looks healthy while nothing persists to L2. `use_layerwise: true` builds `SGLangLayerwiseGPUConnector` and stores succeed (`store_kv completed: stored N tokens`).
+
+Also: SGLang has NO `--kv-transfer-config` flag (unlike vLLM), so the shm name MUST be set via the lmcache config file: `extra_config.sagemaker_hyperpod_shared_memory_name: ai_toolkit_cache` (else it defaults to `shared_memory` and never connects). Launch: `sglang.launch_server --enable-lmcache --lmcache-config-file <yaml>`. Validated: store `Stored 934/934 tokens` → pod restart → replay `cached_tokens=768` on the cold pod (blueprint `sglang-hyperpod-lmcache`). This completes the 3-framework set (Dynamo/vLLM, llm-d/vLLM, SGLang) on HyperPod ai-toolkit L2.
+
 ### Benchmark Observability (mandatory)
 
 #### Every benchmark GPU node runs Prometheus + DCGM + node-exporter from bootstrap

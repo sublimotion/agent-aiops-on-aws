@@ -1,0 +1,46 @@
+# Kaniko in-cluster build: vllm/vllm-openai:v0.23.0 + sentencepiece/tiktoken baked in.
+# Builds + pushes to ECR with NO local Docker and NO IAM change (uses a short-lived ECR token secret).
+# Runs on a CPU system node (no GPU needed). The Dockerfile is inlined via a ConfigMap.
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: minimax-dockerfile, namespace: default}
+data:
+  Dockerfile: |
+    FROM vllm/vllm-openai:v0.23.0
+    # The tokenizer backend MiniMax-M2 needs. --break-system-packages: the base is a PEP668 env.
+    RUN pip install --break-system-packages --no-cache-dir sentencepiece tiktoken \
+        && python3 -c "import sentencepiece, tiktoken; print('tokenizer deps baked OK')"
+---
+apiVersion: batch/v1
+kind: Job
+metadata: {name: kaniko-minimax-build, namespace: default}
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      hostNetwork: true          # external DNS (ECR/DockerHub) only resolves via the node's VPC resolver
+      dnsPolicy: Default         # (lessons.md: pod-net DNS is broken on this cluster's GPU nodes)
+      nodeSelector: {workload: deepseek-ocr}
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:latest
+          args:
+            - --dockerfile=/workspace/Dockerfile
+            - --context=dir:///workspace
+            - --destination=615299764834.dkr.ecr.us-east-2.amazonaws.com/minimax-m2-vllm:v0.23.0-tok
+            - --cleanup
+            - --single-snapshot          # one layer snapshot at end → far less scratch I/O
+            - --compressed-caching=false  # don't hold compressed layers in memory/disk
+            - --use-new-run               # lighter filesystem diffing
+          volumeMounts:
+            - {name: dockerfile, mountPath: /workspace}
+            - {name: docker-config, mountPath: /kaniko/.docker}
+          resources:
+            requests: {cpu: "2", memory: 6Gi}
+            limits:   {cpu: "3", memory: 12Gi}
+      volumes:
+        - {name: dockerfile, configMap: {name: minimax-dockerfile}}
+        - {name: docker-config, secret: {secretName: ecr-dockerconfig, items: [{key: config.json, path: config.json}]}}

@@ -1,0 +1,90 @@
+catalog_id: distinct-prefix-multitenant
+use_case: multi-tenant-distinct-codebases
+description: >
+  The regime where TIERED KV cache (CPU/NVMe offload) earns its keep — distinct from
+  coding-agent-100k-shared-prefix (a SINGLE shared prefix, where offload was measured
+  neutral because one prefix fits HBM with nothing to evict).
+
+  Here a POOL of N distinct codebases (each a large, byte-identical-per-group prefix)
+  is reused with high per-codebase hit (~90%), but the AGGREGATE working set is sized
+  to EXCEED the GPU KV pool. Reusable prefixes therefore get evicted and re-referenced:
+  - gpu-only must RECOMPUTE the ~90K prefill on every evicted-prefix re-reference (costly).
+  - cpu-offload / nvme-tiering can FETCH the evicted prefix KV from the tier instead.
+
+  This card exists to MEASURE the tiering-vs-recompute crossover and to settle, with
+  data, that tiered KV cache (not P/D disaggregation) is the lever for the high-reuse /
+  working-set>HBM multi-tenant regime. Companion to minimax-m2-kv-tiering.md.
+
+modality: text
+
+# ── The eviction-pressure knob (the primary axis) ───────────────────────────
+# N distinct codebases, sized vs the GPU KV pool so eviction actually happens.
+# Measured sizing (B200 4xTP4, fp8 KV ~124KB/tok, ~492GB pool ⇒ ~3.87M tokens ⇒
+# ~43 distinct 90K prefixes fill the pool). Sweep spans under-fill → 4x overflow.
+prefix_pool:
+  distinct_prefixes_sweep: [22, 43, 86, 172]   # 0.5x / 1x / 2x / 4x pool-fill threshold
+  prefix_tokens_each: 90000                     # one "codebase" context (byte-identical within its group)
+  per_codebase_reuse_target: 0.90               # each codebase reused ~90% — but spread across N → overflow
+  prefix_byte_identical_within_group: true      # APC/radix exact-match per codebase; only the suffix varies
+  access_distribution_sweep: [zipfian, uniform] # zipfian = realistic hot/cold repos; uniform = worst-case eviction churn
+  zipf_s: 1.1                                    # skew for the zipfian arm
+
+dataset:
+  type: distinct-prefix-pool
+  unique_suffix_tokens: {mean: 10000, std_dev: 2000}  # the per-request "new work" (the ~10% that varies)
+  output: run-to-eos                                  # thinking model — measure real OSL, don't force
+  osl_reference: 224
+
+# ── KV architecture arms (the comparison) ───────────────────────────────────
+kv_architecture_arms:
+  - id: gpu-only
+    description: APC only — RECOMPUTES the 90K prefill on every evicted-prefix re-reference. The baseline this card stresses.
+    config: { enable_prefix_caching: true, kv_offload: none }
+  - id: cpu-offload
+    description: CPU KV tier (OffloadingConnector). Fetches evicted prefix KV from RAM instead of recomputing. Size num_cpu_blocks to hold the overflow at the largest N.
+    config: { enable_prefix_caching: true, kv_offload: cpu }
+  - id: nvme-tiering
+    description: CPU + NVMe tier — for working sets where even CPU RAM overflows. NOTE: NVMe shares the disk with model weights; record I/O contention.
+    config: { enable_prefix_caching: true, kv_offload: cpu+nvme }
+
+load:
+  type: constant-concurrency
+  concurrency_sweep: [16, 64, 128, 256]   # secondary — prefix-count is the primary axis; hold concurrency sensible
+  num_requests_per_point: 400             # enough to warm the pool AND drive eviction/re-reference cycles
+  warmup_requests: 0                       # do NOT pre-warm — the cold→evict→re-fetch dynamic IS the measurement
+
+slo:
+  # No fixed gate — Pareto map. TTFT/queue are the metrics tiering should improve; report, don't gate.
+  ttft_warm_p95_ms: 2000     # PLACEHOLDER (prefix served from a tier)
+  ttft_cold_p95_ms: 8000     # PLACEHOLDER (prefix recomputed / first reference)
+  error_rate_max: 0.01
+
+# ── Telemetry — the tier-hit breakdown is the headline ──────────────────────
+extensions:
+  kv_tiering:
+    gpu_hbm_hit_rate: required        # served from GPU HBM (the warm fraction)
+    cpu_kv_hit_rate: required         # served from CPU tier (0 on gpu-only)
+    nvme_kv_hit_rate: required        # served from NVMe tier (nvme arm only)
+    tokens_recomputed: required       # the COST gpu-only pays — re-prefilled-on-evict; the number tiering avoids
+    tier_fetch_vs_recompute_ratio: required  # the headline crossover metric
+  cache_stats:
+    aggregate_prefix_hit_rate: required   # Σ cached / Σ prompt across the pool — should approach per-codebase 0.90
+    eviction_rate: required               # MUST be non-zero at N>43 or the experiment didn't stress eviction
+    kv_utilization_pct: required
+  latency:
+    ttft_cold_vs_warm_split: required     # cold (recompute/first-ref) vs warm (tier-fetch) — quantifies the tier benefit
+    queue_depth_max: required             # downstream of TTFT via holding time
+    itl_p95_ms: required                  # NVMe-fetch on the decode path would inflate this — the tier's cost signal
+  throughput:
+    output_tokens_per_sec: required       # NEGATIVE CONTROL — should stay ~flat across arms (counter-space unchanged)
+  dcgm:
+    required_gauges: [DCGM_FI_DEV_FB_USED, DCGM_FI_DEV_POWER_USAGE, DCGM_FI_DEV_PCIE_TX_BYTES, DCGM_FI_DEV_PCIE_RX_BYTES, DCGM_FI_DEV_XID_ERRORS]
+    note: "PCIE_TX/RX bytes are the offload-tier transfer cost (vLLM 0.19.1rc1 does not expose kv_transfer bytes directly). PROF counters may be unavailable on this driver — fall back to FB+POWER+PCIe."
+
+# ── What this card must let us conclude ─────────────────────────────────────
+# 1. At what N (eviction pressure) does each tier start beating gpu-only recompute on TTFT/queue?
+# 2. The tier-hit breakdown (gpu/cpu/nvme/recomputed) as the working set overflows.
+# 3. Decode throughput stays flat across arms (tiering relieves latency, NOT the ceiling) — the negative control.
+# 4. Where PCIe/NVMe fetch latency becomes the new bottleneck (does NVMe-fetch cost more than recompute saves?).
+# 5. CPU-sufficient vs NVMe-needed threshold (at what N does CPU RAM also overflow?).
+# 6. Confirms (or refutes) that this regime wants TIERING, not P/D disagg.

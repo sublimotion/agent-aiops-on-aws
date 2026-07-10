@@ -1,0 +1,274 @@
+[2026-06-28T12:27:25Z] === 3-PHASE SESSION START ===
+[2026-06-28T12:27:27Z] PREFLIGHT OK — scaledown ARMED.
+[2026-06-28T12:27:27Z] waiting for weight staging...
+configmap/dcgm-metrics-prof-minimax unchanged
+configmap/prometheus-bench-config-minimax unchanged
+pod/observability-bench created
+[2026-06-28T13:18:46Z] observability applied
+[2026-06-28T13:18:46Z] === PHASE 1: KV-tiering distinct-prefix sweep ===
+pareto: 0 points -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2-kv-tiering/results/pareto-2026-06-28.json
+trajectory: 3 nodes -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2-kv-tiering/results/optimization-trajectory-2026-06-28.json
+[2026-06-28T13:40:41Z] PHASE 1 complete
+[2026-06-28T13:40:41Z] === PHASE 2: DP/TP parallelism + nvme arm (minimax-m2 gap) ===
+pareto: 0 points -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2/results/pareto-2026-06-28.json
+trajectory: 6 nodes -> /Users/phi/Documents/workbench/agent-aiops-on-aws/domains/gpu-serving/blueprints/minimax-m2/results/optimization-trajectory-2026-06-28.json
+[2026-06-28T13:57:25Z] PHASE 2 complete
+[2026-06-28T13:57:25Z] === PHASE 3: v0.23.0 patched (sentencepiece+tiktoken) correctness gate ===
+No resources found
+pod/vllm-minimax-m2-v23 created
+[2026-06-28T13:57:34Z] v0.23.0 patched pod applied; waiting for boot (pip install + ~35min cold start)...
+[2026-06-28T13:57:36Z] v23 boot phase=Pending health=
+[2026-06-28T13:58:19Z] v23 boot phase=Pending health=
+[2026-06-28T13:59:01Z] v23 boot phase=Pending health=
+[2026-06-28T13:59:44Z] v23 boot phase=Pending health=
+[2026-06-28T14:00:27Z] v23 boot phase=Running health=000
+[2026-06-28T14:01:11Z] v23 boot phase=Running health=000
+[2026-06-28T14:01:54Z] v23 boot phase=Running health=000
+[2026-06-28T14:02:37Z] v23 boot phase=Running health=000
+[2026-06-28T14:03:20Z] v23 boot phase=Running health=000
+[2026-06-28T14:04:02Z] v23 boot phase=Running health=000
+[2026-06-28T14:04:45Z] v23 boot phase=Running health=000
+[2026-06-28T14:05:29Z] v23 boot phase=Running health=000
+[2026-06-28T14:06:11Z] v23 boot phase=Running health=000
+[2026-06-28T14:06:54Z] v23 boot phase=Running health=000
+[2026-06-28T14:07:37Z] v23 boot phase=Running health=000
+[2026-06-28T14:08:21Z] v23 boot phase=Running health=000
+[2026-06-28T14:09:03Z] v23 boot phase=Running health=000
+[2026-06-28T14:09:45Z] v23 boot phase=Running health=000
+[2026-06-28T14:10:28Z] v23 boot phase=Running health=000
+[2026-06-28T14:11:11Z] v23 boot phase=Running health=000
+[2026-06-28T14:11:53Z] v23 boot phase=Running health=000
+[2026-06-28T14:12:37Z] v23 boot phase=Running health=000
+[2026-06-28T14:13:19Z] v23 boot phase=Running health=000
+[2026-06-28T14:14:02Z] v23 boot phase=Running health=000
+[2026-06-28T14:14:45Z] v23 boot phase=Running health=000
+[2026-06-28T14:15:28Z] v23 boot phase=Running health=000
+[2026-06-28T14:16:10Z] v23 boot phase=Running health=000
+[2026-06-28T14:16:53Z] v23 boot phase=Running health=000
+[2026-06-28T14:17:36Z] v23 boot phase=Running health=000
+[2026-06-28T14:18:19Z] v23 boot phase=Running health=000
+[2026-06-28T14:19:02Z] v23 boot phase=Running health=000
+[2026-06-28T14:19:45Z] v23 boot phase=Running health=000
+[2026-06-28T14:20:29Z] v23 boot phase=Running health=000
+[2026-06-28T14:21:12Z] v23 boot phase=Running health=000
+[2026-06-28T14:21:55Z] v23 boot phase=Running health=000
+[2026-06-28T14:22:38Z] v23 boot phase=Running health=000
+[2026-06-28T14:23:21Z] v23 boot phase=Running health=000
+[2026-06-28T14:24:04Z] v23 boot phase=Running health=000
+[2026-06-28T14:24:46Z] v23 boot phase=Running health=000
+[2026-06-28T14:25:29Z] v23 boot phase=Running health=000
+[2026-06-28T14:26:11Z] v23 boot phase=Running health=000
+[2026-06-28T14:26:53Z] v23 boot phase=Running health=000
+[2026-06-28T14:27:36Z] v23 boot phase=Running health=000
+[2026-06-28T14:28:18Z] v23 boot phase=Running health=000
+[2026-06-28T14:29:00Z] v23 boot phase=Running health=000
+[2026-06-28T14:29:44Z] v23 boot phase=Running health=000
+[2026-06-28T14:30:28Z] v23 boot phase=Running health=200
+[2026-06-28T14:30:28Z] v0.23.0 patched HEALTHY
+[2026-06-28T14:30:32Z] v0.23.0 patched correctness smoke: tool_call=PASS
+{
+  "scenario": "shared-prefix",
+  "concurrency": 64,
+  "model": "MiniMax-M2",
+  "requests_ok": 128,
+  "requests_err": 0,
+  "error_rate": 0.0,
+  "duration_s": 115.658,
+  "agg_decode_tok_s": 566.6,
+  "prompt_tokens_total": 13616019,
+  "cached_tokens_total": 0,
+  "client_cache_hit_fraction": 0.0,
+  "reuse_fraction_target": 0.9,
+  "reuse_target_met": false,
+  "kv_tier": {
+    "available": true,
+    "tokens_fresh_prefill": 1456531.0,
+    "tokens_gpu_hbm_hit": 12159488.0,
+    "tokens_offload_tier_hit": 0.0,
+    "tokens_recomputed": null,
+    "frac_fresh_prefill": 0.107,
+    "frac_gpu_hbm_hit": 0.893,
+    "frac_offload_tier_hit": 0.0,
+    "gpu_prefix_hit_rate": 0.893,
+    "external_prefix_hit_rate": null,
+    "kv_utilization_end": 0.0,
+    "kv_transfer_bytes_latency_exposed": true
+  },
+  "ttft_avg_s": 23.3929,
+  "ttft_p50_s": 22.3837,
+  "ttft_p95_s": 41.9664,
+  "ttft_p99_s": 44.3779,
+  "ttft_samples": 128,
+  "ttft_cold_avg_s": 23.3929,
+  "ttft_warm_avg_s": null,
+  "ttft_cold_warm_ratio": null,
+  "ttft_cold_samples": 128,
+  "ttft_warm_samples": 0,
+  "itl_client_mean_s": 0.066,
+  "e2e_p50_s": 59.3764,
+  "e2e_p95_s": 64.9715,
+  "e2e_p99_s": 65.0672,
+  "quality_pass": true,
+  "quality_empty": 0,
+  "quality_repetition_loops": 0,
+  "quality_sampled": 10,
+  "t_start": 1782657034.0419862,
+  "t_end": 1782657149.7004328
+}
+[2026-06-28T14:32:31Z]   v23 shared-prefix c=64 tok/s=566.6 ttft_p95=41.9664 cache_hit=0.0 qpass=True
+{
+  "scenario": "shared-prefix",
+  "concurrency": 128,
+  "model": "MiniMax-M2",
+  "requests_ok": 256,
+  "requests_err": 0,
+  "error_rate": 0.0,
+  "duration_s": 201.29,
+  "agg_decode_tok_s": 651.2,
+  "prompt_tokens_total": 27235970,
+  "cached_tokens_total": 0,
+  "client_cache_hit_fraction": 0.0,
+  "reuse_fraction_target": 0.9,
+  "reuse_target_met": false,
+  "kv_tier": {
+    "available": true,
+    "tokens_fresh_prefill": 2817170.0,
+    "tokens_gpu_hbm_hit": 24418800.0,
+    "tokens_offload_tier_hit": 0.0,
+    "tokens_recomputed": null,
+    "frac_fresh_prefill": 0.1034,
+    "frac_gpu_hbm_hit": 0.8966,
+    "frac_offload_tier_hit": 0.0,
+    "gpu_prefix_hit_rate": 0.8966,
+    "external_prefix_hit_rate": null,
+    "kv_utilization_end": 0.0,
+    "kv_transfer_bytes_latency_exposed": true
+  },
+  "ttft_avg_s": 23.5562,
+  "ttft_p50_s": 5.2894,
+  "ttft_p95_s": 71.8224,
+  "ttft_p99_s": 77.5558,
+  "ttft_samples": 256,
+  "ttft_cold_avg_s": 23.5562,
+  "ttft_warm_avg_s": null,
+  "ttft_cold_warm_ratio": null,
+  "ttft_cold_samples": 256,
+  "ttft_warm_samples": 0,
+  "itl_client_mean_s": 0.1484,
+  "e2e_p50_s": 95.507,
+  "e2e_p95_s": 162.4857,
+  "e2e_p99_s": 168.2275,
+  "quality_pass": true,
+  "quality_empty": 0,
+  "quality_repetition_loops": 0,
+  "quality_sampled": 10,
+  "t_start": 1782657152.935329,
+  "t_end": 1782657354.2251546
+}
+tar: Removing leading `/' from member names
+[2026-06-28T14:35:56Z]   v23 shared-prefix c=128 tok/s=651.2 ttft_p95=71.8224 cache_hit=0.0 qpass=True
+{
+  "scenario": "100k-90pct-reuse",
+  "concurrency": 64,
+  "model": "MiniMax-M2",
+  "requests_ok": 128,
+  "requests_err": 0,
+  "error_rate": 0.0,
+  "duration_s": 107.811,
+  "agg_decode_tok_s": 607.9,
+  "prompt_tokens_total": 13615446,
+  "cached_tokens_total": 0,
+  "client_cache_hit_fraction": 0.0,
+  "reuse_fraction_target": 0.9,
+  "reuse_target_met": false,
+  "kv_tier": {
+    "available": true,
+    "tokens_fresh_prefill": 1457990.0,
+    "tokens_gpu_hbm_hit": 12157456.0,
+    "tokens_offload_tier_hit": 0.0,
+    "tokens_recomputed": null,
+    "frac_fresh_prefill": 0.1071,
+    "frac_gpu_hbm_hit": 0.8929,
+    "frac_offload_tier_hit": 0.0,
+    "gpu_prefix_hit_rate": 0.8929,
+    "external_prefix_hit_rate": null,
+    "kv_utilization_end": 0.0,
+    "kv_transfer_bytes_latency_exposed": true
+  },
+  "ttft_avg_s": 16.9132,
+  "ttft_p50_s": 12.1804,
+  "ttft_p95_s": 37.8901,
+  "ttft_p99_s": 40.3933,
+  "ttft_samples": 128,
+  "ttft_cold_avg_s": 16.9132,
+  "ttft_warm_avg_s": null,
+  "ttft_cold_warm_ratio": null,
+  "ttft_cold_samples": 128,
+  "ttft_warm_samples": 0,
+  "itl_client_mean_s": 0.0716,
+  "e2e_p50_s": 50.1863,
+  "e2e_p95_s": 76.1192,
+  "e2e_p99_s": 78.5939,
+  "quality_pass": true,
+  "quality_empty": 0,
+  "quality_repetition_loops": 0,
+  "quality_sampled": 10,
+  "t_start": 1782657357.5723524,
+  "t_end": 1782657465.3830974
+}
+tar: Removing leading `/' from member names
+[2026-06-28T14:37:47Z]   v23 100k-90pct-reuse c=64 tok/s=607.9 ttft_p95=37.8901 cache_hit=0.0 qpass=True
+{
+  "scenario": "100k-90pct-reuse",
+  "concurrency": 128,
+  "model": "MiniMax-M2",
+  "requests_ok": 256,
+  "requests_err": 0,
+  "error_rate": 0.0,
+  "duration_s": 200.739,
+  "agg_decode_tok_s": 652.9,
+  "prompt_tokens_total": 27210723,
+  "cached_tokens_total": 0,
+  "client_cache_hit_fraction": 0.0,
+  "reuse_fraction_target": 0.9,
+  "reuse_target_met": false,
+  "kv_tier": {
+    "available": true,
+    "tokens_fresh_prefill": 2816403.0,
+    "tokens_gpu_hbm_hit": 24394320.0,
+    "tokens_offload_tier_hit": 0.0,
+    "tokens_recomputed": null,
+    "frac_fresh_prefill": 0.1035,
+    "frac_gpu_hbm_hit": 0.8965,
+    "frac_offload_tier_hit": 0.0,
+    "gpu_prefix_hit_rate": 0.8965,
+    "external_prefix_hit_rate": null,
+    "kv_utilization_end": 0.0,
+    "kv_transfer_bytes_latency_exposed": true
+  },
+  "ttft_avg_s": 23.3173,
+  "ttft_p50_s": 4.9216,
+  "ttft_p95_s": 71.2931,
+  "ttft_p99_s": 77.0146,
+  "ttft_samples": 256,
+  "ttft_cold_avg_s": 23.3173,
+  "ttft_warm_avg_s": null,
+  "ttft_cold_warm_ratio": null,
+  "ttft_cold_samples": 256,
+  "ttft_warm_samples": 0,
+  "itl_client_mean_s": 0.1484,
+  "e2e_p50_s": 95.4746,
+  "e2e_p95_s": 161.9179,
+  "e2e_p99_s": 167.6492,
+  "quality_pass": true,
+  "quality_empty": 0,
+  "quality_repetition_loops": 0,
+  "quality_sampled": 10,
+  "t_start": 1782657468.7712576,
+  "t_end": 1782657669.5103865
+}
+[2026-06-28T14:41:11Z]   v23 100k-90pct-reuse c=128 tok/s=652.9 ttft_p95=71.2931 cache_hit=0.0 qpass=True
+[2026-06-28T14:41:11Z] PHASE 3 complete (v0.23.0 vs 0.19.1rc1 A/B data in v23-RESULT.txt + v23-*.json)
+[2026-06-28T14:41:11Z] === ALL PHASES DONE ===
+[2026-06-28T14:41:11Z] EXIT rc=0
+[2026-06-28T14:41:13Z] scale-to-zero accepted (attempt 1)

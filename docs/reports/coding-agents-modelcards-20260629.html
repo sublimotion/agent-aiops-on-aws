@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Open-Weight Coding Agents on Blackwell — Model Cards & Cost vs Opus / GPT-5.x</title>
+<style>
+  :root{--bg:#0d1117;--card:#161b22;--card2:#1c2230;--border:#30363d;--fg:#e6edf3;--mut:#8b949e;--accent:#58a6ff;--good:#3fb950;--warn:#d29922;--bad:#f85149;--violet:#a371f7;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--fg);font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:32px;max-width:1100px;margin:0 auto}
+  h1{font-size:26px;margin-bottom:4px}h2{font-size:19px;margin:36px 0 14px;border-bottom:1px solid var(--border);padding-bottom:6px}
+  .meta{color:var(--mut);margin-bottom:8px;font-size:13px}
+  .legend{font-size:12px;color:var(--mut);margin:10px 0}
+  .legend .tag{margin-right:4px}
+  .tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:600}
+  .tag.m{background:#132e1a;color:var(--good)}.tag.v{background:#2b2150;color:var(--violet)}.tag.a{background:#3a2e14;color:var(--warn)}
+  .note{background:var(--card);border-left:3px solid var(--accent);padding:10px 14px;margin:12px 0;border-radius:0 6px 6px 0;color:var(--mut);font-size:13px}
+  .note.warn{border-left-color:var(--warn)}
+  .note b{color:var(--fg)}
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:13px}
+  th,td{text-align:left;padding:6px 9px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{color:var(--mut);font-weight:600}
+  .good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}.mut{color:var(--mut)}.violet{color:var(--violet)}
+  /* model card */
+  .mc{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px;margin:16px 0}
+  .mc.frontier{border-color:#5a4a1f}
+  .mc-head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:12px}
+  .mc-name{font-size:19px;font-weight:700}
+  .mc-sub{color:var(--mut);font-size:12px}
+  .mc-tldr{background:var(--card2);border-radius:6px;padding:10px 12px;margin:10px 0;font-size:13px}
+  .mc-tldr b{color:var(--fg)}
+  .mc-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:10px}
+  @media(max-width:720px){.mc-grid{grid-template-columns:1fr}}
+  .mc-col h4{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);margin-bottom:6px}
+  .kv{display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px dotted #21262d;font-size:13px}
+  .kv .l{color:var(--mut)}.kv .r{text-align:right;font-weight:600}
+  .verdict{margin-top:10px;font-size:13px;padding:8px 10px;border-radius:6px;background:#11221a;border:1px solid #1d3a28}
+  .verdict.cau{background:#221c11;border-color:#3a2e14}
+  .big{font-size:22px;font-weight:700}
+</style>
+</head>
+<body>
+  <h1>Open-Weight Coding Agents on Blackwell</h1>
+  <div class="meta">Model cards + cost analysis for teams on Claude Opus / GPT-5.x evaluating self-hosted open-weight coding models · B200/B300 · compiled 2026-06-29</div>
+
+  <div class="note"><b>How to read this (start here).</b> Most teams begin agentic coding on a frontier API (Opus, GPT-5.x) — it just works. As token volume grows, the bill grows with it, and agentic coding burns tokens (reasoning + multi-turn tool loops + repo context = 100K–1M+ tokens per solved issue). This report asks: <b>can a self-hosted open-weight model do the work, and what does it cost?</b> Each model gets a <b>card</b> (the TL;DR) with three things: (1) <b>capability</b> — the model author's official published benchmarks; (2) <b>serving</b> — what <i>we</i> measured running it on our own Blackwell GPUs; (3) <b>cost</b> — $/output-token at current spot and on-demand GPU prices. Detail sections follow the cards.</div>
+
+  <div class="legend">Every number is tagged by source:
+    <span class="tag m">MEASURED</span> we ran it (our GPUs) ·
+    <span class="tag v">OFFICIAL</span> model author's HF card / tech report (self-reported, not independently verified) ·
+    <span class="tag a">LIST</span> provider list price (Anthropic / OpenAI / AWS, current as of 2026-06-29)
+  </div>
+
+  <div class="note warn"><b>Why there is no single "best model" leaderboard.</b> Our serving runs used different hardware (B200/B300), quantization (FP8/NVFP4/FP4), parallel layouts, and — critically — different output lengths. Aggregate tok/s is dominated by output length, so the throughput numbers are <b>not</b> a model speed ranking; they tell you what a node delivers for <i>that</i> config. Capability numbers come from each vendor's own card, measured on <i>their</i> harness — vendor SWE-bench scores are not mutually comparable either (harness choice alone swung one model 38→88% in our tests). The cards exist precisely because a flat table would mislead. Treat each card as "what this model is for," not "rank #N."</div>
+
+  <h2>The cost picture — current prices, grounded</h2>
+  <div class="note"><b>Frontier API output price (per 1M output tokens), current list:</b> Claude <b>Opus 4.5–4.8 = $25</b> (the old Opus 4.1 $75 is deprecated), Sonnet 4.6 = $15, Haiku 4.5 = $5 · OpenAI <b>GPT-5.5 = $30</b>, GPT-5.4 = $15, GPT-5.2 = $14, GPT-5 = $10, GPT-5-pro = $120. On Bedrock, GPT-5.5 = $33 / GPT-5.4 = $16.50.<br>
+  <b>Self-hosted GPU cost (verified via EC2 pricing API, 2026-06-29):</b> p6-b300.48xlarge = <b>$23–38/hr spot</b> (us-east-1 ~$23, us-west-2 ~$38), <b>$142.42/hr on-demand/ODCR</b>; p6-b200.48xlarge = ~$23/hr spot, $113.93/hr on-demand.</div>
+  <div class="note warn"><b>The honest multiplier.</b> Self-hosting wins, but how much depends on the GPU pricing basis. Using GLM-5.2's measured 9,271 tok/s @ $0.69–1.14/Mtok (spot) vs $4.27/Mtok (ODCR): the gap to Opus ($25) is <b>~36× on spot but ~6× on ODCR</b>; vs Sonnet/GPT-5.4 ($15) it's <b>~22× spot / ~3.5× ODCR</b>; vs GPT-5 ($10) it's ~14× spot / ~2.3× ODCR. <b>Production usually runs ODCR (spot can be reclaimed), so the defensible everyday number is ~2–7×, with spot as the best case.</b> Either way the direction is clear against Opus-class; against the cheaper GPT-5 tier on ODCR the margin is real but not dramatic, and gets eaten if your GPUs sit idle.</div>
+
+  <!-- ===================== FRONTIER REFERENCE CARD ===================== -->
+  <h2>Frontier reference — what you're migrating from</h2>
+  <div class="mc frontier">
+    <div class="mc-head"><div><span class="mc-name">Claude Opus 4.x / GPT-5.x</span> <span class="mc-sub">API (Anthropic / OpenAI / Bedrock)</span></div><div class="mc-sub">the incumbent</div></div>
+    <div class="mc-tldr"><b>TL;DR.</b> The capability bar and the cost ceiling. Best-in-class agentic coding, zero ops burden, but the most expensive per token by a wide margin. The migration target is "keep these for the hard tail, move bulk volume to open weights."</div>
+    <div class="mc-grid">
+      <div class="mc-col"><h4>Capability <span class="tag v">OFFICIAL</span></h4>
+        <div class="kv"><span class="l">Claude Opus 4.6 SWE-bench Verified</span><span class="r">~80.8%</span></div>
+        <div class="kv"><span class="l">GPT-5.x SWE-bench Verified</span><span class="r">~75–80% (tier-dep.)</span></div>
+        <div class="kv"><span class="l">Harness</span><span class="r">vendor-native</span></div>
+      </div>
+      <div class="mc-col"><h4>Cost <span class="tag a">LIST</span></h4>
+        <div class="kv"><span class="l">Opus 4.5–4.8 output</span><span class="r">$25 / Mtok</span></div>
+        <div class="kv"><span class="l">Sonnet 4.6 / GPT-5.4 output</span><span class="r">$15 / Mtok</span></div>
+        <div class="kv"><span class="l">GPT-5.5 output (Bedrock)</span><span class="r">$30 ($33) / Mtok</span></div>
+        <div class="kv"><span class="l">Ops cost</span><span class="r">$0 (managed)</span></div>
+      </div>
+    </div>
+    <div class="verdict cau"><b>Role:</b> capability reference + the price to beat. Every open-weight card below is "how close on capability, how much cheaper."</div>
+  </div>
+
+  <!-- ===================== GLM-5.2 ===================== -->
+  <h2>The open-weight cards</h2>
+  <div class="mc">
+    <div class="mc-head"><div><span class="mc-name">GLM-5.2</span> <span class="mc-sub">zai-org · 753B MoE · 1M ctx · MIT</span></div><div class="tag m">we measured BOTH axes</div></div>
+    <div class="mc-tldr"><b>TL;DR.</b> Our lead recommendation and the only model we measured on capability <i>and</i> cost. <b>89% fix rate on the same 46 SWE-bench issues + same harness as Opus/Sonnet/Haiku</b> (≈10pp under Claude), serving cleanly at 9,271 tok/s on a B300 within an 8s TTFT. Strong, disciplined tool-loop. Use FP8 (NVFP4 is slower today).</div>
+    <div class="mc-grid">
+      <div class="mc-col"><h4>Capability</h4>
+        <div class="kv"><span class="l"><span class="tag m">MEAS.</span> fix rate (OpenCode, n=46)</span><span class="r good">89%</span></div>
+        <div class="kv"><span class="l"><span class="tag v">OFF.</span> Terminal-Bench 2.1</span><span class="r">81.0</span></div>
+        <div class="kv"><span class="l"><span class="tag v">OFF.</span> SWE-bench Pro</span><span class="r">62.1</span></div>
+        <div class="kv"><span class="l"><span class="tag v">OFF.</span> GPQA Diamond</span><span class="r">91.2</span></div>
+      </div>
+      <div class="mc-col"><h4>Serving <span class="tag m">MEASURED</span> + cost</h4>
+        <div class="kv"><span class="l">Best config</span><span class="r">B300 · FP8 · TP4+DP2</span></div>
+        <div class="kv"><span class="l">Goodput @ c320 (ISL 12K/OSL 2048)</span><span class="r">9,271 tok/s</span></div>
+        <div class="kv"><span class="l">TTFT p95</span><span class="r">8.1 s</span></div>
+        <div class="kv"><span class="l">$/Mtok out — spot / ODCR</span><span class="r good">$0.69–1.14 / $4.27</span></div>
+      </div>
+    </div>
+    <div class="verdict"><b>Verdict:</b> the migration workhorse. ~10pp capability gap to Opus on identical issues, ~6× cheaper on ODCR / ~36× on spot. FP8, prefix-cache + TP4+DP2 are the levers (full loop in the GLM-5.2 B300 report).</div>
+  </div>
+
+  <!-- ===================== Kimi K2.6 ===================== -->
+  <div class="mc">
+    <div class="mc-head"><div><span class="mc-name">Kimi K2.6</span> <span class="mc-sub">moonshotai · 1T MoE / 32B active · 256K ctx · Modified MIT</span></div><div class="mc-sub">capability leader (open)</div></div>
+    <div class="mc-tldr"><b>TL;DR.</b> The strongest open-weight coding capability we found — its <b>official 80.2% SWE-bench Verified essentially matches Opus (~80.8%)</b>. We measured serving only (no fix-rate run), and it serves fast on B300. Best pick when capability is the priority and you can host a 1T model.</div>
+    <div class="mc-grid">
+      <div class="mc-col"><h4>Capability <span class="tag v">OFFICIAL</span></h4>
+        <div class="kv"><span class="l">SWE-bench Verified</span><span class="r good">80.2</span></div>
+        <div class="kv"><span class="l">LiveCodeBench v6</span><span class="r">89.6</span></div>
+        <div class="kv"><span class="l">SWE-bench Multilingual</span><span class="r">76.7</span></div>
+        <div class="kv"><span class="l">GPQA Diamond</span><span class="r">90.5</span></div>
+      </div>
+      <div class="mc-col"><h4>Serving <span class="tag m">MEASURED</span> + cost</h4>
+        <div class="kv"><span class="l">Config (NVFP4)</span><span class="r">B300 · TP4+DP2</span></div>
+        <div class="kv"><span class="l">Goodput @ c256 (ISL 16K/OSL 1024)</span><span class="r">12,478 tok/s</span></div>
+        <div class="kv"><span class="l">INT4 config peak</span><span class="r">10,437 tok/s @ c512</span></div>
+        <div class="kv"><span class="l">$/Mtok out — spot / ODCR</span><span class="r good">$0.51–0.85 / $3.17</span></div>
+      </div>
+    </div>
+    <div class="verdict"><b>Verdict:</b> highest open capability (Opus-parity on the vendor's SWE-bench). Caveat: we did <i>not</i> run our own fix-rate eval, and 1T params is a bigger host. Capability number is vendor-self-reported.</div>
+  </div>
+
+  <!-- ===================== DeepSeek V4 Flash ===================== -->
+  <div class="mc">
+    <div class="mc-head"><div><span class="mc-name">DeepSeek V4 Flash</span> <span class="mc-sub">deepseek-ai · 284B MoE / 13B active · 1M ctx · MIT</span></div><div class="mc-sub">cheapest to serve</div></div>
+    <div class="mc-tldr"><b>TL;DR.</b> The efficiency play — only 13B active params, so it serves very cheaply, and the official SWE-bench Verified (79%) is near-frontier. We measured serving (not capability). Best when cost-per-token is the dominant constraint.</div>
+    <div class="mc-grid">
+      <div class="mc-col"><h4>Capability <span class="tag v">OFFICIAL</span></h4>
+        <div class="kv"><span class="l">SWE-bench Verified (Max)</span><span class="r good">79.0</span></div>
+        <div class="kv"><span class="l">LiveCodeBench (Max)</span><span class="r">91.6</span></div>
+        <div class="kv"><span class="l">SWE-bench Multilingual</span><span class="r">73.3</span></div>
+        <div class="kv"><span class="l">GPQA Diamond</span><span class="r">88.1</span></div>
+      </div>
+      <div class="mc-col"><h4>Serving <span class="tag m">MEASURED</span> + cost</h4>
+        <div class="kv"><span class="l">Config</span><span class="r">B300 · FP4/FP8 · TP8</span></div>
+        <div class="kv"><span class="l">Output @ QPS8 (ISL 2K/OSL 512)</span><span class="r">2,365 tok/s</span></div>
+        <div class="kv"><span class="l">32K-ISL shared-prefix total</span><span class="r">57,497 tok/s</span></div>
+        <div class="kv"><span class="l">$/Mtok out — spot / ODCR†</span><span class="r">$2.70 / $16.73†</span></div>
+      </div>
+    </div>
+    <div class="verdict"><b>Verdict:</b> strongest $/token efficiency in principle (13B active); official 79% SWE-V is near-frontier (vendor-reported, we didn't eval). <b>†</b> the $/Mtok looks high only because it's a <i>light-load</i> QPS=8 point, not a saturated knee — the 32K-prefix run hit 57K tok/s, which would put it at the cheapest end. Re-measure at the throughput knee for a fair cost.</div>
+  </div>
+
+  <!-- ===================== Nemotron-3 Ultra ===================== -->
+  <div class="mc">
+    <div class="mc-head"><div><span class="mc-name">Nemotron-3 Ultra</span> <span class="mc-sub">nvidia · 550B MoE / 55B active · 1M ctx · OpenMDW</span></div><div class="mc-sub">NVIDIA-tuned, mid capability</div></div>
+    <div class="mc-tldr"><b>TL;DR.</b> Solid mid-tier (70.7 SWE-bench Verified official), NVIDIA-optimized for their stack with MTP speculative decode. In our runs the per-token cost was notably higher because the best config used only half the GPUs — efficiency depends heavily on layout. Capability below the Kimi/DeepSeek/GLM leaders.</div>
+    <div class="mc-grid">
+      <div class="mc-col"><h4>Capability <span class="tag v">OFFICIAL</span></h4>
+        <div class="kv"><span class="l">SWE-bench Verified</span><span class="r">70.7</span></div>
+        <div class="kv"><span class="l">LiveCodeBench v6</span><span class="r">89.0</span></div>
+        <div class="kv"><span class="l">SWE-bench Multilingual</span><span class="r">67.7</span></div>
+        <div class="kv"><span class="l">MMLU-Pro</span><span class="r">86.8</span></div>
+      </div>
+      <div class="mc-col"><h4>Serving <span class="tag m">MEASURED</span> + cost</h4>
+        <div class="kv"><span class="l">Config</span><span class="r">B200 · NVFP4 · TP4 (4/8 GPU)</span></div>
+        <div class="kv"><span class="l">Goodput @ c256 (ISL n/m, peak sweep)</span><span class="r">1,883 tok/s</span></div>
+        <div class="kv"><span class="l">coding-agent (ISL 4K/OSL 2048) c8</span><span class="r">2,008 tok/s</span></div>
+        <div class="kv"><span class="l">$/Mtok out — spot / ODCR</span><span class="r warn">$3.39 / $16.81</span></div>
+      </div>
+    </div>
+    <div class="verdict cau"><b>Verdict:</b> capable but the priciest to serve here — the TP4 config bills a full node for 4 idle GPUs (a layout/packing issue, fixable). Mid-tier capability. Consider only if you're already deep in the NVIDIA stack.</div>
+  </div>
+
+  <!-- ===================== MiniMax-M2 ===================== -->
+  <div class="mc">
+    <div class="mc-head"><div><span class="mc-name">MiniMax-M2</span> <span class="mc-sub">MiniMaxAI · 230B MoE / 10B active · 128K ctx · Modified MIT</span></div><div class="mc-sub">lightweight active params</div></div>
+    <div class="mc-tldr"><b>TL;DR.</b> Very light (10B active), claims "#1 open-source globally" on a composite, official 69.4 SWE-bench Verified with strong agentic tool-use (tau²-Bench 77.2). We ran a serving sweep (best 2,158 tok/s on B200) + a correctness smoke (the <code>minimax_m2</code> parser emits clean structured tool-calls) — but <b>no SWE-bench pass-rate eval</b>, and the run was on older vLLM (0.19.1rc1, not 0.23.0). A credible lightweight option; numbers are partial.</div>
+    <div class="mc-grid">
+      <div class="mc-col"><h4>Capability <span class="tag v">OFFICIAL</span></h4>
+        <div class="kv"><span class="l">SWE-bench Verified</span><span class="r">69.4</span></div>
+        <div class="kv"><span class="l">SWE-bench Multilingual</span><span class="r">56.5</span></div>
+        <div class="kv"><span class="l">tau²-Bench (agentic)</span><span class="r">77.2</span></div>
+        <div class="kv"><span class="l">GPQA Diamond</span><span class="r">78</span></div>
+      </div>
+      <div class="mc-col"><h4>Serving <span class="tag m">MEASURED</span> + cost</h4>
+        <div class="kv"><span class="l">Config</span><span class="r">B200 · FP8 · TP4+EP4</span></div>
+        <div class="kv"><span class="l">Goodput @ c128 (90K ISL)</span><span class="r">2,158 tok/s</span></div>
+        <div class="kv"><span class="l">$/Mtok out — spot / ODCR</span><span class="r">$2.96 / $14.67</span></div>
+        <div class="kv"><span class="l">Tool-calls / fix-rate</span><span class="r">clean / <span class="warn">not run</span></span></div>
+      </div>
+    </div>
+    <div class="verdict cau"><b>Verdict:</b> attractive on paper — 10B active = cheap in principle, 69.4 SWE-V official, clean tool-calls. But the cost above reflects a long-shared-prefix sweep on old vLLM (not a tuned knee), and we never ran our own fix-rate. Lightweight contender; re-run on current vLLM + a real eval before committing.</div>
+  </div>
+
+  <!-- ===================== Qwen3-235B ===================== -->
+  <div class="mc">
+    <div class="mc-head"><div><span class="mc-name">Qwen3-235B-A22B</span> <span class="mc-sub">Qwen · 235B MoE / 22B active · 262K ctx · Apache-2.0</span></div><div class="mc-sub">most permissive license</div></div>
+    <div class="mc-tldr"><b>TL;DR.</b> The Apache-2.0 option (cleanest license for commercial use) and our highest measured throughput (13,877 tok/s). The Instruct card publishes <b>no SWE-bench Verified</b> — coding capability is less documented (Aider-Polyglot 57.3, strong tool-calling BFCL 70.9). A throughput/licensing pick more than a coding-capability leader.</div>
+    <div class="mc-grid">
+      <div class="mc-col"><h4>Capability <span class="tag v">OFFICIAL</span></h4>
+        <div class="kv"><span class="l">SWE-bench Verified</span><span class="r mut">not published</span></div>
+        <div class="kv"><span class="l">Aider-Polyglot</span><span class="r">57.3</span></div>
+        <div class="kv"><span class="l">BFCL-v3 (tool-calling)</span><span class="r">70.9</span></div>
+        <div class="kv"><span class="l">MMLU-Pro</span><span class="r">83.0</span></div>
+      </div>
+      <div class="mc-col"><h4>Serving <span class="tag m">MEASURED</span> + cost</h4>
+        <div class="kv"><span class="l">Config</span><span class="r">B300 · FP8 · TP2+DP4+EP</span></div>
+        <div class="kv"><span class="l">Goodput @ c512 (ISL n/m, W-suite)</span><span class="r good">13,877 tok/s</span></div>
+        <div class="kv"><span class="l">TTFT p99</span><span class="r">2.08 s</span></div>
+        <div class="kv"><span class="l">$/Mtok out — spot / ODCR</span><span class="r good">$0.46–0.76 / $2.85</span></div>
+      </div>
+    </div>
+    <div class="verdict"><b>Verdict:</b> best license (Apache-2.0) + highest measured throughput + cheapest ODCR $/Mtok here. But coding capability is the least documented (no SWE-bench Verified) — validate on your own task set before committing for agentic coding.</div>
+  </div>
+
+  <div class="note"><b>Also ran, not carded:</b> <b>Nemotron-3 Super</b> (120B/12B) — official 60.5 SWE-bench Verified, but we completed no coding-serving benchmark (fin-RAG axis only). <b>GLM-5.2 NVFP4</b> and <b>Kimi NVFP4</b> — measured, both ~50% slower than FP8 on the current experimental NVFP4 MoE kernel; use FP8 for serving.</div>
+
+  <h2>Cost vs capability — the Pareto</h2>
+  <div class="chartbox">
+  <svg viewBox="0 0 880 300" width="100%" role="img" aria-label="Cost vs capability Pareto">
+    <text x="440" y="16" fill="#e6edf3" font-size="13" text-anchor="middle" font-weight="600">SWE-bench Verified (%) vs $/Mtok output, ODCR basis — up-and-left is better</text>
+    <line x1="80" y1="30" x2="80" y2="250" stroke="#30363d"/>
+    <line x1="80" y1="250" x2="800" y2="250" stroke="#30363d"/>
+    <!-- y gridlines 55..85 -->
+    <g fill="#8b949e" font-size="10" text-anchor="end">
+      <line x1="80" y1="250" x2="800" y2="250" stroke="#21262d"/><text x="72" y="254">55%</text>
+      <line x1="80" y1="180" x2="800" y2="180" stroke="#21262d"/><text x="72" y="184">65%</text>
+      <line x1="80" y1="110" x2="800" y2="110" stroke="#21262d"/><text x="72" y="114">75%</text>
+      <line x1="80" y1="40"  x2="800" y2="40"  stroke="#21262d"/><text x="72" y="44">85%</text>
+    </g>
+    <text x="26" y="140" fill="#8b949e" font-size="11" transform="rotate(-90 26 140)" text-anchor="middle">SWE-bench Verified %</text>
+    <!-- x log ticks -->
+    <g fill="#8b949e" font-size="10" text-anchor="middle">
+      <text x="80" y="265">$2</text><text x="317" y="265">$5</text><text x="496" y="265">$10</text><text x="733" y="265">$25</text>
+      <text x="440" y="282" fill="#8b949e">$/Mtok output (ODCR, log scale) — cheaper ←</text>
+    </g>
+    <!-- frontier API band -->
+    <line x1="733" y1="30" x2="733" y2="250" stroke="#d29922" stroke-dasharray="4 4"/>
+    <text x="733" y="28" fill="#d29922" font-size="10" text-anchor="middle">Opus $25</text>
+    <!-- open-weight measured-cost / official-SWE (solid) -->
+    <g>
+      <circle cx="199" cy="74" r="6" fill="#3fb950"/><text x="199" y="66" fill="#3fb950" font-size="11" text-anchor="middle" font-weight="700">Kimi K2.6</text>
+      <circle cx="629" cy="82" r="6" fill="#3fb950"/><text x="629" y="74" fill="#3fb950" font-size="11" text-anchor="middle">DeepSeek V4F†</text>
+      <circle cx="630" cy="140" r="6" fill="#3fb950"/><text x="630" y="132" fill="#3fb950" font-size="11" text-anchor="middle">Nemotron Ultra</text>
+      <circle cx="595" cy="149" r="6" fill="#3fb950"/><text x="560" y="153" fill="#3fb950" font-size="11" text-anchor="end">MiniMax-M2</text>
+    </g>
+    <!-- estimate-SWE (hollow): GLM (fix-rate proxy), Qwen (no SWE-V) -->
+    <g>
+      <circle cx="276" cy="69" r="6" fill="none" stroke="#58a6ff" stroke-width="2"/><text x="276" y="61" fill="#58a6ff" font-size="11" text-anchor="middle" font-weight="700">GLM-5.2 ◌</text>
+      <circle cx="172" cy="131" r="6" fill="none" stroke="#58a6ff" stroke-width="2"/><text x="172" y="123" fill="#58a6ff" font-size="11" text-anchor="middle">Qwen3-235B ◌</text>
+    </g>
+    <!-- frontier API (warn) -->
+    <g>
+      <circle cx="733" cy="69" r="6" fill="#d29922"/><text x="733" y="61" fill="#d29922" font-size="11" text-anchor="middle">Opus 4.x</text>
+      <circle cx="601" cy="110" r="6" fill="#d29922"/><text x="601" y="102" fill="#d29922" font-size="11" text-anchor="middle">Sonnet/GPT-5.4</text>
+    </g>
+    <text x="120" y="230" fill="#8b949e" font-size="10">● official SWE-V + measured cost &nbsp; ◌ capability estimate (no official SWE-V) &nbsp; ● frontier API</text>
+  </svg>
+  <div class="mut" style="font-size:12px">The open-weight cluster sits <b>up-and-left of Opus</b> — comparable SWE-bench Verified at 1.5–9× lower $/Mtok. <b>Read with care:</b> (1) y-axis mixes <i>our measured</i> GLM-5.2 (89% fix-rate, plotted at its ~Opus-adjacent estimate ◌ since it publishes no SWE-V) and Qwen (◌, no SWE-V — placed at a rough 72) with vendors' <i>self-reported</i> SWE-V for the rest; not a like-for-like capability axis. (2) x-axis is ODCR cost at each run's <i>measured</i> config — Kimi/Qwen/GLM were at saturated knees (trustworthy); <b>† DeepSeek, Nemotron, MiniMax were light-load or half-idle-node configs, so their cost is overstated</b> — a tuned knee moves all three sharply left. The shape of the conclusion holds; exact x-positions for the three flagged points will improve with a knee re-measure.</div>
+  </div>
+
+  <h2>Capability — alleged (official) vs measured</h2>
+  <table>
+    <tr><th>Model</th><th>SWE-bench Verified</th><th>LiveCodeBench</th><th>SWE-Multiling.</th><th>Reasoning</th><th>Our measured</th><th>Src</th></tr>
+    <tr><td><b>GLM-5.2</b></td><td class="mut">n/p (SWE-Pro 62.1)</td><td class="mut">n/p</td><td class="mut">n/p</td><td>GPQA-D 91.2</td><td class="good">89% fix (n=46)</td><td><span class="tag m">M</span><span class="tag v">V</span></td></tr>
+    <tr><td>Kimi K2.6</td><td class="good">80.2</td><td>89.6</td><td>76.7</td><td>GPQA-D 90.5</td><td class="mut">serving only</td><td><span class="tag v">V</span></td></tr>
+    <tr><td>DeepSeek V4 Flash</td><td>79.0</td><td>91.6</td><td>73.3</td><td>GPQA-D 88.1</td><td class="mut">serving only</td><td><span class="tag v">V</span></td></tr>
+    <tr><td>Nemotron-3 Ultra</td><td>70.7</td><td>89.0</td><td>67.7</td><td>MMLU-Pro 86.8</td><td class="mut">smoke only</td><td><span class="tag v">V</span></td></tr>
+    <tr><td>Nemotron-3 Super</td><td>60.5</td><td>81.2</td><td>45.8</td><td>AIME25 90.2</td><td class="mut">no coding run</td><td><span class="tag v">V</span></td></tr>
+    <tr><td>MiniMax-M2</td><td>69.4</td><td class="mut">~83 (AA)</td><td>56.5</td><td>GPQA-D 78</td><td>tool-calls clean</td><td><span class="tag m">M</span><span class="tag v">V</span></td></tr>
+    <tr><td>Qwen3-235B-A22B</td><td class="mut">n/p</td><td>51.8</td><td class="mut">n/p (Aider 57.3)</td><td>MMLU-Pro 83.0</td><td class="mut">serving only</td><td><span class="tag v">V</span></td></tr>
+    <tr class="mut"><td>Claude Opus 4.6 / GPT-5.x</td><td>~80.8 / 75–80</td><td>—</td><td>—</td><td>—</td><td>baseline traces (n=46)</td><td><span class="tag a">A</span></td></tr>
+  </table>
+  <div class="mut" style="font-size:12px"><span class="tag v">V</span> = vendor-self-reported (own harness, not mutually comparable) · <span class="tag m">M</span> = our run · <span class="tag a">A</span> = provider-published. GLM-5.2's 89% is fix-rate on OpenCode (same 46 issues as the Claude baseline) — a different metric than SWE-V, the cleanest cross-model point we own.</div>
+
+  <h2>Serving experiments — what we actually ran</h2>
+  <table>
+    <tr><th>Model · config</th><th>HW</th><th>Quant</th><th>Layout</th><th>Conc</th><th>ISL</th><th>OSL</th><th>Goodput tok/s</th><th>TTFT</th><th>$/Mtok spot / ODCR</th></tr>
+    <tr><td>GLM-5.2 (winner)</td><td>B300</td><td>FP8</td><td>TP4+DP2</td><td>320</td><td>12K</td><td>2048</td><td class="good">9,271</td><td>p95 8.1s</td><td>$0.69–1.14 / $4.27</td></tr>
+    <tr><td>Kimi K2.6 NVFP4</td><td>B300</td><td>NVFP4</td><td>TP4+DP2</td><td>256</td><td>16K</td><td>1024</td><td class="good">12,478</td><td>p99 3.97s</td><td>$0.51–0.85 / $3.17</td></tr>
+    <tr><td>Kimi K2.6 INT4</td><td>B300</td><td>INT4-QAT</td><td>TP8</td><td>512</td><td>n/m</td><td>n/m</td><td>10,437</td><td>n/m</td><td>~$3.8 (ODCR)</td></tr>
+    <tr><td>Qwen3-235B</td><td>B300</td><td>FP8</td><td>TP2+DP4+EP</td><td>512</td><td>n/m</td><td>n/m</td><td class="good">13,877</td><td>p99 2.08s</td><td>$0.46–0.76 / $2.85</td></tr>
+    <tr><td>DeepSeek V4 Flash</td><td>B300</td><td>FP4/FP8</td><td>TP8</td><td>QPS8</td><td>2K</td><td>512</td><td class="warn">2,365†</td><td>p99 484ms</td><td>$2.70 / $16.73†</td></tr>
+    <tr><td>DeepSeek V4 (32K prefix)</td><td>B300</td><td>FP4/FP8</td><td>TP8</td><td>n/m</td><td>32K</td><td>n/m</td><td class="good">57,497 total</td><td>n/m</td><td>~$0.7 (ODCR, est)</td></tr>
+    <tr><td>MiniMax-M2</td><td>B200</td><td>FP8</td><td>TP4+EP4</td><td>128</td><td>90K</td><td>n/m</td><td>2,158</td><td>p95 17.3s</td><td>$2.96 / $14.67</td></tr>
+    <tr><td>Nemotron-3 Ultra</td><td>B200</td><td>NVFP4</td><td>TP4 (4/8 GPU)</td><td>256</td><td>n/m</td><td>n/m</td><td class="warn">1,883†</td><td>n/m</td><td>$3.39 / $16.81†</td></tr>
+    <tr><td>Nemotron-3 Ultra (coding)</td><td>B200</td><td>NVFP4</td><td>TP4</td><td>8</td><td>4K</td><td>2048</td><td>2,008</td><td>n/m</td><td>—</td></tr>
+  </table>
+  <div class="mut" style="font-size:12px"><b>†</b> light-load or half-idle-node configs — cost overstated, a saturated/packed knee moves them sharply cheaper. <b>Do not rank models by the goodput column</b> — OSL/ISL/quant/HW all differ. ISL "n/m" = the run used a mixed workload suite without a single fixed input length.</div>
+
+  <h2>Detail & caveats (for the careful reader)</h2>
+  <ul style="color:var(--mut);font-size:13px;margin-left:18px;line-height:1.8">
+    <li><b>Capability numbers are vendor-self-reported</b> (HF cards / tech reports), each on the vendor's own harness — <i>not</i> independently verified and <i>not</i> mutually comparable. The one exception is GLM-5.2's 89%, which <b>we</b> ran on the same harness + issues as the Claude baseline. Harness choice alone swung a fixed model 38→88% in our agent-harness study, so cross-vendor SWE-bench comparisons are soft.</li>
+    <li><b>$/Mtok is output-token only</b>, = (GPU $/hr) ÷ (measured output tok/s × 3600 / 1e6). It excludes input tokens, prompt-cache economics, and ops overhead. Blended $/solved-task on your real input:output mix is the number that should drive the decision.</li>
+    <li><b>Spot vs ODCR matters more than the model:</b> B300 spot ranges $23 (us-east-1) to $38 (us-west-2); ODCR is $142.42. Production usually can't tolerate spot reclaim, so the everyday basis is ODCR → the realistic savings vs frontier is ~2–7×, with spot as best-case (~14–43×).</li>
+    <li><b>Throughput is config-specific, not a model ranking</b> — different OSL/quant/layout/HW per run. The Nemotron $16.81 ODCR figure is inflated by a TP4 config that billed a full node for 4 idle GPUs; a packed layout would roughly halve it.</li>
+    <li><b>Some HF cards contain forward-dated content</b> (2026 competitor references). We report the cards' own published figures verbatim; treat as vendor claims pending independent eval.</li>
+    <li><b>Bedrock note:</b> OpenAI models on Bedrock bill through AWS and differ from direct OpenAI (GPT-5.5 $33 vs $30, GPT-5.4 $16.50 vs $15). Current Anthropic Opus is $25 output (Opus 4.1's $75 is deprecated/retired).</li>
+  </ul>
+
+  <div class="meta" style="margin-top:24px">MEASURED sources: <code>domains/gpu-serving/blueprints/&lt;model&gt;/results/</code> + <code>domains/autoresearch/blueprints/{agent-swarm,agent-harness,verification-primitives-swebench}/</code>. OFFICIAL: each model's Hugging Face card. LIST prices: Anthropic & OpenAI pricing pages + AWS Bedrock / EC2 pricing API, 2026-06-29. This report deliberately presents per-model cards, not a single ranking — the runs are not matched and a flat leaderboard would mislead.</div>
+</body>
+</html>

@@ -1,0 +1,110 @@
+# trace-lineage-self-reflection — pilot lessons
+
+Local pilot (2026-07-06, before any cluster fan-out). Model: `us.anthropic.claude-sonnet-4-6` via Bedrock. Goal of the pilot: confirm the harness works end-to-end and the effect is *measurable* before scaling.
+
+## What works (validated end-to-end)
+
+1. **Full pipeline runs**: `gen_task.py` (seeded coupled-site repo) → headless `claude -p --output-format stream-json` under an arm's Stop hook → `grade.py` (mechanical grep oracle) → result row. Confirmed on control + reflect arms.
+2. **`decision: block` continues headless agents** — the spec's one documented unknown. Smoke test: a Stop hook returning `{"decision":"block","reason":...}` under `--max-turns 5` made the agent keep working and act on the injected reason. **Reflect arms are feasible headless.** (Settles spec falsification-adjacent risk.)
+3. **stream-json adapter works** (`lineage.py --stream-json`) — parses agent-runner `run.log` shape (skips git/npm noise lines, extracts tool_use file events). Prerequisite for the cluster path.
+4. **Value-drift detection works and is precise** — new `detect_value_drift` in `lineage.py`: extracts the token the agent changed (from Edit `old_string`/`new_string`, snapped to word boundaries) and flags untouched files still holding the old token. On the pilot: **0 false positives on a completed task, correct 2/2 true positives on an incomplete one.** Clears spec falsification #4 (precision ≥ 0.7) on seeded tasks.
+
+## What we FIXED mid-pilot (bugs the pilot caught)
+
+- **Model ID**: bare `claude-sonnet-4-6` is rejected under Bedrock; must use the inference-profile ID `us.anthropic.claude-sonnet-4-6`. (Env already routes Opus via a full ARN.)
+- **stdin**: headless `claude -p` needs `</dev/null` or it waits 3s for stdin. Added to `run_cell.sh`.
+- **Coupling mismatch (the important one)**: `lineage.py`'s original drift was *reference*-coupling (file B mentions file A's name). The seeded tasks couple on a shared *value* token. The detector saw no drift where the oracle correctly saw stale files. **Fixed by adding value-drift** and defaulting the experiment hook to `--no-reference-drift` (value-only), because...
+- **Reference-drift false-positives on completed tasks**: "edited README at step 9, config at step 10, README mentions config" fired even though the task was 100% correct. It injected 6 times / wasted ~8 turns on a non-issue. Value-drift does not have this problem. Experiment uses value-only.
+
+## The blocking finding (why v1 as-designed has NO headroom)
+
+**Sonnet 4.6 does not naturally drift on these seeded value-propagation tasks.** Control-arm completion:
+- K=3 short: 1.0
+- K=6 short: 1.0
+- K=8 **long tier** (filler + compaction pressure, 120 max-turns): **1.0, 0 stale**
+
+The "change X everywhere" instruction + grep-ability makes propagation too easy for a frontier model. **The ceiling effect is total** — if control is already 1.0, reflect cannot show a lift (nothing to fix), and the whole reflect-vs-control comparison collapses to noise. This is exactly the trinity-coordinator saturation pattern (`project_trinity_saturation_cost_pivot`): strong model + easy task → no headroom → intervention invisible.
+
+**Implication: the experiment cannot run as-designed and produce signal.** Before any cluster fan-out, the task design must be made hard enough that the *control* arm naturally leaves drift. Candidate levers (untested):
+1. **Weaker model** (Haiku) — the spec's v2 model axis, pulled forward. Cheapest test of "is there drift to catch at all".
+2. **Genuinely long trajectories** — bury the coupled sites under substantial unrelated work so compaction actually evicts the early edits (current "long tier" filler was too light to induce forgetting).
+3. **Non-obvious coupling** — sites that don't all contain the literal token (e.g. a value derived/formatted differently), so grep-and-replace doesn't trivially catch them. Risk: must keep the *oracle* mechanical.
+4. **No-explicit-instruction framing** — don't tell the agent "change it everywhere"; make the propagation a consequence of a task, so missing a site is natural.
+
+Recommended next step: a **headroom-finding sweep** (Haiku × long × K=8, control only) to locate a task/model regime where control drifts 20-60%. Only if such a regime exists does the reflect experiment have anything to measure. If no regime drifts, the honest conclusion is "for value-propagation on capable models, the drift-reflection layer has no correctness headroom" — itself a valid (if deflating) finding, consistent with verifier-reward's saturation results.
+
+### Haiku result (headroom sweep, run 2026-07-06)
+
+Ran the recommended sweep immediately. **Haiku 4.5 (`us.anthropic.claude-haiku-4-5-20251001-v1:0`) also hits 1.0, 0/8 stale** at K=8 long tier — just slower (46 turns vs Sonnet's 26). So the ceiling is not Sonnet-specific; **even a cheap model fully propagates** this task. (First attempt returned completion 0.0 in 1 turn — that was a bad model ID: the suffix `-v1:0` is required for Haiku on this Bedrock, and the 400 error aborts to 1 turn. Not drift.)
+
+**Decisive conclusion:** the seeded value-propagation task has **no drift headroom on either model tier**. The lever "weaker model" is exhausted. Remaining headroom levers, in order of likelihood to actually induce drift:
+1. **Much longer trajectories with real forgetting** — the current "long tier" filler (read+summarize each file) is far too light to force compaction to evict the coupled sites. Need trajectories long enough that the early edit is genuinely out of context when the later site is written. This is the *point* of the experiment (drift grows with autonomy) and the pilot never reached it — the tasks completed in 26-46 turns, nowhere near compaction.
+2. **Implicit coupling** — sites where the token isn't literally identical (derived/formatted), so "grep and replace all" doesn't trivially solve it. Must keep the oracle mechanical (e.g. oracle knows the derived form).
+3. **Distractor load** — many uncoupled near-miss values so the agent must discriminate which to change.
+
+**The pilot's real lesson about the experiment:** the hard part isn't building the detector or the arms (both work) — it's **inducing genuine drift**. A task a capable model solves in <50 turns will never drift. The experiment's validity depends entirely on constructing a trajectory long/hard enough that the *control* agent forgets. Until a drifting regime is demonstrated, fanning out to the cluster would burn spend measuring a null effect. This mirrors trinity-coordinator: when accuracy saturates, there is no signal on the accuracy axis.
+
+## Drift-headroom research (2026-07-06) — the blocker is now solvable
+
+Two research passes for "where is drift already documented, so we reuse real headroom instead of synthesizing it." Root cause of our null result, confirmed: **frontier models saturate per-step reliability (~1.0); drift only appears under a knob that COMPOUNDS across steps.** Our task had no compounding. Documented drift takes two shapes:
+- **Composition drift** — per-edit correct, the SET fails. PyMigBench: per-change 89-94% but end-to-end unit-test pass 64% (GPT-4o) / 36% (Llama-3.1). MQuAKE: single-edit recall 88-96% → multi-hop propagation 7-8%.
+- **Horizon drift** — success ≈ p^H. arXiv:2509.09677 (ICLR 2026): ~100% single-step accuracy still collapses <50% within ~15 dependent steps; **self-conditioning** (injecting the model's own prior errors into context) worsens it; not fixed by scale; thinking models immune. τ-bench: pass^1<50% → pass^8<25%.
+
+### Recommended drift-induction protocol (adopt this)
+**arXiv:2509.09677 self-conditioning setup** — `github.com/long-horizon-execution/measuring-execution` (public code + HF dataset). Run a **non-thinking model** over a **long dependent-step budget (100+)** with **controlled injection of its own prior errors**. Two dials (horizon length × injected-error rate) put a control agent reliably in the 30-70% band. The injected-error mechanism IS the inconsistency the detector must catch — clean stress test. Mechanically graded (key-value execution).
+
+### Substrate menu for reuse (all mechanically graded — no LLM judge)
+| Substrate | Fit | Headroom | Grading |
+|-----------|-----|----------|---------|
+| arXiv:2509.09677 self-conditioning | purest horizon-drift, manufactures on demand | tunable 30-70% | key-value exact |
+| PyMigBench (arXiv:2504.13272) | REAL code coupled-site propagation | ~36% fail (94%→64%) | unit tests (supply harness) |
+| τ-bench (arXiv:2406.12045) | built-in `pass^k` drift metric, loop maps 1:1 | pass^8<25% | DB-state (no judge) |
+| Aider refactor benchmark | fast partial/lazy-edit detector, no Docker | mid-tier 45-63% | AST node-count |
+| MQuAKE (arXiv:2305.14795) | knowledge analog of coupled-site | ~92% fail | exact/alias match |
+
+Skip LongMemEval / LoCoMo — LLM-judge graded (violates the mechanical-oracle discipline; verifier-reward recall-ceiling lesson).
+
+### Recommended two-track redesign for v2
+- **Track A (prove the mechanism):** adopt 2509.09677 self-conditioning — reliably drifting control arm; detector must catch the injected errors; reflect-vs-control lift is measurable here.
+- **Track B (prove it's real):** PyMigBench — ecologically-valid code coupled-site propagation; value-drift mode already fits.
+
+Correction: spec previously cited arXiv:2602.06413 for long-horizon decay — that is theory-only with no code. Empirical paper is 2509.09677. Spec fixed.
+
+## Status
+
+Harness: BUILT + VALIDATED. Experiment: BLOCKED on headroom, but **path unblocked** — adopt a documented-drift substrate (2509.09677 self-conditioning as primary, PyMigBench as the real-code track) instead of the saturated synthetic task. v2 redesign captured above; not yet built. Do not fan out to cluster until the control arm demonstrably drifts on the chosen substrate.
+
+## Substrate hunt — two more falsified, PyMigBench too heavy (2026-07-06 cont.)
+
+Continued the search for a substrate that BOTH drifts AND is realistic. Result: the realistic + drifting + cheap combination does not exist off-the-shelf.
+
+- **Synthetic file-ledger task (gen_horizon_task.py):** falsified. Sonnet hits 1.0 at K=4/turns=80. Trace inspection shows WHY: the agent **offloads state to files** (reads/writes each balance) and computes the whole op-list in one batch — files ARE its memory, so nothing to forget. This is the deepest finding of the session: **file access prevents drift** on simple tasks.
+- **Forced in-context horizon (horizon_incontext.py, Bedrock Converse, one op/turn, no tools):** DOES drift under self-conditioning (inject-error-rate 0.3 stepped accuracy 0.75→0.5 mid-run). BUT this regime is **unrealistic** — real agents use files/tools; amputating them manufactures drift artificially. AND the drift lives in CONTEXT, not files, so the file-event detector can't observe it. **Kept only as a sanity-check probe** that drift is inducible on our stack; NOT the experiment. (Note: an off-by-one — model 1-indexes acct_1..acct_4 vs truth acct_0.. — inflated the "wrong" count; arithmetic was otherwise correct. Moot given the pivot.)
+- **PyMigBench (arXiv:2504.13272):** the documented 94%→64% coupled-site drift is REAL and file-based, but the benchmark ships **metadata only** (YAML: 335 migrations / 3096 changes). The study's 64% rests on a **hand-curated ~25-migration subset with bespoke per-repo virtualenvs** (date-based dep reconstruction, no lockfiles). No released harness (figshare artifact = 2 sample apps + reports, no runner). Reproducing = **multi-week SWE-bench-class env engineering.** Too heavy for a go/no-go pilot.
+
+### The genuine finding (user's insight, confirmed)
+**Agents that persist state to files do not drift on simple tasks — the file is durable memory.** Realistic file-based drift only appears in tasks complex enough to have NON-OBVIOUS coupled sites (a call site you didn't think to grep, a derived value in an unexpected place). Those tasks require heavy real-repo infrastructure. So the reliability layer's correctness value is narrower than hoped: it pays off on *complex* real codebases, not toy tasks, and demonstrating it needs a real-repo substrate.
+
+### Pivot decision
+Recommended: reuse the **SWE-bench** infra already standing (verification-primitives-swebench: Docker-from-Hub working, 175/300 baseline, m7i EC2). **PASS_TO_PASS regressions = mechanical drift oracle** (agent broke a coupled site) on real file tasks that lineage.py CAN observe. Turns "multi-week rebuild" into "reuse what exists." Alternative: Aider refactor benchmark (AST-graded, no Docker, lighter, but saturates on top models).
+
+## Offline drift-vs-outcome on 301 real SWE-bench traces (2026-07-06) — the free gate
+
+Ran lineage's detectors over 301 real Claude Code SWE-bench sessions (pivot-analysis blueprint) with known pass/fail. No new runs, no spend. This is the retrospective gate before any live experiment.
+
+**Results (301 labeled, base fail rate 35.9%):**
+| | drift detected | no drift |
+|---|---|---|
+| **failed** | 1 | 107 |
+| **passed** | 0 | 193 |
+
+- `P(fail | drift) = 1.0` — every drift-flagged trace failed. **Zero false positives across 193 passing traces.** Odds ratio 5.4. mean val_drift: 0.556 (fail) vs 0.000 (pass).
+- **BUT recall ≈ 0**: only **1 of 108 failures** carried a detectable drift flag.
+- Not a Bash-editing artifact: only 1% of sessions edited via Bash-only; 95% used file Edit/Write. The detector *could* see the edits — the coupled-site value-drift pattern simply **wasn't present** in the failures.
+
+**Verdict — qualified NO-GO for the naive experiment:**
+- ✅ Detector PRECISION confirmed on real data (1.0), corroborating the synthetic pilot.
+- ❌ COVERAGE too low on SWE-bench: catches ~1% of failures. Feeding it back would help almost no runs. Not worth a live reflect experiment on this benchmark.
+- 🔑 **Core finding:** coupled-site value-drift is a REAL but RARE failure mode in general bug-fixing. SWE-bench agents fail mostly from wrong logic / incomplete fix / wrong location — not from propagating a value to some sites and forgetting others. The reliability layer's correctness value is **narrow and task-dependent**: it pays off on propagation-heavy work (migrations, renames, mass config edits), NOT general single-bug fixing.
+
+**Convergent conclusion across the whole investigation:** the detector is sound (high precision, both synthetic and real) but addresses a failure mode that is rare in the dominant coding-agent benchmark. Two defensible next moves: (a) target a propagation-heavy substrate where the mode is common (migrations/refactors — but those need heavy env infra, see PyMigBench note); or (b) accept the boundary and ship the detector as a precise, low-recall *advisory* tripwire (its original form), NOT an in-loop reflect layer. Recommend (b) unless a propagation-heavy use case becomes a priority. Artifact: results/offline-drift-swebench.json (per-session rows).

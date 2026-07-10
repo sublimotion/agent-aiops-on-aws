@@ -1,0 +1,35 @@
+## Smoke-test resource overrides for the llm-d standalone router.
+## Layer on top of: recipes/router/base.values.yaml + tiered-prefix-cache-cpu.values.yaml
+##
+## The base recipe requests epp=4cpu/8Gi + proxy=4cpu/8Gi = 8cpu/16Gi in ONE pod,
+## which will not fit on the vanilla EKS nodes (3920m/~14.5Gi allocatable, system
+## nodes are tainted). This is a functional smoke test at concurrency ~1, so shrink
+## both containers hard. Restore the base recipe for any throughput benchmark.
+router:
+  epp:
+    resources:
+      requests:
+        cpu: "500m"
+        memory: 1Gi
+      limits:
+        memory: 2Gi
+  proxy:
+    args:
+      - "--service-node"
+      - "envoy-sidecar"
+      - "--log-level"
+      - "warn"
+      - "--concurrency"
+      - "2"
+      - "--drain-strategy"
+      - "immediate"
+      - "--drain-time-s"
+      - "60"
+      - "-c"
+      - "/etc/envoy/envoy.yaml"
+    resources:
+      requests:
+        cpu: "500m"
+        memory: 1Gi
+      limits:
+        memory: 2Gi

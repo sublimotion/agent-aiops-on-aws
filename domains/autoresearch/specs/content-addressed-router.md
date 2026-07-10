@@ -1,6 +1,22 @@
 # Autoresearch Spec: Content-Addressed Router — a pool-agnostic learned router
 
-## Status: DRAFT (2026-06-29)
+## Status: DEFERRED — research-direction doc, not the next run (2026-06-29)
+
+> **Why deferred (pragmatic scoping):** this spec accreted into ~5 papers in one
+> experiment (RouterDC two-tower reproduction + EmbedLLM model-embeddings +
+> unseen-pool transfer + intent-classifier baseline + CMA-ES positional repro +
+> cascade ROI). Most of the *mechanism* is established prior art (see Related
+> work) we agreed not to reinvent, and the trained router is **not even the
+> deployable artifact** — at serving you'd collapse it to a thin upfront
+> classifier or, more likely, ship the no-training **verifier-gated cascade**
+> instead (the thing Trinity actually validated). Per the mechanism-selection
+> framework, a trained router is a narrow **case-3** tool; building this now would
+> be boiling the ocean. **Kept as a well-reasoned, lit-grounded future direction.**
+>
+> **The pragmatic next run instead:** `cheaper-verifier-cascade.md` — one variable
+> changed (swap the frontier verifier for a cheap one), reuses the harness we
+> already built, and directly tests whether the Trinity-validated cascade becomes
+> Pareto-dominant on cost. That ships a deployable result; this doesn't.
 
 ## Overview
 

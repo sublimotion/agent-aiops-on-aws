@@ -1,0 +1,15 @@
+# LMCache config for SGLang IP mode on HyperPod (mounted at /etc/lmcache/config.yaml).
+# Same LMCacheEngineConfig schema the vLLM path uses — SGLang's lmcache_get_config
+# calls LMCacheEngineConfig.from_file(), so remote_url reaches the SageMaker adapter.
+#
+# NOTE: unlike the vLLM blueprint (which also sets extra_config via --kv-transfer-config),
+# SGLang has no such flag — the shm name MUST come from this file's extra_config.
+chunk_size: 256
+local_cpu: true
+max_local_cpu_size: 4
+save_unfull_chunk: true          # deterministic cross-restart L2 hit
+use_layerwise: true              # SGLang IP mode store_layer asserts a layerwise GPU connector
+remote_url: "sagemaker-hyperpod://PLACEHOLDER_NODE_IP:9200"   # patched at runtime from $NODE_IP
+remote_serde: "naive"
+extra_config:
+  sagemaker_hyperpod_shared_memory_name: ai_toolkit_cache
