@@ -1,0 +1,57 @@
+{
+  "timestamp": "2026-07-10T11:12:51Z",
+  "region": "us-west-2",
+  "selected_instance_type": "ml.g6e.xlarge",
+  "fallback_reason": "reused existing dynamo-hyperpod-lmcache cluster; ml.g7.* not accepted by SageMaker HyperPod API",
+  "model": "Qwen/Qwen3-0.6B",
+  "orchestrator": "llm-d",
+  "endpoint": "llm-d standalone router (tpc-epp) -> InferencePool -> vLLM decode",
+  "hyperpod_cluster": "dynamo-hp-lmcache-west-20260709",
+  "eks_cluster": "qn-sglang-eks-cluster",
+  "gpu_node": "hyperpod-i-0ebd814e4a113cdce",
+  "l2_daemon": "sagemaker-hyperpod://10.2.37.31:9200",
+  "shared_memory": "ai_toolkit_cache",
+  "versions": {
+    "llm_d_router_chart": "v0.9.0",
+    "gaie": "v1.5.0",
+    "llm_d_router_epp": "v0.9.0",
+    "vllm": "0.16.0",
+    "lmcache": "0.3.14-gf7b040e8a",
+    "worker_image": "nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.0.1"
+  },
+  "procedure": "store -> rollout restart decode (wipes L0 GPU + L1 CPU) -> replay identical 743-token prefix through the gateway; segment survives via type:File shm mount",
+  "requests": [
+    {
+      "name": "cold_store",
+      "http_status": 200,
+      "e2e_ms": 3374.93,
+      "prompt_tokens": 743,
+      "store_log": "Stored 743 out of total 743 tokens. size: 0.0794 GB, throughput: 8.0256 GB/s"
+    },
+    {
+      "name": "warm_replay_after_restart",
+      "http_status": 200,
+      "e2e_ms": 378.56,
+      "prompt_tokens": 743,
+      "retrieval_log": "Retrieved 743 out of 743 required tokens (from 743 total tokens). throughput: 3.3521 GB/s"
+    }
+  ],
+  "telemetry": {
+    "vllm_external_prefix_cache": {
+      "fresh_pod_at_startup": {"queries_total": 0, "hits_total": 0},
+      "after_replay": {"queries_total": 743, "hits_total": 742},
+      "note": "hits went 0 -> 742 on a pod that started cold after restart; KV can only have come from the ai-toolkit L2 daemon"
+    },
+    "lmcache_hit_log": "Reqid ...: Total tokens 743, Inference Engine computed tokens: 0, LMCache hit tokens: 743, need to load: 742",
+    "external_prefix_cache_hit_rate_pct": 99.9,
+    "latency_speedup": "3374.93 ms cold -> 378.56 ms warm (8.9x)"
+  },
+  "result": "PASS",
+  "notes": [
+    "Core deliverable proven: llm-d-managed vLLM replica (not the HyperPod Inference Operator) writes to and reads from the HyperPod managed L2 daemon via LMCacheConnectorV1.",
+    "L2 hit survived a full pod restart, isolating the source to the ai-toolkit daemon.",
+    "Router co-located on the GPU node to work around a cross-node pod-networking gap between HyperPod and vanilla EKS nodes.",
+    "type:File shm mount (not Directory) required to keep the daemon segment alive across client restarts.",
+    "Stage 6 (two-replica same-node sharing) SKIPPED: ml.g6e.xlarge has a single GPU."
+  ]
+}

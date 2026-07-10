@@ -1,0 +1,15 @@
+# LMCache config for the llm-d vLLM replica on HyperPod.
+# Mounted at /etc/lmcache/config.yaml via the lmcache-config ConfigMap and
+# referenced by env LMCACHE_CONFIG_FILE=/etc/lmcache/config.yaml.
+#
+# The SageMaker HyperPod adapter reads extra_config from THIS file. Without it,
+# the shared-memory name defaults to `shared_memory` and never connects to the
+# ai-toolkit daemon (which uses `ai_toolkit_cache`).
+chunk_size: 256
+local_cpu: true
+max_local_cpu_size: 8
+# save_unfull_chunk is required for a deterministic cross-restart L2 hit (Stage 5).
+# Without it the store→restart→replay proof hits flakily.
+save_unfull_chunk: true
+extra_config:
+  sagemaker_hyperpod_shared_memory_name: ai_toolkit_cache

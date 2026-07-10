@@ -1,0 +1,54 @@
+{
+  "timestamp": "2026-07-10T14:47:22Z",
+  "region": "us-west-2",
+  "selected_instance_type": "ml.g6e.xlarge",
+  "model": "Qwen/Qwen3-0.6B",
+  "engine": "sglang",
+  "orchestrator": "sglang (standalone launch_server)",
+  "hyperpod_cluster": "dynamo-hp-lmcache-west-20260709",
+  "eks_cluster": "qn-sglang-eks-cluster",
+  "gpu_node": "hyperpod-i-0ebd814e4a113cdce",
+  "l2_daemon": "sagemaker-hyperpod://10.2.37.31:9200",
+  "shared_memory": "ai_toolkit_cache",
+  "lmcache_mode": "IP (LMCacheLayerwiseConnector, use_layerwise=true)",
+  "versions": {
+    "sglang_image": "lmsysorg/sglang:latest (Python 3.12, CUDA 13)",
+    "lmcache": "0.5.1 (pip-installed at runtime; CUDA-13 PyPI wheel)",
+    "note": "no custom image build — pip install lmcache in the stock SGLang image"
+  },
+  "setup_steps": [
+    "pip install lmcache (0.5.1, c_ops loads against CUDA13)",
+    "sed patch lmc_radix_cache.py: self._mode = LMCacheMode.MP -> IP",
+    "render lmcache config with remote_url sagemaker-hyperpod://$NODE_IP:9200, use_layerwise: true",
+    "sglang.launch_server --enable-lmcache --lmcache-config-file"
+  ],
+  "procedure": "store 934-token prefix via /generate -> rollout restart SGLang pod (wipes L0/L1) -> replay identical prefix on fresh pod",
+  "requests": [
+    {
+      "name": "cold_store",
+      "prompt_tokens": 934,
+      "store_log": "Stored 934 out of total 934 tokens. size: 0.0998 GB, throughput: 7.9030 GB/s"
+    },
+    {
+      "name": "warm_replay_after_restart",
+      "prompt_tokens": 926,
+      "cached_tokens": 768,
+      "retrieve_log": "LMCache retrieve started: lookup=768, offset=0, retrieve 768 new tokens"
+    }
+  ],
+  "telemetry": {
+    "fresh_pod": "sglang-lmcache-d6b58998c-f2zk8 (created 14:42:44Z, cold L0/L1 after restart)",
+    "cached_tokens_after_restart": 768,
+    "segment_survived_restart": true,
+    "note": "768 cached tokens on a pod started cold after restart -> KV can only have come from the ai-toolkit L2 daemon"
+  },
+  "result": "PASS",
+  "notes": [
+    "SGLang reaches ai-toolkit L2 via LMCache IP mode (NOT HiCache/Mooncake). IP mode forwards the full config incl remote_url to the same SageMakerHyperPodConnectorAdapter the vLLM path uses.",
+    "use_layerwise: true is REQUIRED — SGLang IP store_layer asserts a layerwise GPU connector (assert_layerwise_gpu_connector); without it store_kv fails with AssertionError.",
+    "MP->IP is a one-line source patch (lmc_radix_cache.py line 139); MP mode reads only mp_host/mp_port and does not forward remote_url.",
+    "No custom image needed: stock lmsysorg/sglang (CUDA13) + pip install lmcache (CUDA13 wheel is the PyPI default). Earlier 'CUDA 12 vs 13' blocker was from grafting the dynamo image's CUDA-12 lmcache; pip-installing fresh resolves it.",
+    "Same type:File shm mount + PYTHONHASHSEED=0 + save_unfull_chunk + uid-1000 gotchas as the vLLM path.",
+    "3rd of 3 frameworks proven on HyperPod ai-toolkit L2 (dynamo, llm-d, sglang)."
+  ]
+}

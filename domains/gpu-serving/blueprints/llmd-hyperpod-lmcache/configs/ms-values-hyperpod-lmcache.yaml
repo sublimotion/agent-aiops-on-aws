@@ -1,0 +1,168 @@
+# llm-d modelservice overlay — Qwen3-0.6B on HyperPod, wired to the ai-toolkit
+# managed L2 daemon via LMCacheConnectorV1.
+#
+# Overlay for guides/inference-scheduling/ms-inference-scheduling/values.yaml.
+# Deploy into the llmd-hp-lmcache namespace. Aggregated serving only — no P/D
+# disaggregation (that is the NIXL recipe from the AWS blog, out of scope here).
+#
+# Prereqs (see spec §Serving Stack): EPP SA RBAC, EnvoyExtensionPolicy CRD +
+# controller restart, EnvoyExtensionPolicy messageTimeout>=30s / failOpen:true.
+
+multinode: false
+
+modelArtifacts:
+  uri: "hf://Qwen/Qwen3-0.6B"
+  name: "Qwen/Qwen3-0.6B"
+  size: 5Gi
+  labels:
+    llm-d.ai/inference-serving: "true"
+    llm-d.ai/guide: "inference-scheduling"
+    llm-d.ai/accelerator-variant: "gpu"
+    llm-d.ai/accelerator-vendor: "nvidia"
+    llm-d.ai/model: "Qwen3-0.6B"
+
+routing:
+  proxy:
+    enabled: false        # no P/D disaggregation — colocated replica
+    targetPort: 8000
+
+accelerator:
+  type: nvidia
+
+decode:
+  create: true
+  parallelism:
+    tensor: 1
+    data: 1
+  replicas: 1             # bump to 2 for the same-node cache-sharing stage
+  # Recreate so `rollout restart` fully drops L0/L1 before the replay probe.
+  strategy:
+    type: Recreate
+  monitoring:
+    podmonitor:
+      enabled: true
+      portName: "vllm"
+      path: "/metrics"
+      interval: "30s"
+  nodeSelector:
+    # Update to the resolved instance group: g7-workers | g6e-workers | gpu-workers
+    sagemaker.amazonaws.com/instance-group-name: g6e-workers
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  # ai-toolkit creates /dev/shm/ai_toolkit_cache as 0600 uid 1000; vLLM runs
+  # uid 2000. chmod it before vLLM starts (or unify GID in production).
+  initContainers:
+    - name: fix-shm-perms
+      image: busybox:1.36
+      command: ["sh", "-c", "chmod 666 /dev/shm/ai_toolkit_cache || true"]
+      volumeMounts:
+        - name: shm
+          mountPath: /dev/shm
+  containers:
+    - name: "vllm"
+      # llm-d-aws ships EFA/libfabric + NIXL + a compatible LMCache. Pin to a tag
+      # whose LMCache major.minor matches the running ai-toolkit daemon.
+      image: ghcr.io/llm-d/llm-d-aws:v0.5.1
+      modelCommand: vllmServe
+      args:
+        - "--disable-uvicorn-access-log"
+        - "--gpu-memory-utilization=0.80"
+        - "--enable-prefix-caching"
+        - "--max-model-len"
+        - "8192"
+        # --- L2 integration (LMCacheConnectorV1 → ai-toolkit) ---
+        - "--kv-transfer-config"
+        - '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both","kv_connector_extra_config":{"sagemaker_hyperpod_shared_memory_name":"ai_toolkit_cache"}}'
+      env:
+        # HF_HOME is injected by the chart automatically.
+        - name: LMCACHE_CONFIG_FILE
+          value: "/etc/lmcache/config.yaml"     # adapter reads extra_config + save_unfull_chunk from here
+        - name: LMCACHE_USE_EXPERIMENTAL
+          value: "True"
+        - name: LMCACHE_LOCAL_CPU
+          value: "True"                          # L1 CPU offload
+        - name: LMCACHE_MAX_LOCAL_CPU_SIZE
+          value: "8"
+        - name: LMCACHE_CHUNK_SIZE
+          value: "256"
+        # NODE_IP MUST precede LMCACHE_REMOTE_URL for $(NODE_IP) substitution.
+        - name: NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: LMCACHE_REMOTE_URL
+          value: "sagemaker-hyperpod://$(NODE_IP):9200"   # L2
+        # Stable LMCache keys across replica restarts — required for the replay hit.
+        - name: PYTHONHASHSEED
+          value: "0"
+        # --- L3 FSx (Stage 7): replaces the L2 URL above ---
+        # - name: LMCACHE_REMOTE_URL
+        #   value: "file:///mnt/fsx/llmd-hp-lmcache"
+      ports:
+        - containerPort: 8000
+          name: vllm
+          protocol: TCP
+      resources:
+        limits:
+          cpu: '6'
+          memory: 24Gi
+        requests:
+          cpu: '2'
+          memory: 8Gi
+      mountModelVolume: true
+      volumeMounts:
+        - name: metrics-volume
+          mountPath: /.config
+        - name: shm
+          mountPath: /dev/shm
+        - name: torch-compile-cache
+          mountPath: /.cache
+        - name: lmcache-config
+          mountPath: /etc/lmcache
+        # --- L3 FSx mount (Stage 7) ---
+        # - name: fsx-cache
+        #   mountPath: /mnt/fsx
+      startupProbe:
+        httpGet:
+          path: /v1/models
+          port: vllm
+        initialDelaySeconds: 15
+        periodSeconds: 30
+        timeoutSeconds: 5
+        failureThreshold: 120
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: vllm
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+      readinessProbe:
+        httpGet:
+          path: /v1/models
+          port: vllm
+        periodSeconds: 5
+        timeoutSeconds: 2
+        failureThreshold: 3
+  volumes:
+    - name: metrics-volume
+      emptyDir: {}
+    - name: torch-compile-cache
+      emptyDir: {}
+    # hostPath (not emptyDir) to share POSIX shm with the ai-toolkit daemon.
+    - name: shm
+      hostPath:
+        path: /dev/shm
+        type: Directory
+    - name: lmcache-config
+      configMap:
+        name: lmcache-config
+    # --- L3 FSx volume (Stage 7) ---
+    # - name: fsx-cache
+    #   persistentVolumeClaim:
+    #     claimName: fsx-kvcache
+
+prefill:
+  create: false

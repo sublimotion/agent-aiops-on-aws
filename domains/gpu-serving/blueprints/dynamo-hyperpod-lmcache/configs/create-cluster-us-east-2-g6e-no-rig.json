@@ -1,0 +1,93 @@
+{
+  "ClusterName": "dynamo-hp-lmcache-20260709",
+  "InstanceGroups": [
+    {
+      "InstanceCount": 1,
+      "MinInstanceCount": 1,
+      "InstanceGroupName": "g6e-workers",
+      "InstanceType": "ml.g6e.xlarge",
+      "LifeCycleConfig": {
+        "SourceS3Uri": "s3://sagemaker-hyperpod-dynamo-615299764834-us-east-2/lifecycle",
+        "OnCreate": "on_create.sh"
+      },
+      "ExecutionRole": "arn:aws:iam::615299764834:role/aiops-sagemaker-execution-role",
+      "ThreadsPerCore": 1,
+      "InstanceStorageConfigs": [
+        {
+          "EbsVolumeConfig": {
+            "VolumeSizeInGB": 200
+          }
+        }
+      ]
+    },
+    {
+      "InstanceCount": 2,
+      "MinInstanceCount": 1,
+      "InstanceGroupName": "system-nodes",
+      "InstanceType": "ml.m5.2xlarge",
+      "LifeCycleConfig": {
+        "SourceS3Uri": "s3://sagemaker-hyperpod-dynamo-615299764834-us-east-2/lifecycle",
+        "OnCreate": "on_create.sh"
+      },
+      "ExecutionRole": "arn:aws:iam::615299764834:role/aiops-sagemaker-execution-role",
+      "ThreadsPerCore": 1,
+      "InstanceStorageConfigs": [
+        {
+          "EbsVolumeConfig": {
+            "VolumeSizeInGB": 100
+          }
+        }
+      ],
+      "KubernetesConfig": {
+        "Labels": {
+          "node-role": "system"
+        },
+        "Taints": [
+          {
+            "Key": "node-role",
+            "Value": "system",
+            "Effect": "NoSchedule"
+          }
+        ]
+      }
+    }
+  ],
+  "VpcConfig": {
+    "SecurityGroupIds": [
+      "sg-05896b0f6e63a8bf2"
+    ],
+    "Subnets": [
+      "subnet-0fced510ea62b874e",
+      "subnet-04be09c7bf104edb8",
+      "subnet-03d03f1fb8d62d6a5"
+    ]
+  },
+  "Tags": [
+    {
+      "Key": "Project",
+      "Value": "agent-aiops"
+    },
+    {
+      "Key": "Blueprint",
+      "Value": "dynamo-hyperpod-lmcache"
+    },
+    {
+      "Key": "Model",
+      "Value": "Qwen-Qwen3-0.6B"
+    }
+  ],
+  "Orchestrator": {
+    "Eks": {
+      "ClusterArn": "arn:aws:eks:us-east-2:615299764834:cluster/qwen3-next-bench-eks-cluster"
+    }
+  },
+  "NodeRecovery": "Automatic",
+  "TieredStorageConfig": {
+    "Mode": "Enable",
+    "InstanceMemoryAllocationPercentage": 20
+  },
+  "NodeProvisioningMode": "Continuous",
+  "AutoScaling": {
+    "Mode": "Disable"
+  }
+}

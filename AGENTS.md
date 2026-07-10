@@ -74,7 +74,10 @@ Read these files **on demand** based on what you're doing:
 | `domains/gpu-serving/blueprints/ray-serve-ft/` | `domains/gpu-serving/specs/ray-serve-ft.md` |
 | `domains/gpu-serving/blueprints/ray-serve-video/` | `domains/gpu-serving/specs/ray-serve-video.md` |
 | `domains/gpu-serving/blueprints/llmd-hyperpod/` | `domains/gpu-serving/specs/llmd-hyperpod.md` |
+| `domains/gpu-serving/blueprints/llmd-hyperpod-lmcache/` | `domains/gpu-serving/specs/llmd-hyperpod-lmcache.md` |
 | `domains/gpu-serving/blueprints/dynamo-hyperpod/` | `domains/gpu-serving/specs/dynamo-hyperpod.md` |
+| `domains/gpu-serving/blueprints/dynamo-hyperpod-lmcache/` | `domains/gpu-serving/specs/dynamo-hyperpod-lmcache.md` |
+| `domains/gpu-serving/blueprints/sglang-hyperpod-lmcache/` | `domains/gpu-serving/specs/sglang-hyperpod-lmcache.md` |
 | `domains/gpu-serving/blueprints/gemma4-hyperpod/` | `domains/gpu-serving/specs/gemma4-hyperpod.md` |
 | `domains/gpu-serving/blueprints/gemma4-4b-hyperpod/` | `domains/gpu-serving/specs/gemma4-4b-hyperpod.md` |
 | `domains/gpu-serving/blueprints/mistral-small-4-hyperpod/` | `domains/gpu-serving/specs/mistral-small-4-hyperpod.md` |

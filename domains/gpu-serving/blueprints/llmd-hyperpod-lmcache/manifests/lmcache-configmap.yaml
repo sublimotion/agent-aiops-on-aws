@@ -1,0 +1,17 @@
+# ConfigMap wrapping configs/lmcache-config.yaml.
+# Apply into the llm-d-hp-lmcache namespace before deploying the model service.
+#   kubectl apply -n llm-d-hp-lmcache -f manifests/lmcache-configmap.yaml
+# Keep the `config.yaml` key in sync with configs/lmcache-config.yaml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lmcache-config
+  namespace: llm-d-hp-lmcache
+data:
+  config.yaml: |
+    chunk_size: 256
+    local_cpu: true
+    max_local_cpu_size: 8
+    save_unfull_chunk: true
+    extra_config:
+      sagemaker_hyperpod_shared_memory_name: ai_toolkit_cache
