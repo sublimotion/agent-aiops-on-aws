@@ -27,8 +27,8 @@ benchmark:
 
 ralph_iterations: 1
 
-mdc_learn_commands: []
-gpu_infra_learn_commands: []
+
+learn_commands: []
 ---
 
 # Lessons Learned: Ray Serve Fault Tolerance

@@ -28,14 +28,13 @@ benchmark:
 
 ralph_iterations: null  # not a RALPH deployment (direct run)
 
-mdc_learn_commands:
+
+learn_commands:
   - 'mdc learn minimax-m2 vllm "B200 FP8 correctness CONFIRMED on vLLM 0.19.1rc1 (minimax27 image) with --moe-backend triton + VLLM_USE_FLASHINFER_MOE_FP8=0. Output correct, tool-calling works, NO garbage. REFUTES card blanket "broken on B200" — that claim is NVFP4/SM120-specific, NOT FP8/SM100. Cold start ~35-40min (weight load 25.5min). 2026-06-27."'
   - 'mdc learn minimax-m2 vllm "Pure TP8 UNSUPPORTED per FP8 block-128 divisibility: MoE expert FFN intermediate_size=1536 -> 1536/8=192 (NOT divisible by 128) -> vLLM fails "output_size not divisible by block_n". TP4 valid (1536/4=384, OK). Use TP4+EP or TP4+DP, never raw TP8. 2026-06-27."'
   - 'mdc learn minimax-m2 vllm "Dual reasoning-parser: --reasoning-parser minimax_m2_append_think (keeps think in content, survives multi-turn) vs minimax_m2 (reasoning_content field, lost unless echoed). For agent harness, append_think is the correct default. 2026-06-27."'
   - 'mdc learn minimax-m2 vllm "minimax27 vendor image (vllm/vllm-openai:minimax27) is 0.19.1rc1 (2026-04-11, ~2mo behind stable as of 2026-06-27). Frozen feature branch, not a maintained release. Stock v0.23.0 unvalidated for M2 (missing tokenizer backend). 2026-06-27."'
   - 'mdc learn minimax-m2 vllm "Stock vllm/vllm-openai:v0.23.0 FAILS TO BOOT M2: missing tokenizer backend (sentencepiece/tiktoken). Packaging gap, NOT model-arch incompatibility. Fixable: add the dep via init layer / custom image, OR --tokenizer-mode slow. After fix, correctness+perf on v0.23.0 still OPEN. 2026-06-28."'
-
-gpu_infra_learn_commands: []
 ---
 # MiniMax-M2 (vLLM, 4× B200) — Lessons
 

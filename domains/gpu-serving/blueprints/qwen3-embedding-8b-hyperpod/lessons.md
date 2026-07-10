@@ -27,12 +27,11 @@ benchmark:
 
 ralph_iterations: 10
 
-mdc_learn_commands:
+
+learn_commands:
   - 'mdc learn qwen3-embedding-8b vllm "v0.19.1+ removed --task embed. Use vllm serve <model> — vLLM auto-detects pooling/embed mode from HF sentence-transformers + pooling config. Container manifests need command: [\"vllm\"] override to avoid default entrypoint conflict with the serve subcommand."'
   - 'mdc learn qwen3-embedding-8b vllm "Peak 122.96 req/s at c=32 on ml.g5.4xlarge (A10G BF16). 1h burn-in: 0 errors, +2.49% drift (warm-cache improvement). Cost ~$3.44/M embeddings, ~22x cheaper than commercial APIs at equivalent dimension. T0 eager-no-prefix vs T5 compile+FLASH_ATTN = 21.3x throughput delta at c=32."'
   - 'mdc learn qwen3-embedding-8b vllm --from domains/gpu-serving/blueprints/qwen3-embedding-8b-hyperpod/lessons.md'
-
-gpu_infra_learn_commands:
   - 'gpu-infra learn -c platform "HyperPod per-instance-type cluster quotas default 0-1, separate from EC2. Check: aws service-quotas get-service-quota --service-code sagemaker --quota-code <CODE>. g6e.xlarge=L-DE7D3776, g5.2xlarge=L-596C3331. ~30 min for increase."'
   - 'gpu-infra learn -c k8s "HyperPod pre-installed controllers (cert-manager, fsx-csi, s3-csi, inference-operator) run on YOUR worker nodes, not managed plane. On g5.2xlarge kubelet max-pods=14 they saturate the node with zero workload headroom. Add CPU-only system nodegroup or taint GPU nodes."'
   - 'gpu-infra learn -c platform "Single-AZ HyperPod capacity is fragile. Race multiple candidate instance groups (g5.xlarge, g5.2xlarge, g6e.xlarge) to let first-to-provision win; no CloudTrail RunInstances error surfaces during silent retries."'

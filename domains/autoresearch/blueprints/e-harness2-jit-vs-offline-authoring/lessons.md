@@ -20,8 +20,8 @@ benchmark:
   concurrent_users: null
   gpu_util_pct: null
 ralph_iterations: null
-mdc_learn_commands: []
-gpu_infra_learn_commands: []
+
+learn_commands: []
 ---
 # Lessons — e-harness2-jit-vs-offline-authoring
 

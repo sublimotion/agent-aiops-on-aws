@@ -22,7 +22,8 @@ failure_categories:
   - huggingface_cli_deprecation
   - max_position_embeddings_mismatch
   - tool_call_parser_incompatibility
-mdc_learn_commands:
+
+learn_commands:
   - 'mdc learn qwen3-235b vllm "FP8 block_n=128: moe_intermediate_size=1536 / TP8 = 192, not divisible. TP4 (384) or TP2 (768) work. TP1/TP3 also valid."'
   - 'mdc learn qwen3-235b vllm "max_position_embeddings=40960, NOT 131072. FP8 variant does not include YaRN config. Do not set --max-model-len > 40960."'
   - 'mdc learn qwen3-235b vllm "Use --tool-call-parser hermes (not qwen3_xml). qwen3_xml does not parse <tool_call> tags in vLLM v0.19.1."'
@@ -31,7 +32,6 @@ mdc_learn_commands:
   - 'mdc learn qwen3-235b vllm "TP2+DP4+EP: 17% more peak throughput (13,877 tok/s) but 4.4x worse single-stream and 36x worse cold-start TTFT. Use TP4 unless sustained >256 concurrent."'
   - 'mdc learn qwen3-235b vllm "FLASHINFER_TRTLLM MoE backend selected automatically for FP8. DeepGEMM E8M0 enabled on B300 sm_103."'
   - 'mdc learn qwen3-235b vllm "$0.39/M output tokens at peak (c=512). Break-even vs Sonnet at just 54 engineers. Most cost-efficient self-hosted coding model tested."'
-gpu_infra_learn_commands: []
 ---
 
 # Qwen3-235B-A22B-FP8 on B300 — Lessons Learned

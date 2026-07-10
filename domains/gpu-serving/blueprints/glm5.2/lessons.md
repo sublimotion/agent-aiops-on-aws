@@ -23,15 +23,14 @@ benchmark:
 
 ralph_iterations: 1
 
-mdc_learn_commands:
+
+learn_commands:
   - 'mdc learn GLM-5.2 sglang "fp8-KV is auto-default on SGLang v0.5.13+ — quantization=fp8 auto-resolves kv_cache_dtype=fp8_e4m3"'
   - 'mdc learn GLM-5.2 sglang "Official nvidia/GLM-5.2-NVFP4 regresses ~50% batched throughput vs FP8 on B300 sm_103 (experimental MoE kernel, deferred-finalize disabled). Use FP8 for high-concurrency goodput; NVFP4 only for VRAM-constrained fit or single-stream latency."'
   - 'mdc learn GLM-5.2 sglang "TP4+DP2 layout beats TP8 by +28% @ c256 on B300 8-GPU (7,728→9,271 tok/s @ c320 knee, TTFT p95 8.1s). Batch-scheduling win for high-concurrency MoE."'
   - 'mdc learn GLM-5.2 sglang "Prefix cache is the dominant lever (+347% vs cache-off baseline @ c256). Coding-agent workload with 12K byte-identical prefix → 92% cache hit → regime flips prefill-bound → decode-bound."'
   - 'mdc learn GLM-5.2 sglang "NEXTN MTP spec-decode REGRESSES −12% at the c256 knee (accept-len ~1.6, draft overhead at batch). MTP is a low-QPS latency lever, not for high-concurrency goodput."'
   - 'mdc learn GLM-5.2 sglang "--chunked-prefill-size (MNBT) is regime-dependent: default-16384 wins at the c320 knee WITH prefix cache (+9400 vs 9157 @ c320), opposite of B200 no-cache long-context result where 8192 won. Prefix cache removes prefill pressure MNBT addressed on B200; smaller chunks add overhead when cache already handles the repeated prefix."'
-
-gpu_infra_learn_commands:
   - 'gpu-infra learn -c platform "DCGM PROF metrics unavailable on B300 sm_103 / driver 580.159.03 (dcgmi confirms: DCP module loads but fields 1004/1005 read N/A/0.000, no counter movement). Same class as B200/driver-580 kimi-k2.6-nvfp4 L8. Driver-580 profiling path not functional on Blackwell yet. Use nsys --gpu-metrics-device for HBM-BW/SM/tensor-active sampling at the knee, or fall back to engine gauges + nvidia-smi dmon for coarse bottleneck classification."'
   - 'gpu-infra learn -c platform "B300 cluster EKS node has no GFD/NFD — device plugin needs hand-labeling nvidia.com/gpu.present=true after scale-up before GPUs advertise (same as kimi-k2.6-nvfp4 L1/L7)."'
 ---

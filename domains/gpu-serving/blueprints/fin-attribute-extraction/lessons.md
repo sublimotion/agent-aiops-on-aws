@@ -34,7 +34,8 @@ benchmark:
 ralph_iterations: null  # not a RALPH deployment — benchmark session only
 
 # Ready-to-run commands — copy-paste or let `fe learn` run them automatically
-mdc_learn_commands:
+
+learn_commands:
   - 'mdc learn Qwen/Qwen3.6-35B-A3B vllm "Qwen3.6-35B-A3B (qwen3_5_moe): hybrid Gated-DeltaNet MoE, 256 experts (8 routed), moe_intermediate_size=512, 40 layers, multimodal (vision encoder present). Serves on vLLM 0.22.1. No official FP8 — online --quantization fp8 (per-tensor) works, fits ~32 GB. FP8 ≈ 2× the SLO-safe per-replica rate of bf16 (admission-ceiling bound, not bandwidth)."'
   - 'mdc learn Qwen/Qwen3.6-35B-A3B vllm "Disable thinking per-request with chat_template_kwargs={\"enable_thinking\": False} — default-on thinking emits ~64 tokens that blow tight SLOs (1s target). A regression that re-enables thinking is the single biggest deployment risk for this workload."'
   - 'mdc learn Qwen/Qwen3.6-35B-A3B vllm "Vision-encoder CUTLASS ICE on H200/sm_90 and B200/sm_100 — vit_flash_attn_wrapper to cute.compile crash during ViT profiling. Serve text-only with --limit-mm-per-prompt set to image:0,video:0 to skip ViT. g7e/sm_120 dodged via a different ViT attention path."'
@@ -42,8 +43,6 @@ mdc_learn_commands:
   - 'mdc learn Qwen/Qwen3.6-35B-A3B vllm "FP8 + --data-parallel-size 2 broken on vLLM 0.22.1 for this hybrid GDN MoE — AssertionError: 1 != <ISL> in all-reduce path. bf16 DP=2 works. Workaround: run independent TP1 replicas behind a router (no DP coordinator)."'
   - 'mdc learn Qwen/Qwen3.6-35B-A3B vllm "First-batch JIT brutal — fused_moe_kernel + GDN/causal-conv1d JIT on first unseen shape → 32s cold TTFT, then 93ms warm. Always run warmup pass before benchmarking; cold-start makes server look wedged."'
   - 'mdc learn Qwen/Qwen3.6-35B-A3B vllm "FP8 MoE TP-divisibility: moe_intermediate_size 512 → TP1/2/4 OK (512/TP % 128 == 0), TP8 forbidden (512/8=64). Moot — model fits TP1 with huge headroom; use TP1 replicas."'
-
-gpu_infra_learn_commands:
   - 'gpu-infra learn -c inference "vLLM full-decode CUDA-graph capture (Capturing CUDA graphs (decode, FULL)) is sm-arch-specific for hybrid Gated-DeltaNet MoE. SUCCEEDS on H200 (sm_90) and B200 (sm_100), CRASHES on g7e (sm_120) with AssertionError: 1 != <ISL> on vLLM 0.22.1. The crash is the ~2× per-replica differentiator — g7e launch-bound (SM ~43%) while datacenter parts compute-bound (SM ~99-100%). MoE backend identical (TRITON on all three). Re-test graph-capture per arch before concluding a bigger GPU will not help."'
   - 'gpu-infra learn -c k8s "GPU spot nodegroups on qwen3-next-bench-eks-cluster (us-east-2) launch WITHOUT the node security group (only cluster SG sg-0abb08cf4d13be131). Missing node SG (sg-0bf5ad07fc6c29df1) → ALL pod networking silently broken (cross-node pod-to-pod, FSx mount, in-cluster DNS). Manifests as connection timeouts / DNS failures, not obvious SG error. Fix: attach node SG to instance primary ENI after launch. Applies to both B200 and H200 spot nodegroups."'
   - 'gpu-infra learn -c k8s "GPU nodes with no internet egress + FSx-Lustre CSI mount failure (mount.lustre cannot parse NID, Lustre kmod mismatch on AMI). Pattern: stage weights to FSx from CPU node (has egress + working CSI), serve over HTTP from CPU-node pod (python3 -m http.server), fetch to GPU node emptyDir over pod network with pure-Python downloader (no apt/curl/egress needed). Reference ClusterIP via service IP if in-cluster DNS is flaky. Validated on qwen3-next-bench cluster."'

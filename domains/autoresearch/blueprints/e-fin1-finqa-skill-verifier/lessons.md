@@ -36,14 +36,8 @@ benchmark:
 ralph_iterations: null         # autoresearch experiment (not a RALPH deployment loop)
 
 # Ready-to-run commands — copy-paste or let `fe learn` run them automatically
-mdc_learn_commands: []
-  # No mdc learn commands — this is an autoresearch verification experiment with no
-  # model deployment or serving stack. The lessons are about verification methodology
-  # (verification asymmetry), not model deployment recipes.
 
-gpu_infra_learn_commands: []
-  # No gpu-infra learn commands — this is an API-only experiment with no GPU hardware.
-  # All compute was via Bedrock API (Claude Haiku 4.5, Amazon Nova-Pro).
+learn_commands: []
 ---
 # Lessons — e-fin1-finqa-skill-verifier
 

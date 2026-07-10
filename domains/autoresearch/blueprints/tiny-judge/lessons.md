@@ -4,9 +4,8 @@ engine: scikit-learn
 hardware: cpu-local
 outcome: complete
 failure_categories: []
-mdc_learn_commands: []
-gpu_infra_learn_commands: []
-elevated_to_steering: false
+
+learn_commands: []
 ---
 
 # Tiny Judge — Lessons

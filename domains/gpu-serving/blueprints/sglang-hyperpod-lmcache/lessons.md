@@ -26,10 +26,9 @@ benchmark:
 
 ralph_iterations: null
 
-mdc_learn_commands:
-  - 'mdc learn "Qwen/Qwen3-0.6B" sglang "SGLang -> HyperPod ai-toolkit L2 via LMCache IP mode (NOT HiCache). Stock lmsysorg/sglang (Py3.12/CUDA13) + pip install lmcache (0.5.1, CUDA-13 wheel is PyPI default, no build). Patch lmc_radix_cache.py self._mode MP->IP (MP only forwards mp_host/mp_port, not remote_url). REQUIRE use_layerwise:true in lmcache config or IP store_layer fails assert_layerwise_gpu_connector -> store_kv AssertionError. shm name only settable via config extra_config (no --kv-transfer-config flag). type:File shm mount, PYTHONHASHSEED=0, save_unfull_chunk. Proof: store 934/934 -> restart -> replay cached_tokens=768."'
 
-gpu_infra_learn_commands:
+learn_commands:
+  - 'mdc learn "Qwen/Qwen3-0.6B" sglang "SGLang -> HyperPod ai-toolkit L2 via LMCache IP mode (NOT HiCache). Stock lmsysorg/sglang (Py3.12/CUDA13) + pip install lmcache (0.5.1, CUDA-13 wheel is PyPI default, no build). Patch lmc_radix_cache.py self._mode MP->IP (MP only forwards mp_host/mp_port, not remote_url). REQUIRE use_layerwise:true in lmcache config or IP store_layer fails assert_layerwise_gpu_connector -> store_kv AssertionError. shm name only settable via config extra_config (no --kv-transfer-config flag). type:File shm mount, PYTHONHASHSEED=0, save_unfull_chunk. Proof: store 934/934 -> restart -> replay cached_tokens=768."'
   - 'gpu-infra learn -c platform "SGLang on HyperPod ai-toolkit L2: reuses the same SageMakerHyperPodConnectorAdapter + type:File /dev/shm/ai_toolkit_cache mount as the vLLM engines. SGLang-specific: needs LMCache IP mode (MP->IP source patch) + use_layerwise:true; MP mode dials a standalone lmcache server and never forwards remote_url."'
 ---
 

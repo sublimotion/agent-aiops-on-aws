@@ -26,8 +26,8 @@ benchmark:
 
 ralph_iterations: 3
 
-mdc_learn_commands: []
-gpu_infra_learn_commands:
+
+learn_commands:
   - 'gpu-infra learn -c platform "EKS pods need IMDS hop limit 2 for IAM credentials — aws ec2 modify-instance-metadata-options --http-put-response-hop-limit 2"'
 ---
 

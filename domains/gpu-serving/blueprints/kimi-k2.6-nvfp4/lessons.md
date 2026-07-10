@@ -17,18 +17,17 @@ benchmark:
   knee_concurrency: "1024"
   bottleneck: "decode-compute-saturated (TP8), scheduling-inefficiency resolved by TP4+DP2 (+25%); ~26% prefill-bound (TTFT share)"
   parallelism_winner: "TP4+DP2 (3,187 tok/s @ c=1024) vs TP8 (2,578 tok/s)"
-mdc_learn_commands:
+
+learn_commands:
   - 'mdc learn kimi-k2.6 sglang "NVFP4 requires -cu130 image (cutlass DSL for FP4 kernels); pip install nvidia-cutlass-dsl into cu129 does NOT work"'
   - 'mdc learn kimi-k2.6 sglang "EAGLE3 bf16 draft + FP4 base requires --speculative-draft-model-quantization unquant to avoid FP4-on-bf16 ValueError"'
   - 'mdc learn kimi-k2.6 sglang "Spec decode hurts throughput on compute-bound decode (-12 to -19% c64-512) despite 3.74 accept length — draft competes with batch decode when compute saturated"'
   - 'mdc learn kimi-k2.6 sglang "NVFP4 checkpoint ships fp8 KV by default (kv_cache_scheme:fp8) + group_size 16 (not block_n 128) — fp8-KV flag no-op, fp8-moe-tp-divisibility N/A"'
   - 'mdc learn kimi-k2.6 sglang "TP4+DP2 beats TP8 by +19-25% at high concurrency (c=256-1024) for 1T NVFP4 MoE — TP8 funnels into oversized batch, TP4+DP2 schedules efficiently; always sweep both"'
   - 'mdc learn kimi-k2.6 sglang "4P/4D single-node disagg = 3.8× regression (815 vs 3,138 tok/s TP4+DP2) — SGLang disables prefix cache (disable_radix_cache=True) in disagg decode, loses the 74% cache"'
-gpu_infra_learn_commands:
   - 'gpu-infra learn -c platform "ECC gate for reused spot GPUs: check volatile.total==0 AND remapped_rows.{pending,failure}==No AND uncorrectable==0, NOT lifetime aggregate. Blackwell uses remapped_rows.*, not retired_pages.*"'
   - 'gpu-infra learn -c platform "qwen3-next-bench-eks-cluster: no GFD/NFD -> manual nvidia.com/gpu.present=true + blueprint label per scale-up; taint ai-infra/b200 (not nvidia.com/gpu); dnsPolicy:Default for egress; NVMe raw (RAID-0); node role lacks S3 write; DCGM profiling unavailable on driver-580 (use engine gauges); mountPropagation: HostToContainer for post-kubelet NVMe mounts"'
   - 'gpu-infra learn -c inference "SGLang disagg transport: mooncake picks TCP on no-IB (ignores NVLink); use NIXL for same-node. UCX_TLS needs sm,self,tcp for control-plane, not just cuda_copy,cuda_ipc. CUDA_VISIBLE_DEVICES conflicts with --base-gpu-id (pick one)"'
-ralph_iterations: null
 ---
 
 # Kimi K2.6 NVFP4 — Lessons Learned

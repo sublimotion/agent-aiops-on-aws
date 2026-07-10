@@ -23,11 +23,10 @@ benchmark:
 
 ralph_iterations: null
 
-mdc_learn_commands:
+
+learn_commands:
   - 'mdc learn "Qwen/Qwen3-0.6B" vllm "SageMaker HyperPod ai-toolkit L2 via LMCacheConnectorV1: requires type:File shm mount (/dev/shm/ai_toolkit_cache), not Directory — Directory mount lets terminating client shm_unlink poison daemon segment. Set sagemaker_hyperpod_shared_memory_name in BOTH kv_connector_extra_config AND LMCACHE_CONFIG_FILE extra_config. PYTHONHASHSEED=0 + save_unfull_chunk:true for deterministic cross-restart hits. Worker image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.0.1 (vLLM 0.16.0 + LMCache 0.3.14, has SageMakerHyperPodConnectorAdapter)."'
   - 'mdc learn "Qwen/Qwen3-0.6B" llmd "llm-d on SageMaker HyperPod with ai-toolkit L2 via vLLM LMCacheConnectorV1: use GAIE v1.5.0 + llm-d-router-standalone chart (tiered-prefix-cache path). Cross-node pod networking may be blocked (HyperPod GPU node ↔ vanilla EKS nodes) — co-locate router on GPU node if data plane fails."'
-
-gpu_infra_learn_commands:
   - 'gpu-infra learn -c platform "SageMaker HyperPod ai-toolkit tiered-storage daemon: mount the shm segment FILE (/dev/shm/ai_toolkit_cache) with type:File, NOT whole /dev/shm as Directory. Directory mount lets a terminating LMCache client shm_unlink the daemon-owned segment; daemon (create=False) never recreates it → health check fails → all store/lookup silently skipped. Recovery: scale clients to 0 → delete daemon pod (init container recreates segment) → scale clients back. Worker must run uid 1000 or chmod 666. Observed: dynamo-hyperpod-lmcache + llmd-hyperpod-lmcache."'
 ---
 

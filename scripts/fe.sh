@@ -23,8 +23,6 @@ usage() {
 fe $FE_VERSION — Field Engineer AI CLI
 
 Commands:
-  fe card <model> [--engine <engine>]   Look up model deployment card
-  fe card --hardware <instance>         Look up GPU infrastructure card
   fe learn <blueprint-path>             Run learn commands from lessons.md frontmatter
   fe contribute <blueprint-path>        Generate community contribution PR template
   fe agent <launch|status|logs|attach|stop|ls> [args]
@@ -32,8 +30,6 @@ Commands:
   fe help                               Show this help
 
 Examples:
-  fe card glm-5 --engine sglang
-  fe card --hardware p6-b200
   fe learn domains/gpu-serving/blueprints/glm5/
   fe contribute domains/gpu-serving/blueprints/glm5/
 
@@ -83,37 +79,6 @@ else:
 PYEOF
 }
 
-cmd_card() {
-  local hardware_mode=false
-  local model=""
-  local engine=""
-
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --hardware) hardware_mode=true; shift; hardware="$1"; shift ;;
-      --engine)   shift; engine="$1"; shift ;;
-      *)          model="$1"; shift ;;
-    esac
-  done
-
-  if $hardware_mode; then
-    echo "→ GPU infrastructure card: $hardware"
-    echo ""
-    gpu-infra card "$hardware"
-  elif [[ -n "$model" ]]; then
-    echo "→ Model deployment card: $model${engine:+ ($engine)}"
-    echo ""
-    if [[ -n "$engine" ]]; then
-      mdc get "$model" --engine "$engine"
-    else
-      mdc get "$model"
-    fi
-  else
-    echo "Usage: fe card <model> [--engine <engine>]" >&2
-    echo "       fe card --hardware <instance>" >&2
-    exit 1
-  fi
-}
 
 cmd_learn() {
   local blueprint_path="${1:-}"
@@ -327,7 +292,6 @@ cmd_agent() {
 
 # Main dispatch
 case "${1:-help}" in
-  card)        shift; cmd_card "$@" ;;
   learn)       shift; cmd_learn "$@" ;;
   contribute)  shift; cmd_contribute "$@" ;;
   agent)       shift; cmd_agent "$@" ;;

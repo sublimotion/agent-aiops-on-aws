@@ -7,12 +7,12 @@ failure_categories:
   - image_compatibility
   - disk_pressure
   - kubeconfig_context_switch
-mdc_learn_commands:
+
+learn_commands:
   - 'mdc learn gemma-4-E4B vllm "Use vllm/vllm-openai:gemma4 image — standard tags lack gemma4 model_type support"'
   - 'mdc learn gemma-4-E4B vllm "Model is ungated (no HF_TOKEN needed). head_dim heterogeneity (256/512) forces TRITON_ATTN backend"'
   - 'mdc learn gemma-4-E4B vllm "tool_choice:required works perfectly (100% BFCL). auto mode outputs tools in content text instead of structured format"'
   - 'mdc learn gemma-4-E4B vllm "15.16 GiB GPU memory BF16, 53s load, 47s compile. 3.58 GiB KV cache, 39K tokens, ~6x concurrency at 32K"'
-gpu_infra_learn_commands:
   - 'gpu-infra learn -c platform "HyperPod stale disk-pressure: restart kubelet via kubectl debug node to clear after large image pulls"'
   - 'gpu-infra learn -c platform "HyperPod GPU pods need 3 tolerations: RestrictedNode, nvidia.com/gpu, disk-pressure"'
 ---

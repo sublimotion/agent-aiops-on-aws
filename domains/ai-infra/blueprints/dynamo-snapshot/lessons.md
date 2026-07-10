@@ -28,9 +28,8 @@ benchmark:
 
 ralph_iterations: null            # manual primitive validation, not a RALPH loop
 
-mdc_learn_commands: []            # no model-specific lessons to feed back
 
-gpu_infra_learn_commands:
+learn_commands:
   - 'gpu-infra learn -c platform "g6.xlarge (L4 sm_89) + driver 595.71.05 + CRIU 4.2 PR#3021: single-GPU CRIU+cuda-checkpoint works. 1.69s restore, token-ID byte-identical. Artifact sizing ~3 GiB fixed overhead. 2026-05-30."'
   - 'gpu-infra learn -c platform "p5e.48xlarge (H200 sm_90): multi-GPU bare-metal CRIU blocked. Driver opens 51 fds to all /dev/nvidiaN; cuda_plugin lacks HANDLE_DEVICE_FD. Needs containerized execution (nvidia-container-runtime --gpus device=0). 2026-05-30."'
   - 'gpu-infra learn -c driver "NVIDIA driver 580.xx+ required for cuda-checkpoint. R555 insufficient. Validated with 595.71.05 on AL2023 AMI. 2026-05-30."'

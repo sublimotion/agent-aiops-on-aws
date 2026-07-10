@@ -5,8 +5,8 @@ engine: n/a
 hardware: local-cpu (python3.13 + scikit-learn 1.8.0)
 outcome: complete
 failure_categories: []
-mdc_learn_commands: []
-gpu_infra_learn_commands: []
+
+learn_commands: []
 ---
 
 # Lessons — e-harness1-harness-behavioral-interaction

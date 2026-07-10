@@ -69,14 +69,9 @@ benchmark:
 ralph_iterations: null  # how many RALPH loop iterations to reach success (1 = first try)
 
 # Ready-to-run commands — copy-paste or let `fe learn` run them automatically
-mdc_learn_commands: []
-  # - 'mdc learn <model> <engine> "<lesson>"'
-  # - 'mdc learn <model> <engine> --from domains/<domain>/blueprints/<name>/lessons.md'
-
-gpu_infra_learn_commands: []
-  # - 'gpu-infra learn -c nccl "<lesson>"'
-  # - 'gpu-infra learn -c platform "<lesson>"'
-  # - 'gpu-infra learn -c ami "<lesson>"'
+# Use whatever card system you've plugged in (see docs/card-format.md)
+learn_commands: []
+  # - 'my-card-tool learn <model> <engine> "<lesson>"'
 ---
 ```
 
@@ -99,7 +94,7 @@ gpu_infra_learn_commands: []
 
 ## Card format (model deployment cards)
 
-Model deployment cards live in the `model-deployment-card` repo (`mdc`). Format:
+Model deployment cards cover model-specific deployment knowledge. Format:
 
 ```yaml
 ---
@@ -112,11 +107,11 @@ validation_count: 3
 ---
 ```
 
-Card body contains: launch command, known issues, upstream PR tracking, benchmark reference.
+Card body contains: launch command, known issues, benchmark reference.
 
 ## Card format (GPU infrastructure cards)
 
-GPU infra cards live in the `gpu-infra-troubleshooting` repo. Format:
+GPU infra cards cover hardware-specific deployment knowledge. Format:
 
 ```yaml
 ---
@@ -134,3 +129,5 @@ last_validated: 2026-03-10
 ```
 
 Card body contains: architecture notes, EFA config, NCCL requirements, AMI requirements, known failure patterns.
+
+Community cards are available at https://github.com/field-engineer-ai/cards
