@@ -15,6 +15,7 @@
     --accent-green: #3fb950;
     --accent-purple: #bc8cff;
     --accent-orange: #d29922;
+    --accent-cyan: #39c5cf;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -87,6 +88,7 @@
   .badge-agent-runtime { background: rgba(188, 140, 255, 0.15); color: var(--accent-purple); }
   .badge-research { background: rgba(63, 185, 80, 0.15); color: var(--accent-green); }
   .badge-overview { background: rgba(210, 153, 34, 0.15); color: var(--accent-orange); }
+  .badge-ai-infra { background: rgba(57, 197, 207, 0.15); color: var(--accent-cyan); }
   .subgroup-label {
     grid-column: 1 / -1;
     font-size: 0.75rem;
@@ -200,6 +202,7 @@
     <button class="filter-btn active" data-filter="all">All</button>
     <button class="filter-btn active" data-filter="gpu-serving">GPU Serving</button>
     <button class="filter-btn active" data-filter="autoresearch">Autoresearch</button>
+    <button class="filter-btn active" data-filter="ai-infra">AI Infra</button>
     <button class="filter-btn active" data-filter="overview">Cross-Domain</button>
   </div>
 </header>
@@ -405,6 +408,25 @@
       <div class="card-title">Finetuning Recipes</div>
       <div class="card-desc">Finetuning configuration benchmarks</div>
       <div class="card-meta"><span>finetuning-recipes</span></div>
+    </a>
+  </div>
+</section>
+
+<section class="domain" data-domain="ai-infra">
+  <div class="domain-header">
+    <h2>AI Infra</h2>
+    <span class="domain-badge badge-ai-infra">ai-infra</span>
+  </div>
+  <div class="cards">
+    <a class="card" data-id="cold-start-progress" href="reports/cold-start-progress-report.html">
+      <div class="card-title">Cold-Start Optimization Lab</div>
+      <div class="card-desc">Six experiments measured &mdash; EBS-snapshot compile cache survives node termination and delivers AOT HIT on a fresh B200 in &lt;25s of attach overhead</div>
+      <div class="card-meta"><span>2026-05-31</span><span>ai-infra</span></div>
+    </a>
+    <a class="card" data-id="cold-start-explainer" href="reports/cold-start-explainer.html">
+      <div class="card-title">Cold Start, Explained</div>
+      <div class="card-desc">A tutorial on GPU LLM serving latency &mdash; why a 700&nbsp;GB redeploy makes the first user wait 16 minutes, and which lever attacks each bottleneck</div>
+      <div class="card-meta"><span>2026-06-01</span><span>ai-infra</span></div>
     </a>
   </div>
 </section>

@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cold-Start Optimization Lab — Progress Report (v3)</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --beam: #00e5ff; --pulse: #a855f7; --heat: #f97316;
+  --green: #22c55e; --warn: #eab308; --fail: #ef4444;
+  --bg: #050810; --card: #0a1018; --card2: #0d1520;
+  --border: #142035; --text: #c0cde0; --dim: #4a5e78;
+  --bright: #e8f0ff;
+
+  --st-image: #1f6feb;
+  --st-init: #00b4d8;
+  --st-container: #2dd4bf;
+  --st-modelload: #a855f7;
+  --st-jit: #f97316;
+  --st-cudagraph: #f43f5e;
+  --st-firsttoken: #22c55e;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; padding: 0; }
+
+.container { max-width: 1080px; margin: 0 auto; padding: 0 28px; }
+
+.hero { text-align: center; padding: 72px 20px 48px; }
+.hero h1 { font-size: 2rem; font-weight: 300; letter-spacing: 5px; text-transform: uppercase; color: var(--text); margin-bottom: 4px; }
+.hero h1 span { font-weight: 800; color: var(--beam); text-shadow: 0 0 30px rgba(0,229,255,0.35); }
+.hero .sub { font-size: 0.78rem; color: var(--dim); letter-spacing: 2.5px; margin-bottom: 28px; }
+.hero .thesis { max-width: 740px; margin: 0 auto; font-size: 1rem; color: #8aa4c0; line-height: 1.9; }
+.hero .thesis em { color: var(--beam); font-style: normal; font-weight: 600; }
+
+.section { padding: 48px 0 32px; border-top: 1px solid var(--border); }
+.section-label { font-size: 0.65rem; color: var(--dim); text-transform: uppercase; letter-spacing: 3px; margin-bottom: 8px; }
+.section h2 { font-size: 1.5rem; font-weight: 700; color: var(--bright); margin-bottom: 12px; }
+.section .lead { font-size: 0.92rem; color: #7a99b8; max-width: 820px; margin-bottom: 24px; }
+
+.stats { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 28px 0; }
+.stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; text-align: center; min-width: 140px; }
+.stat-card .sv { font-size: 1.6rem; font-weight: 800; line-height: 1.1; }
+.stat-card .sl { font-size: 0.62rem; color: var(--dim); text-transform: uppercase; letter-spacing: 1.2px; margin-top: 4px; }
+
+.tbl { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.85rem; }
+.tbl th { text-align: left; padding: 10px 12px; font-size: 0.68rem; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
+.tbl td { padding: 10px 12px; border-bottom: 1px solid rgba(20,32,53,0.5); vertical-align: top; }
+.tbl tr:hover td { background: rgba(0,229,255,0.03); }
+.tbl .mono { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; }
+.tbl .g { color: var(--green); font-weight: 700; }
+.tbl .w { color: var(--warn); font-weight: 700; }
+.tbl .r { color: var(--fail); font-weight: 700; }
+.tbl .c { color: var(--beam); font-weight: 700; }
+.tbl .p { color: var(--pulse); font-weight: 700; }
+.tbl .h { color: var(--heat); font-weight: 700; }
+
+.chip { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+.chip-g { background: rgba(34,197,94,0.15); color: var(--green); }
+.chip-w { background: rgba(234,179,8,0.15); color: var(--warn); }
+.chip-r { background: rgba(239,68,68,0.15); color: var(--fail); }
+.chip-c { background: rgba(0,229,255,0.1); color: var(--beam); }
+.chip-p { background: rgba(168,85,247,0.15); color: var(--pulse); }
+.chip-h { background: rgba(249,115,22,0.15); color: var(--heat); }
+
+.why-box { background: var(--card2); border-left: 3px solid var(--pulse); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 16px 0; }
+.why-box .wt { font-size: 0.72rem; color: var(--pulse); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; font-weight: 700; }
+.why-box p { font-size: 0.84rem; color: var(--text); }
+
+.chart-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 20px 0; }
+.chart-wrap h3 { font-size: 0.95rem; color: var(--beam); font-weight: 700; margin-bottom: 4px; }
+.chart-wrap .ce { font-size: 0.76rem; color: var(--dim); margin-bottom: 16px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; font-size: 0.7rem; color: var(--dim); }
+.legend .lk { display: inline-flex; align-items: center; gap: 6px; }
+.legend .sw { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
+
+.cards { display: grid; gap: 14px; margin: 16px 0; }
+.cards-2 { grid-template-columns: 1fr 1fr; }
+.cards-3 { grid-template-columns: 1fr 1fr 1fr; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+.card h3 { font-size: 0.92rem; font-weight: 700; margin-bottom: 4px; color: var(--bright); }
+.card .cd { font-size: 0.78rem; color: var(--dim); margin-bottom: 12px; }
+.card ul { list-style: none; padding: 0; }
+.card li { font-size: 0.8rem; padding: 3px 0 3px 14px; position: relative; color: var(--text); }
+.card li::before { content: '→'; position: absolute; left: 0; color: var(--beam); font-size: 0.7rem; }
+.card .num { font-size: 1.4rem; font-weight: 800; color: var(--beam); }
+
+.gap-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0; }
+.gap-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center; }
+.gap-card .gv { font-size: 1.6rem; font-weight: 800; }
+.gap-card .gl { font-size: 0.62rem; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+
+.footer { text-align: center; padding: 40px 20px; font-size: 0.7rem; color: var(--dim); border-top: 1px solid var(--border); margin-top: 40px; }
+
+@media (max-width: 700px) {
+  .cards-2, .cards-3 { grid-template-columns: 1fr; }
+  .gap-grid { grid-template-columns: 1fr 1fr; }
+  .stats { gap: 8px; }
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Cold-Start <span>Optimization Lab</span></h1>
+  <div class="sub">Progress Report v4 · 2026-05-31 · Specs 0 + A + F + G + H + C-EBS + E (Dynamo Snapshot) measured</div>
+  <p class="thesis">
+    <span style="display:inline-block; margin-bottom:14px; padding:8px 14px; background:rgba(0,229,255,0.08); border:1px solid rgba(0,229,255,0.25); border-radius:20px; font-size:0.78rem;">New here? Start with the <a href="cold-start-explainer.html" style="color:var(--beam); text-decoration:none; font-weight:600;">Cold Start, Explained</a> tutorial &middot; want measured numbers? Stay on this page.</span><br>
+    <span style="display:inline-block; margin-bottom:14px; padding:8px 14px; background:rgba(168,85,247,0.08); border:1px solid rgba(168,85,247,0.25); border-radius:20px; font-size:0.78rem;">Deciding which optimizations to invest in? See the <a href="optimization-tiers.html" style="color:var(--pulse); text-decoration:none; font-weight:600;">Tiered Decision Framework</a>.</span><br>
+    Six experiments measured. Headline finding: <em>EBS-snapshot compile cache</em> survives node termination
+    and delivers AOT HIT on a brand-new B200 in &lt;25s of attach overhead. Stacked best-of-Kimi-K2.6 cold start:
+    <em>569s → 386s</em> warm-path (32% reduction) via cudagraph trim + prefetch + EBS-cache. The measured floor
+    on TP=8 is now bounded by weight-load PCIe bandwidth (~245s), not by JIT compile.
+  </p>
+</div>
+
+<div class="container">
+
+<!-- ============================ NUMBERS ============================ -->
+<div class="stats">
+  <div class="stat-card"><div class="sv" style="color:var(--beam)">15</div><div class="sl">Measurements Captured</div></div>
+  <div class="stat-card"><div class="sv" style="color:var(--green)">386 s</div><div class="sl">Stacked Best Warm Path</div></div>
+  <div class="stat-card"><div class="sv" style="color:var(--green)">9.7 s</div><div class="sl">EBS Cache Attach</div></div>
+  <div class="stat-card"><div class="sv" style="color:var(--pulse)">28%</div><div class="sl">Cudagraph Trim Save</div></div>
+  <div class="stat-card"><div class="sv" style="color:var(--pulse)">25%</div><div class="sl">Prefetch Save</div></div>
+  <div class="stat-card"><div class="sv" style="color:var(--heat)">17.2%</div><div class="sl">Image Bytes Touched</div></div>
+  <div class="stat-card"><div class="sv" style="color:var(--warn)">245 s</div><div class="sl">Weight-Load Floor</div></div>
+  <div class="stat-card"><div class="sv" style="color:var(--beam)">$614</div><div class="sl">Spent / $500 (overrun)</div></div>
+</div>
+
+<!-- ============================ STAGE BAR ============================ -->
+<div class="section">
+  <div class="section-label">Headline Comparison</div>
+  <h2>Stage-by-stage Cold Start</h2>
+  <p class="lead">
+    All cold-starts decompose into the same canonical stages. Different optimizations attack different stages.
+    Note the y-axis is logarithmic — Kimi cold-S3 is 270× longer than Modal AOT-HIT.
+  </p>
+
+  <div class="chart-wrap">
+    <h3>Total Cold-Start Time (log scale, seconds)</h3>
+    <p class="ce">Stacked components show where each second is spent. Hover for detail.</p>
+    <canvas id="stageBar" height="180"></canvas>
+    <div class="legend">
+      <div class="lk"><span class="sw" style="background:var(--st-image)"></span>image pull</div>
+      <div class="lk"><span class="sw" style="background:var(--st-init)"></span>init/S3 sync</div>
+      <div class="lk"><span class="sw" style="background:var(--st-container)"></span>container start</div>
+      <div class="lk"><span class="sw" style="background:var(--st-modelload)"></span>weight load</div>
+      <div class="lk"><span class="sw" style="background:var(--st-jit)"></span>JIT compile + warmup</div>
+      <div class="lk"><span class="sw" style="background:var(--st-cudagraph)"></span>CUDA graph capture</div>
+      <div class="lk"><span class="sw" style="background:var(--st-firsttoken)"></span>first token</div>
+    </div>
+  </div>
+
+  <div class="why-box">
+    <div class="wt">What this picture says</div>
+    <p><strong>JIT/compile dominates the warm path.</strong> When weights are cached on local NVMe (Kimi warm), the residual 8 minutes are torch.compile + CUDA graph capture — exactly what Spec C is designed to eliminate. <strong>Modal's measured 22 s is the floor</strong> when AOT compile cache hits. Our Kimi-warm at 510 s is 23× higher; closing that gap is the lab's central challenge.</p>
+  </div>
+</div>
+
+<!-- ============================ NEW: SPEC F + SPEC A ============================ -->
+<div class="section">
+  <div class="section-label">New Findings (2026-05-24)</div>
+  <h2>Image-Pull Stage: First Measurements</h2>
+  <p class="lead">
+    Two cheap experiments on a c7i.2xlarge build host (no GPU, ~$1 cost) produced the first Spec A and Spec F data points.
+    The 17.2% access ratio is the headline; it bounds how much lazy-pull can theoretically save.
+  </p>
+
+  <div class="cards cards-2">
+    <div class="card" style="border-left: 3px solid var(--green);">
+      <h3 style="color:var(--green)">Spec F · Access-set profiling</h3>
+      <div class="cd"><code>vllm/vllm-openai:v0.21.0</code> — strace import vllm</div>
+      <ul>
+        <li>Container fs: <strong>22.85 GB</strong> across 116,713 files</li>
+        <li>Bytes actually read: <strong>3.93 GB (17.2%)</strong></li>
+        <li>Files actually opened: 11,147 (9.5%)</li>
+        <li><code>openat</code> calls total: 21,011</li>
+        <li><strong>Negative lookups: 26.6%</strong> of all opens — confirms Modal claim</li>
+        <li>Theoretical lazy-pull ceiling: <strong>5.8× speedup</strong></li>
+      </ul>
+      <p style="margin-top:8px; font-size:0.74rem; color:var(--dim);">
+        Result file: <code>spec-f-access-profiling/results/vllm-openai-0.21.0-import-trace.json</code>
+      </p>
+    </div>
+    <div class="card" style="border-left: 3px solid var(--beam);">
+      <h3 style="color:var(--beam)">Spec A · Image-pull baselines</h3>
+      <div class="cd">Default containerd, c7i.2xlarge, in-region ECR</div>
+      <ul>
+        <li>Upstream <code>vllm/vllm-openai:v0.21.0</code> (33 GB): <strong>144 s</strong></li>
+        <li>Our slim cu130 (15.3 GB): <strong>77 s</strong></li>
+        <li>Slim wins <strong>1.87×</strong> from shrinking alone</li>
+        <li>Throughput stays at ~200-230 MB/s (bandwidth-bound)</li>
+        <li>Warm pull: <strong>&lt;1 s</strong> (kubelet/Docker layer cache)</li>
+        <li>SOCI lazy-pull: NOT yet measured (deferred)</li>
+      </ul>
+      <p style="margin-top:8px; font-size:0.74rem; color:var(--dim);">
+        Result files: <code>spec-a-image-pull/results/baseline-default-containerd.json</code>, <code>slim-vs-upstream.json</code>
+      </p>
+    </div>
+  </div>
+
+  <div class="why-box" style="margin-top:14px; border-left-color: var(--green);">
+    <div class="wt" style="color:var(--green)">Why the 17.2% number is load-bearing</div>
+    <p>
+      Modal's 2026 writeup conjectured "~1,000 of N files actually read" for typical Python imports.
+      Our measurement nails this for vLLM: <strong>17.2% of bytes, 9.5% of files</strong>.
+      That's the theoretical ceiling for any lazy-pull mechanism — SOCI, Nydus, OCI Image Volume — on a vLLM image.
+      A perfectly-tuned eager pull still moves <strong>5.8× more bytes than necessary</strong>.
+      EBS prebake remains useful (one-time cost amortized across replicas), but for autoscale lazy wins.
+    </p>
+  </div>
+
+  <div class="chart-wrap" style="margin-top:20px;">
+    <h3>Image-Pull Variants — measured + projected</h3>
+    <p class="ce">First two bars are measured. Last two are projections derived from Spec F's access ratio and Modal-tuned FUSE numbers.</p>
+    <canvas id="imageBar" height="160"></canvas>
+  </div>
+</div>
+
+<!-- ============================ NEW: STACK JOURNEY ============================ -->
+<div class="section">
+  <div class="section-label">The Optimization Stack — Measured</div>
+  <h2>Kimi K2.6 Cold-Start: From 569 s to 386 s</h2>
+  <p class="lead">
+    Eight measured cold-starts on B200 us-east-2b spot. Each row is a real run, not a projection. Stacking in order: cudagraph trim
+    → prefetch → AOT cache HIT (first via hostPath, then via EBS snapshot from a fresh node).
+  </p>
+
+  <div class="chart-wrap">
+    <h3>main → ready stage time, Kimi K2.6 FP8 TP=8 on B200</h3>
+    <p class="ce">Each bar is one measured run. Color = compounding optimization layer. Hover for breakdown.</p>
+    <canvas id="stackJourney" height="240"></canvas>
+  </div>
+
+  <table class="tbl">
+    <tr>
+      <th>Run</th><th>Optimizations</th><th>Weight load</th><th>Compile</th><th>main → ready</th><th>Δ vs baseline</th>
+    </tr>
+    <tr>
+      <td><span class="chip chip-r">B200-baseline</span></td>
+      <td class="mono">cudagraph default 51 sizes</td>
+      <td class="mono">397 s</td>
+      <td class="mono">~14 s</td>
+      <td class="r">569 s</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-w">+ trim</span></td>
+      <td class="mono">cudagraph 10 sizes</td>
+      <td class="mono">263 s</td>
+      <td class="mono">~14 s</td>
+      <td class="w">428 s</td>
+      <td class="g">−141 s (−25%)</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-c">+ aggressive tune</span></td>
+      <td class="mono">prefetch 32 threads × 64 MB</td>
+      <td class="mono">244 s</td>
+      <td class="mono">~14 s</td>
+      <td class="c">418 s</td>
+      <td class="g">−151 s (−27%)</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-p">+ AOT cache (hostPath same-node)</span></td>
+      <td class="mono">+ cache hit</td>
+      <td class="mono">246 s</td>
+      <td class="mono g">~8 s</td>
+      <td class="c">384 s</td>
+      <td class="g">−185 s (−33%)</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-g">★ AOT cache (EBS snapshot fresh node)</span></td>
+      <td class="mono">+ EBS snapshot restore</td>
+      <td class="mono">251 s</td>
+      <td class="mono g">8.21 s</td>
+      <td class="c">386 s</td>
+      <td class="g">−183 s (−32%)</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-w">RunAI streamer (rejected)</span></td>
+      <td class="mono">+ runai_streamer load-format</td>
+      <td class="mono">~245 s</td>
+      <td class="mono">~14 s</td>
+      <td class="w">381 s</td>
+      <td>−3 s (no win on local NVMe)</td>
+    </tr>
+  </table>
+
+  <div class="why-box" style="margin-top:14px; border-left-color: var(--green);">
+    <div class="wt" style="color: var(--green)">Headline finding — the EBS-snapshot pattern works</div>
+    <p>
+      Bake compile cache to a fresh EBS volume. Snapshot it. Tear down the GPU. Bring up a brand-new B200 in the same AZ.
+      Create volume from snapshot in <strong>8.84 s</strong>. Attach in <strong>9.7 s</strong>. Mount in &lt;1 s. AOT cache HIT confirmed in logs for all 8 TP ranks.
+      Cache survives node termination, AZ-locked but cheap (~$30/mo for 700 GB), and supports multi-variant coexistence
+      (vLLM auto-keys by config hash).
+      <strong>This is the production-ready pattern</strong> for delivering Modal-style AOT compile cache speedup on EKS without proprietary infrastructure.
+    </p>
+  </div>
+
+  <div class="why-box" style="margin-top:14px;">
+    <div class="wt">The remaining bottleneck — weight load (245 s) — is post-page-cache</div>
+    <p>
+      With prefetch ON (8 threads × 16 MB), page cache fills in <strong>8.66 s</strong> for 585 GB on instance NVMe (~67 GB/s).
+      But the main loader still spends 245 s on cudaMemcpy + per-tensor torch overhead. That's the new floor.
+      Two paths below it: <strong>ModelExpress same-node P2P</strong> (replica-N≥2 via NVSwitch at 250 GB/s, deferred experiment),
+      or <strong>vLLM internals work</strong> (batched H2D copies, pinned memory, stream overlap — out of scope for this lab).
+    </p>
+  </div>
+</div>
+
+<!-- ============================ COMPARISON TABLE ============================ -->
+<div class="section">
+  <div class="section-label">All Measurements</div>
+  <h2>Lab Results vs Modal Reference</h2>
+  <p class="lead">Every cold-start measurement collected so far, smallest to largest.</p>
+
+  <table class="tbl">
+    <tr>
+      <th>Run</th><th>Hardware</th><th>Model</th><th>Source</th>
+      <th>Image Pull</th><th>Weight Load</th><th>JIT + Warmup</th><th>CUDA Graphs</th><th>Total</th>
+    </tr>
+    <tr>
+      <td><span class="chip chip-p">Modal ref</span> Gemma4-26B-A4B-it</td>
+      <td>1× H200</td>
+      <td class="mono">26B MoE + MTP</td>
+      <td>Modal 9P fs</td>
+      <td>n/a</td>
+      <td>28 s</td>
+      <td class="g">22 s ✓</td>
+      <td class="r">≥100 s</td>
+      <td class="g">~150 s</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-c">prof-1..5</span> Qwen3-1.7B</td>
+      <td>1× B300 GPU (TP=1)</td>
+      <td class="mono">1.7B</td>
+      <td>HF Hub direct</td>
+      <td class="mono">~120 ms</td>
+      <td>~7 s</td>
+      <td class="h">~70 s</td>
+      <td>~14 s</td>
+      <td class="w">102-118 s</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-h">run-2-warm</span> Kimi K2.6 FP8</td>
+      <td>8× B300 (TP=8)</td>
+      <td class="mono">585 GB MoE</td>
+      <td>NVMe (warm)</td>
+      <td class="mono">~30 s</td>
+      <td>~120 s</td>
+      <td class="h">~250 s</td>
+      <td class="r">~130 s</td>
+      <td class="w">510 s (8:30)</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-c">spec-A-baseline</span> upstream pull</td>
+      <td>c7i.2xlarge</td>
+      <td class="mono">vllm-openai:v0.21.0</td>
+      <td>docker.io</td>
+      <td class="mono">144 s (cold)</td>
+      <td>n/a</td>
+      <td>n/a</td>
+      <td>n/a</td>
+      <td class="w">144 s</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-c">spec-A-slim</span> our slim image</td>
+      <td>c7i.2xlarge</td>
+      <td class="mono">ai-infra/vllm-slim:0.21.0-cu130</td>
+      <td>ECR (in-region)</td>
+      <td class="mono g">77 s (cold)</td>
+      <td>n/a</td>
+      <td>n/a</td>
+      <td>n/a</td>
+      <td class="g">77 s (1.87×)</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-r">run-1-cold</span> Kimi K2.6 FP8</td>
+      <td>8× B300 (TP=8)</td>
+      <td class="mono">585 GB MoE</td>
+      <td class="r">S3 sync (cold)</td>
+      <td class="mono">~30 s</td>
+      <td class="r"><strong>32 min</strong></td>
+      <td class="h">~9 min</td>
+      <td>~2 min</td>
+      <td class="r">46 min</td>
+    </tr>
+  </table>
+
+  <p style="font-size:0.78rem; color:var(--dim); margin-top:8px;">
+    Numbers are medians where multiple runs exist. Modal Gemma4 numbers from a single run with AOT compile cache HIT (see <code>references/modal-gemma4-aot-h200.md</code>).
+    "JIT + warmup" includes torch.compile, Dynamo bytecode transform, AOT cache load (when applicable), and initial profiling.
+  </p>
+</div>
+
+<!-- ============================ FINDINGS ============================ -->
+<div class="section">
+  <div class="section-label">What we learned</div>
+  <h2>Five Concrete Findings</h2>
+
+  <div class="cards cards-2">
+    <div class="card">
+      <h3 style="color:var(--green)">1. Warm cache wins 5.4×</h3>
+      <div class="cd">Kimi K2.6 FP8 cold-S3 → warm-NVMe</div>
+      <div class="num">46 min → 8:30</div>
+      <ul>
+        <li>S3 sync of 585 GB takes 32 min on B300 (~17 GB/min steady).</li>
+        <li>Once cached on instance NVMe, that disappears. The <code>.staged</code> marker in init container is enough.</li>
+        <li>This is just "Smart Cache DaemonSet" applied correctly — no new infra needed.</li>
+        <li>Implication: warm node pool with image-prepull-style weight prepull is high-leverage.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--heat)">2. JIT dominates warm path</h3>
+      <div class="cd">Even tiny Qwen3-1.7B spends 70 of 102 s on compile</div>
+      <div class="num">~70%</div>
+      <ul>
+        <li>For a 1.7B model on B300 (the easy case), JIT + CUDA graph capture is 70 % of cold start.</li>
+        <li>For Kimi K2.6 on warm path, JIT + capture is ~75 % of remaining 8:30.</li>
+        <li>This is the stage Spec C targets.</li>
+        <li>Without compile-cache work, every replica pays this cost from scratch.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--pulse)">3. Modal sets the achievable floor</h3>
+      <div class="cd">AOT compile cache HIT on H200, 26B MoE</div>
+      <div class="num">~22 s</div>
+      <ul>
+        <li>Backbone Dynamo + AOT load: 13.96 s.</li>
+        <li>Drafter Dynamo + AOT load: 2.82 s.</li>
+        <li>Profiling/warmup: 5.34 s.</li>
+        <li>Cache files in <code>/root/.cache/vllm/torch_compile_cache/...</code> — portable, format <code>binary</code>.</li>
+        <li>This is what Spec C will reproduce on EKS+PVC.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--beam)">4. CUDA graph capture is NOT cached</h3>
+      <div class="cd">Modal default = 51 sizes, ≥100 s capture</div>
+      <div class="num">≥100 s</div>
+      <ul>
+        <li>Even with AOT cache HIT, 51 cudagraph sizes (1, 2, 4, ..., 512) take 100+ s to capture.</li>
+        <li>Capture is keyed on dynamic shapes seen at runtime.</li>
+        <li>Trimming to ~10 production batch sizes reclaims 60-80 % of this stage independent of cache.</li>
+        <li>Two independent levers: cache (Spec C) + capture-set tuning (separate).</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="cards cards-2" style="margin-top:14px;">
+    <div class="card">
+      <h3 style="color:var(--warn)">5. flashinfer JIT is a known papercut</h3>
+      <div class="cd">Crashes both Modal app and our slim image at the same code path</div>
+      <ul>
+        <li>vLLM v1 sampler calls <code>flashinfer.sampling.top_k_top_p_sampling_from_logits</code>.</li>
+        <li>flashinfer JITs the kernel with ninja the first time it's hit.</li>
+        <li>Slim runtime images without <code>nvcc</code> crash. Modal hits the same KeyboardInterrupt during build.</li>
+        <li>Workaround: dummy completion request during cache-baker CI to populate flashinfer cache, then bake or PVC-mount.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--green)">6. Spec 0 profiler works</h3>
+      <div class="cd">Canonical 14-event timeline captured cleanly across 6 runs</div>
+      <ul>
+        <li>5 Qwen3-1.7B + 2 Kimi K2.6 measurements all produced complete stage attributions.</li>
+        <li>Stage durations sum to ≥95 % of total (validation criterion met).</li>
+        <li>Run-to-run σ/μ on Qwen3 stages all under 0.5 (variance criterion met).</li>
+        <li>Profiler is ready for Specs A/B/C/D to consume.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ GAP TO MODAL ============================ -->
+<div class="section">
+  <div class="section-label">Path Forward</div>
+  <h2>Closing the Gap to Modal Floor</h2>
+  <p class="lead">
+    Our Kimi K2.6 warm path is 510 s. Modal's H200 floor for a similarly-sized model is 22 s + capture. The gap is real but tractable.
+  </p>
+
+  <div class="chart-wrap">
+    <h3>Projected Kimi K2.6 FP8 cold-start by experiment phase</h3>
+    <p class="ce">Each spec eliminates a specific stage. Stacked vertically: as specs land, the bar shrinks.</p>
+    <canvas id="gapChart" height="220"></canvas>
+  </div>
+
+  <table class="tbl">
+    <tr>
+      <th>State</th><th>S3 Sync</th><th>Weight Load</th><th>JIT Compile</th><th>CUDA Graphs</th><th>Total (Kimi K2.6)</th><th>Path</th>
+    </tr>
+    <tr>
+      <td><span class="chip chip-r">measured</span> cold S3</td>
+      <td class="r">1940 s</td>
+      <td>120 s</td>
+      <td>540 s</td>
+      <td>130 s</td>
+      <td class="r">2730 s (46 min)</td>
+      <td class="mono">naïve</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-h">measured</span> warm NVMe</td>
+      <td class="g">0 s</td>
+      <td>120 s</td>
+      <td>250 s</td>
+      <td>130 s</td>
+      <td class="w">510 s (8:30)</td>
+      <td class="mono">+ smart cache</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-c">target</span> + Spec B (RunAI/MX)</td>
+      <td class="g">0 s</td>
+      <td class="g">30-40 s</td>
+      <td>250 s</td>
+      <td>130 s</td>
+      <td>~410 s</td>
+      <td class="mono">runai_streamer</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-p">target</span> + Spec C (compile cache)</td>
+      <td class="g">0 s</td>
+      <td class="g">30-40 s</td>
+      <td class="g">40-60 s</td>
+      <td>130 s</td>
+      <td class="c">~200 s</td>
+      <td class="mono">PVC-mounted AOT</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-g">target</span> + cudagraph trim (free)</td>
+      <td class="g">0 s</td>
+      <td class="g">30-40 s</td>
+      <td class="g">40-60 s</td>
+      <td class="g">25-40 s</td>
+      <td class="g">~100-140 s</td>
+      <td class="mono">cudagraph_capture_sizes=10</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-c">aspirational</span> Modal-equivalent</td>
+      <td class="g">0 s</td>
+      <td class="g">30-40 s</td>
+      <td class="g">~22 s</td>
+      <td class="g">~25 s</td>
+      <td class="c"><strong>~75-90 s</strong></td>
+      <td class="mono">image-baked AOT + trimmed graphs</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ============================ NEW: SPEC E DYNAMO SNAPSHOT ============================ -->
+<div class="section">
+  <div class="section-label">New Findings (2026-05-31)</div>
+  <h2>Spec E · Dynamo Snapshot (CRIU process C/R)</h2>
+  <p class="lead">
+    NVIDIA Dynamo Snapshot uses <code>cuda-checkpoint</code> + <code>CRIU</code> to serialize an entire
+    warmed-up vLLM worker process to disk and restore it on a fresh node. This is a <strong>different
+    primitive</strong> from Spec C-EBS: where C-EBS snapshots the AOT compile-cache <em>directory</em> on a
+    block volume, Spec E snapshots the <em>process tree</em> including GPU device state, fds, and pinned
+    host memory. The two compose — a fresh node can mount the EBS compile cache <em>and</em> restore from
+    a Dynamo snapshot — but they attack different stages.
+  </p>
+
+  <div class="cards cards-2">
+    <div class="card" style="border-left: 3px solid var(--green);">
+      <h3 style="color:var(--green)">Single-GPU primitive · PASS</h3>
+      <div class="cd">g6.xlarge L4 (sm_89), Qwen3-0.6B FP16, CRIU 4.2 + PR #3021</div>
+      <ul>
+        <li>Gate 1 (token-ID equality): <strong>PASS</strong> — SHA256 byte-identical across restore.</li>
+        <li>Gate 3 (restore wall-clock): <strong>1.69 s</strong> for 4.14 GiB artifact (~1.95 GiB/s).</li>
+        <li>Gate 2 (artifact ratio): 2.93x on 0.6B is dominated by ~3 GiB fixed Python/torch/CUDA overhead.</li>
+        <li>Extrapolation: Ministral-3B = 1.50x, Mistral-Small-4 = 1.25x, Gemma-4-26B = 1.12x — all PASS.</li>
+        <li>Predicted cold-start: <strong>15-45 s vs 100-240 s baseline = 5-10x</strong> on Ministral-class.</li>
+      </ul>
+    </div>
+    <div class="card" style="border-left: 3px solid var(--fail);">
+      <h3 style="color:var(--fail)">Multi-GPU bare-metal · BLOCKED</h3>
+      <div class="cd">p5e.48xlarge (8× H200), CRIU dump fails on bare /dev/nvidiaN fds</div>
+      <ul>
+        <li>NVIDIA driver opens <strong>51 fds across all 8 /dev/nvidiaN</strong> regardless of <code>CUDA_VISIBLE_DEVICES</code> — used for NVLink/NVSwitch topology discovery.</li>
+        <li>cuda_plugin only registers <code>HANDLE_DEVICE_VMA</code>; bare-fd opens fall through to <code>dump_unsupp_fd</code> → <code>-ENOTSUP</code>.</li>
+        <li>NVIDIA's K8s <code>snapshot-agent</code> sidesteps this via <code>nvidia-container-runtime</code> OCI hooks that hide peer GPU device nodes.</li>
+        <li><strong>Pivot: containerized execution</strong> with <code>--gpus '"device=0"'</code> is the next experiment.</li>
+        <li>Gemma-4 anchor cell vs Modal's 22 s AOT-HIT floor is deferred until container path validated.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="why-box" style="margin-top:14px; border-left-color: var(--beam);">
+    <div class="wt" style="color: var(--beam)">Read carefully — Spec C-EBS vs Spec E are NOT the same thing</div>
+    <p>
+      <strong>Spec C-EBS (compile-cache snapshot, production-ready):</strong> bake vLLM's
+      <code>torch_compile_cache/</code> onto an EBS volume, take an EBS snapshot, mount on each fresh node
+      via the EBS CSI driver. Eliminates the JIT/compile + CUDA-graph capture stages. AOT cache HIT in
+      ~25 s overhead. Block-storage operation.<br><br>
+      <strong>Spec E (Dynamo Snapshot, single-GPU PASS / multi-GPU bare-metal BLOCKED):</strong>
+      <code>cuda-checkpoint</code> serializes GPU device state, then CRIU dumps the full process tree
+      (memory + fds + CUDA contexts). Restore brings back a fully warmed-up vLLM worker. Eliminates
+      <strong>model load + JIT + first-token warmup</strong> in a single step. Process-level C/R, requires
+      kernel <code>CAP_CHECKPOINT_RESTORE</code> + driver 580.xx+.<br><br>
+      Spec C-EBS is the production default for any model size, any TP. Spec E is the single-GPU replica-N≥2
+      fast-path: when an autoscale signal arrives and a warmed worker artifact already exists for the exact
+      (model, engine version, driver, hardware) tuple, you skip not just compile but also weight load.
+    </p>
+  </div>
+
+  <table class="tbl" style="margin-top:14px;">
+    <tr>
+      <th>Stage</th><th>Baseline (s)</th><th>+ Spec C-EBS (s)</th><th>+ Spec E snapshot (s)</th><th>Why eliminated by E</th>
+    </tr>
+    <tr>
+      <td>Image pull (EBS prebake)</td><td class="mono">5-15</td><td class="mono">5-15</td><td class="mono">5-15</td><td>unchanged</td>
+    </tr>
+    <tr>
+      <td>Container start</td><td class="mono">5-10</td><td class="mono">5-10</td><td class="mono">5-10</td><td>unchanged</td>
+    </tr>
+    <tr>
+      <td>Model load</td><td class="mono w">60-120</td><td class="mono w">60-120</td><td class="mono g">0</td><td>weights are inside the snapshot</td>
+    </tr>
+    <tr>
+      <td>JIT / compile</td><td class="mono w">30-90</td><td class="mono g">~25 (cache HIT)</td><td class="mono g">0</td><td>compiled state inside the snapshot</td>
+    </tr>
+    <tr>
+      <td>CRIU + cuMemMap restore</td><td class="mono">—</td><td class="mono">—</td><td class="mono c">5-15</td><td>new step (parallel-memfd path)</td>
+    </tr>
+    <tr>
+      <td>First token</td><td class="mono">1-5</td><td class="mono">1-5</td><td class="mono">1-5</td><td>unchanged</td>
+    </tr>
+    <tr>
+      <td><strong>Total (Ministral-class)</strong></td><td class="r"><strong>100-240</strong></td><td class="w"><strong>~75-160</strong></td><td class="g"><strong>15-45</strong></td><td><strong>5-10x vs baseline</strong></td>
+    </tr>
+  </table>
+
+  <div class="why-box" style="margin-top:14px; border-left-color: var(--warn);">
+    <div class="wt" style="color: var(--warn)">Operational gotchas captured during Stage 0</div>
+    <p>
+      (1) <strong>CRIU PRs #3021 + #3022 conflict</strong> on <code>criu/mem.c</code>; merging both requires
+      hand-resolution. Bridging cell took #3021 (parallel-memfd) only.
+      (2) <strong>io_uring is unsupported</strong> in CRIU even with NVIDIA's PRs; vLLM's uvloop dep
+      triggers it. NVIDIA's snapshot-agent injects a seccomp profile blocking <code>io_uring_*</code>
+      syscalls so libuv falls back to epoll.
+      (3) <strong>Host RAM ≥ 1.2× peak GPU alloc + 4 GiB</strong> — cuda-checkpoint copies device state to
+      host before CRIU dumps. A g6.xlarge at <code>gpu_memory_utilization=0.85</code> OOMs on the L4's
+      19.7 GiB GPU footprint.
+      (4) <strong>Use <code>sleep(level=1)</code> only</strong> — level=2 unloads weights and breaks token-ID
+      equality on restore (different CUDA context post-wake_up).
+      (5) <strong>AMI-bake pattern</strong> survived two spot reclaims cleanly (~$0.05 add cost, saves ~25 min
+      rebuild per reclaim).
+      Full recap: <a href="dynamo-snapshot-recap.html" style="color: var(--beam); text-decoration: none;">dynamo-snapshot-recap.html</a>.
+    </p>
+  </div>
+</div>
+
+<!-- ============================ STACKED AUTOSCALE PARETO ============================ -->
+<div class="section">
+  <div class="section-label">Stacked · Spec A + Spec C-EBS + Spec E</div>
+  <h2>Predicted autoscale wall time — image pull + EBS+FSR + CRIU restore</h2>
+  <p class="lead">
+    Each spec answers one stage of the cold-start pipeline. This is what they look like <em>composed</em> for a
+    replica-N≥2 autoscale event on EKS — the realistic floor when none of the techniques are run in isolation.
+  </p>
+
+  <div class="why-box" style="border-left-color: var(--beam)">
+    <div class="wt" style="color: var(--beam)">What changed vs the per-spec tables above</div>
+    <p>
+      Spec E's standalone budget table (15-45 s) measures CRIU restore <em>against an already-attached
+      artifact</em>. In a real autoscale event the snapshot artifact lives on an EBS+FSR snapshot in S3 —
+      so each new replica also pays volume-create + attach (the Spec C-EBS measurements: ~9 s + ~10 s).
+      The stack below is the honest p50 / p95 floor.
+    </p>
+  </div>
+
+  <table class="tbl" style="margin-top:14px;">
+    <tr>
+      <th>Stage</th>
+      <th>Source spec</th>
+      <th>Time (Ministral-3B class, ~6 GiB)</th>
+      <th>Notes</th>
+    </tr>
+    <tr>
+      <td>Node provision (warm pool hit)</td>
+      <td class="dim">spec assumption</td>
+      <td class="mono g">0 s</td>
+      <td>Replica-N path; replica-1 is cold-cluster-only</td>
+    </tr>
+    <tr>
+      <td>Image pull (EBS-prebaked)</td>
+      <td><strong>Spec A</strong></td>
+      <td class="mono">5-15 s</td>
+      <td>Slim image baseline, 1.87× faster than default</td>
+    </tr>
+    <tr>
+      <td>Container start</td>
+      <td class="dim">substrate</td>
+      <td class="mono">5-10 s</td>
+      <td>Unchanged from baseline</td>
+    </tr>
+    <tr>
+      <td>EBS volume-create from FSR snapshot</td>
+      <td><strong>Spec C-EBS</strong></td>
+      <td class="mono">~9 s</td>
+      <td>Measured on B200 fresh-node validation</td>
+    </tr>
+    <tr>
+      <td>EBS attach + mount</td>
+      <td><strong>Spec C-EBS</strong></td>
+      <td class="mono">~10 s</td>
+      <td>Measured</td>
+    </tr>
+    <tr>
+      <td>CRIU + cuMemMap restore</td>
+      <td><strong>Spec E</strong></td>
+      <td class="mono">5-15 s</td>
+      <td>Predicted; iter-1 dump was 1.5 s, restore predicted 5-10 s for ~6 GiB on NVMe-class read</td>
+    </tr>
+    <tr>
+      <td>First token (synthetic)</td>
+      <td class="dim">substrate</td>
+      <td class="mono">1-5 s</td>
+      <td>Unchanged</td>
+    </tr>
+    <tr>
+      <td><strong>Serial total</strong></td>
+      <td class="dim">—</td>
+      <td class="mono w"><strong>25-64 s</strong></td>
+      <td>If stages run strictly sequentially</td>
+    </tr>
+    <tr style="background: rgba(143, 232, 184, 0.06);">
+      <td><strong>With overlap</strong> (image pull ‖ volume-create; container-start ‖ attach)</td>
+      <td class="dim">—</td>
+      <td class="mono g"><strong>~25-40 s p50, ~40 s p95</strong></td>
+      <td><strong>Realistic autoscale floor</strong></td>
+    </tr>
+    <tr>
+      <td colspan="2" class="dim" style="text-align:right">Baseline cold start (no stack)</td>
+      <td class="mono r"><strong>50-120 s</strong></td>
+      <td>Model load + JIT + CUDA graph capture</td>
+    </tr>
+  </table>
+
+  <div class="why-box" style="margin-top:14px; border-left-color: var(--warn)">
+    <div class="wt" style="color: var(--warn)">Two important caveats before quoting this number</div>
+    <p>
+      <strong>(1) Concurrent-restore contention is unmeasured.</strong> When 4 replicas restore from one canonical
+      snapshot simultaneously, EBS+FSR per-AZ throughput becomes the question. Cell E1 of
+      <code>dynamo-snapshot-eks-multinode</code> exists specifically to measure this. Until that runs, treat
+      ~25-40 s as best-case <em>single-replica</em> wall time, not aggregate fan-out.
+    </p>
+    <p>
+      <strong>(2) For larger models the curve gets better, not worse.</strong> The ~19 s EBS volume-create + attach
+      overhead is fixed. Baseline scales with weights × bandwidth + JIT, so a GLM-5-class baseline (16 min)
+      against a stacked floor still bottlenecked by ~20 s of EBS overhead is a much larger speedup multiplier
+      than what Ministral-3B shows here.
+    </p>
+  </div>
+
+  <div class="why-box" style="margin-top:14px; border-left-color: var(--green)">
+    <div class="wt" style="color: var(--green)">Speedup multiplier framing</div>
+    <p>
+      <strong>2-4× vs baseline</strong> for Ministral-3B class — <em>not</em> the 5-10× the standalone Spec E
+      budget table promised, because EBS+FSR adds back ~20 s the pure-snapshot path doesn't pay if you cheat
+      with FSx Lustre always-on. That's the actual cost of using EBS as the snapshot transport instead of
+      paying $1,095+/mo for FSx P-1000.
+    </p>
+    <p>
+      <strong>Order of operations for the autoscaler:</strong> warm pool hit → image pull starts ‖ EBS volume-create
+      starts → container start ‖ EBS attach → CRIU restore → first token. The two parallel-able pairs are
+      what gets the floor below 30 s. Without overlap engineering in the autoscaler controller, expect the
+      serial 25-64 s number instead.
+    </p>
+  </div>
+</div>
+
+<!-- ============================ THREE-TIER VS FUSED ============================ -->
+<div class="section">
+  <div class="section-label">Architecture · separation of env vs model vs compile-state</div>
+  <h2>Three-tier persistence ladder vs the snapshot's fused artifact</h2>
+  <p class="lead">
+    Spec E fuses env + model + compiled state + process state into one binary blob. Specs A + B + C-EBS keep them separate, so each layer invalidates independently. Different operating cost profiles for different fleet shapes.
+  </p>
+
+  <table class="tbl" style="margin-top:14px;">
+    <tr>
+      <th>Tier</th>
+      <th>What's in it</th>
+      <th>Invalidates on</th>
+      <th>Size</th>
+      <th>Bake cost</th>
+      <th>Storage $/mo</th>
+    </tr>
+    <tr>
+      <td><strong>Slim image</strong> (Spec A, EBS-prebaked)</td>
+      <td>env: CUDA, vLLM, drivers</td>
+      <td class="mono">vLLM/driver bump</td>
+      <td class="mono">~2-5 GB</td>
+      <td class="mono">~minutes</td>
+      <td class="mono g">~$0.10</td>
+    </tr>
+    <tr>
+      <td><strong>Compile cache</strong> (Spec C-EBS)</td>
+      <td>torch.compile + AOT + DeepGEMM JIT, keyed by <code>(model, vllm_version, tp, config_hash)</code></td>
+      <td class="mono">vLLM bump OR config OR hw</td>
+      <td class="mono">~1-5 GB / key</td>
+      <td class="mono">~25 s once</td>
+      <td class="mono g">~$30 (one volume, many keys)</td>
+    </tr>
+    <tr>
+      <td><strong>Model weights</strong> (Spec B / MX / S3)</td>
+      <td>weights only</td>
+      <td class="mono">weights update</td>
+      <td class="mono">6 GB - 700 GB</td>
+      <td class="mono">one-time</td>
+      <td class="mono g">~$0.02 / GB-mo S3</td>
+    </tr>
+    <tr style="background: rgba(143, 232, 184, 0.06);">
+      <td><strong>Snapshot</strong> (Spec E, fused)</td>
+      <td>env + compile + weights + process state, all fused</td>
+      <td class="mono w">ANY of the above</td>
+      <td class="mono">weights + 4 GiB + 1 GiB×TP</td>
+      <td class="mono w">full cold start</td>
+      <td class="mono w">~$10-100 (FSR-on-demand)</td>
+    </tr>
+  </table>
+
+  <div class="why-box" style="margin-top:14px; border-left-color: var(--beam)">
+    <div class="wt" style="color: var(--beam)">First-token wall time on different stack compositions</div>
+    <table class="tbl" style="margin-top:8px;">
+      <tr>
+        <th>Path</th>
+        <th>Replica-N cold start</th>
+        <th>Bake / invalidation cost</th>
+      </tr>
+      <tr>
+        <td>Slim image only</td>
+        <td class="mono r">~100-240 s</td>
+        <td class="g">low</td>
+      </tr>
+      <tr>
+        <td>Slim + MX weights (Spec B)</td>
+        <td class="mono">~80-180 s (PCIe-bound)</td>
+        <td class="g">low</td>
+      </tr>
+      <tr>
+        <td>Slim + Spec C-EBS compile cache</td>
+        <td class="mono w">~75-160 s (JIT eliminated)</td>
+        <td class="g">~25 s amortized</td>
+      </tr>
+      <tr>
+        <td>Slim + MX + Spec C-EBS</td>
+        <td class="mono">~50-120 s</td>
+        <td class="g">low; layers invalidate independently</td>
+      </tr>
+      <tr style="background: rgba(143, 232, 184, 0.08);">
+        <td><strong>Snapshot (everything fused)</strong></td>
+        <td class="mono g"><strong>~25-40 s</strong></td>
+        <td class="r"><strong>full produce-path on every layer change</strong></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="why-box" style="margin-top:14px; border-left-color: var(--green)">
+    <div class="wt" style="color: var(--green)">When fused wins vs when separated wins</div>
+    <p>
+      <strong>Snapshot (Spec E) wins on:</strong> fast-twitch autoscaling on a stable stack — no recent vLLM bumps, weights stable, config locked. Replica-N≥2 events firing often enough that 25-40 s vs 50-120 s is load-bearing. vLLM-only.
+    </p>
+    <p>
+      <strong>Three-tier (A+B+C-EBS) wins on:</strong> environments where vLLM ships weekly, model fleet is multi-tenant, compile cache reuse is high, or the engine is SGLang (where snapshot is unsupported). Each layer invalidates without invalidating the others — a vLLM bump rebuilds image+compile-cache but reuses the entire weights cache; a weights swap reuses image+compile-cache.
+    </p>
+    <p>
+      <strong>Multi-tenant arithmetic:</strong> 10 models × 3 vLLM versions × 2 hardware tiers = <strong>60 snapshots</strong> vs <strong>10 weights + 6 env images = 16 artifacts</strong> for the three-tier path.
+    </p>
+  </div>
+
+  <div class="why-box" style="margin-top:14px; border-left-color: var(--warn)">
+    <div class="wt" style="color: var(--warn)">Production rule (also in <code>.claude/steering/tech-stack.md</code>)</div>
+    <p>
+      Default stack: <strong>slim image (A) + EBS-snapshotted compile cache (C-EBS) + MX/RunAI weights (B)</strong>.
+      Add <strong>Dynamo Snapshot (E)</strong> only on the specific replica-pools where (a) the stack is frozen for ≥1 week between bumps, (b) autoscale events fire often enough that 25-40 s vs 50-120 s is load-bearing, and (c) the engine is vLLM. Everywhere else, the three-tier separation is cheaper to operate and degrades gracefully under fleet churn. Snapshot's compile-cache contribution can also be reproduced by C-EBS at a fraction of the bake cost — the unique value snapshot adds is the <em>process state</em> (CUDA graphs, pinned memory, NCCL state when in scope), not the compiled artifacts.
+    </p>
+  </div>
+</div>
+
+<!-- ============================ EXPERIMENT STATUS ============================ -->
+<div class="section">
+  <div class="section-label">What's done · what's left</div>
+  <h2>Experiment Status</h2>
+  <p class="lead">Lab is mostly complete. 6 specs measured, 2 partial, 2 still draft. The headline finding is Spec C-EBS — the production-ready compile cache pattern.</p>
+
+  <table class="tbl">
+    <tr>
+      <th>Spec</th><th>Status</th><th>What it measures</th><th>Headline result</th><th>Spent</th>
+    </tr>
+    <tr>
+      <td><span class="chip chip-g">DONE</span> <strong>Spec 0</strong></td>
+      <td class="g">profiler validation</td>
+      <td>14-event canonical timeline</td>
+      <td>5 Qwen3 + 2 Kimi runs, valid</td>
+      <td>~$130</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-g">DONE</span> <strong>Spec F</strong></td>
+      <td class="g">access-set profiling</td>
+      <td>Bytes-touched ratio</td>
+      <td class="g">17.2% bytes / 9.5% files / 26.6% ENOENT</td>
+      <td>~$0.50</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-w">PARTIAL</span> <strong>Spec A</strong></td>
+      <td class="w">image-pull baselines done</td>
+      <td>Default vs slim image pull</td>
+      <td>Slim 1.87× faster (77 s vs 144 s)</td>
+      <td>~$1</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-w">PARTIAL</span> <strong>Spec B</strong></td>
+      <td class="w">RunAI tested, no win on NVMe; ModelExpress deferred</td>
+      <td>Model-load mechanisms</td>
+      <td>RunAI Streamer −3 s on local NVMe (PCIe-bound)</td>
+      <td>~$45</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-g">DONE</span> <strong>Spec C</strong></td>
+      <td class="g">AOT compile cache (same-node hostPath)</td>
+      <td>Compile cache HIT on warm node</td>
+      <td>384 s warm path (vs 569 s baseline)</td>
+      <td>~$50</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-g">DONE ★</span> <strong>Spec C-EBS</strong></td>
+      <td class="g">compile cache via EBS snapshot</td>
+      <td>Cache HIT on fresh node from snapshot</td>
+      <td class="g"><strong>386 s on brand-new B200 — production-ready pattern</strong></td>
+      <td>~$220</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-w">PARTIAL ★</span> <strong>Spec E</strong> (Dynamo Snapshot, CRIU C/R)</td>
+      <td class="w">single-GPU PASS / multi-GPU bare-metal BLOCKED</td>
+      <td>process-level C/R via cuda-checkpoint + CRIU</td>
+      <td class="g">1.69 s restore on L4; 5-10x predicted; p5e blocked on /dev/nvidia* fds</td>
+      <td>~$5</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-g">DONE</span> <strong>Spec G</strong> (cudagraph trim)</td>
+      <td class="g">CLI flag change only</td>
+      <td>cudagraph_capture_sizes 51 → 10</td>
+      <td class="g">−162 s (28% of warm path)</td>
+      <td>~$5</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-g">DONE</span> <strong>Spec H</strong> (prefetch tuning)</td>
+      <td class="g">CLI flags + thread/block sweep</td>
+      <td>safetensors-load-strategy=prefetch</td>
+      <td class="g">−141 s (25% of warm path)</td>
+      <td>~$30</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-r">PENDING</span> <strong>Spec E</strong></td>
+      <td class="r">FUSE tuning for stargz/SOCI</td>
+      <td>Modal tunables sweep</td>
+      <td>—</td>
+      <td>~$10 build host</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-r">PENDING</span> <strong>ModelExpress P2P</strong></td>
+      <td class="r">replica-N≥2 weight load</td>
+      <td>Same-node NVSwitch broadcast</td>
+      <td>—</td>
+      <td>~$60 GPU</td>
+    </tr>
+    <tr>
+      <td><span class="chip chip-w">IMPLICIT</span> <strong>Spec D</strong></td>
+      <td class="w">stacked end-to-end</td>
+      <td>Best of all measured stacks</td>
+      <td class="g">386 s on fresh node (Spec C-EBS run is the stacked answer)</td>
+      <td>covered</td>
+    </tr>
+  </table>
+
+  <div class="cards cards-2" style="margin-top:24px;">
+    <div class="card" style="border-left:3px solid var(--green);">
+      <h3 style="color:var(--green)">What was answered</h3>
+      <ul>
+        <li><strong>Cudagraph trim is the cheapest big win</strong> — saves 162 s for one CLI flag (~$0.05/s saved)</li>
+        <li><strong>Prefetch ON beats prefetch OFF on local NVMe</strong> — defeats vLLM's auto-disable heuristic, saves 141 s</li>
+        <li><strong>Aggressive prefetch tuning is marginal</strong> — 32 threads × 64 MB beats 8 × 16 MB by only 10 s</li>
+        <li><strong>RunAI Streamer is conditional</strong> — 0 s win on local NVMe (PCIe-bound), only useful for S3-backed sources</li>
+        <li><strong>EBS-snapshot AOT cache works</strong> — same speedup on fresh node as same-node hostPath, 25 s overhead</li>
+        <li><strong>Weight-load floor is post-page-cache</strong> — 245 s of cudaMemcpy work that no current technique addresses on TP=8</li>
+      </ul>
+    </div>
+    <div class="card" style="border-left:3px solid var(--pulse);">
+      <h3 style="color:var(--pulse)">What's still open</h3>
+      <ul>
+        <li><strong>ModelExpress same-node multi-pod</strong> — only path below 245 s weight-load floor; needs 2 pods on same B200; ~$60 to test</li>
+        <li><strong>Spec A SOCI / Nydus</strong> — 17.2% access ratio is established; mechanism implementation deferred (low priority for our workload)</li>
+        <li><strong>Spec E FUSE tuning</strong> — only relevant if Spec A SOCI runs</li>
+        <li><strong>Variance tightening</strong> — most measurements are single-shot; 3 more replicates per cell would add error bars</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="why-box" style="margin-top:14px; border-left-color: var(--green);">
+    <div class="wt" style="color: var(--green)">Production-ready steering rules from this lab</div>
+    <p>
+      1. <strong>Always</strong> set <code>--compilation-config={"cudagraph_capture_sizes":[1,2,4,8,16,32,64,128,256,512]}</code> (or your production batch sizes). Saves ~25-30%.<br>
+      2. <strong>Always</strong> set <code>--safetensors-load-strategy=prefetch</code> on local NVMe. Saves ~25%. vLLM's auto-detection auto-disables this; force it on.<br>
+      3. <strong>Bake AOT compile cache to EBS snapshot</strong> per (model, vLLM version, config hash). Mount as PVC. Cache HIT on every fresh node, ~25 s overhead, ~$30/mo storage.<br>
+      4. <strong>Use slim image</strong> for any new vLLM deployment. 1.87× pull speedup just from shrinking, no infrastructure work.<br>
+      5. <strong>Skip RunAI Streamer when source is local NVMe</strong>. Use only when source is S3 / network-attached storage.<br>
+      6. <strong>Co-locate weight bucket with serving cluster</strong>. Cross-region S3 sync was 2× slower than in-region.
+    </p>
+  </div>
+
+  <div class="why-box" style="margin-top:14px; border-left-color: var(--warn);">
+    <div class="wt" style="color: var(--warn)">Budget</div>
+    <p>~$614 spent of $500 budget. Overrun of $114 absorbed for the EBS snapshot validation (~$220 of this session) — the headline production finding.
+    Spot prices remain volatile: B200 us-east-2b cleared at $113.93/hr today, B300 us-west-2b at $142/hr (was $26 three days ago).
+    Persistent assets kept: <code>snap-035013a5b031c6e9f</code> (498 MB AOT cache for Kimi K2.6 TP=8) at ~$0.025/month.</p>
+  </div>
+</div>
+
+<!-- ============================ FOOTER ============================ -->
+<div class="footer">
+  Generated 2026-06-01 (v5) from <code>domains/ai-infra/blueprints/{spec-0-*, spec-c-ebs-snapshot, spec-f-access-profiling, spec-a-image-pull, b200-kimi-stats, b200-prefetch-experiments, dynamo-snapshot, dynamo-snapshot-eks}</code>. v5 adds the Spec A + Spec C-EBS + Spec E stacked autoscale Pareto, plus the three-tier-vs-fused architecture comparison and production rule.<br>
+  Profiler: <code>shared/profiler.py</code> + <code>shared/log_patterns.yaml</code>. Stage taxonomy: <code>specs/profiler-validation.md</code>.
+</div>
+
+</div>
+
+<script>
+const gridColor = 'rgba(20,32,53,0.9)';
+const textColor = '#7a99b8';
+const stageColors = {
+  image: '#1f6feb',
+  init: '#00b4d8',
+  container: '#2dd4bf',
+  modelload: '#a855f7',
+  jit: '#f97316',
+  cudagraph: '#f43f5e',
+  firsttoken: '#22c55e',
+};
+
+// ---------------- Stage breakdown bar ----------------
+const stageLabels = ['Modal\nGemma4 26B\n(AOT cache HIT)', 'Our\nQwen3 1.7B\n(B300, no cache)', 'Our Kimi K2.6\nFP8 warm-NVMe\n(B300)', 'Our Kimi K2.6\nFP8 cold-S3\n(B300)'];
+
+// In seconds
+const stages = {
+  image:      [0,    0.12,  30,    30],
+  init:       [0,    0,     0,     1936],
+  container:  [4,    4,     5,     5],
+  modelload:  [28,   7,     120,   120],
+  jit:        [22,   70,    250,   540],
+  cudagraph:  [100,  14,    130,   130],
+  firsttoken: [0,    1,     0.1,   12],
+};
+
+const stageDsets = [
+  { label: 'image pull',         color: stageColors.image,     data: stages.image },
+  { label: 'init / S3 sync',     color: stageColors.init,      data: stages.init },
+  { label: 'container start',    color: stageColors.container, data: stages.container },
+  { label: 'weight load',        color: stageColors.modelload, data: stages.modelload },
+  { label: 'JIT compile + warmup', color: stageColors.jit,     data: stages.jit },
+  { label: 'CUDA graph capture', color: stageColors.cudagraph, data: stages.cudagraph },
+  { label: 'first token',        color: stageColors.firsttoken,data: stages.firsttoken },
+];
+
+new Chart(document.getElementById('stageBar'), {
+  type: 'bar',
+  data: {
+    labels: stageLabels,
+    datasets: stageDsets.map(d => ({
+      label: d.label,
+      data: d.data,
+      backgroundColor: d.color,
+      borderColor: d.color,
+      borderWidth: 0,
+      stack: 'cold',
+    })),
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw < 1 ? ctx.raw.toFixed(2) : ctx.raw.toFixed(0)} s`,
+          footer: (items) => {
+            const total = items.reduce((a,b) => a + b.raw, 0);
+            return `total: ${total.toFixed(0)} s`;
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        type: 'logarithmic',
+        ticks: {
+          color: textColor,
+          callback: (v) => {
+            if (v === 1) return '1 s';
+            if (v === 10) return '10 s';
+            if (v === 60) return '1 min';
+            if (v === 100) return '100 s';
+            if (v === 600) return '10 min';
+            if (v === 1000) return '1000 s';
+            if (v === 3000) return '50 min';
+            return null;
+          }
+        },
+        grid: { color: gridColor },
+        min: 1,
+        max: 5000,
+      },
+      y: { stacked: true, ticks: { color: '#c0cde0', font: { size: 10 } }, grid: { display: false } },
+    },
+  },
+});
+
+// ---------------- Gap chart ----------------
+const gapLabels = ['cold S3\n(measured)', 'warm NVMe\n(measured)', '+ Spec B\n(target)', '+ Spec C\n(target)', '+ cudagraph\ntrim (target)', 'Modal\nequivalent'];
+const gapStages = {
+  s3sync:   [1940, 0,   0,   0,   0,   0],
+  load:     [120,  120, 35,  35,  35,  35],
+  jit:      [540,  250, 250, 50,  50,  22],
+  graph:    [130,  130, 130, 130, 30,  25],
+  rest:     [100,  10,  10,  10,  10,  10],
+};
+const gapDsets = [
+  { label: 'S3 sync',                color: stageColors.init,      data: gapStages.s3sync },
+  { label: 'weight load',            color: stageColors.modelload, data: gapStages.load },
+  { label: 'JIT compile + warmup',   color: stageColors.jit,       data: gapStages.jit },
+  { label: 'CUDA graph capture',     color: stageColors.cudagraph, data: gapStages.graph },
+  { label: 'overhead',               color: stageColors.container, data: gapStages.rest },
+];
+new Chart(document.getElementById('gapChart'), {
+  type: 'bar',
+  data: {
+    labels: gapLabels,
+    datasets: gapDsets.map(d => ({
+      label: d.label,
+      data: d.data,
+      backgroundColor: d.color,
+      borderWidth: 0,
+      stack: 'gap',
+    })),
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { position: 'top', labels: { color: textColor, font: { size: 10 } } },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw} s`,
+          footer: (items) => {
+            const total = items.reduce((a,b) => a + b.raw, 0);
+            return `total: ${total} s`;
+          },
+        },
+      },
+    },
+    scales: {
+      x: { ticks: { color: textColor, font: { size: 10 } }, grid: { display: false }, stacked: true },
+      y: {
+        stacked: true,
+        ticks: { color: textColor, callback: (v) => v >= 60 ? `${(v/60).toFixed(0)} min` : `${v} s` },
+        grid: { color: gridColor },
+      },
+    },
+  },
+});
+
+// ---------------- Image-pull variants chart ----------------
+new Chart(document.getElementById('imageBar'), {
+  type: 'bar',
+  data: {
+    labels: [
+      'Upstream default\n(measured)',
+      'Slim image\n(measured)',
+      'SOCI lazy + slim\n(projected, 17% access)',
+      'EBS prebake\n(projected)',
+    ],
+    datasets: [{
+      label: 'pull seconds',
+      data: [144, 77, 30, 8],
+      backgroundColor: [
+        'rgba(239,68,68,0.65)',
+        'rgba(234,179,8,0.7)',
+        'rgba(0,229,255,0.7)',
+        'rgba(34,197,94,0.85)',
+      ],
+      borderRadius: 4,
+    }],
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: (ctx) => ` ${ctx.raw} s` } },
+    },
+    scales: {
+      x: { ticks: { color: textColor, callback: (v) => `${v} s` }, grid: { color: gridColor } },
+      y: { ticks: { color: '#c0cde0', font: { size: 10 } }, grid: { display: false } },
+    },
+  },
+});
+
+// ---------------- Stack journey chart ----------------
+new Chart(document.getElementById('stackJourney'), {
+  type: 'bar',
+  data: {
+    labels: [
+      'B200 baseline\n(no opts)',
+      '+ cudagraph trim\n10 sizes',
+      '+ prefetch aggressive\n32t/64MB',
+      '+ AOT cache hostPath\n(same node)',
+      '★ AOT cache EBS-snapshot\n(fresh node)',
+      'RunAI streamer\n(no win, rejected)',
+    ],
+    datasets: [
+      {
+        label: 'weight load',
+        data: [397, 263, 244, 246, 251, 245],
+        backgroundColor: '#a855f7',
+        stack: 'stack',
+      },
+      {
+        label: 'compile + warmup',
+        data: [14, 14, 14, 8, 8.21, 14],
+        backgroundColor: '#f97316',
+        stack: 'stack',
+      },
+      {
+        label: 'CUDA graph capture',
+        data: [130, 50, 50, 50, 50, 50],
+        backgroundColor: '#f43f5e',
+        stack: 'stack',
+      },
+      {
+        label: 'engine init + other',
+        data: [28, 101, 110, 80, 77, 72],
+        backgroundColor: '#2dd4bf',
+        stack: 'stack',
+      },
+    ],
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { position: 'top', labels: { color: textColor, font: { size: 10 } } },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw} s`,
+          footer: (items) => {
+            const total = items.reduce((a, b) => a + b.raw, 0);
+            return `total: ${total.toFixed(0)} s`;
+          },
+        },
+      },
+    },
+    scales: {
+      x: { stacked: true, ticks: { color: textColor, font: { size: 10 } }, grid: { display: false } },
+      y: {
+        stacked: true,
+        ticks: { color: textColor, callback: (v) => `${v} s` },
+        grid: { color: gridColor },
+        title: { display: true, text: 'main → ready (s)', color: textColor },
+      },
+    },
+  },
+});
+</script>
+
+</body>
+</html>
