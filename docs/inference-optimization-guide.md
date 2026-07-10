@@ -1,7 +1,7 @@
 # Pragmatic Inference Optimization Guide
 
 **Audience**: Engineers deploying open-weight LLMs on AWS GPU instances (g7e, p5e, p6-b200, p6-b300)
-**Last updated**: 2026-05-06
+**Last updated**: 2026-07-08
 **Sources**: InferenceX v2 (SemiAnalysis), our own B200/B300/g7e benchmarks, field deployments
 
 ---
@@ -665,6 +665,8 @@ When using hierarchical caching:
 
 The highest-leverage software optimizations happen at the kernel level. Our kernel optimization agent work on Kimi K2.6 (384-expert MoE + MLA, H200) produced concrete data on where time actually goes.
 
+> **⚠️ Every "near-optimal" / "no headroom" claim is scoped to a regime — never inherit it across regimes.** A kernel verdict is only valid for the exact tuple **hardware × kernel × concurrency × quantization × phase (prefill vs decode)**. The K2.6 findings below were measured on **H200 (sm_90), FP8, at decode (bs=1–128)**. They say nothing about the same model on Blackwell, in NVFP4, or during prefill. Concrete example of why this matters: the agent found K2.6's **FP8 MoE dispatch is near-optimal at decode** (4.6% BW util is architectural, and MoE is only 3% of c=128 compute → <1% e2e headroom). This does **not** contradict the pending **CuTe-DSL NVFP4 MoE-GEMM** "up to 2×" claim — that is a *different kernel* (NVFP4 GEMM, not FP8 dispatch) on *different hardware* (B200/B300 sm_100/103) in a *partly compute-bound* regime, and it is **unverified because the upstream merge has not landed** (FlashInfer #3645 open, SGLang #28354 draft — see `domains/gpu-serving/blueprints/kimi-k2.6-cutedsl-moe/`). Same model name, otherwise nothing in common. Before quoting a kernel verdict, restate its regime; before acting on one, re-profile in *your* regime.
+
 ### Where Time Goes (CUDA Graphs Enabled)
 
 **At decode bs=1 (latency optimization):**
@@ -873,6 +875,40 @@ Inference providers operate at >10,000 req/s across many models. At that scale:
 | 500+ users | Consider Bedrock/managed service (operational overhead > savings) |  API pricing |
 
 At each tier, exhaust single-node optimizations (EAGLE3, prefix caching, dynamic MLA routing) before adding nodes. Adding 60% throughput via EAGLE3 is equivalent to avoiding an entire extra node ($11K/month).
+
+---
+
+## 15. Attention Family Taxonomy
+
+**Read this first when a new model lands.** The attention family a model uses determines its serving behavior more than any flag: whether KV is prefix-cacheable, whether HiCache/LMCache/disagg work at all, where the decode bottleneck sits, and which kernels even exist on your GPU. This section maps the families we serve, which models use each, and the serving consequence. It exists because the mechanism is easy to confuse with the vendor — e.g. "MiniMax Sparse Attention (MSA)" is a MiniMax *project*, but the MiniMax-M2 we serve is dense GQA and does not use it.
+
+`SERVING_COMPAT_MATRIX.md` (§Attention Backends) covers the *kernel implementations* (FlashAttention, FlashInfer, FlashMLA, Triton) per GPU. This section covers the *architectural families* those kernels serve. Read them together: family here → backend there.
+
+### The Families
+
+| Family | Mechanism | KV / state | Prefix-cacheable? | HiCache / LMCache / disagg | Decode bottleneck | Models we serve |
+|---|---|---|:---:|:---:|---|---|
+| **Dense MHA / GQA** (± qk_norm) | Full softmax over all past tokens; GQA shares KV across head groups | Full KV, grows with context | Yes | Yes | KV bandwidth; for MoE models the MoE dispatch is the cost center | **MiniMax-M2** (GQA + per-layer qk_norm), **Qwen3-235B** (GQA) |
+| **MLA** (Multi-head Latent Attention) | KV compressed to a low-rank latent (`kv_lora_rank`) then projected up | Small latent KV (20-28× smaller) | Yes | Yes | Memory-bound; **at HW ceiling at high batch** (§12) — MLA already IS the compression | **Kimi K2.x**, **DeepSeek V3/R1**, **GLM-5** (MLA + NSA) |
+| **Sparse attention** (top-k / NSA / DSA) | Score a cheap proxy, attend to only the top-k KV blocks | Full KV stored, sparse *read* | Yes | Yes (KV is standard) | Query-dependent block selection overhead | GLM-5 (NSA path). **MSA target: no served model uses it yet** |
+| **Linear / gated-delta / DeltaNet** | Recurrent fixed-size state replaces softmax KV; delta-rule erase/write | **Fixed-size recurrent state — NOT KV** | **No (state layers)** | **No — incompatible with all KV-transfer connectors** | Prefill slower; no KV to be BW-bound on | **Qwen3-Next** (hybrid gated-delta + full attention) |
+| **SSM / Mamba-2 hybrid** | State-space recurrence interleaved with a few full-attention layers | Fixed-size SSM state + KV for attention layers only | **Partial (attention layers only)** | **No — recurrent state blocks HiCache/LMCache/NIXL** | Sub-quadratic long-context prefill is the win | **Nemotron-3-Super / -Ultra** (Mamba-2 + LatentMoE + Select-Attention) |
+| **Sliding-window + full hybrid** | Local window on most layers, full attention on a few | Bounded local KV + full on global layers | Yes | Yes | Long-context prefill penalty on global layers | Gemma-4 (local + global) |
+
+### The Serving Rules That Fall Out of This
+
+1. **Recurrent-state families (linear/gated-delta, Mamba-2 hybrid) break KV offload and disaggregation.** The fixed-size recurrent state is not a KV cache — HiCache, LMCache, NIXL, and disagg P/D all assume transferable KV pages and silently fail or degrade. This is why the Nemotron specs forbid HiCache and disagg (nemotron-super lessons #1/#2/#17/#21). Prefix caching helps only the interleaved attention layers, so expect a cold/warm TTFT ratio between 1× and 2×, not the ~100× you get on a pure transformer.
+2. **MLA decode is at the hardware ceiling at production batch (§12).** No kernel rewrite helps; the only escape hatches are more GPUs (distribute KV via TP/EP), FP4 (smaller KV), or accepting it. Don't spend a kernel-optimization budget here.
+3. **Dense-GQA MoE models are MoE-bound, not attention-bound.** For MiniMax-M2 and Qwen3-235B the attention is ordinary; the levers are MoE backend (FlashInfer vs Triton), qk-norm fusion, and speculative decode — not attention sparsity. A sparse-attention kernel (MSA) has nothing to accelerate on a dense model.
+4. **Sparse-attention kernels need sparse-native weights.** MSA-style top-k attention only applies to a model whose config/weights invoke the sparse path. You cannot bolt it onto a dense checkpoint. As of this writing no model we serve uses MSA.
+5. **A family is a training-time choice, not a swap-in.** Gated DeltaNet-2 (NVlabs, [arXiv 2605.22791](https://arxiv.org/abs/2605.22791)) beats Mamba-2 on RULER long-context retrieval at matched state size, making it a plausible *successor* architecture for a future Nemotron generation — but the weights are not interchangeable, and it inherits the same recurrent-state serving constraints as rule 1. Track it as an architecture watch-item, not a kernel to merge.
+
+### Watch-Items (architectures not yet servable but worth tracking)
+
+| Candidate | Family | Why track it | Status |
+|---|---|---|---|
+| **MSA** (MiniMax Sparse Attention) | Sparse top-k | Sparse-attn + FP4/NVFP4 indexer kernels; sm_120 (g7e) port exists (chutesai fork) | No released sparse MiniMax checkpoint confirmed; kernel library + microbenchmarks only |
+| **Gated DeltaNet-2** | Linear / gated-delta | Mamba-2 successor; best-in-class RULER retrieval at matched state; relevant to the Nemotron Mamba-2 hybrid family | Research/training repo (NVlabs; chutesai added sm_120 training kernels). No servable checkpoint |
 
 ---
 

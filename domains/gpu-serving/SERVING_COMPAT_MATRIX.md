@@ -20,6 +20,8 @@ Quick-reference compatibility matrix for vLLM and SGLang serving engines across 
 
 ## Attention Backends
 
+> This section lists the *kernel implementations* per GPU. For the *architectural families* they serve (dense/GQA, MLA, sparse, linear/gated-delta, Mamba-2 hybrid) and the serving consequence of each — prefix-cacheability, HiCache/disagg compatibility, decode bottleneck, which models use which — see `docs/inference-optimization-guide.md` §15 (Attention Family Taxonomy).
+
 ### vLLM
 
 | Backend | H100/H200 (sm_90) | B200 (sm_100) | RTX PRO 6000 (sm_120) | Notes |
