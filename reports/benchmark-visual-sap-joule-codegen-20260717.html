@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAP Joule Codegen — g7e Benchmark Report (2026-07-17)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117; --surface: #1a1d2e; --surface-2: #242740; --border: #2e3151;
+      --text: #e2e8f0; --text-muted: #8892a4; --accent: #6366f1;
+      --accent-soft: rgba(99,102,241,0.15);
+      --green: #22c55e; --green-soft: rgba(34,197,94,0.12);
+      --red: #ef4444; --red-soft: rgba(239,68,68,0.12);
+      --yellow: #f59e0b; --yellow-soft: rgba(245,158,11,0.12);
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc; --surface: #ffffff; --surface-2: #f1f5f9; --border: #e2e8f0;
+      --text: #0f172a; --text-muted: #64748b;
+      --accent-soft: rgba(99,102,241,0.08); --green-soft: rgba(34,197,94,0.08);
+      --red-soft: rgba(239,68,68,0.08); --yellow-soft: rgba(245,158,11,0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1.25rem 2rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    header .meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .theme-toggle { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); padding: 0.4rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-family: inherit; }
+    .theme-toggle:hover { background: var(--border); }
+    main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    .hw-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 2rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; }
+    .hw-item .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 0.25rem; }
+    .hw-item .value { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
+    .section { margin-bottom: 2.5rem; }
+    .note { font-size: 0.82rem; color: var(--text-muted); margin-top: 0.75rem; }
+    .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    thead { background: var(--surface-2); }
+    th { padding: 0.75rem 1rem; text-align: left; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); white-space: nowrap; }
+    td { padding: 0.75rem 1rem; border-top: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; }
+    tr:hover td { background: var(--accent-soft); }
+    td.config-name { font-family: 'Inter', sans-serif; font-weight: 500; font-size: 0.85rem; }
+    .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600; font-family: 'Inter', sans-serif; }
+    .badge-pass { background: var(--green-soft); color: var(--green); }
+    .badge-fail { background: var(--red-soft); color: var(--red); }
+    .badge-warn { background: var(--yellow-soft); color: var(--yellow); }
+    .chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; }
+    .mermaid { overflow-x: auto; }
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .summary-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; }
+    .summary-card .stat-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 0.35rem; }
+    .summary-card .stat-value { font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; font-weight: 600; color: var(--accent); }
+    .summary-card .stat-value.red { color: var(--red); }
+    .summary-card .stat-value.green { color: var(--green); }
+    .summary-card .stat-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .verdict { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--red); border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 2rem; font-size: 0.9rem; }
+    .verdict strong { color: var(--red); }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 800px) { .two-col { grid-template-columns: 1fr; } }
+    .lesson-list { list-style: none; }
+    .lesson-list li { padding: 0.6rem 0.9rem; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 0.5rem; font-size: 0.83rem; background: var(--surface); }
+    .lesson-list li b { color: var(--accent); }
+    footer { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.75rem; border-top: 1px solid var(--border); margin-top: 3rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>SAP Joule Codegen — Cache-Honest SLA Verdict on g7e</h1>
+    <div class="meta">Qwen3-32B BF16 · vLLM 0.25.1 · g7e.12xlarge (TP2 replica) · 2026-07-17 · 742 requests · 0 errors · 0 think-leaks</div>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">Toggle theme</button>
+</header>
+
+<main>
+
+  <div class="hw-card">
+    <div class="hw-item"><div class="label">Instance</div><div class="value">g7e.12xlarge (spot $1.95/hr)</div></div>
+    <div class="hw-item"><div class="label">GPUs</div><div class="value">2 × RTX PRO 6000 (sm_120, 96GB)</div></div>
+    <div class="hw-item"><div class="label">Model</div><div class="value">Qwen3-32B BF16 (~65 GB)</div></div>
+    <div class="hw-item"><div class="label">Workload</div><div class="value">30/40/20/10 @ 1K/8K/20K/28K, out=256</div></div>
+    <div class="hw-item"><div class="label">SLA</div><div class="value">E2E P90 ≤ 30 s @ 50/geo</div></div>
+    <div class="hw-item"><div class="label">Cache policy</div><div class="value">unique prompts (honest)</div></div>
+  </div>
+
+  <div class="verdict">
+    <strong>Headline:</strong> a tuned TP2 replica holds <strong>~9 concurrent</strong> at the 30 s SLA on cache-honest
+    traffic → a 48xl as TP2×4 ≈ <strong>~36 per geo, below the 50 target</strong>. The 2026-07-14 field run
+    (P90 15 s @ c=100 on 1× 48xl TP8) cycled 82 prompts across 6,000 requests — prefix caching made prefill
+    nearly free, overstating capacity ~7×. Decisive next measurement: TP2×DP4 vs TP4×DP2 vs TP8 on
+    ml.g7e.48xlarge (agent-account quota = 4 confirmed).
+  </div>
+
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="stat-label">Knee per TP2 replica</div>
+      <div class="stat-value">~9 concurrent</div>
+      <div class="stat-sub">c=8 PASS (22.1 s P90) · c=10 FAIL (33.1 s)</div>
+    </div>
+    <div class="summary-card">
+      <div class="stat-label">Best kernel config</div>
+      <div class="stat-value green">MNBT 16384</div>
+      <div class="stat-sub">−19% P90 vs untuned 8192 · FA2 ≈ FlashInfer</div>
+    </div>
+    <div class="summary-card">
+      <div class="stat-label">EAGLE3 spec decode</div>
+      <div class="stat-value red">+41% worse</div>
+      <div class="stat-sub">at c=8 · 33% acceptance · deferral confirmed</div>
+    </div>
+    <div class="summary-card">
+      <div class="stat-label">Cost per geo (measured path)</div>
+      <div class="stat-value">$49.7/hr</div>
+      <div class="stat-sub">6× 12xl = 1.5× 48xl ($4.14/GPU-hr linear)</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Concurrency Sweep — tuned config (FA2 + MNBT 16384), E2E seconds</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Concurrency</th><th>Agg P50</th><th>Agg P90</th><th>20K bucket P90</th><th>28K bucket P90</th><th>vs 30 s SLA</th></tr></thead>
+        <tbody>
+          <tr><td>8</td><td>15.1</td><td>22.1</td><td>—</td><td>22.5</td><td><span class="badge badge-pass">PASS</span></td></tr>
+          <tr><td>10</td><td>22.3</td><td>33.1</td><td>34.6</td><td>33.4</td><td><span class="badge badge-fail">FAIL</span></td></tr>
+          <tr><td>12</td><td>25.6</td><td>34.7</td><td>34.8</td><td>35.6</td><td><span class="badge badge-fail">FAIL</span></td></tr>
+          <tr><td>14</td><td>32.4</td><td>42.0</td><td>38.3</td><td>46.1</td><td><span class="badge badge-fail">FAIL</span></td></tr>
+          <tr><td>32 (untuned MNBT 8192)</td><td>55.6</td><td>64.1</td><td>64.7</td><td>63.5</td><td><span class="badge badge-fail">FAIL</span></td></tr>
+          <tr><td>50 (untuned MNBT 8192)</td><td>91.7</td><td>107.8</td><td>104.2</td><td>139.2</td><td><span class="badge badge-fail">FAIL — 3.6×</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note">Per-bucket percentiles reported per the workload card's percentile-trap rule: aggregate P90 sits on the 20K/28K boundary, so the 28K bucket must independently clear 30 s.</div>
+  </div>
+
+  <div class="section">
+    <h2>E2E P90 vs Concurrency (tuned TP2 replica)</h2>
+    <div class="chart-container">
+      <div class="mermaid">
+xychart-beta
+  title "Aggregate E2E P90 (s) vs concurrency — SLA line at 30 s"
+  x-axis ["c=8", "c=10", "c=12", "c=14"]
+  y-axis "E2E P90 (s)" 0 --> 50
+  bar [22.1, 33.1, 34.7, 42.0]
+  line [30, 30, 30, 30]
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col section">
+    <div>
+      <h2>Kernel A/B at c=8 (single-variable)</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Config</th><th>Agg P90</th><th>Δ vs base</th></tr></thead>
+          <tbody>
+            <tr><td class="config-name">FA2 + MNBT 2048</td><td>29.3</td><td><span class="badge badge-fail">+7%</span></td></tr>
+            <tr><td class="config-name">FA2 + MNBT 8192 (base)</td><td>27.3</td><td>—</td></tr>
+            <tr><td class="config-name">FA2 + MNBT 16384</td><td>22.1</td><td><span class="badge badge-pass">−19%</span></td></tr>
+            <tr><td class="config-name">FlashInfer + MNBT 8192</td><td>23.7</td><td><span class="badge badge-pass">−13%</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">Chunked-prefill budget, not attention kernel, is the lever — larger chunks cut head-of-line blocking from 28K prefills.</div>
+    </div>
+    <div>
+      <h2>EAGLE3 Spec Decode (T3) — regression</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>c</th><th>Specdec P90</th><th>Baseline P90</th><th>Δ</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>12.6</td><td>~11.4</td><td><span class="badge badge-warn">wash</span></td></tr>
+            <tr><td>8</td><td>31.2</td><td>22.1</td><td><span class="badge badge-fail">+41%</span></td></tr>
+            <tr><td>10</td><td>35.9</td><td>33.1</td><td><span class="badge badge-fail">+8%</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">33% token acceptance (mean len 2.0 of k=3, RedHatAI EAGLE3). Batch-saturated GDDR7 + weak acceptance = drafting steals compute. Stage 0b deferral confirmed by measurement.</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>c=1 Cold Prefill Isolation (per bucket)</h2>
+    <div class="chart-container">
+      <div class="mermaid">
+xychart-beta
+  title "TTFT p50 (s) by input bucket at c=1 — prefill linear at ~0.15 s/K tokens"
+  x-axis ["1K", "8K", "20K", "28K"]
+  y-axis "TTFT (s)" 0 --> 5
+  bar [0.14, 1.0, 2.9, 4.2]
+      </div>
+    </div>
+    <div class="note">Decode floor ~6.6 s for 256 tokens (26 ms/tok — at the GDDR7 weights-read roofline). At this output length decode is co-equal with prefill, revising the pure prefill-bound regime prediction for TP2. No PCIe interconnect penalty measured at TP2.</div>
+  </div>
+
+  <div class="section">
+    <h2>Field Run vs Cache-Honest (the ~7× gap)</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Run</th><th>Shape</th><th>Load</th><th>P90</th><th>Prompts</th><th>Validity</th></tr></thead>
+        <tbody>
+          <tr><td class="config-name">Field run 2026-07-14</td><td>1× 48xl TP8</td><td>c=100</td><td>15.0 s</td><td>82 cycled ×73</td><td><span class="badge badge-warn">cache-inflated upper bound</span></td></tr>
+          <tr><td class="config-name">This session</td><td>12xl TP2 (¼ of 48xl)</td><td>c=8–50</td><td>22.1 s @ c=8</td><td>unique per request</td><td><span class="badge badge-pass">SLA-valid</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note">Unresolved split: how much of the gap is cache inflation vs TP8 shape advantage. One cache-honest TP8 run on ml.g7e.48xlarge (agent account, quota=4) settles it.</div>
+  </div>
+
+  <div class="section">
+    <h2>Cost Table (verified EC2 on-demand, us-east-2 — SageMaker ml.* premium TBD)</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Option</th><th>Basis</th><th>Per geo (50 conc)</th><th>$/hr per geo</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td class="config-name">g7e.12xl × N (TP2)</td><td>measured ~9/replica</td><td>6 instances</td><td>$49.7</td><td><span class="badge badge-pass">measured</span></td></tr>
+          <tr><td class="config-name">g7e.48xl TP2×4</td><td>extrapolated ~36/geo</td><td>2 whole (1.5 amortized)</td><td>$49.7–66.3</td><td><span class="badge badge-warn">extrapolated</span></td></tr>
+          <tr><td class="config-name">g7e.48xl TP8 / TP+DP</td><td>field claim, unverified</td><td>1?</td><td>$33.1 if it holds</td><td><span class="badge badge-warn">unmeasured</span></td></tr>
+          <tr><td class="config-name">p5e.48xl (8× H200)</td><td>public ballpark</td><td>1?</td><td>~$40–44</td><td><span class="badge badge-warn">unmeasured</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Key Lessons (compounded to steering + cards)</h2>
+    <ul class="lesson-list">
+      <li><b>Cache-honest rule:</b> never accept a benchmark whose request count exceeds its distinct-prompt count without a prefix-hit-rate audit — it changed this engagement's answer by ~7×.</li>
+      <li><b>MNBT probe mandatory:</b> untuned chunked-prefill budget cost 20% P90 on a mixed-length workload; probe before any topology verdict.</li>
+      <li><b>Small-n knees are optimistic:</b> n=48 said 10–12; n=80 said 9. Confirm with ≥8·c samples before quoting concurrency-at-SLA.</li>
+      <li><b>Spec decode crossover is real:</b> EAGLE3 regresses 41% at the batch operating point on GDDR7; drafters exist but the regime rules them out here.</li>
+      <li><b>OSL caps mislead:</b> models EOS naturally (~300–800 tok); ask for the measured output-length distribution, not the cap. p99 at cap 2048 hit 116 s.</li>
+      <li><b>g7e capacity intel:</b> spot 12xl only (64 vCPU quota; raise CASE_OPENED), ODCR dry 36/36 AZ probes, SageMaker ml pool independent — agent account has ml.g7e.48xl quota = 4.</li>
+      <li><b>NVFP4 is the biggest unmeasured lever:</b> ~3× decode from bytes-read on this architecture, but needs offline requant + SAP sign-off + sm_120 kernel smoke.</li>
+    </ul>
+  </div>
+
+</main>
+
+<footer>
+  Generated by visual-explainer · agent-aiops-on-aws · 2026-07-17 · raw artifacts: s3://agent-aiops-bench-us-east-2/sap-joule-codegen/results-g7e12xl-tp2/
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
+    themeVariables: { primaryColor: '#6366f1', primaryTextColor: '#e2e8f0', primaryBorderColor: '#2e3151', lineColor: '#8892a4', background: '#1a1d2e', mainBkg: '#1a1d2e' }
+  });
+  function toggleTheme() {
+    const html = document.documentElement;
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+  }
+</script>
+</body>
+</html>

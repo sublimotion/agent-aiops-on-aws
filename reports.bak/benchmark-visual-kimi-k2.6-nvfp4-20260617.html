@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kimi K2.6 NVFP4 — B200 + B300 Benchmark Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0f1117;--surface:#1a1d2e;--surface-2:#242740;--border:#2e3151;--text:#e2e8f0;--text-muted:#8892a4;--accent:#6366f1;--accent-soft:rgba(99,102,241,.15);--green:#22c55e;--green-soft:rgba(34,197,94,.12);--red:#ef4444;--red-soft:rgba(239,68,68,.12);--yellow:#f59e0b;--yellow-soft:rgba(245,158,11,.12);--blue:#38bdf8;--blue-soft:rgba(56,189,248,.12)}
+[data-theme="light"]{--bg:#f8fafc;--surface:#fff;--surface-2:#f1f5f9;--border:#e2e8f0;--text:#0f172a;--text-muted:#64748b;--accent-soft:rgba(99,102,241,.08);--green-soft:rgba(34,197,94,.08);--red-soft:rgba(239,68,68,.08);--yellow-soft:rgba(245,158,11,.08);--blue-soft:rgba(56,189,248,.08)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.55;padding:2rem 1rem;max-width:1100px;margin:0 auto;transition:background .2s}
+h1{font-size:1.7rem;font-weight:700;margin-bottom:.3rem}
+h2{font-size:1.25rem;font-weight:600;margin:2.2rem 0 .9rem;padding-bottom:.4rem;border-bottom:1px solid var(--border)}
+h3{font-size:1rem;font-weight:600;margin:1.2rem 0 .5rem;color:var(--text-muted)}
+p{margin-bottom:.7rem}
+code{font-family:'JetBrains Mono',monospace;font-size:.85em;background:var(--surface-2);padding:.1rem .35rem;border-radius:4px}
+.sub{color:var(--text-muted);font-size:.92rem;margin-bottom:1.2rem}
+.meta{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1.5rem}
+.chip{background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:.25rem .8rem;font-size:.8rem;color:var(--text-muted)}
+.chip b{color:var(--text);font-weight:600}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.2rem 1.4rem;margin-bottom:1rem}
+table{width:100%;border-collapse:collapse;margin:.6rem 0 1rem;font-size:.88rem}
+th,td{text-align:left;padding:.55rem .7rem;border-bottom:1px solid var(--border)}
+th{color:var(--text-muted);font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;user-select:none}
+th:hover{color:var(--text)}
+td{font-family:'JetBrains Mono',monospace}
+td.lbl{font-family:'Inter',sans-serif}
+tr:hover td{background:var(--accent-soft)}
+.tag{display:inline-block;font-size:.7rem;font-weight:600;padding:.1rem .5rem;border-radius:5px;font-family:'Inter',sans-serif;white-space:nowrap}
+.measured{background:var(--green-soft);color:var(--green)}
+.inferred{background:var(--yellow-soft);color:var(--yellow)}
+.partial{background:var(--blue-soft);color:var(--blue)}
+.blocked{background:var(--red-soft);color:var(--red)}
+.null{color:var(--text-muted)}
+.neg{color:var(--red)}
+.pos{color:var(--green)}
+.banner{border-radius:12px;padding:1rem 1.3rem;margin-bottom:1rem;border:1px solid}
+.banner.warn{background:var(--red-soft);border-color:var(--red)}
+.banner.warn h3{color:var(--red);margin-top:0}
+.banner.info{background:var(--blue-soft);border-color:var(--blue)}
+.banner.info h3{color:var(--blue);margin-top:0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.8rem;margin:1rem 0}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.9rem 1rem}
+.kpi .v{font-size:1.5rem;font-weight:700;font-family:'JetBrains Mono',monospace}
+.kpi .l{font-size:.78rem;color:var(--text-muted);margin-top:.2rem}
+.toggle{position:fixed;top:1rem;right:1rem;background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:.45rem .7rem;cursor:pointer;font-size:.85rem}
+ul{margin:.3rem 0 .9rem 1.2rem}li{margin-bottom:.35rem}
+.legend{display:flex;gap:1rem;flex-wrap:wrap;font-size:.8rem;color:var(--text-muted);margin-bottom:.8rem}
+.legend span{display:inline-flex;align-items:center;gap:.35rem}
+.dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+.footnote{font-size:.82rem;color:var(--text-muted);margin-top:.4rem}
+.chart{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem;margin:.5rem 0 1rem;text-align:center}
+</style>
+</head>
+<body>
+<button class="toggle" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'">◐ theme</button>
+
+<h1>Kimi K2.6 NVFP4 — Single-Node Optimization &amp; Parallelism Sweep (B200 + B300)</h1>
+<p class="sub">Customer workload characterization · 8×B200 (us-east-2) + 8×B300 (us-west-2) · sessions 2026-06-16/17</p>
+<div class="meta">
+<span class="chip"><b>Model</b> nvidia/Kimi-K2.6-NVFP4 (1T MoE, 32B active)</span>
+<span class="chip"><b>HW</b> p6-b200 + p6-b300.48xlarge · TP4+DP2</span>
+<span class="chip"><b>Engine</b> SGLang v0.5.13.post1-cu130</span>
+<span class="chip"><b>Workload</b> 31,404-tok ctx · 1,024 out · 74% prefix cache</span>
+<span class="chip"><b>Substrate</b> EKS qwen3-next-bench (us-east-2 spot)</span>
+</div>
+
+<div class="legend">
+<span><span class="dot" style="background:var(--green)"></span>measured</span>
+<span><span class="dot" style="background:var(--yellow)"></span>inferred</span>
+<span><span class="dot" style="background:var(--blue)"></span>partial data</span>
+<span><span class="dot" style="background:var(--red)"></span>blocked / negative</span>
+</div>
+
+<div class="card">
+<h3 style="margin-top:0">TL;DR</h3>
+<p>Goal: characterize Kimi-K2.6-NVFP4 on one 8-GPU Blackwell node against the customer's workload (31K context, 1,024-token output, 74% prefix cache) and size a fleet for 32,500 tok/s aggregate.</p>
+<ul>
+<li><b>Config:</b> SGLang, <b>TP4+DP2</b> (two 4-GPU replicas) is the best single-node layout — +19-25% over TP8 at every concurrency, lower latency. Decode-tier tricks (fp8-KV, EAGLE3, MoE-tile, MNBT) were all null/negative; wide-EP is blocked upstream; single-node disaggregation regressed 68%.</li>
+<li><b>Hardware:</b> <b>B300 beats B200 by +36-43% throughput and up to −49% p50 latency</b> — because the B200 result was limited by KV-cache capacity, not bandwidth, and B300's larger HBM relieves it.</li>
+<li><b>Fleet sizing:</b> measured TTFT shows a node holds <b>~c512 users at the 16k peak context</b> within the 15s SLO (p99 7.9s) — so the <b>TTFT SLO does NOT bind</b>; <b>aggregate throughput is the constraint → ~8 (B300) / ~11 (B200) nodes</b> for the 32,500 tok/s peak. Autoscale to keep each node ≤~c512 (16k) / ≤~c256 (31k).</li>
+<li><b>Cost verdict: not yet decidable</b> — see the blocked-cost note below.</li>
+</ul>
+</div>
+
+<div class="banner warn">
+<h3>Cost / go-no-go verdict: BLOCKED (need 3 inputs)</h3>
+<p style="margin-bottom:.4rem">Self-host <b>output-only</b> $/Mtok looks favorable at spot, but the customer's <code>$0.338/Mtok</code> target is a <b>blended</b> price dominated by <b>input</b> tokens (~31:1 input:output). Output-only vs blended is not a fair comparison, so we are <b>not</b> declaring a go/no-go.</p>
+<p style="margin-bottom:0">To decide, we need: <b>(a)</b> customer's upstream <b>input</b> $/Mtok, <b>(b)</b> confirmed input:output ratio, <b>(c)</b> our measured input/prefill throughput.</p>
+</div>
+
+<h3>Headline numbers (TP4+DP2)</h3>
+<div class="kpis">
+<div class="kpi"><div class="v">3,187</div><div class="l">B200 peak agg decode tok/s (@ c1024) <span class="tag measured">measured</span></div></div>
+<div class="kpi"><div class="v pos">4,489</div><div class="l">B300 peak agg decode tok/s (@ c512) <span class="tag measured">measured</span></div></div>
+<div class="kpi"><div class="v">0.74</div><div class="l">prefix cache hit (matches customer 74%) <span class="tag measured">measured</span></div></div>
+<div class="kpi"><div class="v" style="color:var(--yellow)">~8 / ~11</div><div class="l">nodes for 32,500 tok/s (B300 / B200) — throughput binds, not TTFT <span class="tag inferred">inferred</span></div></div>
+</div>
+
+<h2>1 · Results — all configs, one view</h2>
+<p>Aggregate decode throughput vs concurrency, every config on one chart. <b>Higher and flatter = better.</b> TP4+DP2 beats TP8 at all loads; B300 beats B200; EP is blocked and disagg collapses (off-scale low). <span class="tag measured">measured</span></p>
+<div class="chart">
+<svg viewBox="0 0 820 400" xmlns="http://www.w3.org/2000/svg" font-family="Inter,system-ui,sans-serif" style="width:100%;height:auto">
+<text x="70" y="26" font-size="14" font-weight="600" fill="var(--text)">Aggregate decode tok/s vs concurrency (per 8-GPU node)</text>
+<line x1="70" y1="330.0" x2="600" y2="330.0" stroke="var(--border)" stroke-width="1"/>
+<text x="62" y="334.0" font-size="11" fill="var(--text-muted)" text-anchor="end">0</text>
+<line x1="70" y1="273.2" x2="600" y2="273.2" stroke="var(--border)" stroke-width="1"/>
+<text x="62" y="277.2" font-size="11" fill="var(--text-muted)" text-anchor="end">1,000</text>
+<line x1="70" y1="216.4" x2="600" y2="216.4" stroke="var(--border)" stroke-width="1"/>
+<text x="62" y="220.4" font-size="11" fill="var(--text-muted)" text-anchor="end">2,000</text>
+<line x1="70" y1="159.6" x2="600" y2="159.6" stroke="var(--border)" stroke-width="1"/>
+<text x="62" y="163.6" font-size="11" fill="var(--text-muted)" text-anchor="end">3,000</text>
+<line x1="70" y1="102.8" x2="600" y2="102.8" stroke="var(--border)" stroke-width="1"/>
+<text x="62" y="106.8" font-size="11" fill="var(--text-muted)" text-anchor="end">4,000</text>
+<line x1="70" y1="46.0" x2="600" y2="46.0" stroke="var(--border)" stroke-width="1"/>
+<text x="62" y="50.0" font-size="11" fill="var(--text-muted)" text-anchor="end">5,000</text>
+<text x="18" y="188" font-size="11" fill="var(--text-muted)" text-anchor="middle" transform="rotate(-90 18 188)">agg decode tok/s</text>
+<text x="70.0" y="350" font-size="11" fill="var(--text-muted)" text-anchor="middle">128</text>
+<text x="246.7" y="350" font-size="11" fill="var(--text-muted)" text-anchor="middle">256</text>
+<text x="423.3" y="350" font-size="11" fill="var(--text-muted)" text-anchor="middle">512</text>
+<text x="600.0" y="350" font-size="11" fill="var(--text-muted)" text-anchor="middle">1024</text>
+<text x="335" y="368" font-size="11" fill="var(--text-muted)" text-anchor="middle">concurrency (users/node)</text>
+<polyline points="70.0,195.2 246.7,184.1 423.3,187.1 600.0,183.6" fill="none" stroke="#8892a4" stroke-width="2.5"/>
+<circle cx="70.0" cy="195.2" r="3.5" fill="#8892a4"/>
+<text x="70.0" y="187.2" font-size="9.5" fill="#8892a4" text-anchor="middle">2,374</text>
+<circle cx="246.7" cy="184.1" r="3.5" fill="#8892a4"/>
+<text x="246.7" y="176.1" font-size="9.5" fill="#8892a4" text-anchor="middle">2,569</text>
+<circle cx="423.3" cy="187.1" r="3.5" fill="#8892a4"/>
+<text x="423.3" y="179.1" font-size="9.5" fill="#8892a4" text-anchor="middle">2,516</text>
+<circle cx="600.0" cy="183.6" r="3.5" fill="#8892a4"/>
+<text x="600.0" y="175.6" font-size="9.5" fill="#8892a4" text-anchor="middle">2,578</text>
+<polyline points="70.0,168.4 246.7,155.8 423.3,151.8 600.0,149.0" fill="none" stroke="#6366f1" stroke-width="2.5"/>
+<circle cx="70.0" cy="168.4" r="3.5" fill="#6366f1"/>
+<text x="70.0" y="182.4" font-size="9.5" fill="#6366f1" text-anchor="middle">2,845</text>
+<circle cx="246.7" cy="155.8" r="3.5" fill="#6366f1"/>
+<text x="246.7" y="169.8" font-size="9.5" fill="#6366f1" text-anchor="middle">3,067</text>
+<circle cx="423.3" cy="151.8" r="3.5" fill="#6366f1"/>
+<text x="423.3" y="165.8" font-size="9.5" fill="#6366f1" text-anchor="middle">3,138</text>
+<circle cx="600.0" cy="149.0" r="3.5" fill="#6366f1"/>
+<text x="600.0" y="163.0" font-size="9.5" fill="#6366f1" text-anchor="middle">3,187</text>
+<polyline points="423.3,75.0 600.0,84.2" fill="none" stroke="#22c55e" stroke-width="2.5"/>
+<circle cx="423.3" cy="75.0" r="3.5" fill="#22c55e"/>
+<text x="423.3" y="67.0" font-size="9.5" fill="#22c55e" text-anchor="middle">4,489</text>
+<circle cx="600.0" cy="84.2" r="3.5" fill="#22c55e"/>
+<text x="600.0" y="76.2" font-size="9.5" fill="#22c55e" text-anchor="middle">4,327</text>
+<rect x="622" y="56" width="14" height="4" rx="2" fill="#8892a4"/>
+<text x="642" y="62" font-size="11.5" fill="var(--text)">B200 TP8</text>
+<rect x="622" y="80" width="14" height="4" rx="2" fill="#6366f1"/>
+<text x="642" y="86" font-size="11.5" fill="var(--text)">B200 TP4+DP2</text>
+<rect x="622" y="104" width="14" height="4" rx="2" fill="#22c55e"/>
+<text x="642" y="110" font-size="11.5" fill="var(--text)">B300 TP4+DP2</text>
+</svg>
+</div>
+<p class="footnote">Three lines, bottom→top: <b>① B200 TP8</b> (2,374 → 2,578 across c128-1024) · <b>② B200 TP4+DP2</b> (2,845 → 3,187, +19-25% over ①) · <b>③ B300 TP4+DP2</b> (4,489 @ c512, 4,327 @ c1024, +36-43% over ②). B300 was measured only at c512/c1024 — its line is flat-left to those points, not interpolated data. Not shown: vLLM (≈3% below SGLang at c512, thin control arm), wide-EP (blocked, SGLang #24502), 4P/4D disagg (815 tok/s, −68% — off-scale because disagg mode disables the prefix cache).</p>
+
+<h2>1b · TTFT vs the 15s SLO (B300 TP4+DP2) — the real scale-out trigger</h2>
+<p>The customer's <b>primary</b> SLO is <b>TTFT p95 &lt; 15s</b> (their observed avg 3.3s, p95 5.8-15s). TTFT is prefill-bound, so it depends on <b>context length</b> — measured here at both ends of their diurnal swing: <b>16k</b> (peak-traffic hours) and <b>31k</b> (quiet hours). <span class="tag measured">measured (cold prompts = conservative upper bound; real 74%-cached TTFT is lower)</span></p>
+<div class="chart">
+<svg viewBox="0 0 820 400" xmlns="http://www.w3.org/2000/svg" font-family="Inter,system-ui,sans-serif" style="width:100%;height:auto">
+<text x="70" y="26" font-size="14" font-weight="600" fill="var(--text)">TTFT p99 vs concurrency — 15s SLO threshold</text>
+<line x1="70" y1="330.0" x2="600" y2="330.0" stroke="var(--border)" stroke-width="1"/>
+<text x="62" y="334.0" font-size="11" fill="var(--text-muted)" text-anchor="end">0</text>
+<line x1="70" y1="273.2" x2="600" y2="273.2" stroke="var(--border)" stroke-width="1"/>
+<text x="62" y="277.2" font-size="11" fill="var(--text-muted)" text-anchor="end">5,000</text>
+<line x1="70" y1="216.4" x2="600" y2="216.4" stroke="var(--border)" stroke-width="1"/>
+<text x="62" y="220.4" font-size="11" fill="var(--text-muted)" text-anchor="end">10,000</text>
+<line x1="70" y1="159.6" x2="600" y2="159.6" stroke="var(--border)" stroke-width="1"/>
+<text x="62" y="163.6" font-size="11" fill="var(--text-muted)" text-anchor="end">15,000</text>
+<line x1="70" y1="102.8" x2="600" y2="102.8" stroke="var(--border)" stroke-width="1"/>
+<text x="62" y="106.8" font-size="11" fill="var(--text-muted)" text-anchor="end">20,000</text>
+<line x1="70" y1="46.0" x2="600" y2="46.0" stroke="var(--border)" stroke-width="1"/>
+<text x="62" y="50.0" font-size="11" fill="var(--text-muted)" text-anchor="end">25,000</text>
+<text x="18" y="188" font-size="11" fill="var(--text-muted)" text-anchor="middle" transform="rotate(-90 18 188)">TTFT p99 (ms)</text>
+<rect x="70" y="46" width="530" height="113.6" fill="rgba(239,68,68,0.08)"/>
+<line x1="70" y1="159.6" x2="600" y2="159.6" stroke="#ef4444" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="594" y="153.6" font-size="11" fill="#ef4444" text-anchor="end" font-weight="600">15s SLO</text>
+<text x="70.0" y="350" font-size="11" fill="var(--text-muted)" text-anchor="middle">128</text>
+<text x="202.5" y="350" font-size="11" fill="var(--text-muted)" text-anchor="middle">256</text>
+<text x="335.0" y="350" font-size="11" fill="var(--text-muted)" text-anchor="middle">512</text>
+<text x="467.5" y="350" font-size="11" fill="var(--text-muted)" text-anchor="middle">768</text>
+<text x="600.0" y="350" font-size="11" fill="var(--text-muted)" text-anchor="middle">1024</text>
+<text x="335" y="368" font-size="11" fill="var(--text-muted)" text-anchor="middle">concurrency (users/node)</text>
+<polyline points="70.0,285.9 202.5,284.9 335.0,240.5 467.5,105.9 600.0,106.9" fill="none" stroke="#8892a4" stroke-width="2.5"/>
+<circle cx="70.0" cy="285.9" r="3.5" fill="#8892a4"/>
+<text x="70.0" y="277.9" font-size="9.5" fill="#8892a4" text-anchor="middle">3.9s</text>
+<circle cx="202.5" cy="284.9" r="3.5" fill="#8892a4"/>
+<text x="202.5" y="276.9" font-size="9.5" fill="#8892a4" text-anchor="middle">4.0s</text>
+<circle cx="335.0" cy="240.5" r="3.5" fill="#8892a4"/>
+<text x="335.0" y="232.5" font-size="9.5" fill="#8892a4" text-anchor="middle">7.9s</text>
+<circle cx="467.5" cy="105.9" r="3.5" fill="#8892a4"/>
+<text x="467.5" y="97.9" font-size="9.5" fill="#8892a4" text-anchor="middle">19.7s</text>
+<circle cx="600.0" cy="106.9" r="3.5" fill="#8892a4"/>
+<text x="600.0" y="98.9" font-size="9.5" fill="#8892a4" text-anchor="middle">19.6s</text>
+<polyline points="70.0,217.2 202.5,243.0 335.0,109.3" fill="none" stroke="#6366f1" stroke-width="2.5"/>
+<circle cx="70.0" cy="217.2" r="3.5" fill="#6366f1"/>
+<text x="70.0" y="231.2" font-size="9.5" fill="#6366f1" text-anchor="middle">9.9s</text>
+<circle cx="202.5" cy="243.0" r="3.5" fill="#6366f1"/>
+<text x="202.5" y="257.0" font-size="9.5" fill="#6366f1" text-anchor="middle">7.7s</text>
+<circle cx="335.0" cy="109.3" r="3.5" fill="#6366f1"/>
+<text x="335.0" y="123.3" font-size="9.5" fill="#6366f1" text-anchor="middle">19.4s</text>
+<rect x="622" y="56" width="14" height="4" rx="2" fill="#8892a4"/>
+<text x="642" y="62" font-size="11.5" fill="var(--text)">16k ctx (peak hrs)</text>
+<rect x="622" y="80" width="14" height="4" rx="2" fill="#6366f1"/>
+<text x="642" y="86" font-size="11.5" fill="var(--text)">31k ctx (quiet hrs)</text>
+</svg>
+</div>
+<p class="footnote">Flat line = <b>15s SLO ceiling</b>. Lower curve = <b>16k context</b> (peak hours): p99 3.9-7.9s through c512, <b>breaches at c768 (19.7s)</b> → ceiling <b>~c512-600</b>. Upper curve = <b>31k context</b> (quiet hours): fine to c256 (7.7s), <b>breaches at c512 (19.4s)</b> → ceiling <b>~c256-400</b> (31k c768/c1024 clipped to 25k axis; both ≫15s). Both ceilings pressure-tested to breach. Per-request decode at c1 = 166 tok/s; the TTFT (prefill) SLO binds well before the decode-rate SLO.</p>
+
+<div class="banner info">
+<h3>Scale-out trigger: TTFT-bound at ~c512 (16k peak) / ~c256 (31k quiet) per node</h3>
+<p style="margin-bottom:.4rem"><b>The operational trigger</b> is concurrent-users-per-node gated by TTFT: a B300 node holds <b>~c512 users at the 16k peak-traffic context</b> (p99 7.9s, comfortably under 15s) and <b>~c256 at 31k</b>. Past those, TTFT breaches with <b>no throughput gain</b> (16k c768 agg 14,816 ≈ c512's 14,616 but p99 doubles to 19.7s; c1536 agg actually drops to 10,945). So provision/autoscale to keep each node ≤~c512 (16k) / ≤~c256 (31k) — never chase aggregate past the knee.</p>
+<p style="margin-bottom:0"><b>Correction (owned):</b> an earlier version claimed "scale every ~50 users / ~25-30 nodes" — that was built on end-to-end latency <b>mislabeled as TTFT</b> and is <b>withdrawn</b>. Real measured TTFT puts per-node capacity ~10× higher. Fleet for 1,500 peak users: at the 16k peak context (~c512/node) ≈ <b>3-4 nodes for SLO</b>, but aggregate-throughput still needs <b>~8 (B300) / ~11 (B200)</b> — so <b>throughput, not TTFT, is the binding constraint at 16k</b>; size to ~8-11. (At 31k the TTFT ceiling ~c256 would need ~6 nodes — still under the throughput floor.) <b>Gaps:</b> TPOT/ITL not captured; TTFT on B300 only, cold prompts (real cached TTFT lower).</p>
+</div>
+
+<h2>2 · Consolidated results table</h2>
+<table id="master">
+<thead><tr><th>config ▲▼</th><th>HW</th><th>c256</th><th>c512</th><th>c1024</th><th>p50 @ c512</th><th>cache</th><th>verdict</th></tr></thead>
+<tbody>
+<tr><td class="lbl">TP8×1</td><td>B200</td><td>2569</td><td>2516</td><td>2578</td><td>186s</td><td>0.74</td><td class="lbl">session-1 baseline (was mistaken for the ceiling)</td></tr>
+<tr><td class="lbl">TP4+DP2</td><td>B200</td><td class="pos">3067</td><td class="pos">3138</td><td class="pos">3187</td><td class="pos">142s</td><td>0.74</td><td class="pos">+19-25% — best on B200</td></tr>
+<tr><td class="lbl">TP4+DP2</td><td>B300</td><td>—</td><td class="pos">4489</td><td class="pos">4327</td><td class="pos">120s</td><td>0.74</td><td class="pos">+36-43% over B200 — overall best</td></tr>
+<tr><td class="lbl">vLLM TP8</td><td>B200</td><td>2421</td><td>2435*</td><td>—</td><td>—</td><td>0.74</td><td class="lbl">≈3% below SGLang (thin control arm, not tuning-swept)</td></tr>
+<tr><td class="lbl">TP4+EP4 / wide-EP</td><td>B200</td><td colspan="4" style="text-align:center">— would not start —</td><td class="neg">blocked: SGLang #24502 (no fused a2a for NVFP4 runner)</td></tr>
+<tr><td class="lbl">4P/4D disagg</td><td>B200</td><td>—</td><td class="neg">815</td><td>—</td><td>636s</td><td class="neg">lost</td><td class="neg">−68%: disagg mode disables prefix cache + decode starves</td></tr>
+<tr><td class="lbl">TP2 (any DP)</td><td>—</td><td colspan="4" style="text-align:center">— ruled out —</td><td class="lbl">doesn't fit B200 (260GB&gt;180); KV-starves on B300</td></tr>
+</tbody>
+</table>
+<p class="footnote">Decode-tier levers (all B200, all <span class="tag measured">measured</span> null/negative, not in table): fp8-KV null (already fp8 in checkpoint), MNBT null (±5% across 8k-64k — fresh prefill fits one chunk), MoE-tile N/A (vendor FlashInfer-TRTLLM ignores Triton JSON), EAGLE3 −12-19% (compute-saturated, draft competes), HiCache untested. * vLLM c512 is the MNBT=16384 variant (default errored); vLLM cache hit (74%) reads from server counters, not per-request. Why B300 wins: KV pool 2.99M vs 536K tok/replica → token_usage 0.75 (headroom) vs 0.95 (saturated/queuing) — B200's number was KV-capacity-limited, not bandwidth-limited.</p>
+
+<h2>3 · Consistency vs prior Kimi run (no regression)</h2>
+<p>Engine-matched (SGLang→SGLang) — the prior <b>vLLM</b> 10,437 is not a valid comparison. <span class="tag measured">measured</span></p>
+<table>
+<thead><tr><th>metric</th><th>prior B300 SGLang INT4-QAT</th><th>this B200 SGLang NVFP4</th><th>read</th></tr></thead>
+<tbody>
+<tr><td class="lbl">peak agg @ c512</td><td>3,400</td><td>2,516</td><td class="lbl">−26%, but 4× longer output + 2× context</td></tr>
+<tr><td class="lbl">single-stream, short ctx</td><td>124–129 tok/s</td><td class="pos">166 tok/s</td><td class="lbl">ours faster — the true hardware proxy</td></tr>
+</tbody>
+</table>
+<p class="footnote">No regression: normalized for the 4× heavier output, B200 NVFP4 does more work/s than the prior B300 INT4-QAT run, and single-stream is faster. The "slower" impression was an artifact of comparing against the wrong engine on a lighter workload.</p>
+
+<h2>4 · Cost — output-only (blended verdict blocked)</h2>
+<p>$/Mtok output = ($/hr) ÷ (peak tok/s × 3600 / 1e6), at TP4+DP2 peak throughput (B200 3,138 @ c512; B300 4,489 @ c512). vs upstream output price <b>$3.76/Mtok</b>.</p>
+<table>
+<thead><tr><th>HW · basis</th><th>$/hr</th><th>peak tok/s</th><th>$/Mtok output</th><th>vs $3.76</th></tr></thead>
+<tbody>
+<tr><td class="lbl">B200 · spot low</td><td>18.00</td><td>3,138</td><td class="pos">1.59</td><td class="pos">beats (2.4×)</td></tr>
+<tr><td class="lbl">B200 · spot high</td><td>26.15</td><td>3,138</td><td class="pos">2.31</td><td class="pos">beats</td></tr>
+<tr><td class="lbl">B300 · spot</td><td>34.00</td><td>4,489</td><td class="pos">2.10</td><td class="pos">beats</td></tr>
+<tr><td class="lbl">blended vs $0.338</td><td>—</td><td>—</td><td>—</td><td class="blocked">BLOCKED</td></tr>
+</tbody>
+</table>
+<p class="footnote">Spot pricing only (the deployment basis). Recomputed on corrected TP4+DP2 throughput (was stale at the old ~2,500 tok/s / B200-only). <b>B300 spot $2.10/Mtok ≈ B200 spot</b> — B300 costs ~30% more per hour but its +43% throughput nearly cancels it, so $/output-token is a wash; B300's real win is latency/SLO + fewer nodes, not output-token cost. Spot rates are session-observed point estimates (B200 us-east-2 $18-28/hr; B300 us-west-2 ~$34/hr) — volatile, not contracted. <b>Blended verdict still BLOCKED</b>: output-only beats $3.76 at spot, but the customer optimizes blended $0.338 (input-dominated) — needs their input price + token mix.</p>
+<p class="footnote">Spot was volatile $18–28/hr; $/Mtok output is a point estimate, not a stable rate. Excludes multi-node overhead, KV-residency memory cost, spot-reclaim risk.</p>
+
+<h2>5 · Bottom line</h2>
+<ul>
+<li><b>[measured] WINNER config — TP4+DP2</b> (not TP8): +19-25% over TP8 at every concurrency, better latency. Peak <b>~3,190 tok/s on B200, ~4,490 on B300</b>. The session-1 "~2,500 ceiling" was a TP8 artifact — <b>parallelism layout, then hardware, were the real levers — not any decode trick</b>.</li>
+<li><b>[measured]</b> 74% prefix cache reproduced both engines; workload ~26% prefill-bound; all decode-tier levers (fp8-KV, EAGLE3, MoE-tile, MNBT) null/negative on both TP8 and TP4+DP2.</li>
+<li><b>[measured]</b> EP/wide-EP <b>blocked upstream</b> (#24502); single-node 4P/4D disagg <b>−68%</b> (loses prefix cache + GPU starvation) — disagg is multi-node-only.</li>
+<li><b>[measured] B300 &gt; B200: +36-43% throughput, up to −49% p50 latency</b> — B200's peak was partly KV-capacity-throttled, not purely BW-bound; B300's 5.6× KV pool fixes it. The SLO lever for the customer's p95 TTFT ceiling.</li>
+<li><b>[measured] TTFT SLO does not bind; throughput does.</b> Node holds ~c512 users at 16k peak context within the 15s TTFT SLO (p99 7.9s; breaches at c768). So sizing is set by aggregate throughput → <b>~8 (B300) / ~11 (B200) nodes</b> for 32,500 tok/s. Autoscale each node to ≤~c512 (16k) / ≤~c256 (31k). (Earlier "~25-30 nodes / scale every 50 users" was from E2E-mislabeled-as-TTFT — withdrawn.)</li>
+<li><b>[blocked]</b> Blended cost verdict pending customer input price + token mix. Output-only is competitive at spot.</li>
+<li><b>Open</b>: vLLM not tuning-swept; HiCache untested; engine-winner reversal vs prior B300 unexplained.</li>
+<li><b>Meta-lesson</b>: the +25% win came from a carryover lesson (TP4+DP2, kimi-spec L20) the session-1 spec omitted — the fix was systematic lever coverage, not a new trick.</li>
+</ul>
+
+<p class="footnote">Source: <code>domains/gpu-serving/blueprints/kimi-k2.6-nvfp4/lessons.md</code> · 44 result JSONs (B200 + B300) · conclusions audited per <code>.claude/steering/benchmark-analysis.md</code> (verify-before-assert). Confidence tags carried faithfully from source.</p>
+
+<script>
+// sortable tables
+document.querySelectorAll('table').forEach(tbl=>{
+  tbl.querySelectorAll('th').forEach((th,i)=>th.addEventListener('click',()=>{
+    const rows=[...tbl.querySelectorAll('tbody tr')];
+    const asc=th.dataset.asc=th.dataset.asc==='1'?'0':'1';
+    rows.sort((a,b)=>{
+      const x=a.children[i].textContent.replace(/[^0-9.\-]/g,''),y=b.children[i].textContent.replace(/[^0-9.\-]/g,'');
+      const nx=parseFloat(x),ny=parseFloat(y);
+      if(!isNaN(nx)&&!isNaN(ny))return asc==='1'?nx-ny:ny-nx;
+      return asc==='1'?a.children[i].textContent.localeCompare(b.children[i].textContent):b.children[i].textContent.localeCompare(a.children[i].textContent);
+    });
+    rows.forEach(r=>tbl.querySelector('tbody').appendChild(r));
+  }));
+});
+</script>
+</body>
+</html>

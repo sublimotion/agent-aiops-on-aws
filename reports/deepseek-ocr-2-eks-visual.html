@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepSeek-OCR-2 on EKS L40S — Visual Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d2e;
+    --surface-2: #242740;
+    --border: #2e3151;
+    --text: #e2e8f0;
+    --text-muted: #8892a4;
+    --accent: #6366f1;
+    --accent-2: #a78bfa;
+    --accent-soft: rgba(99,102,241,0.15);
+    --green: #22c55e;
+    --green-soft: rgba(34,197,94,0.14);
+    --red: #ef4444;
+    --red-soft: rgba(239,68,68,0.14);
+    --yellow: #f59e0b;
+    --yellow-soft: rgba(245,158,11,0.14);
+    --cyan: #06b6d4;
+    --pink: #ec4899;
+  }
+  [data-theme="light"] {
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --surface-2: #f1f5f9;
+    --border: #e2e8f0;
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --accent-soft: rgba(99,102,241,0.08);
+    --green-soft: rgba(34,197,94,0.08);
+    --red-soft: rgba(239,68,68,0.08);
+    --yellow-soft: rgba(245,158,11,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+  header {
+    background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 2rem;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, var(--accent-soft) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  header .wrap { max-width: 1200px; margin: 0 auto; position: relative; }
+  header .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
+  header .meta { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.35rem; }
+  .hero-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .hero-stat {
+    background: rgba(0,0,0,0.25);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+  }
+  [data-theme="light"] .hero-stat { background: rgba(255,255,255,0.7); }
+  .hero-stat .label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+  }
+  .hero-stat .value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .hero-stat.lead .value { color: var(--green); font-size: 1.8rem; }
+  .hero-stat .sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem; }
+  .theme-toggle {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.4rem 0.9rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-family: inherit;
+  }
+  .theme-toggle:hover { background: var(--border); }
+  main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+  nav.toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem 1.25rem;
+    margin-bottom: 2rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    font-size: 0.8rem;
+  }
+  nav.toc a { color: var(--text-muted); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); }
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    letter-spacing: -0.01em;
+  }
+  h3 { font-size: 0.95rem; font-weight: 600; margin: 0 0 0.75rem 0; color: var(--text-muted); }
+  .section { margin-bottom: 2.75rem; }
+  .hw-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 2rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 1rem;
+  }
+  .hw-item .label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+  }
+  .hw-item .value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85rem;
+  }
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+  .chart-wrap { position: relative; height: 340px; }
+  .chart-wrap.tall { height: 420px; }
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+  @media (max-width: 850px) { .two-col { grid-template-columns: 1fr; } }
+  .table-wrap {
+    overflow-x: auto;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  thead { background: var(--surface-2); }
+  th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  td {
+    padding: 0.65rem 1rem;
+    border-top: 1px solid var(--border);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.82rem;
+  }
+  td.name { font-family: inherit; font-weight: 500; }
+  tr:hover td { background: var(--accent-soft); }
+  td.best { color: var(--green); font-weight: 600; }
+  td.worst { color: var(--red); }
+  td.warn { color: var(--yellow); }
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  .badge-pass { background: var(--green-soft); color: var(--green); }
+  .badge-fail { background: var(--red-soft); color: var(--red); }
+  .badge-skip { background: var(--yellow-soft); color: var(--yellow); }
+  .badge-na { background: var(--surface-2); color: var(--text-muted); }
+  .callout {
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.25rem;
+    border-radius: 0 8px 8px 0;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+  }
+  .callout strong { color: var(--accent); }
+  .callout.green { background: var(--green-soft); border-left-color: var(--green); }
+  .callout.green strong { color: var(--green); }
+  .callout.yellow { background: var(--yellow-soft); border-left-color: var(--yellow); }
+  .callout.yellow strong { color: var(--yellow); }
+  .callout.red { background: var(--red-soft); border-left-color: var(--red); }
+  .callout.red strong { color: var(--red); }
+  /* Heatmap */
+  .heatmap {
+    display: grid;
+    gap: 2px;
+    background: var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    font-size: 0.8rem;
+  }
+  .heatmap .cell {
+    padding: 0.65rem 0.75rem;
+    background: var(--surface);
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    text-align: right;
+  }
+  .heatmap .cell.head {
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-family: inherit;
+    text-align: left;
+  }
+  .heatmap .cell.row-label {
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: inherit;
+    font-weight: 500;
+    text-align: left;
+  }
+  /* Tier stack */
+  .tier-grid {
+    display: grid;
+    gap: 0.5rem;
+  }
+  .tier-row-v {
+    display: grid;
+    grid-template-columns: 70px 1fr 140px 100px;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    font-size: 0.85rem;
+  }
+  .tier-row-v.landed { border-left: 4px solid var(--green); }
+  .tier-row-v.blocked { opacity: 0.6; border-left: 4px solid var(--yellow); }
+  .tier-row-v .tier-name { font-weight: 700; font-size: 1.1rem; }
+  .tier-row-v.landed .tier-name { color: var(--green); }
+  .tier-row-v.blocked .tier-name { color: var(--yellow); }
+  .tier-row-v .metric {
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    text-align: right;
+    font-weight: 600;
+  }
+  /* Timeline */
+  .timeline {
+    position: relative;
+    padding-left: 2rem;
+    margin-top: 1rem;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--border);
+  }
+  .timeline-item {
+    position: relative;
+    padding-bottom: 1.2rem;
+  }
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -1.55rem;
+    top: 0.4rem;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--accent);
+  }
+  .timeline-item.blocked::before { border-color: var(--red); background: var(--red-soft); }
+  .timeline-item.success::before { border-color: var(--green); background: var(--green-soft); }
+  .timeline-item .time {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-family: ui-monospace, monospace;
+  }
+  .timeline-item .title { font-weight: 600; margin: 0.2rem 0; }
+  .timeline-item .desc { font-size: 0.82rem; color: var(--text-muted); }
+  /* SLO matrix */
+  .slo-grid {
+    display: grid;
+    gap: 2px;
+    background: var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    grid-template-columns: 140px repeat(3, 1fr);
+    font-size: 0.82rem;
+  }
+  .slo-grid .cell {
+    padding: 0.7rem 0.85rem;
+    background: var(--surface);
+    font-family: ui-monospace, monospace;
+    text-align: center;
+  }
+  .slo-grid .cell.head {
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-family: inherit;
+  }
+  .slo-grid .cell.row-label {
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: inherit;
+    font-weight: 500;
+    text-align: left;
+  }
+  .slo-grid .pass { background: var(--green-soft); color: var(--green); font-weight: 600; }
+  .slo-grid .fail { background: var(--red-soft); color: var(--red); font-weight: 600; }
+  .slo-grid .na { color: var(--text-muted); }
+  footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    border-top: 1px solid var(--border);
+    margin-top: 3rem;
+  }
+  footer code { font-size: 0.72rem; background: var(--surface-2); padding: 0.1rem 0.4rem; border-radius: 4px; }
+  .artifact-list { list-style: none; display: flex; flex-direction: column; gap: 0.35rem; align-items: center; margin-top: 0.75rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="row">
+      <div>
+        <h1>DeepSeek-OCR-2 on EKS · L40S 48GB</h1>
+        <div class="meta">Stage 6 benchmark · g6e.2xlarge · us-east-2 · vLLM 0.19.1 BF16 · 2026-05-14</div>
+      </div>
+      <button class="theme-toggle" onclick="toggleTheme()">Toggle theme</button>
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat lead">
+        <div class="label">Headline capacity</div>
+        <div class="value">3,361 tok/s</div>
+        <div class="sub">output tokens/s @ c=32 saturation · stratified corpus</div>
+      </div>
+      <div class="hero-stat">
+        <div class="label">Request rate</div>
+        <div class="value">6.79 req/s</div>
+        <div class="sub">realistic 6-doc mix · 454 completed</div>
+      </div>
+      <div class="hero-stat">
+        <div class="label">Cost</div>
+        <div class="value">$0.66/M</div>
+        <div class="sub">output tokens · $2.24/hr on-demand</div>
+      </div>
+      <div class="hero-stat">
+        <div class="label">Coverage</div>
+        <div class="value">3 / 11</div>
+        <div class="sub">Stage 6 cells landed · 8 blocked on dataset mirror</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <nav class="toc">
+    <a href="#config">Config</a>
+    <a href="#normalization">Normalization</a>
+    <a href="#perdoc">Per-doc-type</a>
+    <a href="#scaling">Concurrency scaling</a>
+    <a href="#latency">Latency distribution</a>
+    <a href="#tier">Tier stack</a>
+    <a href="#slo">SLO matrix</a>
+    <a href="#cost">Cost</a>
+    <a href="#timeline">Timeline</a>
+    <a href="#gaps">Gaps &amp; next</a>
+  </nav>
+
+  <!-- Config -->
+  <section id="config" class="section">
+    <h2>Configuration summary</h2>
+    <div class="hw-card">
+      <div class="hw-item"><div class="label">Substrate</div><div class="value">Amazon EKS · managed NG</div></div>
+      <div class="hw-item"><div class="label">Node</div><div class="value">g6e.2xlarge · 1× L40S 48GB</div></div>
+      <div class="hw-item"><div class="label">Region</div><div class="value">us-east-2 · sm_89</div></div>
+      <div class="hw-item"><div class="label">Engine</div><div class="value">vLLM 0.19.1 · BF16</div></div>
+      <div class="hw-item"><div class="label">Attention</div><div class="value">flash-attn</div></div>
+      <div class="hw-item"><div class="label">Prompt</div><div class="value">&lt;image&gt;\n&lt;|grounding|&gt; markdown</div></div>
+      <div class="hw-item"><div class="label">max_num_seqs</div><div class="value">32</div></div>
+      <div class="hw-item"><div class="label">KV cache tokens</div><div class="value">573,664 · ctx 8K</div></div>
+      <div class="hw-item"><div class="label">GPU mem util</div><div class="value">0.90</div></div>
+      <div class="hw-item"><div class="label">On-demand $/hr</div><div class="value">$2.24</div></div>
+      <div class="hw-item"><div class="label">Driver / CUDA</div><div class="value">570.195.03 / 12.8</div></div>
+      <div class="hw-item"><div class="label">Modality</div><div class="value">vision-language · 8B VLM</div></div>
+    </div>
+  </section>
+
+  <!-- Normalization story -->
+  <section id="normalization" class="section">
+    <h2>Normalization story · iter 4 single-image vs iter 5 stratified corpus</h2>
+    <div class="callout yellow">
+      <strong>The req/s collapse.</strong> Switching from a single 19 KB image to a 6-document stratified corpus
+      collapsed request throughput 3.7× (25.4 → 6.79 req/s) while output tokens/s held within 18%
+      (4,063 → 3,361). <strong>Output tokens/s is the correct capacity metric for OCR</strong>; req/s massively
+      undervalues throughput on long-output documents.
+    </div>
+    <div class="chart-card">
+      <h3>Iter 4 vs Iter 5 @ c=32 saturation</h3>
+      <div class="chart-wrap"><canvas id="normChart"></canvas></div>
+    </div>
+  </section>
+
+  <!-- Per-doc-type matrix -->
+  <section id="perdoc" class="section">
+    <h2>Per-doc-type efficiency matrix · batch saturation (c=32)</h2>
+    <div class="callout green">
+      <strong>Counter-intuitive finding.</strong> Dense pages deliver <strong>3.3× the output throughput of articles</strong>
+      (1,118 vs 323 output tok/s) despite 3.6× longer e2e latency — they max decode-phase utilization
+      by hitting the 1024-token cap. Dense is the cheapest bucket ($2.00/M tokens); handwritten is the
+      most expensive ($13.50/M tokens) because the encoder cost is fixed but the output is minimal.
+    </div>
+
+    <div class="chart-card">
+      <h3>Output tok/s per doc type</h3>
+      <div class="chart-wrap"><canvas id="perDocThroughput"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+      <h3>Efficiency heatmap</h3>
+      <div class="heatmap" style="grid-template-columns: 140px repeat(6, 1fr);">
+        <div class="cell head">doc type</div>
+        <div class="cell head">img toks p50</div>
+        <div class="cell head">out toks p50</div>
+        <div class="cell head">e2e p50 (ms)</div>
+        <div class="cell head">e2e p99 (ms)</div>
+        <div class="cell head">out tok/s</div>
+        <div class="cell head">$/M out tok</div>
+
+        <div class="cell row-label">receipt</div>
+        <div class="cell">274</div>
+        <div class="cell">308</div>
+        <div class="cell">2,794</div>
+        <div class="cell">2,898</div>
+        <div class="cell">341</div>
+        <div class="cell">$6.57</div>
+
+        <div class="cell row-label">article</div>
+        <div class="cell">1,138</div>
+        <div class="cell">270</div>
+        <div class="cell">2,518</div>
+        <div class="cell">2,626</div>
+        <div class="cell">323</div>
+        <div class="cell">$6.93</div>
+
+        <div class="cell row-label">table</div>
+        <div class="cell">850</div>
+        <div class="cell">267</div>
+        <div class="cell">2,441</div>
+        <div class="cell">2,566</div>
+        <div class="cell">307</div>
+        <div class="cell">$7.30</div>
+
+        <div class="cell row-label">formula</div>
+        <div class="cell">850</div>
+        <div class="cell" style="color:var(--yellow)">1,024</div>
+        <div class="cell" style="color:var(--yellow)">9,147</div>
+        <div class="cell" style="color:var(--yellow)">9,327</div>
+        <div class="cell" style="color:var(--green)">1,106</div>
+        <div class="cell" style="color:var(--green)">$2.02</div>
+
+        <div class="cell row-label" style="color:var(--green)">dense ★</div>
+        <div class="cell">1,138</div>
+        <div class="cell" style="color:var(--yellow)">1,024</div>
+        <div class="cell" style="color:var(--yellow)">9,176</div>
+        <div class="cell" style="color:var(--yellow)">9,350</div>
+        <div class="cell" style="color:var(--green);font-weight:700">1,118</div>
+        <div class="cell" style="color:var(--green);font-weight:700">$2.00</div>
+
+        <div class="cell row-label">handwritten</div>
+        <div class="cell">1,138</div>
+        <div class="cell">154</div>
+        <div class="cell">1,454</div>
+        <div class="cell">1,648</div>
+        <div class="cell">166</div>
+        <div class="cell" style="color:var(--red)">$13.50</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Concurrency scaling -->
+  <section id="scaling" class="section">
+    <h2>Concurrency scaling · stratified corpus</h2>
+    <p style="color:var(--text-muted);font-size:0.88rem;margin-bottom:1rem;">
+      Sweep at c = [1, 4, 16, 32], 50 steady-state requests per level.
+      Both request rate and output token/s scale near-linearly through c=16; the c=32 step is partly
+      bounded by the sweep's short window (9.8 s @ c=32). The 60s batch-throughput run pushes the
+      c=32 ceiling to 6.79 req/s &amp; 3,361 output tok/s.
+    </p>
+    <div class="chart-card">
+      <h3>req/s and output tok/s vs concurrency</h3>
+      <div class="chart-wrap tall"><canvas id="scalingChart"></canvas></div>
+    </div>
+  </section>
+
+  <!-- Latency distribution -->
+  <section id="latency" class="section">
+    <h2>Latency distribution @ c=32 saturation</h2>
+    <div class="callout yellow">
+      <strong>The tail is bimodal.</strong> Short-output buckets (receipt/article/table/handwritten)
+      cluster under 3 s. <strong>Formula and dense stretch to ~9.3 s p99</strong> because both hit the
+      1024-token output cap. Single-pool scheduling will miss a p99 &lt; 3 s SLO whenever long docs batch together.
+    </div>
+    <div class="chart-card">
+      <h3>e2e latency p50 / p90 / p99 per doc type (ms)</h3>
+      <div class="chart-wrap tall"><canvas id="latencyChart"></canvas></div>
+    </div>
+  </section>
+
+  <!-- Tier stack -->
+  <section id="tier" class="section">
+    <h2>Tier stack · T0 landed · T1-T5 blocked</h2>
+    <div class="callout red">
+      <strong>Dataset mirror is the critical path.</strong> Every optimization tier beyond T0 is gated on
+      the olmOCR-bench + OmniDocBench corpus mirror to S3. Without it the O3 quantization quality gate
+      cannot run, and T1 FP8 (the single highest-impact lift at 1.5-2× expected) cannot be published.
+    </div>
+    <div class="tier-grid">
+      <div class="tier-row-v landed">
+        <div class="tier-name">T0</div>
+        <div>
+          <strong>BF16 baseline landed.</strong> TP=1 · eager · flash-attn · no prefix cache ·
+          max-num-seqs=32 · gpu-mem-util=0.90 · KV 573,664 tokens. Stratified corpus iter 5 reference.
+        </div>
+        <div class="metric" style="color:var(--green)">3,361 tok/s</div>
+        <div class="metric">1.0×</div>
+      </div>
+      <div class="tier-row-v blocked">
+        <div class="tier-name">T1</div>
+        <div>
+          <strong>FP8 (E4M3) quantization</strong> — blocked on olmOCR-bench corpus mirror for O3 quality gate.
+          Expected Δ 1.5-2× throughput on L40S sm_89 FP8 tensor cores + 2× VRAM headroom.
+          <span class="badge badge-fail" style="margin-left:0.5rem;">blocked: needs dataset mirror</span>
+        </div>
+        <div class="metric">—</div>
+        <div class="metric">—</div>
+      </div>
+      <div class="tier-row-v blocked">
+        <div class="tier-name">T2</div>
+        <div>
+          <strong>Prefix / KV cache</strong> — OCR has no shared prefix beyond persona; HiCache/LMCache N/A.
+          <span class="badge badge-na" style="margin-left:0.5rem;">workload mismatch</span>
+        </div>
+        <div class="metric">—</div>
+        <div class="metric">—</div>
+      </div>
+      <div class="tier-row-v blocked">
+        <div class="tier-name">T3</div>
+        <div>
+          <strong>Speculative decode</strong> — no published draft; MTP not native; acceptance low on novel OCR content.
+          <span class="badge badge-na" style="margin-left:0.5rem;">workload mismatch</span>
+        </div>
+        <div class="metric">—</div>
+        <div class="metric">—</div>
+      </div>
+      <div class="tier-row-v blocked">
+        <div class="tier-name">T4</div>
+        <div>
+          <strong>Parallelism</strong> — single-GPU cell. g6e.12xlarge TP=4 deferred pending O3 gate.
+          <span class="badge badge-fail" style="margin-left:0.5rem;">blocked: needs dataset mirror</span>
+        </div>
+        <div class="metric">—</div>
+        <div class="metric">—</div>
+      </div>
+      <div class="tier-row-v blocked">
+        <div class="tier-name">T5</div>
+        <div>
+          <strong>torch.compile + kernels</strong> — vLLM 0.19.1 ships flash-attn + CUDA graphs by default;
+          explicit <code>--torch-compile</code> not enabled. Expected +10-15% at low c, +5-10% at saturation.
+          <span class="badge badge-skip" style="margin-left:0.5rem;">next iteration</span>
+        </div>
+        <div class="metric">—</div>
+        <div class="metric">—</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLO matrix -->
+  <section id="slo" class="section">
+    <h2>SLO pass/fail matrix · targets from <code>sidecars/benchmark-g6e-2xlarge.yaml</code></h2>
+    <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;">
+      Targets: <code>ttft_p99 = 500 ms</code> (N/A non-streaming), <code>e2e_p99 = 5000 ms</code>,
+      <code>error_rate_max = 0.001</code> (0.1%). Verdicts at c=32 saturation.
+    </p>
+    <div class="slo-grid">
+      <div class="cell head">doc type</div>
+      <div class="cell head">TTFT p99</div>
+      <div class="cell head">e2e p99 ≤ 5,000 ms</div>
+      <div class="cell head">error rate ≤ 0.001</div>
+
+      <div class="cell row-label">receipt</div>
+      <div class="cell na">n/a · non-stream</div>
+      <div class="cell pass">PASS · 2,898 ms</div>
+      <div class="cell fail">FAIL · 0.0133</div>
+
+      <div class="cell row-label">article</div>
+      <div class="cell na">n/a</div>
+      <div class="cell pass">PASS · 2,626 ms</div>
+      <div class="cell fail">FAIL · 0.0123</div>
+
+      <div class="cell row-label">table</div>
+      <div class="cell na">n/a</div>
+      <div class="cell pass">PASS · 2,566 ms</div>
+      <div class="cell fail">FAIL · 0.0128</div>
+
+      <div class="cell row-label">formula</div>
+      <div class="cell na">n/a</div>
+      <div class="cell fail">FAIL · 9,327 ms</div>
+      <div class="cell fail">FAIL · 0.0127</div>
+
+      <div class="cell row-label">dense</div>
+      <div class="cell na">n/a</div>
+      <div class="cell fail">FAIL · 9,350 ms</div>
+      <div class="cell pass">PASS · 0.0000</div>
+
+      <div class="cell row-label">handwritten</div>
+      <div class="cell na">n/a</div>
+      <div class="cell pass">PASS · 1,648 ms</div>
+      <div class="cell pass">PASS · 0.0000</div>
+
+      <div class="cell row-label"><strong>aggregate</strong></div>
+      <div class="cell na">n/a</div>
+      <div class="cell fail">FAIL · 9,331 ms</div>
+      <div class="cell fail">FAIL · 0.0087</div>
+    </div>
+    <div class="callout" style="margin-top:1rem;">
+      <strong>Mode-aware target recommended.</strong> The 5 s e2e target is calibrated for latency mode
+      (interactive scanner). At batch saturation, formula + dense stretch past 5 s due to the 1024-token
+      output cap. Split SLO by mode (latency vs batch) or apply doc-type-aware bucketed scheduling.
+    </div>
+  </section>
+
+  <!-- Cost panel -->
+  <section id="cost" class="section">
+    <h2>Cost per million output tokens · on-demand $2.24/hr</h2>
+    <div class="chart-card">
+      <h3>$/M output tokens by doc type · 6.8× spread</h3>
+      <div class="chart-wrap"><canvas id="costChart"></canvas></div>
+    </div>
+    <div class="callout green">
+      <strong>Aggregate cost $0.66/M output tokens</strong> across the uniform 1/6 corpus weighting.
+      Benchmark execution cost for this entire report: <strong>~$9</strong> (4 GPU-hours spanning 5 artifact runs
+      + iteration debugging). Nodegroup scaled to desiredSize=0 at session end.
+    </div>
+  </section>
+
+  <!-- Timeline -->
+  <section id="timeline" class="section">
+    <h2>Capacity journey · 3 failed regions before EKS us-east-2 unblocked</h2>
+    <div class="timeline">
+      <div class="timeline-item blocked">
+        <div class="time">2026-05-13 ~15:28 ET</div>
+        <div class="title">HyperPod <code>embedding-g6e-2xlarge</code> stuck</div>
+        <div class="desc">25+ minutes at <code>Scaling=1, Current=0</code> — no node provisioned.</div>
+      </div>
+      <div class="timeline-item blocked">
+        <div class="time">2026-05-14 ~08:00 ET</div>
+        <div class="title">EC2 us-east-1 capacity exhausted</div>
+        <div class="desc">All three AZs (a/b/c) returned <code>InsufficientInstanceCapacity</code> for g6e.xl/2xl.</div>
+      </div>
+      <div class="timeline-item success">
+        <div class="time">2026-05-14 ~08:03 ET</div>
+        <div class="title">us-east-2 has capacity</div>
+        <div class="desc">EC2 pre-flight launched in us-east-2a; terminated after health check.</div>
+      </div>
+      <div class="timeline-item success">
+        <div class="time">2026-05-14 ~08:06 ET</div>
+        <div class="title">EKS nodegroup ACTIVE in 2 min</div>
+        <div class="desc">Created <code>g6e-ocr</code> on existing <code>qwen3-next-bench-eks-cluster</code> — fastest path.</div>
+      </div>
+      <div class="timeline-item success">
+        <div class="time">2026-05-14 12:50 ET</div>
+        <div class="title">Iter 3 — first validated artifact</div>
+        <div class="desc">chatbot-short c=1 smoke · 183 tok/s · schema PASS.</div>
+      </div>
+      <div class="timeline-item success">
+        <div class="time">2026-05-14 12:57 ET</div>
+        <div class="title">Iter 4 — single-image batch headline (misleading)</div>
+        <div class="desc">25.4 req/s &amp; 4,063 tok/s — great-looking number, wrong corpus.</div>
+      </div>
+      <div class="timeline-item success">
+        <div class="time">2026-05-14 13:33 ET</div>
+        <div class="title">Iter 5 — stratified corpus honest headline</div>
+        <div class="desc">6.79 req/s &amp; 3,361 tok/s @ c=32 saturation · the reference number.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Gaps & next -->
+  <section id="gaps" class="section">
+    <h2>Known gaps &amp; what's next</h2>
+    <div class="two-col">
+      <div class="chart-card">
+        <h3 style="color:var(--yellow)">In progress</h3>
+        <p style="font-size:0.88rem;margin-bottom:0.6rem;"><strong>Dataset mirror</strong> — olmOCR-bench (1,400 docs, ~800 MB) + OmniDocBench (~1.5 GB) to <code>s3://agent-aiops-bench-us-east-2/datasets/</code>. Unblocks 8 of 11 workload cells.</p>
+        <p style="font-size:0.88rem;"><strong>O3 quality gate</strong> — pending dataset; tolerance=0.02 vs DeepSeek's self-reported 76.3 on olmOCR-bench. Harness runners scaffolded (<code>run-olmocr-bench.sh</code>, <code>run-omnidocbench.sh</code>) but <code>exit 2</code> until mirror completes.</p>
+      </div>
+      <div class="chart-card">
+        <h3 style="color:var(--accent)">Next iteration</h3>
+        <p style="font-size:0.88rem;margin-bottom:0.6rem;"><strong>FP8 Pareto row (T1)</strong> — expected 1.5-2× throughput lift (3,361 → 5-6K tok/s) and 2× VRAM headroom (<code>max_num_seqs</code> 32 → 64-128).</p>
+        <p style="font-size:0.88rem;margin-bottom:0.6rem;"><strong>Wider corpus</strong> — real-world dense pages push the image-token ratio to ~16× vs receipts; synthetic corpus is a floor.</p>
+        <p style="font-size:0.88rem;"><strong>Deferred cells</strong> — burn-in (O5), cold-start (O9), power-efficiency (O11), and g6e.12xlarge TP=4 scheduled post-O3.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div>Generated from <code>results/benchmark-report.md</code>, <code>lessons.md</code>, and 5 Common Benchmark Artifacts v1.0.0 · agent-aiops-on-aws</div>
+  <div style="margin-top:0.75rem;font-weight:600;color:var(--text);">Source artifacts</div>
+  <ul class="artifact-list">
+    <li><code>deepseek-ocr-2_eks_g6e-2xl_vllm_chatbot-short_20260514T125013Z.json</code></li>
+    <li><code>deepseek-ocr-2_eks_g6e-2xl_vllm_concurrency-sweep_20260514T125714Z.json</code></li>
+    <li><code>deepseek-ocr-2_eks_g6e-2xl_vllm_batch-throughput_20260514T125802Z.json</code></li>
+    <li><code>deepseek-ocr-2_eks_g6e-2xl_vllm_concurrency-sweep_20260514T133113Z.json</code> · iter 5 stratified · reference</li>
+    <li><code>deepseek-ocr-2_eks_g6e-2xl_vllm_batch-throughput_20260514T133347Z.json</code> · iter 5 headline · reference</li>
+  </ul>
+</footer>
+
+<script>
+  function toggleTheme() {
+    const html = document.documentElement;
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    // re-render charts with updated palette
+    Object.values(window._charts || {}).forEach(c => { if (c && c.update) c.update(); });
+  }
+
+  // Palette helpers
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const palette = () => ({
+    text: css('--text'),
+    textMuted: css('--text-muted'),
+    border: css('--border'),
+    accent: css('--accent'),
+    accent2: css('--accent-2'),
+    green: css('--green'),
+    red: css('--red'),
+    yellow: css('--yellow'),
+    cyan: css('--cyan'),
+    pink: css('--pink'),
+  });
+  Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, Segoe UI, Inter, sans-serif';
+  Chart.defaults.color = css('--text-muted');
+
+  window._charts = {};
+
+  // 1. Normalization chart: iter 4 vs iter 5
+  (() => {
+    const p = palette();
+    const ctx = document.getElementById('normChart').getContext('2d');
+    window._charts.norm = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['req/s @ c=32', 'output tok/s @ c=32', 'e2e p50 (ms)', 'e2e p99 (ms)'],
+        datasets: [
+          { label: 'Iter 4 · single image', data: [25.39, 4063, 1260, 1320], backgroundColor: p.yellow, borderRadius: 4 },
+          { label: 'Iter 5 · stratified corpus', data: [6.79, 3361, 2620, 9331], backgroundColor: p.accent, borderRadius: 4 },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          y: { type: 'logarithmic', grid: { color: p.border }, ticks: { color: p.textMuted } },
+          x: { grid: { display: false }, ticks: { color: p.textMuted } },
+        },
+        plugins: { legend: { position: 'top', labels: { color: p.text } }, tooltip: { mode: 'index' } }
+      }
+    });
+  })();
+
+  // 2. Per-doc output tok/s
+  (() => {
+    const p = palette();
+    const ctx = document.getElementById('perDocThroughput').getContext('2d');
+    const labels = ['receipt', 'article', 'table', 'formula', 'dense', 'handwritten'];
+    const vals = [341, 323, 307, 1106, 1118, 166];
+    const colors = [p.cyan, p.cyan, p.cyan, p.green, p.green, p.yellow];
+    window._charts.perDoc = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: 'output tok/s', data: vals, backgroundColor: colors, borderRadius: 6 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          y: { grid: { color: p.border }, ticks: { color: p.textMuted }, title: { display: true, text: 'output tokens/s', color: p.textMuted } },
+          x: { grid: { display: false }, ticks: { color: p.text } }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+  })();
+
+  // 3. Concurrency scaling — dual axis
+  (() => {
+    const p = palette();
+    const ctx = document.getElementById('scalingChart').getContext('2d');
+    // stratified sweep artifact sweep_levels
+    const labels = ['c=1', 'c=4', 'c=16', 'c=32'];
+    const rps   = [0.76, 1.81, 3.67, 5.10];
+    const otps  = [380, 902, 1792, 2493];
+    // batch-throughput saturation reference at c=32
+    window._charts.scaling = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'req/s (sweep)', data: rps, borderColor: p.accent, backgroundColor: p.accent + '33', yAxisID: 'y1', tension: 0.3, pointRadius: 5, borderWidth: 3 },
+          { label: 'output tok/s (sweep)', data: otps, borderColor: p.green, backgroundColor: p.green + '33', yAxisID: 'y2', tension: 0.3, pointRadius: 5, borderWidth: 3 },
+          { label: 'req/s @ saturation (60s)', data: [null, null, null, 6.79], borderColor: p.pink, yAxisID: 'y1', pointRadius: 7, pointStyle: 'rectRot', showLine: false },
+          { label: 'output tok/s @ saturation (60s)', data: [null, null, null, 3361], borderColor: p.yellow, yAxisID: 'y2', pointRadius: 7, pointStyle: 'rectRot', showLine: false },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          y1: { type: 'linear', position: 'left', grid: { color: p.border }, ticks: { color: p.accent }, title: { display: true, text: 'req/s', color: p.accent } },
+          y2: { type: 'linear', position: 'right', grid: { display: false }, ticks: { color: p.green }, title: { display: true, text: 'output tok/s', color: p.green } },
+          x: { grid: { display: false }, ticks: { color: p.text } }
+        },
+        plugins: { legend: { position: 'top', labels: { color: p.text } } }
+      }
+    });
+  })();
+
+  // 4. Latency distribution (p50/p90/p99) per doc at c=32 (batch saturation)
+  (() => {
+    const p = palette();
+    const ctx = document.getElementById('latencyChart').getContext('2d');
+    // p50 and p99 from stratified batch-throughput; p90 not in per-doc — interpolate from aggregate shape (use midpoint between p50 and p99 × 0.9 rule)
+    // Use p50 and p99 (actual), and omit p90 to stay honest
+    const labels = ['receipt', 'article', 'table', 'formula', 'dense', 'handwritten'];
+    const p50 = [2794, 2518, 2441, 9147, 9176, 1454];
+    const p99 = [2898, 2626, 2566, 9327, 9350, 1648];
+    window._charts.latency = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'e2e p50', data: p50, backgroundColor: p.accent, borderRadius: 4 },
+          { label: 'e2e p99', data: p99, backgroundColor: p.red, borderRadius: 4 },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          y: { grid: { color: p.border }, ticks: { color: p.textMuted }, title: { display: true, text: 'milliseconds', color: p.textMuted } },
+          x: { grid: { display: false }, ticks: { color: p.text } }
+        },
+        plugins: {
+          legend: { position: 'top', labels: { color: p.text } },
+          annotation: {}
+        }
+      },
+      plugins: [{
+        id: 'sloLine',
+        afterDraw(chart) {
+          const { ctx, chartArea, scales } = chart;
+          const y = scales.y.getPixelForValue(5000);
+          ctx.save();
+          ctx.strokeStyle = p.yellow;
+          ctx.setLineDash([6, 4]);
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(chartArea.left, y);
+          ctx.lineTo(chartArea.right, y);
+          ctx.stroke();
+          ctx.fillStyle = p.yellow;
+          ctx.font = '11px ui-monospace, monospace';
+          ctx.textAlign = 'right';
+          ctx.fillText('SLO e2e p99 = 5,000 ms', chartArea.right - 6, y - 6);
+          ctx.restore();
+        }
+      }]
+    });
+  })();
+
+  // 5. Cost chart
+  (() => {
+    const p = palette();
+    const ctx = document.getElementById('costChart').getContext('2d');
+    const labels = ['dense', 'formula', 'receipt', 'article', 'table', 'handwritten', 'aggregate'];
+    const vals   = [2.00,    2.02,     6.57,      6.93,      7.30,    13.50,         0.66];
+    const colors = [p.green, p.green,  p.cyan,   p.cyan,    p.cyan,  p.red,         p.accent];
+    window._charts.cost = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: '$/M output tokens', data: vals, backgroundColor: colors, borderRadius: 6 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        indexAxis: 'y',
+        scales: {
+          x: { grid: { color: p.border }, ticks: { color: p.textMuted, callback: v => '$' + v }, title: { display: true, text: '$/M output tokens', color: p.textMuted } },
+          y: { grid: { display: false }, ticks: { color: p.text } }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+  })();
+</script>
+</body>
+</html>

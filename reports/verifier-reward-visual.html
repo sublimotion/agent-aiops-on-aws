@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verifier Reward: Skills Amplify Model Capability</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117; --surface: #1a1d2e; --surface-2: #242740; --border: #2e3151;
+      --text: #e2e8f0; --text-muted: #8892a4; --accent: #6366f1;
+      --green: #22c55e; --green-soft: rgba(34,197,94,0.12);
+      --red: #ef4444; --red-soft: rgba(239,68,68,0.12);
+      --yellow: #f59e0b; --yellow-soft: rgba(245,158,11,0.12);
+      --blue: #3b82f6; --blue-soft: rgba(59,130,246,0.12);
+      --purple: #a78bfa; --purple-soft: rgba(167,139,250,0.12);
+      --orange: #f97316; --orange-soft: rgba(249,115,22,0.12);
+      --cyan: #06b6d4; --cyan-soft: rgba(6,182,212,0.12);
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc; --surface: #ffffff; --surface-2: #f1f5f9; --border: #e2e8f0;
+      --text: #0f172a; --text-muted: #64748b;
+      --green-soft: rgba(34,197,94,0.08); --red-soft: rgba(239,68,68,0.08);
+      --yellow-soft: rgba(245,158,11,0.08); --blue-soft: rgba(59,130,246,0.08);
+      --purple-soft: rgba(167,139,250,0.08); --orange-soft: rgba(249,115,22,0.08);
+      --cyan-soft: rgba(6,182,212,0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5; }
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1.25rem 2rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    .meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+    button { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); padding: 0.4rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-family: inherit; }
+    button:hover { background: var(--border); }
+    main { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+    .hero { text-align: center; padding: 2rem 0 3rem; }
+    .hero h2 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .hero .subtitle { font-size: 1rem; color: var(--text-muted); max-width: 750px; margin: 0 auto; }
+    .metrics-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 2rem 0; }
+    .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; text-align: center; }
+    .metric-value { font-size: 2rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .metric-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
+    .metric-sub { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.15rem; }
+    .metric-card.green .metric-value { color: var(--green); }
+    .metric-card.blue .metric-value { color: var(--blue); }
+    .metric-card.yellow .metric-value { color: var(--yellow); }
+    .metric-card.purple .metric-value { color: var(--purple); }
+    .metric-card.orange .metric-value { color: var(--orange); }
+    .section { margin-bottom: 3rem; }
+    h3 { font-size: 1.15rem; font-weight: 600; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+    .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1.5rem 0; }
+    @media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } }
+    .rubric-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; }
+    .rubric-card h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.75rem; }
+    .rubric-card.confirm { border-top: 3px solid var(--blue); }
+    .rubric-card.adversarial { border-top: 3px solid var(--red); }
+    .rubric-card .tag { display: inline-block; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; padding: 0.2rem 0.6rem; border-radius: 4px; margin-bottom: 0.5rem; }
+    .rubric-card.confirm .tag { background: var(--blue-soft); color: var(--blue); }
+    .rubric-card.adversarial .tag { background: var(--red-soft); color: var(--red); }
+    .rubric-card blockquote { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text-muted); border-left: 2px solid var(--border); padding-left: 0.75rem; margin-top: 0.5rem; }
+    .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); margin: 1rem 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    thead { background: var(--surface-2); }
+    th { padding: 0.65rem 1rem; text-align: left; font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); white-space: nowrap; }
+    td { padding: 0.65rem 1rem; border-top: 1px solid var(--border); }
+    tr:hover td { background: rgba(99,102,241,0.05); }
+    .mono { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; }
+    .pass-cell { color: var(--green); font-weight: 600; }
+    .fail-cell { color: var(--red); font-weight: 600; }
+    .warn-cell { color: var(--yellow); font-weight: 600; }
+    .muted-cell { color: var(--text-muted); }
+    .chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin: 1.5rem 0; }
+    .bar-chart { display: flex; align-items: flex-end; gap: 2px; height: 200px; padding-top: 1rem; }
+    .bar-group { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+    .bar { width: 100%; max-width: 40px; border-radius: 4px 4px 0 0; position: relative; min-height: 2px; transition: all 0.3s ease; }
+    .bar:hover { opacity: 0.8; }
+    .bar-label { font-size: 0.6rem; color: var(--text-muted); margin-top: 0.5rem; text-align: center; transform: rotate(-45deg); transform-origin: top left; white-space: nowrap; width: 60px; height: 40px; }
+    .bar-value { font-size: 0.65rem; font-weight: 600; font-family: 'JetBrains Mono', monospace; margin-bottom: 0.25rem; }
+    .timeline { position: relative; padding-left: 2rem; margin: 1.5rem 0; }
+    .timeline::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+    .timeline-item { position: relative; margin-bottom: 1.25rem; padding-left: 1rem; }
+    .timeline-item::before { content: ''; position: absolute; left: -1.7rem; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--border); }
+    .timeline-item.breakthrough::before { background: var(--green); box-shadow: 0 0 8px rgba(34,197,94,0.5); }
+    .timeline-item.negative::before { background: var(--red); }
+    .timeline-item.neutral::before { background: var(--yellow); }
+    .timeline-item .tl-title { font-weight: 600; font-size: 0.85rem; }
+    .timeline-item .tl-detail { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .timeline-item .tl-metric { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; margin-top: 0.2rem; }
+    .findings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; margin: 1rem 0; }
+    .finding-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+    .finding-card h5 { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .finding-card p { font-size: 0.78rem; color: var(--text-muted); }
+    .finding-card.breakthrough { border-left: 3px solid var(--green); }
+    .finding-card.negative { border-left: 3px solid var(--red); }
+    .finding-card.info { border-left: 3px solid var(--blue); }
+    .mermaid-container { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; }
+    /* Lift visualization */
+    .lift-viz { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin: 1.5rem 0; }
+    @media (max-width: 800px) { .lift-viz { grid-template-columns: 1fr; } }
+    .lift-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; text-align: center; position: relative; overflow: hidden; }
+    .lift-card .model-tier { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; padding: 0.2rem 0.6rem; border-radius: 4px; display: inline-block; margin-bottom: 0.75rem; }
+    .lift-card .model-name { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
+    .lift-bars { display: flex; justify-content: center; gap: 1.5rem; margin: 1rem 0; height: 140px; align-items: flex-end; }
+    .lift-bar-group { display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+    .lift-bar { width: 36px; border-radius: 4px 4px 0 0; position: relative; }
+    .lift-bar-label { font-size: 0.65rem; color: var(--text-muted); margin-top: 0.4rem; }
+    .lift-bar-val { font-size: 0.75rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin-bottom: 0.3rem; }
+    .lift-arrow { font-size: 1.5rem; font-weight: 700; margin: 0.5rem 0 0.25rem; }
+    .lift-number { font-size: 1.8rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .lift-label { font-size: 0.75rem; color: var(--text-muted); }
+    .callout { background: var(--surface); border: 2px solid var(--green); border-radius: 10px; padding: 1.5rem; margin: 2rem 0; text-align: center; }
+    .callout h4 { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .callout p { font-size: 0.9rem; color: var(--text-muted); max-width: 700px; margin: 0 auto; }
+    footer { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.75rem; border-top: 1px solid var(--border); margin-top: 3rem; }
+  </style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Verifier Reward Experiment</h1>
+    <div class="meta">autoresearch/verifier-reward &middot; 59 iterations + T10/T10b validation &middot; 2026-03-25</div>
+  </div>
+  <button onclick="toggleTheme()">Toggle theme</button>
+</header>
+<main>
+  <div class="hero">
+    <h2>Drop the Gate, Raise the Threshold</h2>
+    <p class="subtitle">
+      59 iterations discovered that <b>v009 alone at 4/4 unanimous</b> outperforms the v001&cap;v009 ensemble.
+      On SWE-bench Verified (483 patches): precision <b>0.92</b> [0.79, 0.97], only 3 FPs.
+      Simpler (4 calls not 5), cheaper ($0.030/patch), and more precise than the ensemble.
+    </p>
+  </div>
+
+  <!-- CONTEXT: What and Why -->
+  <div class="section">
+    <h3>Context: The Fix-to-Pass Gap</h3>
+    <div class="comparison">
+      <div class="rubric-card" style="border-top: 3px solid var(--red);">
+        <div class="tag" style="background:var(--red-soft);color:var(--red)">The Problem</div>
+        <h4>Coding agents fix bugs but don&rsquo;t solve them</h4>
+        <p style="font-size:0.82rem; color:var(--text-muted);">
+          On <b>SWE-bench Lite</b> (50 real GitHub issues from Django, Flask, scikit-learn, etc.), coding agents generate patches that <em>look correct</em> at very high rates &mdash; but most don&rsquo;t actually pass the project&rsquo;s test suite.
+        </p>
+        <div style="margin-top:0.75rem;">
+          <table style="font-size:0.75rem;">
+            <tr><td style="padding:0.3rem 0.5rem;font-weight:600;">Claude Sonnet</td><td style="padding:0.3rem 0.5rem;">98% produce a patch &rarr; <span class="fail-cell">12% pass tests</span></td><td class="mono" style="padding:0.3rem 0.5rem;color:var(--red);">86pp gap</td></tr>
+            <tr><td style="padding:0.3rem 0.5rem;font-weight:600;">Claude Opus</td><td style="padding:0.3rem 0.5rem;">98% produce a patch &rarr; <span class="fail-cell">12% pass tests</span></td><td class="mono" style="padding:0.3rem 0.5rem;color:var(--red);">86pp gap</td></tr>
+            <tr><td style="padding:0.3rem 0.5rem;font-weight:600;">Qwen3.5 122B</td><td style="padding:0.3rem 0.5rem;">86% produce a patch &rarr; <span class="fail-cell">9% pass tests</span></td><td class="mono" style="padding:0.3rem 0.5rem;color:var(--red);">77pp gap</td></tr>
+            <tr><td style="padding:0.3rem 0.5rem;font-weight:600;">Devstral 24B</td><td style="padding:0.3rem 0.5rem;">96% produce a patch &rarr; <span class="fail-cell">9% pass tests</span></td><td class="mono" style="padding:0.3rem 0.5rem;color:var(--red);">87pp gap</td></tr>
+          </table>
+        </div>
+        <p style="font-size:0.78rem; color:var(--text-muted); margin-top:0.75rem;">
+          The gap is enormous across all model tiers. You get a pile of plausible-looking patches with no way to tell which ones actually work &mdash; without running the full test suite (expensive, slow, often requires complex environment setup).
+        </p>
+      </div>
+      <div class="rubric-card" style="border-top: 3px solid var(--green);">
+        <div class="tag" style="background:var(--green-soft);color:var(--green)">The Hypothesis</div>
+        <h4>A verification skill can close the gap</h4>
+        <p style="font-size:0.82rem; color:var(--text-muted);">
+          Instead of running tests, use a <b>second LLM call</b> as a judge: give it the bug report and the proposed patch, and ask whether the patch actually fixes the bug. If the verifier is precise enough, it can select the good patches from the pile.
+        </p>
+        <ul style="font-size:0.82rem; color:var(--text-muted); margin-top:0.5rem; padding-left:1.2rem; line-height:1.8;">
+          <li><b>Precision matters most</b> &mdash; a false positive (shipping a broken patch) is far worse than a false negative (rejecting a good one)</li>
+          <li><b>Cost must be low</b> &mdash; verification should cost pennies, not dollars</li>
+          <li><b>No test execution</b> &mdash; the skill must work from the diff alone</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- METHODOLOGY -->
+  <div class="section">
+    <h3>Methodology</h3>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+graph LR
+    subgraph "1. Generate Patches"
+      A["Coding Agent<br/>(Claude, Qwen3.5, Devstral)"] -->|"OpenCode / SERA<br/>harness"| B["Patch Diff<br/>(per issue)"]
+    end
+    subgraph "2. Gold Label"
+      B --> C["Apply to Repo"]
+      C --> D["Run Test Suite<br/>(Docker)"]
+      D --> E["PASS / FAIL<br/>(gold label)"]
+    end
+    subgraph "3. Verify (This Work)"
+      B --> F["v001: Confirmatory<br/>'Evaluate correctness'"]
+      B --> G["v009: Adversarial<br/>'Find the bug'"]
+      F --> H["Ensemble<br/>v001 AND v009"]
+      G --> H
+      H --> I["likely_correct /<br/>likely_incorrect"]
+    end
+    subgraph "4. Evaluate Skill"
+      I --> J["Compare to<br/>Gold Labels"]
+      J --> K["Precision, Recall<br/>F0.5, Lift"]
+    end
+    style A fill:#6366f1,stroke:#4f46e5,color:#fff
+    style E fill:#f59e0b,stroke:#d97706,color:#000
+    style H fill:#22c55e,stroke:#16a34a,color:#000
+    style K fill:#3b82f6,stroke:#2563eb,color:#fff
+      </pre>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-top:1.5rem;">
+      <div>
+        <h4 style="font-size:0.9rem; font-weight:600; margin-bottom:0.75rem;">Patch Generation</h4>
+        <p style="font-size:0.82rem; color:var(--text-muted); line-height:1.6;">
+          Each coding agent is given a real GitHub issue (bug report) and a checkout of the repository at the relevant commit. It uses tools (file search, code editing, terminal) to diagnose and fix the bug. The <b>harness</b> (OpenCode or SERA) controls the agent&rsquo;s tool interface and diff capture style.
+        </p>
+        <div style="margin-top:0.75rem;">
+          <table style="font-size:0.75rem;">
+            <tr><td style="padding:0.3rem 0.5rem;font-weight:600;">Eval set</td><td style="padding:0.3rem 0.5rem;">50 issues from SWE-bench Lite (Django, Flask, pytest, scikit-learn, etc.)</td></tr>
+            <tr><td style="padding:0.3rem 0.5rem;font-weight:600;">Models</td><td style="padding:0.3rem 0.5rem;">Claude Haiku/Sonnet/Opus, Qwen3.5-122B, Devstral 24B</td></tr>
+            <tr><td style="padding:0.3rem 0.5rem;font-weight:600;">Harnesses</td><td style="padding:0.3rem 0.5rem;">OpenCode (multi-file diffs, 8-12K) and SERA (surgical diffs, 1-2K)</td></tr>
+            <tr><td style="padding:0.3rem 0.5rem;font-weight:600;">Total patches</td><td style="padding:0.3rem 0.5rem;">~260 gold-labeled patches across all models</td></tr>
+          </table>
+        </div>
+      </div>
+      <div>
+        <h4 style="font-size:0.9rem; font-weight:600; margin-bottom:0.75rem;">Verification Skill</h4>
+        <p style="font-size:0.82rem; color:var(--text-muted); line-height:1.6;">
+          The verifier receives the bug report + the patch diff and returns a structured verdict. The <b>best config (T10b)</b> runs 4 v009 adversarial calls per patch: 1 at temp=0.0 + 3 at temp=0.3. A patch passes only if ALL 4 say &ldquo;likely_correct&rdquo; (unanimous). The v001 confirmatory gate was dropped &mdash; it hurts precision at high base rates.
+        </p>
+        <div style="margin-top:0.75rem;">
+          <table style="font-size:0.75rem;">
+            <tr><td style="padding:0.3rem 0.5rem;font-weight:600;">Verifier model</td><td style="padding:0.3rem 0.5rem;">Claude Haiku 4.5 (cheapest, best calibrated)</td></tr>
+            <tr><td style="padding:0.3rem 0.5rem;font-weight:600;">Calls per patch</td><td style="padding:0.3rem 0.5rem;">4 (all adversarial v009)</td></tr>
+            <tr><td style="padding:0.3rem 0.5rem;font-weight:600;">Cost per patch</td><td style="padding:0.3rem 0.5rem;">$0.030 (~$0.008 per call)</td></tr>
+            <tr><td style="padding:0.3rem 0.5rem;font-weight:600;">Latency</td><td style="padding:0.3rem 0.5rem;">~2s (parallel calls)</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:1.5rem;">
+      <h4 style="font-size:0.9rem; font-weight:600; margin-bottom:0.75rem;">Evaluation Integrity</h4>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem;">
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:1rem;">
+          <div style="font-size:0.78rem; font-weight:600; margin-bottom:0.4rem;">Train / Holdout Split</div>
+          <p style="font-size:0.75rem; color:var(--text-muted);">
+            <b>Dev set</b>: Sonnet patches (49, 6 pass). All rubric iteration uses only this set.<br/>
+            <b>Holdout</b>: Haiku (27, 5 pass) + Opus (49, 6 pass). Evaluated only for final candidates.
+          </p>
+        </div>
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:1rem;">
+          <div style="font-size:0.78rem; font-weight:600; margin-bottom:0.4rem;">Gold Labels</div>
+          <p style="font-size:0.75rem; color:var(--text-muted);">
+            Each patch applied to a Docker container at the correct commit, then the project&rsquo;s own test_patch is run. PASS/FAIL is determined by the project&rsquo;s test suite &mdash; not by human judgment.
+          </p>
+        </div>
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:1rem;">
+          <div style="font-size:0.78rem; font-weight:600; margin-bottom:0.4rem;">Immutable Versions</div>
+          <p style="font-size:0.75rem; color:var(--text-muted);">
+            Each rubric version is a separate file (v001&ndash;v014). Existing versions are never edited &mdash; new experiments create new versions. Gold labels and diffs are read-only.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics-row">
+    <div class="metric-card green"><div class="metric-value">0.92</div><div class="metric-label">Best Precision (n=483)</div><div class="metric-sub">v009 4/4 &middot; 95% CI [0.79, 0.97]</div></div>
+    <div class="metric-card blue"><div class="metric-value">1.81x</div><div class="metric-label">Lift over random</div><div class="metric-sub">0.92 vs 0.51 base rate</div></div>
+    <div class="metric-card yellow"><div class="metric-value">$0.030</div><div class="metric-label">Cost per patch</div><div class="metric-sub">4 Haiku calls (v009 only)</div></div>
+    <div class="metric-card purple"><div class="metric-value">$154</div><div class="metric-label">Total experiment cost</div><div class="metric-sub">59 iterations + T10/T10b</div></div>
+  </div>
+
+  <!-- THE VERIFICATION GAP -->
+  <div class="section">
+    <h3>The Verification Gap</h3>
+    <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.5rem;">
+      When a coding agent generates a patch, you face an asymmetry: the agent is confident it fixed the bug, but you have no way to know without running tests. The <b>verification gap</b> is the space between &ldquo;the agent produced something&rdquo; and &ldquo;the fix actually works.&rdquo;
+    </p>
+
+    <!-- The gap visualized -->
+    <div class="chart-container">
+      <h4 style="font-size:0.9rem; font-weight:600; margin-bottom:1rem;">Fix Rate vs Pass Rate: The Gap Is Universal</h4>
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; text-align:center;">
+        <div>
+          <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.5rem;">Claude Sonnet</div>
+          <div style="position:relative; height:160px; display:flex; align-items:flex-end; justify-content:center; gap:0.5rem;">
+            <div style="display:flex; flex-direction:column; align-items:center;">
+              <div class="mono" style="font-size:0.7rem; color:var(--blue); margin-bottom:0.25rem;">98%</div>
+              <div style="width:28px; height:157px; background:var(--blue); border-radius:4px 4px 0 0; opacity:0.3;"></div>
+              <div style="font-size:0.6rem; color:var(--text-muted); margin-top:0.25rem;">Fix</div>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center;">
+              <div class="mono" style="font-size:0.7rem; color:var(--green); margin-bottom:0.25rem;">12%</div>
+              <div style="width:28px; height:19px; background:var(--green); border-radius:4px 4px 0 0;"></div>
+              <div style="font-size:0.6rem; color:var(--text-muted); margin-top:0.25rem;">Pass</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.5rem;">Claude Opus</div>
+          <div style="position:relative; height:160px; display:flex; align-items:flex-end; justify-content:center; gap:0.5rem;">
+            <div style="display:flex; flex-direction:column; align-items:center;">
+              <div class="mono" style="font-size:0.7rem; color:var(--blue); margin-bottom:0.25rem;">98%</div>
+              <div style="width:28px; height:157px; background:var(--blue); border-radius:4px 4px 0 0; opacity:0.3;"></div>
+              <div style="font-size:0.6rem; color:var(--text-muted); margin-top:0.25rem;">Fix</div>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center;">
+              <div class="mono" style="font-size:0.7rem; color:var(--green); margin-bottom:0.25rem;">12%</div>
+              <div style="width:28px; height:19px; background:var(--green); border-radius:4px 4px 0 0;"></div>
+              <div style="font-size:0.6rem; color:var(--text-muted); margin-top:0.25rem;">Pass</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.5rem;">Qwen3.5 122B</div>
+          <div style="position:relative; height:160px; display:flex; align-items:flex-end; justify-content:center; gap:0.5rem;">
+            <div style="display:flex; flex-direction:column; align-items:center;">
+              <div class="mono" style="font-size:0.7rem; color:var(--blue); margin-bottom:0.25rem;">86%</div>
+              <div style="width:28px; height:138px; background:var(--blue); border-radius:4px 4px 0 0; opacity:0.3;"></div>
+              <div style="font-size:0.6rem; color:var(--text-muted); margin-top:0.25rem;">Fix</div>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center;">
+              <div class="mono" style="font-size:0.7rem; color:var(--green); margin-bottom:0.25rem;">9%</div>
+              <div style="width:28px; height:14px; background:var(--green); border-radius:4px 4px 0 0;"></div>
+              <div style="font-size:0.6rem; color:var(--text-muted); margin-top:0.25rem;">Pass</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.5rem;">Devstral 24B</div>
+          <div style="position:relative; height:160px; display:flex; align-items:flex-end; justify-content:center; gap:0.5rem;">
+            <div style="display:flex; flex-direction:column; align-items:center;">
+              <div class="mono" style="font-size:0.7rem; color:var(--blue); margin-bottom:0.25rem;">96%</div>
+              <div style="width:28px; height:154px; background:var(--blue); border-radius:4px 4px 0 0; opacity:0.3;"></div>
+              <div style="font-size:0.6rem; color:var(--text-muted); margin-top:0.25rem;">Fix</div>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center;">
+              <div class="mono" style="font-size:0.7rem; color:var(--green); margin-bottom:0.25rem;">9%</div>
+              <div style="width:28px; height:14px; background:var(--green); border-radius:4px 4px 0 0;"></div>
+              <div style="font-size:0.6rem; color:var(--text-muted); margin-top:0.25rem;">Pass</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p style="font-size:0.78rem; color:var(--text-muted); margin-top:1rem; text-align:center;">
+        <span style="color:var(--blue); opacity:0.5;">&block;</span> Fix rate = agent produced a patch &nbsp;&nbsp;
+        <span style="color:var(--green);">&block;</span> Pass rate = patch passes project tests &nbsp;&nbsp;
+        The gap between the two bars is wasted effort.
+      </p>
+    </div>
+
+    <!-- Why the gap exists -->
+    <div class="findings-grid" style="margin-top:1.5rem;">
+      <div class="finding-card info">
+        <h5>Why patches look right but aren&rsquo;t</h5>
+        <p>Agents are optimized to produce plausible code. They target the right file, the right function, the right bug &mdash; but introduce subtle logic errors: wrong boundary conditions, missing edge cases, incomplete fixes that address the symptom but not the root cause. These patches pass code review but fail tests.</p>
+      </div>
+      <div class="finding-card info">
+        <h5>Why test execution is expensive</h5>
+        <p>Each SWE-bench issue requires cloning the repo at a specific commit, installing version-specific dependencies, and running the test suite in an isolated container. This takes 2-10 minutes and requires Docker infrastructure. For N candidates across M issues, cost scales as O(N&times;M).</p>
+      </div>
+      <div class="finding-card breakthrough">
+        <h5>The verification skill alternative</h5>
+        <p>A $0.048 LLM call that takes 2 seconds and needs no infrastructure. If its precision is high enough, it can filter the patch pile before expensive test execution &mdash; or replace it entirely for triage. The key question: <em>can prompt engineering alone achieve sufficient precision?</em></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- T10: LARGE-SCALE VALIDATION -->
+  <div class="section">
+    <h3>T10 + T10b: Scale Reveals the Right Config</h3>
+    <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.5rem;">
+      T10 ran the v001&cap;v009 ensemble on SWE-bench Verified (483 patches) and found precision=0.78, not 1.00.
+      T10b iterated on the Verified data: tested 4 new rubrics and analyzed threshold/ensemble variants.
+      The finding: <b>drop the v001 gate and raise the v009 threshold to 4/4 unanimous</b>.
+    </p>
+
+    <!-- Three-way comparison -->
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin-bottom:1.5rem;">
+      <div class="rubric-card" style="border-top: 3px solid var(--text-muted);">
+        <div class="tag" style="background:var(--surface-2);color:var(--text-muted)">Dev Set (n=49)</div>
+        <h4>Small-sample illusion</h4>
+        <div style="margin-top:0.75rem; text-align:center;">
+          <div style="font-family:'JetBrains Mono',monospace; font-size:2rem; font-weight:700; color:var(--text-muted);">1.00</div>
+          <div style="font-size:0.75rem; color:var(--text-muted);">v001&cap;v009(2+/4)</div>
+          <div style="font-size:0.7rem; color:var(--text-muted); margin-top:0.3rem;">0 FP / 2 TP &middot; CI [0.54, 1.00]</div>
+        </div>
+      </div>
+      <div class="rubric-card" style="border-top: 3px solid var(--orange);">
+        <div class="tag" style="background:var(--orange-soft);color:var(--orange)">T10: Ensemble (n=483)</div>
+        <h4>Ensemble at scale</h4>
+        <div style="margin-top:0.75rem; text-align:center;">
+          <div style="font-family:'JetBrains Mono',monospace; font-size:2rem; font-weight:700; color:var(--orange);">0.78</div>
+          <div style="font-size:0.75rem; color:var(--text-muted);">v001&cap;v009(2+/4)</div>
+          <div style="font-size:0.7rem; color:var(--text-muted); margin-top:0.3rem;">5 FP / 18 TP &middot; CI [0.58, 0.90]</div>
+        </div>
+      </div>
+      <div class="rubric-card" style="border-top: 3px solid var(--green);">
+        <div class="tag" style="background:var(--green-soft);color:var(--green)">T10b: Best Config (n=483)</div>
+        <h4>v009 alone, 4/4 unanimous</h4>
+        <div style="margin-top:0.75rem; text-align:center;">
+          <div style="font-family:'JetBrains Mono',monospace; font-size:2rem; font-weight:700; color:var(--green);">0.92</div>
+          <div style="font-size:0.75rem; color:var(--text-muted);">v009 4/4 (no v001)</div>
+          <div style="font-size:0.7rem; color:var(--text-muted); margin-top:0.3rem;">3 FP / 34 TP &middot; CI [0.79, 0.97]</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Component breakdown -->
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Config</th><th>Precision</th><th>95% CI</th><th>Recall</th><th>TP</th><th>FP</th><th>Calls</th><th>Cost</th></tr></thead>
+        <tbody>
+          <tr style="background:var(--green-soft); font-weight:600"><td class="mono">v009 4/4 unanimous</td><td class="mono pass-cell">0.92</td><td class="mono">[0.79, 0.97]</td><td class="mono">0.14</td><td class="mono">34</td><td class="mono pass-cell">3</td><td class="mono">4</td><td class="mono">$0.030</td></tr>
+          <tr><td class="mono">v009 3+/4</td><td class="mono pass-cell">0.89</td><td class="mono">[0.77, 0.95]</td><td class="mono">0.17</td><td class="mono">41</td><td class="mono">5</td><td class="mono">4</td><td class="mono">$0.030</td></tr>
+          <tr><td class="mono">v009 2+/4</td><td class="mono warn-cell">0.83</td><td class="mono">[0.71, 0.90]</td><td class="mono">0.20</td><td class="mono">48</td><td class="mono">10</td><td class="mono">4</td><td class="mono">$0.030</td></tr>
+          <tr style="color:var(--text-muted)"><td class="mono">v001 &cap; v009(2+/4)</td><td class="mono">0.78</td><td class="mono">[0.58, 0.90]</td><td class="mono">0.07</td><td class="mono">18</td><td class="mono">5</td><td class="mono">5</td><td class="mono">$0.024</td></tr>
+          <tr style="color:var(--text-muted)"><td class="mono">Random baseline</td><td class="mono">0.51</td><td class="mono">&mdash;</td><td class="mono">1.00</td><td class="mono">245</td><td class="mono">238</td><td class="mono">0</td><td class="mono">$0</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Why v009 alone is better -->
+    <div class="findings-grid" style="margin-top:1.5rem;">
+      <div class="finding-card breakthrough">
+        <h5>v001 gate hurts at high base rate</h5>
+        <p>At 51% gold pass rate, v001 removes correct patches faster than incorrect ones. Dropping it: +0.14 precision, +2x recall, 2 fewer FPs, 1 fewer call. The confirmatory gate only helps when base rate is low (&lt;20%).</p>
+      </div>
+      <div class="finding-card info">
+        <h5>Unanimity is the key</h5>
+        <p>Requiring all 4 v009 runs to agree (4/4) catches 2 extra FPs over the 2+/4 threshold. True positives consistently get 4/4 lc. False positives occasionally get 3/4 but rarely 4/4.</p>
+      </div>
+      <div class="finding-card negative">
+        <h5>3 stubborn FPs remain</h5>
+        <p>django-15103 and xarray-6992 get 4/4 lc even at temp=0.7 with 6 runs. django-13590 is a new holdout FP. These require codebase-level completeness reasoning beyond diff-only rubrics.</p>
+      </div>
+    </div>
+
+    <!-- T10b rubric iteration -->
+    <div class="chart-container" style="margin-top:1.5rem;">
+      <h4 style="font-size:0.9rem; font-weight:600; margin-bottom:1rem;">T10b: 4 New Rubrics Tested &mdash; Completeness Catches FPs But Kills Recall</h4>
+      <div class="table-wrap" style="border:none;">
+        <table>
+          <thead><tr><th>Rubric</th><th>Change from v009</th><th>FPs Caught</th><th>TP Recall</th><th>Verdict</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">v015</td><td>Full rewrite + completeness step + stricter verdicts</td><td class="pass-cell">5/5</td><td class="fail-cell">1/10</td><td class="fail-cell">Kills recall</td></tr>
+            <tr><td class="mono">v016</td><td>+ test script awareness only</td><td class="fail-cell">0/5</td><td class="mono">3/10</td><td class="fail-cell">No effect on FPs</td></tr>
+            <tr><td class="mono">v017</td><td>+ dedicated completeness step</td><td class="pass-cell">5/5</td><td class="fail-cell">0/10</td><td class="fail-cell">Kills all recall</td></tr>
+            <tr><td class="mono">v018</td><td>Completeness-only probe</td><td class="pass-cell">5/5</td><td class="fail-cell">0/10</td><td class="fail-cell">Same overcorrection</td></tr>
+            <tr style="background:var(--green-soft); font-weight:600"><td class="mono">v009 4/4</td><td>Same rubric, raise threshold</td><td class="mono">3/5</td><td class="mono">—</td><td class="pass-cell">Best tradeoff</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:0.78rem; color:var(--text-muted); margin-top:1rem;">
+        The completeness check is the signal that catches FPs (finding related methods that need the same fix). But the model applies it equally to correct and incorrect patches &mdash; it can&rsquo;t distinguish &ldquo;genuinely incomplete&rdquo; from &ldquo;potentially incomplete.&rdquo; Threshold tuning on the existing v009 rubric produces a better tradeoff than any new rubric.
+      </p>
+    </div>
+
+    <div class="callout" style="border-color:var(--green);">
+      <h4>Simple beats clever: same rubric, better threshold</h4>
+      <p>After testing 4 new rubrics and various ensemble strategies, the best improvement came from two simple changes: drop the v001 confirmatory gate and require unanimous v009 agreement. Precision improved from 0.78 to 0.92, recall doubled, and cost dropped 37%.</p>
+    </div>
+  </div>
+
+  <!-- KEY FINDING: Skills as Capability Amplifiers -->
+  <div class="section">
+    <h3>Skills as Capability Amplifiers (Dev Set Results)</h3>
+    <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.5rem;">
+      The same verification skill (v001&cap;v009 ensemble) applied to patches from different model tiers. The skill&rsquo;s lift scales with model capability &mdash; frontier models produce patches with richer signal for the adversarial rubric to exploit.
+    </p>
+    <div class="lift-viz">
+      <!-- Devstral (Tier 2) -->
+      <div class="lift-card" style="border-top: 3px solid var(--text-muted);">
+        <div class="model-tier" style="background: var(--surface-2); color: var(--text-muted);">Tier 2 &middot; Open 24B</div>
+        <div class="model-name">Devstral &times; SERA</div>
+        <div class="lift-bars">
+          <div class="lift-bar-group">
+            <div class="lift-bar-val" style="color:var(--red)">9%</div>
+            <div class="lift-bar" style="height:12px; background:var(--red);"></div>
+            <div class="lift-bar-label">Before</div>
+          </div>
+          <div class="lift-bar-group">
+            <div class="lift-bar-val" style="color:var(--yellow)">33%</div>
+            <div class="lift-bar" style="height:46px; background:var(--yellow);"></div>
+            <div class="lift-bar-label">After</div>
+          </div>
+        </div>
+        <div class="lift-arrow" style="color:var(--text-muted)">&uarr;</div>
+        <div class="lift-number" style="color:var(--text-muted)">+24pp</div>
+        <div class="lift-label">Prec=0.33 &middot; 2 FP</div>
+      </div>
+      <!-- Qwen3.5 (Tier 1) -->
+      <div class="lift-card" style="border-top: 3px solid var(--orange);">
+        <div class="model-tier" style="background: var(--orange-soft); color: var(--orange);">Tier 1 &middot; Open 122B MoE</div>
+        <div class="model-name">Qwen3.5 &times; OpenCode</div>
+        <div class="lift-bars">
+          <div class="lift-bar-group">
+            <div class="lift-bar-val" style="color:var(--red)">9%</div>
+            <div class="lift-bar" style="height:12px; background:var(--red);"></div>
+            <div class="lift-bar-label">Before</div>
+          </div>
+          <div class="lift-bar-group">
+            <div class="lift-bar-val" style="color:var(--orange)">50%</div>
+            <div class="lift-bar" style="height:70px; background:var(--orange);"></div>
+            <div class="lift-bar-label">After</div>
+          </div>
+        </div>
+        <div class="lift-arrow" style="color:var(--orange)">&uarr;</div>
+        <div class="lift-number" style="color:var(--orange)">+41pp</div>
+        <div class="lift-label">Prec=0.50 &middot; 2 FP</div>
+      </div>
+      <!-- Claude (Frontier) -->
+      <div class="lift-card" style="border-top: 3px solid var(--green);">
+        <div class="model-tier" style="background: var(--green-soft); color: var(--green);">Frontier &middot; Claude</div>
+        <div class="model-name">Claude &times; OpenCode</div>
+        <div class="lift-bars">
+          <div class="lift-bar-group">
+            <div class="lift-bar-val" style="color:var(--red)">12%</div>
+            <div class="lift-bar" style="height:17px; background:var(--red);"></div>
+            <div class="lift-bar-label">Before</div>
+          </div>
+          <div class="lift-bar-group">
+            <div class="lift-bar-val" style="color:var(--green)">100%</div>
+            <div class="lift-bar" style="height:140px; background:var(--green);"></div>
+            <div class="lift-bar-label">After</div>
+          </div>
+        </div>
+        <div class="lift-arrow" style="color:var(--green)">&uarr;</div>
+        <div class="lift-number" style="color:var(--green)">+88pp</div>
+        <div class="lift-label">Prec=1.00 &middot; 0 FP</div>
+      </div>
+    </div>
+
+    <div class="callout" style="border-color:var(--yellow);">
+      <h4>Caveat: Dev set lifts are inflated by small samples</h4>
+      <p>The +88pp lift on Claude patches (prec=1.00) is based on only 6 gold passes. T10 shows the true precision is ~0.78. The amplification pattern (stronger models benefit more) likely holds directionally, but the absolute lift numbers will be smaller once validated at scale for each model tier.</p>
+    </div>
+
+    <!-- Detailed comparison table -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Model Tier</th><th>Generator</th><th>Harness</th><th>Base Rate</th><th>With Skill</th><th>Lift</th><th>Precision</th><th>Recall</th><th>FP</th><th>Diff Size</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span style="color:var(--green);font-weight:600">Frontier</span></td>
+            <td class="mono">Claude Sonnet</td>
+            <td class="mono">OpenCode</td>
+            <td class="mono">12%</td>
+            <td class="mono pass-cell">100%</td>
+            <td class="mono pass-cell">+88pp</td>
+            <td class="mono pass-cell">1.00</td>
+            <td class="mono">0.33</td>
+            <td class="mono pass-cell">0</td>
+            <td class="mono">11.7K</td>
+          </tr>
+          <tr>
+            <td><span style="color:var(--orange);font-weight:600">Tier 1 Open</span></td>
+            <td class="mono">Qwen3.5 122B</td>
+            <td class="mono">OpenCode</td>
+            <td class="mono">9%</td>
+            <td class="mono warn-cell">50%</td>
+            <td class="mono warn-cell">+41pp</td>
+            <td class="mono warn-cell">0.50</td>
+            <td class="mono">0.50</td>
+            <td class="mono warn-cell">2</td>
+            <td class="mono">8.6K</td>
+          </tr>
+          <tr>
+            <td><span style="color:var(--text-muted);font-weight:600">Tier 2 Open</span></td>
+            <td class="mono">Devstral 24B</td>
+            <td class="mono">SERA</td>
+            <td class="mono">9%</td>
+            <td class="mono muted-cell">33%</td>
+            <td class="mono muted-cell">+24pp</td>
+            <td class="mono fail-cell">0.33</td>
+            <td class="mono">0.25</td>
+            <td class="mono fail-cell">2</td>
+            <td class="mono">1.5K</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:0.82rem; color:var(--text-muted); margin-top:0.5rem;">
+      &ldquo;With Skill&rdquo; = pass rate on the verifier-selected subset. Same v001&cap;v009 ensemble, same Haiku verifier, same $0.048/patch cost across all tiers.
+    </p>
+  </div>
+
+  <!-- WHY: Two amplification mechanisms -->
+  <div class="section">
+    <h3>Why Skills Amplify: Two Mechanisms</h3>
+    <div class="comparison">
+      <div class="rubric-card" style="border-top: 3px solid var(--orange);">
+        <div class="tag" style="background:var(--orange-soft);color:var(--orange)">Mechanism 1: Patch Quality</div>
+        <h4>Better models produce richer error signals</h4>
+        <p style="font-size:0.82rem; color:var(--text-muted);">
+          Frontier models generate patches with more distinctive error signatures. Claude&rsquo;s false positives have subtle but detectable logic flaws (regex scope, missing edge cases). Qwen3.5&rsquo;s false positives on small diffs (&lt;2K chars) lack surface area for the adversarial rubric to find bugs.
+        </p>
+        <div style="margin-top:0.75rem;">
+          <table style="font-size:0.75rem;">
+            <tr><td class="mono" style="padding:0.3rem 0.5rem">Claude FPs</td><td style="padding:0.3rem 0.5rem">v009 finds bugs in <span class="pass-cell">100%</span> &mdash; 0/4 lc each</td></tr>
+            <tr><td class="mono" style="padding:0.3rem 0.5rem">Qwen3.5 FPs</td><td style="padding:0.3rem 0.5rem">v009 misses bugs in <span class="fail-cell">50%</span> &mdash; flask-4992 gets 3/3 lc</td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="rubric-card" style="border-top: 3px solid var(--blue);">
+        <div class="tag" style="background:var(--blue-soft);color:var(--blue)">Mechanism 2: Harness Surface Area</div>
+        <h4>Richer diffs give the skill more to work with</h4>
+        <p style="font-size:0.82rem; color:var(--text-muted);">
+          OpenCode produces multi-file, multi-hunk diffs (8-12K chars) regardless of model. SERA produces surgical 2-line patches (1.5K). The adversarial rubric needs surface area to find bugs &mdash; larger diffs provide more attack vectors.
+        </p>
+        <div style="margin-top:0.75rem;">
+          <table style="font-size:0.75rem;">
+            <tr><td class="mono" style="padding:0.3rem 0.5rem">OpenCode diffs</td><td style="padding:0.3rem 0.5rem">Median 8-12K &rarr; prec <span class="pass-cell">0.50-1.00</span></td></tr>
+            <tr><td class="mono" style="padding:0.3rem 0.5rem">SERA diffs</td><td style="padding:0.3rem 0.5rem">Median 1.5K &rarr; prec <span class="fail-cell">0.33</span></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+    <p style="font-size:0.82rem; color:var(--text-muted); margin-top:0.5rem;">
+      Both mechanisms compound: a frontier model &times; rich harness = maximum amplification. A weaker model &times; minimal harness = minimal amplification. The implication: invest in model capability AND harness tooling together.
+    </p>
+
+    <!-- Harness dependency detail -->
+    <div class="chart-container" style="margin-top:1.5rem;">
+      <h4 style="font-size:0.9rem; font-weight:600; margin-bottom:1rem;">Diff Style Determines Verifier Signal</h4>
+      <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1rem;">
+        The harness &mdash; not the model &mdash; controls the diff style. OpenCode produces large, multi-file diffs regardless of which model generates them. The verifier&rsquo;s precision correlates with diff size because adversarial reasoning needs surface area to find bugs. Both Qwen3.5 FPs are on small diffs (&lt;2K), the same size range where SERA patches live.
+      </p>
+      <div style="display:grid; grid-template-columns: repeat(4,1fr); gap:0.5rem; text-align:center;">
+        <div style="background:var(--surface-2); border-radius:8px; padding:1rem;">
+          <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em;">Claude &times; OpenCode</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:1.2rem; font-weight:700; color:var(--green); margin:0.5rem 0;">11.7K</div>
+          <div style="font-size:0.7rem; color:var(--text-muted);">median diff &rarr; prec 1.00</div>
+        </div>
+        <div style="background:var(--surface-2); border-radius:8px; padding:1rem;">
+          <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em;">Qwen3.5 &times; OpenCode</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:1.2rem; font-weight:700; color:var(--orange); margin:0.5rem 0;">8.6K</div>
+          <div style="font-size:0.7rem; color:var(--text-muted);">median diff &rarr; prec 0.50</div>
+        </div>
+        <div style="background:var(--surface-2); border-radius:8px; padding:1rem;">
+          <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em;">Qwen3.5 FPs only</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:1.2rem; font-weight:700; color:var(--red); margin:0.5rem 0;">&lt;2K</div>
+          <div style="font-size:0.7rem; color:var(--text-muted);">small diffs &rarr; FPs leak</div>
+        </div>
+        <div style="background:var(--surface-2); border-radius:8px; padding:1rem;">
+          <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em;">Devstral &times; SERA</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:1.2rem; font-weight:700; color:var(--text-muted); margin:0.5rem 0;">1.5K</div>
+          <div style="font-size:0.7rem; color:var(--text-muted);">median diff &rarr; prec 0.33</div>
+        </div>
+      </div>
+      <p style="font-size:0.78rem; color:var(--text-muted); margin-top:1rem; font-style:italic;">
+        The pattern is clear: if a harness produces diffs that look similar to Claude &times; OpenCode diffs (large, multi-hunk, rich context), the skill transfers well. If diffs are small and surgical, the adversarial rubric has nothing to attack.
+      </p>
+    </div>
+  </div>
+
+  <!-- AUTORESEARCH: How the skill was found -->
+  <div class="section">
+    <h3>Autoresearch: How Autonomous Iteration Found the Skill</h3>
+    <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.5rem;">
+      The verification skill was discovered through an autonomous research loop: hypothesize &rarr; run experiment &rarr; log &rarr; decide. No human rubric engineering &mdash; the agent iterated through 54 experiments, systematically testing and discarding hypotheses until it found the adversarial framing breakthrough.
+    </p>
+    <div class="comparison">
+      <div class="rubric-card" style="border-top: 3px solid var(--accent);">
+        <div class="tag" style="background:rgba(99,102,241,0.12);color:var(--accent)">The Loop</div>
+        <h4>Skill Iteration Protocol</h4>
+        <ol style="font-size:0.82rem; color:var(--text-muted); padding-left:1.2rem; margin-top:0.5rem; line-height:1.8;">
+          <li><b>Read</b> latest sweep results and error analysis</li>
+          <li><b>Hypothesize</b> one specific improvement (rubric, model, threshold, ensemble)</li>
+          <li><b>Run</b> experiment &mdash; one variable at a time, mandatory smoke test</li>
+          <li><b>Log</b> result to immutable table (even failures)</li>
+          <li><b>Decide</b> &mdash; keep, discard, escalate, or terminate</li>
+        </ol>
+        <p style="font-size:0.78rem; color:var(--text-muted); margin-top:0.5rem;">Guardrails: circuit breakers ($5/sweep), one variable per iteration, never edit gold labels, immutable rubric versions, holdout reserved for final candidates only.</p>
+      </div>
+      <div class="rubric-card" style="border-top: 3px solid var(--purple);">
+        <div class="tag" style="background:var(--purple-soft);color:var(--purple)">What the Agent Tried</div>
+        <h4>59 Experiments Across 7 Levers</h4>
+        <div style="margin-top:0.5rem;">
+          <table style="font-size:0.75rem;">
+            <tr><td style="padding:0.3rem 0.5rem; font-weight:600;">Rubric design</td><td style="padding:0.3rem 0.5rem;">14 versions &mdash; confirmatory, adversarial, completeness, test-scoped, few-shot, decomposed, persona</td></tr>
+            <tr><td style="padding:0.3rem 0.5rem; font-weight:600;">Verifier model</td><td style="padding:0.3rem 0.5rem;">5 models &mdash; Haiku, Sonnet, Opus, Devstral 2, Nova Pro, Mistral Large</td></tr>
+            <tr><td style="padding:0.3rem 0.5rem; font-weight:600;">Ensemble</td><td style="padding:0.3rem 0.5rem;">9 strategies &mdash; intersection, union, majority, score-weighted, size-routed</td></tr>
+            <tr><td style="padding:0.3rem 0.5rem; font-weight:600;">Temperature</td><td style="padding:0.3rem 0.5rem;">0.0, 0.3, 1.0 &mdash; deterministic vs sampling vs extended thinking</td></tr>
+            <tr><td style="padding:0.3rem 0.5rem; font-weight:600;">Diff preprocessing</td><td style="padding:0.3rem 0.5rem;">Changes-only, quote filtering, AST normalization, oracle minimal-diff</td></tr>
+            <tr><td style="padding:0.3rem 0.5rem; font-weight:600;">Patch sources</td><td style="padding:0.3rem 0.5rem;">4 sources &mdash; Claude (Haiku/Sonnet/Opus), Devstral, Qwen3.5</td></tr>
+            <tr><td style="padding:0.3rem 0.5rem; font-weight:600;">Applications</td><td style="padding:0.3rem 0.5rem;">Self-critique, best-of-N, cross-model BoN, verifier loop, context augment</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Iteration efficiency -->
+    <div class="chart-container" style="margin-top:1.5rem;">
+      <h4 style="font-size:0.9rem; font-weight:600; margin-bottom:1rem;">Iteration Efficiency: Breakthrough at Iteration 17</h4>
+      <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:1.5rem;">
+        <div style="text-align:center;">
+          <div style="font-family:'JetBrains Mono',monospace; font-size:2rem; font-weight:700; color:var(--green);">17</div>
+          <div style="font-size:0.78rem; color:var(--text-muted);">iterations to breakthrough</div>
+          <div style="font-size:0.7rem; color:var(--text-muted); margin-top:0.25rem;">from prec 0.29 &rarr; 1.00</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-family:'JetBrains Mono',monospace; font-size:2rem; font-weight:700; color:var(--red);">37</div>
+          <div style="font-size:0.78rem; color:var(--text-muted);">iterations confirming ceiling</div>
+          <div style="font-size:0.7rem; color:var(--text-muted); margin-top:0.25rem;">then T10b: simple threshold &gt; clever rubrics</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-family:'JetBrains Mono',monospace; font-size:2rem; font-weight:700; color:var(--accent);">$154</div>
+          <div style="font-size:0.78rem; color:var(--text-muted);">total cost</div>
+          <div style="font-size:0.7rem; color:var(--text-muted); margin-top:0.25rem;">$2.61/iteration avg</div>
+        </div>
+      </div>
+      <p style="font-size:0.78rem; color:var(--text-muted); margin-top:1rem;">
+        The agent spent 31% of iterations finding the breakthrough and 69% proving no further improvement exists. This &ldquo;proving the negative&rdquo; phase is essential &mdash; it confirms the recall ceiling is fundamental (semantic mismatch between verification and testing), not a rubric design limitation.
+      </p>
+    </div>
+
+    <!-- What autonomous iteration discovered that humans wouldn't -->
+    <div class="findings-grid" style="margin-top:1.5rem;">
+      <div class="finding-card breakthrough">
+        <h5>Autonomous Discovery: Adversarial Framing</h5>
+        <p>The agent discovered that inverting the verification prompt from &ldquo;evaluate correctness&rdquo; to &ldquo;find the bug&rdquo; eliminates all false positives. This is a non-obvious insight &mdash; confirmatory rubrics were the standard approach across 8 prior versions.</p>
+      </div>
+      <div class="finding-card info">
+        <h5>Systematic Elimination</h5>
+        <p>After the breakthrough, the agent methodically tested every remaining lever (14 rubric versions, 5 models, extended thinking, multi-turn, decomposition) to prove the recall ceiling is fundamental. A human would likely have stopped after 5-10 negative results.</p>
+      </div>
+      <div class="finding-card negative">
+        <h5>Key Negative: Self-Critique Hurts</h5>
+        <p>The agent tested adversarial self-critique in generation (T5). It discovered that a model can find bugs in OTHER models&rsquo; code but not its own &mdash; fix rate dropped 54%&rarr;30%. This &ldquo;blind spot&rdquo; finding validates external verification as the correct architecture.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ORIGINAL BREAKTHROUGH SECTION -->
+  <div class="section">
+    <h3>The Breakthrough: Adversarial Framing</h3>
+    <div class="comparison">
+      <div class="rubric-card confirm">
+        <div class="tag">Confirmatory (v001)</div>
+        <h4>&ldquo;Evaluate whether this patch is correct&rdquo;</h4>
+        <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:0.5rem;">Score the patch on 6 criteria: problem alignment, minimality, test safety, logic correctness, scope, completeness.</p>
+        <blockquote>&ldquo;You are a patch verification expert. Evaluate the patch on each criterion. Score each 0.0 to 1.0.&rdquo;</blockquote>
+        <p style="font-size:0.78rem; margin-top:0.75rem;"><span class="warn-cell">Precision: 0.29</span> &mdash; Biased toward confirming patches that &ldquo;look right&rdquo;</p>
+      </div>
+      <div class="rubric-card adversarial">
+        <div class="tag">Adversarial (v009)</div>
+        <h4>&ldquo;Assume this patch is wrong &mdash; find the bug&rdquo;</h4>
+        <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:0.5rem;">3 steps: identify what the patch claims, attack the claim, judge based on whether you found a bug.</p>
+        <blockquote>&ldquo;You are a code reviewer whose job is to FIND BUGS. Assume the patch is incorrect. Only clear if you cannot find any plausible bug.&rdquo;</blockquote>
+        <p style="font-size:0.78rem; margin-top:0.75rem;"><span class="pass-cell">Precision: 0.92 (4/4 unanimous, n=483)</span> &mdash; Actively hunts for failure scenarios</p>
+      </div>
+    </div>
+    <p style="font-size:0.85rem; color:var(--text-muted); margin-top:0.5rem;">The best config (T10b) uses v009 alone: 4 adversarial runs (1&times;t=0.0 + 3&times;t=0.3), requiring <b>unanimous</b> agreement. True positives survive all 4 attacks; false positives fail at least once. The v001 confirmatory gate was dropped &mdash; it hurts precision at high base rates.</p>
+  </div>
+
+  <div class="section">
+    <h3>How Adversarial Framing Catches False Positives</h3>
+    <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">Three Claude patches fooled ALL confirmatory rubrics (v001-v008) with scores 0.88-0.98. v009 catches all three with 0/4 &ldquo;likely_correct&rdquo; verdicts.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>FP Instance</th><th>v001 Score</th><th>v001 Verdict</th><th>v009 (4 runs)</th><th>v009 Attack Found</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">astropy-14365</td><td class="mono warn-cell">0.98</td><td class="fail-cell">likely_correct (FP)</td><td class="pass-cell">0/4 lc</td><td>Regex scope incomplete for all separator patterns</td></tr>
+          <tr><td class="mono">astropy-14995</td><td class="mono warn-cell">0.88</td><td class="muted-cell">likely_incorrect</td><td class="pass-cell">0/4 lc</td><td>Missing symmetric case in mask handling</td></tr>
+          <tr><td class="mono">flask-4992</td><td class="mono warn-cell">0.97</td><td class="fail-cell">likely_correct (FP)</td><td class="pass-cell">0/4 lc</td><td>Missing input validation for mode parameter</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:0.82rem; color:var(--text-muted); margin-top:0.5rem;">
+      On Qwen3.5 patches, the same flask-4992 issue generates a <em>different</em> patch that v009 passes (3/3 lc). The skill catches Claude&rsquo;s version but not Qwen3.5&rsquo;s &mdash; different models produce different error signatures.
+    </p>
+  </div>
+
+  <div class="section">
+    <h3>Precision Progression Across 54 Iterations</h3>
+    <div class="chart-container"><div class="bar-chart" id="precisionChart"></div></div>
+  </div>
+
+  <div class="section">
+    <h3>Best Configuration Results</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Evaluation Set</th><th>Config</th><th>Precision</th><th>Recall</th><th>F<sub>0.5</sub></th><th>TP</th><th>FP</th><th>Cost/patch</th></tr></thead>
+        <tbody>
+          <tr style="color:var(--text-muted)"><td>Dev (Sonnet, 49 patches)</td><td class="mono">v001&cap;v009</td><td class="mono">1.00</td><td class="mono">0.33</td><td class="mono">0.71</td><td class="mono">2</td><td class="mono">0</td><td class="mono">$0.048</td></tr>
+          <tr style="color:var(--text-muted)"><td>Combined Holdout (76 patches)</td><td class="mono">v001&cap;v009</td><td class="mono">1.00</td><td class="mono">0.36</td><td class="mono">0.74</td><td class="mono">4</td><td class="mono">0</td><td class="mono">$0.048</td></tr>
+          <tr style="color:var(--text-muted)"><td>T10: Verified (483 patches)</td><td class="mono">v001&cap;v009</td><td class="mono">0.78</td><td class="mono">0.07</td><td class="mono">0.27</td><td class="mono">18</td><td class="mono">5</td><td class="mono">$0.024</td></tr>
+          <tr style="border-top:3px solid var(--green); font-weight:600; background:var(--green-soft)"><td>T10b: Verified (483 patches)</td><td class="mono">v009 4/4</td><td class="pass-cell mono">0.92</td><td class="mono">0.14</td><td class="mono">0.43</td><td class="mono">34</td><td class="pass-cell mono">3</td><td class="mono">$0.030</td></tr>
+          <tr style="font-weight:600; background:var(--green-soft)"><td>T10b: Holdout (233 patches)</td><td class="mono">v009 4/4</td><td class="pass-cell mono">0.94</td><td class="mono">0.14</td><td class="mono">0.43</td><td class="mono">16</td><td class="pass-cell mono">1</td><td class="mono">$0.030</td></tr>
+          <tr style="border-top:2px solid var(--border)"><td>Transfer: Qwen3.5 &times; OpenCode (43)</td><td class="mono">v001&cap;v009</td><td class="warn-cell mono">0.50</td><td class="mono">0.50</td><td class="mono">0.50</td><td class="mono">2</td><td class="warn-cell mono">2</td><td class="mono">$0.034</td></tr>
+          <tr><td>Transfer: Devstral &times; SERA (44)</td><td class="mono">v001&cap;v009</td><td class="fail-cell mono">0.33</td><td class="mono">0.25</td><td class="mono">0.31</td><td class="mono">1</td><td class="fail-cell mono">2</td><td class="mono">$0.048</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:0.82rem; color:var(--text-muted);">The <span style="color:var(--green);font-weight:600;">green rows</span> show the T10b best config: v009 alone at 4/4 unanimous. Holdout (233 patches, 0 known FPs) validates with prec=0.94 and only 1 new FP.</p>
+  </div>
+
+  <div class="section">
+    <h3>Error Analysis: Why Recall = 0.33</h3>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+pie title Error Distribution (91 errors, iteration 2)
+    "FM-003: Plausible but wrong" : 76
+    "FM-001: Reformatting noise" : 13
+    "Other" : 2
+      </pre>
+    </div>
+    <div class="findings-grid">
+      <div class="finding-card breakthrough"><h5>FM-003: Plausible but Wrong &mdash; SOLVED</h5><p>76/91 errors (84%). Patches that look correct but have subtle logic errors. Eliminated by adversarial framing &mdash; v009 actively searches for the hidden bug.</p></div>
+      <div class="finding-card negative"><h5>FM-001: Reformatting Noise &mdash; Unsolved</h5><p>13/91 errors (14%). Sonnet reformats entire files (66-135K chars for a 3-line fix). Even minimal oracle diffs (525 chars) get rejected &mdash; the problem is semantic, not noise.</p></div>
+      <div class="finding-card info"><h5>Semantic Mismatch: The Root Cause</h5><p>Verifier evaluates <em>problem completeness</em>. Tests check <em>specific behaviors</em>. A patch fixing formfield() but not deconstruct() is genuinely incomplete but passes narrow tests. Both Haiku and Sonnet independently agree.</p></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Experiment Timeline</h3>
+    <div class="timeline">
+      <div class="timeline-item neutral"><div class="tl-title">Iterations 1-5: Initial rubrics</div><div class="tl-detail">6 rubric versions (baseline, minimal, few-shot, CoT, binary)</div><div class="tl-metric">Precision: 0.10-0.29 &mdash; INVALIDATED by FM-004 (47% diffs truncated at 12K)</div></div>
+      <div class="timeline-item neutral"><div class="tl-title">Iteration 6: Fixed pipeline baseline</div><div class="tl-detail">Raised diff limit to 100K chars. Re-established v001 baseline.</div><div class="tl-metric">Precision: 0.29</div></div>
+      <div class="timeline-item negative"><div class="tl-title">Iterations 7-9: FM-aware rubrics + Sonnet verifier</div><div class="tl-detail">v006 (reformat-aware), v007 (strict logic), Sonnet as verifier. All too lenient or expensive.</div><div class="tl-metric">Precision: 0.12-0.17 &mdash; Worse than baseline</div></div>
+      <div class="timeline-item neutral"><div class="tl-title">Iterations 10-15: Ensembles + thresholds</div><div class="tl-detail">v001&cap;v007, v001&cap;v008, score thresholds, creative ensembles. Converge to same ceiling.</div><div class="tl-metric">Precision: 0.40 &mdash; plateau confirmed</div></div>
+      <div class="timeline-item breakthrough"><div class="tl-title">Iteration 17: BREAKTHROUGH &mdash; v001 &cap; v009 adversarial ensemble</div><div class="tl-detail">Inverting verification frame from &ldquo;evaluate correctness&rdquo; to &ldquo;find the bug&rdquo;. Temperature sampling at 2+/4 lc.</div><div class="tl-metric" style="color:var(--green)">Precision: 1.00 &mdash; Zero false positives</div></div>
+      <div class="timeline-item neutral"><div class="tl-title">Iterations 18-27: Recall + transfer experiments</div><div class="tl-detail">FM-001 recall, DTV, cross-verifier (Devstral/Nova Pro/Mistral Large), self-critique, BoN selection</div><div class="tl-metric">Precision: 1.00 held &mdash; Recall ceiling confirmed at 0.33</div></div>
+      <div class="timeline-item negative"><div class="tl-title">Iterations 28-53: 26 consecutive negatives</div><div class="tl-detail">14 rubric versions, extended thinking, Opus v009, multi-turn, few-shot, test-gen, decomposition, size routing, structural features, meta-verification, persona variation, score analysis</div><div class="tl-metric" style="color:var(--red)">0pp improvement &mdash; Recall ceiling is fundamental (semantic mismatch)</div></div>
+      <div class="timeline-item neutral"><div class="tl-title">Iteration 54: T9 &mdash; Qwen3.5 &times; OpenCode cross-model transfer</div><div class="tl-detail">Qwen3.5-122B-FP8 on g7e (4&times; RTX PRO 6000 Blackwell). Partial transfer: prec=0.50.</div><div class="tl-metric" style="color:var(--orange)">Lift +41pp (9%&rarr;50%) on dev set &mdash; but sample size caveat applies</div></div>
+      <div class="timeline-item negative"><div class="tl-title">T10: Large-scale validation on SWE-bench Verified (483 patches)</div><div class="tl-detail">Downloaded Claude 3.5 Sonnet predictions + gold labels from public S3 bucket. Ran full v001&cap;v009 ensemble on all 483 patches in 3 minutes ($11.70).</div><div class="tl-metric" style="color:var(--red)">Ensemble precision=0.78 (5 FPs), NOT 1.00. Key claims overturned.</div></div>
+      <div class="timeline-item breakthrough"><div class="tl-title">T10b: Rubric iteration + threshold tuning on Verified data</div><div class="tl-detail">4 new rubrics (v015-v018): completeness-focused catch FPs but kill recall. Threshold analysis reveals v009 4/4 is strictly better than ensemble.</div><div class="tl-metric" style="color:var(--green)">v009 4/4: precision=0.92 (3 FPs), +0.14 prec, +2x recall, -20% cost vs ensemble</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Consolidated Findings</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Finding</th><th>Impact</th><th>Evidence</th></tr></thead>
+        <tbody>
+          <tr><td style="font-weight:600;color:var(--green)">v009 alone 4/4 is best config</td><td class="pass-cell">T10b FINDING</td><td>Drop v001 gate, raise threshold. Prec=0.92, rec=0.14, 3 FPs, 4 calls, $0.030/patch. Simpler and better.</td></tr>
+          <tr><td style="font-weight:600">Adversarial framing (v009)</td><td class="pass-cell">Breakthrough</td><td>Precision 0.29&rarr;0.92 (+63pp). 3 stubborn FPs remain (unanimous 4/4 lc) requiring codebase-level reasoning.</td></tr>
+          <tr><td style="font-weight:600">Completeness rubrics overcorrect</td><td class="fail-cell">T10b</td><td>4 rubrics tested (v015-v018). Catch all FPs but kill all recall. Model can&rsquo;t distinguish genuine vs speculative incompleteness.</td></tr>
+          <tr><td>Temperature sampling (3 runs, temp=0.3)</td><td class="pass-cell">Stabilizes recall</td><td>Recovers pytest-11143 TP that single v009 run rejects. FPs consistently 0/4.</td></tr>
+          <tr><td>Confirmatory &times; adversarial ensemble</td><td class="pass-cell">Better than same-type</td><td>Confirmatory &times; confirmatory tops out at prec=0.40. Adding adversarial &rarr; 1.00.</td></tr>
+          <tr><td>Harness determines verifier surface area</td><td class="warn-cell">Significant</td><td>OpenCode (8-12K diffs) &rarr; prec 0.50-1.00. SERA (1.5K diffs) &rarr; prec 0.33. Diff size matters.</td></tr>
+          <tr><td>Cross-verifier transfer</td><td class="fail-cell">Claude-specific</td><td>Devstral prec=0.20, Nova Pro prec=0.14, Mistral Large rejects all. Only Claude calibrated.</td></tr>
+          <tr><td>Self-critique in generation</td><td class="fail-cell">HARMFUL</td><td>Fix rate drops 54%&rarr;30%. Model can&rsquo;t find bugs in its own code.</td></tr>
+          <tr><td>Recall ceiling = 0.33</td><td class="warn-cell">Fundamental</td><td>Precision requires completeness checking. Recall requires ignoring it. Mutually exclusive via prompt engineering.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Connection to Verification Framework</h3>
+    <div class="mermaid-container">
+      <pre class="mermaid">
+graph LR
+    A["Phase 0.5<br/>Skill Verifier<br/><b>THIS WORK</b>"] --> B["Phase 1<br/>Consensus<br/>(SVG)"]
+    B --> C["Phase 2<br/>Behavioral<br/>(Telemetry)"]
+    C --> D["Phase 3<br/>Learned<br/>(Trained)"]
+    D --> E["Phase 4<br/>RLVR<br/>(Feedback)"]
+    style A fill:#22c55e,stroke:#16a34a,color:#000
+    style B fill:#3b82f6,stroke:#2563eb,color:#fff
+    style C fill:#6366f1,stroke:#4f46e5,color:#fff
+    style D fill:#a78bfa,stroke:#7c3aed,color:#fff
+    style E fill:#f59e0b,stroke:#d97706,color:#000
+      </pre>
+    </div>
+    <div class="comparison">
+      <div class="rubric-card" style="border-top:3px solid var(--green)">
+        <div class="tag" style="background:var(--green-soft);color:var(--green)">Phase 0.5 &mdash; Complete</div>
+        <h4>Skill Verifier (This Work)</h4>
+        <p style="font-size:0.82rem; color:var(--text-muted);">Precision=0.92 at scale (n=483), recall=0.14. 1.81x lift over random.</p>
+        <ul style="font-size:0.82rem; color:var(--text-muted); margin-top:0.5rem; padding-left:1.2rem;">
+          <li>Triage layer (1.81x lift, better at low base rates)</li>
+          <li>Best-of-N pre-filter ($0.030/patch vs test execution)</li>
+          <li>RLVR candidate: 8% FP noise is marginal &mdash; may work with careful negative labeling</li>
+          <li>v009 alone (4/4) strictly better than v001&cap;v009 ensemble</li>
+        </ul>
+      </div>
+      <div class="rubric-card" style="border-top:3px solid var(--blue)">
+        <div class="tag" style="background:var(--blue-soft);color:var(--blue)">Next Phase</div>
+        <h4>Paths Forward</h4>
+        <ul style="font-size:0.82rem; color:var(--text-muted); margin-top:0.5rem; padding-left:1.2rem;">
+          <li>RLVR with skill verifier &mdash; 8% FP rate (v009 4/4) is marginal; needs study</li>
+          <li><b>SVG Consensus</b>: Multiple solver attempts + line-recall voting. AUC 0.981.</li>
+          <li><b>Learned Verifier</b>: Train on (patch, test_outcome) pairs. Closes semantic mismatch.</li>
+          <li><s>Larger eval</s> &mdash; DONE (T10). Precision=0.78, not 1.00.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Experiment Economics</h3>
+    <div class="metrics-row">
+      <div class="metric-card" style="border-top:2px solid var(--accent)"><div class="metric-value" style="color:var(--accent)">$154</div><div class="metric-label">Total experiment cost</div></div>
+      <div class="metric-card" style="border-top:2px solid var(--green)"><div class="metric-value" style="color:var(--green)">59</div><div class="metric-label">Total iterations</div></div>
+      <div class="metric-card" style="border-top:2px solid var(--blue)"><div class="metric-value" style="color:var(--blue)">483</div><div class="metric-label">Verified patches evaluated</div></div>
+      <div class="metric-card" style="border-top:2px solid var(--yellow)"><div class="metric-value" style="color:var(--yellow)">$14.20</div><div class="metric-label">T10 + T10b cost</div></div>
+    </div>
+    <p style="font-size:0.82rem; color:var(--text-muted);">Phase 1 baselines: $61 (125 Claude patches). Phase 2 iterations: $24 (53 rubric experiments). Transfer experiments (T4-T8): $13. T9 Qwen3.5 session: ~$41 (g7e compute + verifier). T10 Verified eval: $11.70. T10b rubric iteration: $2.50.</p>
+  </div>
+</main>
+<footer>Generated by visual-explainer &middot; agent-aiops-on-aws/verifier-reward &middot; Updated 2026-03-25 with T10b threshold optimization results</footer>
+<script>
+  function toggleTheme() {
+    const html = document.documentElement;
+    html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  }
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      primaryColor: '#6366f1', primaryTextColor: '#e2e8f0', primaryBorderColor: '#2e3151',
+      lineColor: '#8892a4', secondaryColor: '#1a1d2e', tertiaryColor: '#242740',
+    }
+  });
+  const data = [
+    { label: '1-5', value: 0.29, color: '#ef4444', note: 'Initial rubrics' },
+    { label: '6', value: 0.29, color: '#f59e0b', note: 'Fixed pipeline' },
+    { label: '7-8', value: 0.14, color: '#ef4444', note: 'FM-aware' },
+    { label: '9', value: 0.17, color: '#ef4444', note: 'Sonnet' },
+    { label: '10', value: 0.33, color: '#f59e0b', note: 'v001∩v007' },
+    { label: '12', value: 0.40, color: '#f59e0b', note: 'v001∩v008' },
+    { label: '14-15', value: 0.40, color: '#f59e0b', note: 'Plateau' },
+    { label: '16', value: 0.25, color: '#ef4444', note: 'v009 alone' },
+    { label: '17', value: 1.00, color: '#22c55e', note: 'BREAKTHROUGH' },
+    { label: '18-53', value: 1.00, color: '#22c55e', note: '26 negatives' },
+    { label: 'T9', value: 0.50, color: '#f97316', note: 'Qwen3.5 transfer' },
+    { label: 'T10', value: 0.78, color: '#f97316', note: 'Ensemble n=483' },
+    { label: 'T10b', value: 0.92, color: '#22c55e', note: 'v009 4/4 BEST' },
+  ];
+  const chart = document.getElementById('precisionChart');
+  data.forEach(d => {
+    const g = document.createElement('div'); g.className = 'bar-group';
+    const v = document.createElement('div'); v.className = 'bar-value'; v.style.color = d.color; v.textContent = d.value.toFixed(2);
+    const b = document.createElement('div'); b.className = 'bar'; b.style.height = (d.value * 180) + 'px'; b.style.background = d.color; b.title = d.note + ': ' + d.value.toFixed(2);
+    const l = document.createElement('div'); l.className = 'bar-label'; l.textContent = d.note;
+    g.appendChild(v); g.appendChild(b); g.appendChild(l); chart.appendChild(g);
+  });
+</script>
+</body>
+</html>

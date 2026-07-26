@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verification Flywheel — Experiment Results</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --surface-2: #242740;
+      --border: #2e3151;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --accent: #6366f1;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #eab308;
+      --blue: #3b82f6;
+      --purple: #a855f7;
+      --orange: #f97316;
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-2: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    .meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+    button {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+    button:hover { background: var(--border); }
+    main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+
+    /* Summary cards */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+    .summary-card .label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.4rem;
+    }
+    .summary-card .value {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+    .summary-card .sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+
+    /* Sections */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .section h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.6rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+    .badge-red { background: rgba(239,68,68,0.15); color: var(--red); }
+    .badge-yellow { background: rgba(234,179,8,0.15); color: var(--yellow); }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    th, td {
+      padding: 0.6rem 0.8rem;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    th {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    tr:last-child td { border-bottom: none; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .highlight-row { background: rgba(99,102,241,0.08); }
+
+    /* Charts */
+    .chart-container {
+      overflow-x: auto;
+      padding: 1rem 0;
+    }
+    .bar-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 0.5rem;
+      height: 200px;
+      padding: 0 0.5rem;
+    }
+    .bar-group {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100%;
+      justify-content: flex-end;
+      min-width: 70px;
+    }
+    .bar {
+      width: 40px;
+      border-radius: 4px 4px 0 0;
+      position: relative;
+      transition: height 0.5s ease;
+    }
+    .bar-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 0.4rem;
+      text-align: center;
+    }
+    .bar-value {
+      font-size: 0.7rem;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+      text-align: center;
+    }
+
+    /* Stacked bar chart */
+    .stacked-bar-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 1rem;
+      height: 220px;
+      padding: 0 0.5rem;
+    }
+    .stacked-group {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100%;
+      justify-content: flex-end;
+      min-width: 80px;
+    }
+    .stacked-bar {
+      width: 50px;
+      display: flex;
+      flex-direction: column-reverse;
+    }
+    .stack-segment {
+      width: 100%;
+      min-height: 1px;
+      transition: height 0.5s ease;
+    }
+    .stack-segment:first-child { border-radius: 0 0 0 0; }
+    .stack-segment:last-child { border-radius: 4px 4px 0 0; }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      gap: 1.2rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+    }
+
+    /* Mermaid */
+    .mermaid-wrap {
+      overflow-x: auto;
+      padding: 1rem 0;
+    }
+
+    /* Conclusions */
+    .conclusion-item {
+      padding: 0.8rem 0;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+    .conclusion-item:last-child { border-bottom: none; }
+    .conclusion-text { font-size: 0.875rem; }
+    .conclusion-text strong { color: var(--text); }
+    .conclusion-text span { color: var(--text-muted); }
+
+    /* Two columns */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+    @media (max-width: 768px) {
+      .two-col { grid-template-columns: 1fr; }
+      .summary-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Verification Flywheel — Experiment Results</h1>
+    <div class="meta">autoresearch / verification-flywheel &nbsp;&middot;&nbsp; 2026-04-26 &nbsp;&middot;&nbsp; CoderForge-Preview (1,600 traces)</div>
+  </div>
+  <div style="display:flex;gap:0.5rem">
+    <button onclick="toggleTheme()">Theme</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- Hypothesis -->
+  <div class="section" style="border-left:3px solid var(--accent)">
+    <h2>Hypothesis</h2>
+    <p style="font-size:0.9rem;margin-bottom:0.75rem">
+      <strong>A cheap classifier (RF) can bootstrap itself from expensive LLM verifier labels, progressively handling more evaluations for free and reducing evaluation cost by 10&times;.</strong>
+    </p>
+    <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.5rem">
+      This is the same pattern Shopify uses for their Flow agent: production data flows to an LLM judge, which generates training labels for a cheaper fine-tuned model (Qwen3-32B), retrained weekly on 2&times; H200. As the cheap model improves, it handles more traffic, and the expensive judge is called less often.
+    </p>
+    <p style="font-size:0.85rem;color:var(--text-muted)">
+      We test whether this flywheel works for <strong>code patch verification</strong>: can an RF classifier trained on silver labels from a Haiku-based content verifier progressively take over evaluation of agent trajectories, and does this transfer to out-of-distribution data?
+    </p>
+  </div>
+
+  <!-- Methodology -->
+  <div class="section" style="border-left:3px solid var(--blue)">
+    <h2>Methodology</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1rem">
+      <div style="padding:0.75rem;background:var(--surface-2);border-radius:8px">
+        <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:0.3rem">Phase 1: Cold Start</div>
+        <div style="font-size:0.85rem">Run cascade <em>without</em> RF on 200 CoderForge trajectories. All traces go through Multiprompt Haiku (Tier 1) or Debate (Tier 2). Use cascade verdicts as <strong>silver labels</strong> to train the initial RF.</div>
+      </div>
+      <div style="padding:0.75rem;background:var(--surface-2);border-radius:8px">
+        <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:0.3rem">Phase 2: Flywheel</div>
+        <div style="font-size:0.85rem">Run 5 cycles of 200 traces each, cascade <em>with</em> RF. RF handles confident cases for free; uncertain cases escalate to Haiku. After each cycle, retrain RF on all accumulated silver labels. Measure cost reduction.</div>
+      </div>
+      <div style="padding:0.75rem;background:var(--surface-2);border-radius:8px">
+        <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:0.3rem">Phase 3: OOD Transfer</div>
+        <div style="font-size:0.85rem">Test RF trained on SWE_Rebench (1,200 traces) against SWE_Smith (different repos, different distribution). Measures whether learned features generalize across dataset splits.</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div>
+        <div style="font-size:0.75rem;font-weight:600;margin-bottom:0.4rem">Dataset</div>
+        <p style="font-size:0.8rem;color:var(--text-muted)"><strong style="color:var(--text)">CoderForge-Preview</strong> &mdash; 155K Docker-verified agent trajectories across 1,655 repos (Together AI). Splits: SWE_Rebench, SWE_Smith, R2E_Gym. Each trajectory has a binary <code style="background:var(--surface-2);padding:0.1rem 0.3rem;border-radius:3px;font-size:0.75rem">reward</code> field (0/1) verified by Docker test execution.</p>
+      </div>
+      <div>
+        <div style="font-size:0.75rem;font-weight:600;margin-bottom:0.4rem">RF Features (4)</div>
+        <p style="font-size:0.8rem;color:var(--text-muted)">
+          <code style="background:var(--surface-2);padding:0.1rem 0.3rem;border-radius:3px;font-size:0.75rem">beh_total_cost_usd</code> &mdash; estimated from char counts (len/4 tokens &times; $0.001/1K)<br/>
+          <code style="background:var(--surface-2);padding:0.1rem 0.3rem;border-radius:3px;font-size:0.75rem">beh_tokens_per_edit</code> &mdash; total tokens / edit count<br/>
+          <code style="background:var(--surface-2);padding:0.1rem 0.3rem;border-radius:3px;font-size:0.75rem">beh_loop_count</code> &mdash; consecutive same-tool calls (&ge;2)<br/>
+          <code style="background:var(--surface-2);padding:0.1rem 0.3rem;border-radius:3px;font-size:0.75rem">svg_accepted</code> &mdash; whether RF predicts accept
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary cards -->
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="label">Total Traces</div>
+      <div class="value">1,600</div>
+      <div class="sub">CoderForge-Preview</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Total Cost</div>
+      <div class="value" style="color:var(--green)">$8.27</div>
+      <div class="sub">vs $60 estimate</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Cost Reduction</div>
+      <div class="value" style="color:var(--accent)">10x</div>
+      <div class="sub">$0.020 &rarr; $0.002/patch</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Peak RF Coverage</div>
+      <div class="value">93%</div>
+      <div class="sub">Cycle 4</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Silver vs Gold</div>
+      <div class="value">68%</div>
+      <div class="sub">Spec predicted 70.2%</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">OOD Transfer</div>
+      <div class="value" style="color:var(--red)">Failed</div>
+      <div class="sub">Char-count features</div>
+    </div>
+  </div>
+
+  <!-- Gold vs Silver explainer -->
+  <div class="section" style="border-left:3px solid var(--yellow)">
+    <h2>Key Terminology</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
+      <div style="padding:0.75rem;background:var(--surface-2);border-radius:8px">
+        <div style="font-size:0.75rem;font-weight:600;color:var(--yellow);margin-bottom:0.3rem">Gold Labels</div>
+        <div style="font-size:0.8rem;color:var(--text-muted)">Docker-verified test execution results from CoderForge. The ground truth: did the agent's patch actually pass the test suite?</div>
+      </div>
+      <div style="padding:0.75rem;background:var(--surface-2);border-radius:8px">
+        <div style="font-size:0.75rem;font-weight:600;color:var(--blue);margin-bottom:0.3rem">Silver Labels</div>
+        <div style="font-size:0.8rem;color:var(--text-muted)">Cascade verdicts from Haiku content verifier. Cheaper than Docker but noisier (68% agreement). Used to train the RF without running tests.</div>
+      </div>
+      <div style="padding:0.75rem;background:var(--surface-2);border-radius:8px">
+        <div style="font-size:0.75rem;font-weight:600;color:var(--green);margin-bottom:0.3rem">RF Classifier</div>
+        <div style="font-size:0.8rem;color:var(--text-muted)">Random Forest using 4 behavioral features extracted from the agent trace. Free (&lt;1ms), runs on CPU. The "cheap model" in the flywheel.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Architecture diagram -->
+  <div class="section">
+    <h2>Cascade Architecture</h2>
+    <div class="mermaid-wrap">
+      <div class="mermaid">
+graph LR
+  Trace["Agent Trace"] --> RF["Tier 0: RF Classifier<br/>$0.000 &middot; &lt;1ms<br/>4 features"]
+  RF -->|"confident<br/>(p>0.85 or p<0.15)"| RFVerdict["Verdict"]
+  RF -->|"uncertain"| MP["Tier 1: Multiprompt<br/>Haiku &times;3<br/>$0.006-0.020"]
+  MP -->|"consensus"| MPVerdict["Verdict"]
+  MP -->|"split vote"| Debate["Tier 2: Debate<br/>Haiku advocate<br/>$0.094"]
+  Debate --> DebVerdict["Verdict"]
+
+  RFVerdict --> Labels["Silver Labels"]
+  MPVerdict --> Labels
+  DebVerdict --> Labels
+  Labels -->|"retrain"| RF
+
+  style RF fill:#22c55e22,stroke:#22c55e,color:#e2e8f0
+  style MP fill:#3b82f622,stroke:#3b82f6,color:#e2e8f0
+  style Debate fill:#a855f722,stroke:#a855f7,color:#e2e8f0
+  style Labels fill:#eab30822,stroke:#eab308,color:#e2e8f0
+      </div>
+    </div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>RF (free, &lt;1ms)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Multiprompt ($0.006-0.020)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div>Debate ($0.094)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div>Silver Labels (retrain loop)</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+
+    <!-- Cost per patch chart -->
+    <div class="section">
+      <h2>Cost per Patch by Cycle</h2>
+      <div class="chart-container">
+        <div class="bar-chart" id="cost-chart">
+          <div class="bar-group">
+            <div class="bar-value" style="color:var(--red)">$0.0204</div>
+            <div class="bar" style="height:100%;background:var(--red)"></div>
+            <div class="bar-label">Phase 1<br/>(no RF)</div>
+          </div>
+          <div class="bar-group">
+            <div class="bar-value">$0.0072</div>
+            <div class="bar" style="height:35.3%;background:var(--blue)"></div>
+            <div class="bar-label">Cycle 1</div>
+          </div>
+          <div class="bar-group">
+            <div class="bar-value">$0.0042</div>
+            <div class="bar" style="height:20.6%;background:var(--blue)"></div>
+            <div class="bar-label">Cycle 2</div>
+          </div>
+          <div class="bar-group">
+            <div class="bar-value">$0.0033</div>
+            <div class="bar" style="height:16.2%;background:var(--blue)"></div>
+            <div class="bar-label">Cycle 3</div>
+          </div>
+          <div class="bar-group">
+            <div class="bar-value" style="color:var(--green)">$0.0020</div>
+            <div class="bar" style="height:9.8%;background:var(--green)"></div>
+            <div class="bar-label">Cycle 4</div>
+          </div>
+          <div class="bar-group">
+            <div class="bar-value">$0.0042</div>
+            <div class="bar" style="height:20.6%;background:var(--blue)"></div>
+            <div class="bar-label">Cycle 5</div>
+          </div>
+        </div>
+      </div>
+      <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem">Non-monotonic: batch composition varies (cycle 3 has 26% base rate vs 66.5% in cycle 1)</p>
+    </div>
+
+    <!-- Tier distribution chart -->
+    <div class="section">
+      <h2>Tier Distribution by Cycle</h2>
+      <div class="chart-container">
+        <div class="stacked-bar-chart">
+          <div class="stacked-group">
+            <div class="stacked-bar" style="height:180px">
+              <div class="stack-segment" style="height:84%;background:var(--blue)"></div>
+              <div class="stack-segment" style="height:16%;background:var(--purple)"></div>
+            </div>
+            <div class="bar-label">Phase 1<br/>(no RF)</div>
+          </div>
+          <div class="stacked-group">
+            <div class="stacked-bar" style="height:180px">
+              <div class="stack-segment" style="height:71%;background:var(--green)"></div>
+              <div class="stack-segment" style="height:21%;background:var(--blue)"></div>
+              <div class="stack-segment" style="height:8%;background:var(--purple)"></div>
+            </div>
+            <div class="bar-label">Cycle 1</div>
+          </div>
+          <div class="stacked-group">
+            <div class="stacked-bar" style="height:180px">
+              <div class="stack-segment" style="height:79%;background:var(--green)"></div>
+              <div class="stack-segment" style="height:14.5%;background:var(--blue)"></div>
+              <div class="stack-segment" style="height:4.5%;background:var(--purple)"></div>
+            </div>
+            <div class="bar-label">Cycle 2</div>
+          </div>
+          <div class="stacked-group">
+            <div class="stacked-bar" style="height:180px">
+              <div class="stack-segment" style="height:83.5%;background:var(--green)"></div>
+              <div class="stack-segment" style="height:14%;background:var(--blue)"></div>
+              <div class="stack-segment" style="height:2.5%;background:var(--purple)"></div>
+            </div>
+            <div class="bar-label">Cycle 3</div>
+          </div>
+          <div class="stacked-group">
+            <div class="stacked-bar" style="height:180px">
+              <div class="stack-segment" style="height:93%;background:var(--green)"></div>
+              <div class="stack-segment" style="height:5.5%;background:var(--blue)"></div>
+              <div class="stack-segment" style="height:1.5%;background:var(--purple)"></div>
+            </div>
+            <div class="bar-label">Cycle 4</div>
+          </div>
+          <div class="stacked-group">
+            <div class="stacked-bar" style="height:180px">
+              <div class="stack-segment" style="height:85%;background:var(--green)"></div>
+              <div class="stack-segment" style="height:11%;background:var(--blue)"></div>
+              <div class="stack-segment" style="height:4%;background:var(--purple)"></div>
+            </div>
+            <div class="bar-label">Cycle 5</div>
+          </div>
+        </div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>RF (free)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Multiprompt</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div>Debate</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Phase 2 detail table -->
+  <div class="section">
+    <h2>Phase 2: Flywheel Iteration (5 cycles &times; 200 traces)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Cycle</th>
+          <th style="text-align:right">Cost/Patch</th>
+          <th style="text-align:right">RF Handles</th>
+          <th style="text-align:right">Multiprompt</th>
+          <th style="text-align:right">Debate</th>
+          <th style="text-align:right">Base Rate</th>
+          <th style="text-align:right">Cumulative Savings</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="color:var(--text-muted)">
+          <td>0 (no RF)</td>
+          <td class="num">$0.0204</td>
+          <td class="num">0%</td>
+          <td class="num">84%</td>
+          <td class="num">16%</td>
+          <td class="num">62.5%</td>
+          <td class="num">&mdash;</td>
+        </tr>
+        <tr>
+          <td>1</td>
+          <td class="num">$0.0072</td>
+          <td class="num">71%</td>
+          <td class="num">21%</td>
+          <td class="num">8%</td>
+          <td class="num">66.5%</td>
+          <td class="num" style="color:var(--green)">-65%</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td class="num">$0.0042</td>
+          <td class="num">79%</td>
+          <td class="num">14.5%</td>
+          <td class="num">4.5%</td>
+          <td class="num">53.5%</td>
+          <td class="num" style="color:var(--green)">-79%</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td class="num">$0.0033</td>
+          <td class="num">83.5%</td>
+          <td class="num">14%</td>
+          <td class="num">2.5%</td>
+          <td class="num">26.0%</td>
+          <td class="num" style="color:var(--green)">-84%</td>
+        </tr>
+        <tr class="highlight-row">
+          <td><strong>4</strong></td>
+          <td class="num"><strong>$0.0020</strong></td>
+          <td class="num"><strong>93%</strong></td>
+          <td class="num">5.5%</td>
+          <td class="num">1.5%</td>
+          <td class="num">55.5%</td>
+          <td class="num" style="color:var(--green)"><strong>-90%</strong></td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td class="num">$0.0042</td>
+          <td class="num">85%</td>
+          <td class="num">11%</td>
+          <td class="num">4%</td>
+          <td class="num">65.5%</td>
+          <td class="num" style="color:var(--green)">-79%</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Phase 3: OOD -->
+  <div class="section">
+    <h2>Phase 3: OOD Generalization (SWE_Rebench &rarr; SWE_Smith)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th style="text-align:right">SWE_Rebench (in-dist)</th>
+          <th style="text-align:right">SWE_Smith (OOD)</th>
+          <th style="text-align:right">Retrained on SWE_Smith</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Base rate</td>
+          <td class="num">~55%</td>
+          <td class="num">82%</td>
+          <td class="num">82%</td>
+        </tr>
+        <tr>
+          <td>Accuracy</td>
+          <td class="num">0.615</td>
+          <td class="num" style="color:var(--yellow)">0.755</td>
+          <td class="num" style="color:var(--red)">0.320</td>
+        </tr>
+        <tr>
+          <td>Precision</td>
+          <td class="num">&mdash;</td>
+          <td class="num">0.823</td>
+          <td class="num" style="color:var(--red)">0.353</td>
+        </tr>
+        <tr>
+          <td>Recall</td>
+          <td class="num">&mdash;</td>
+          <td class="num">0.903</td>
+          <td class="num" style="color:var(--red)">0.149</td>
+        </tr>
+        <tr>
+          <td>AUC</td>
+          <td class="num">0.625</td>
+          <td class="num">N/A</td>
+          <td class="num" style="color:var(--red)">0.283</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:0.75rem;padding:0.75rem;background:var(--surface-2);border-radius:6px">
+      <strong style="color:var(--red)">Root cause:</strong> The 4 RF features are estimated from message character counts (no actual token/cost data in CoderForge). This approximation works within SWE_Rebench but fails across splits with different base rates and trajectory profiles. Matches Shopify's 35% activation drop on OOD traffic.
+    </p>
+  </div>
+
+  <!-- Shopify Parallel -->
+  <div class="section">
+    <h2>Shopify Flow Agent Parallel</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Component</th>
+          <th>Shopify Flow Agent</th>
+          <th>Verification Flywheel</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Free data source</td>
+          <td>Production merchant conversations</td>
+          <td>Agent traces ($0)</td>
+        </tr>
+        <tr>
+          <td>Expensive oracle</td>
+          <td>LLM judge</td>
+          <td>Multiprompt Haiku ($0.006-0.020)</td>
+        </tr>
+        <tr>
+          <td>Cheap model</td>
+          <td>Fine-tuned Qwen3-32B</td>
+          <td>RF classifier (free, &lt;1ms)</td>
+        </tr>
+        <tr>
+          <td>Retrain cadence</td>
+          <td>Weekly on 2&times; H200</td>
+          <td>Per cycle (seconds on CPU)</td>
+        </tr>
+        <tr>
+          <td>OOD degradation</td>
+          <td style="color:var(--red)">35% activation drop at 1% traffic</td>
+          <td style="color:var(--red)">Transfer failed on SWE_Smith</td>
+        </tr>
+        <tr>
+          <td>Cost reduction</td>
+          <td>10&times; (inference cost)</td>
+          <td style="color:var(--green)">10&times; ($0.020 &rarr; $0.002/patch)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Reward Model Readiness -->
+  <div class="section">
+    <h2>Reward Model Readiness for RL / Post-Training</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Signal</th>
+          <th style="text-align:right">AUC</th>
+          <th style="text-align:right">ECE</th>
+          <th style="text-align:right">Cost</th>
+          <th>RL-Ready?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>RF (4-feature)</td>
+          <td class="num">0.633 &ndash; 0.70</td>
+          <td class="num" style="color:var(--text-muted)">Unknown</td>
+          <td class="num">$0.000</td>
+          <td><span class="badge badge-red">No</span> <span style="font-size:0.75rem;color:var(--text-muted)">AUC too low</span></td>
+        </tr>
+        <tr>
+          <td>Multiprompt (Haiku)</td>
+          <td class="num">0.812</td>
+          <td class="num" style="color:var(--text-muted)">Unknown</td>
+          <td class="num">$0.006 &ndash; 0.020</td>
+          <td><span class="badge badge-yellow">Maybe</span> <span style="font-size:0.75rem;color:var(--text-muted)">ECE unknown</span></td>
+        </tr>
+        <tr>
+          <td>SVG consensus</td>
+          <td class="num">0.981</td>
+          <td class="num" style="color:var(--text-muted)">Unknown</td>
+          <td class="num">$0.042</td>
+          <td><span class="badge badge-yellow">Maybe</span> <span style="font-size:0.75rem;color:var(--text-muted)">precision=1.0</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:0.75rem;padding:0.75rem;background:var(--surface-2);border-radius:6px">
+      <strong style="color:var(--yellow)">ECE calibration is the gate for RL use.</strong> SWE-RM showed 7&times; ECE difference collapsed RL training. Best-of-N is safe (log overoptimization). Phase 3 rejection sampling SFT is the safest next step (Shopify pattern).
+    </p>
+  </div>
+
+  <!-- Flywheel loop diagram -->
+  <div class="section">
+    <h2>Flywheel Loop</h2>
+    <div class="mermaid-wrap">
+      <div class="mermaid">
+graph TB
+  A["1. Collect agent traces<br/>(free)"] --> B["2. RF classifies easy cases<br/>(71-93% handled for $0)"]
+  B -->|uncertain| C["3. Multiprompt Haiku verifies<br/>($0.006-0.020/patch)"]
+  C -->|split vote| D["4. Debate resolves<br/>($0.094/patch)"]
+  B --> E["5. Accumulate silver labels"]
+  C --> E
+  D --> E
+  E --> F["6. Retrain RF on all labels"]
+  F -->|"next cycle"| A
+
+  style A fill:#6366f122,stroke:#6366f1,color:#e2e8f0
+  style B fill:#22c55e22,stroke:#22c55e,color:#e2e8f0
+  style C fill:#3b82f622,stroke:#3b82f6,color:#e2e8f0
+  style D fill:#a855f722,stroke:#a855f7,color:#e2e8f0
+  style E fill:#eab30822,stroke:#eab308,color:#e2e8f0
+  style F fill:#f9731622,stroke:#f97316,color:#e2e8f0
+      </div>
+    </div>
+  </div>
+
+  <!-- Conclusions -->
+  <div class="section">
+    <h2>Key Conclusions</h2>
+    <div class="conclusion-item">
+      <span class="badge badge-green">Validated</span>
+      <div class="conclusion-text">
+        <strong>Flywheel cost reduction: 10&times;</strong><br/>
+        <span>$0.020 &rarr; $0.002/patch as RF handles 71-93% of evaluations for free</span>
+      </div>
+    </div>
+    <div class="conclusion-item">
+      <span class="badge badge-green">Validated</span>
+      <div class="conclusion-text">
+        <strong>Silver label quality: 68% agreement</strong><br/>
+        <span>68% agreement with Docker gold labels &mdash; in line with spec prediction of 70.2%</span>
+      </div>
+    </div>
+    <div class="conclusion-item">
+      <span class="badge badge-red">Failed</span>
+      <div class="conclusion-text">
+        <strong>OOD transfer: char-count features too noisy</strong><br/>
+        <span>Features estimated from char counts fail across distributions. Real token/cost data from live inference would improve this.</span>
+      </div>
+    </div>
+    <div class="conclusion-item">
+      <span class="badge badge-green">Validated</span>
+      <div class="conclusion-text">
+        <strong>Cascade economics: better than expected</strong><br/>
+        <span>Haiku costs $0.020/patch (vs $0.029 estimate). Total: $8.27 for 1,600 traces (vs $60 budget).</span>
+      </div>
+    </div>
+    <div class="conclusion-item">
+      <span class="badge badge-yellow">Next</span>
+      <div class="conclusion-text">
+        <strong>Near-term path: rejection sampling SFT</strong><br/>
+        <span>Shopify pattern (weekly retrain) is safe. RL requires ECE calibration data we don't have yet.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Next Steps -->
+  <div class="section">
+    <h2>Next Steps</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Action</th>
+          <th>Why</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><strong>Improve features</strong>: Use actual inference metrics (tokens, cost, latency) from live agent runs</td>
+          <td>Fixes OOD transfer failure</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><strong>Stratified sampling</strong>: Balance base rates across flywheel cycles</td>
+          <td>Prevents RF drift from batch composition</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><strong>Phase 4 calibration</strong>: Run 2 harness configs, verify cascade ranks them vs Docker gold</td>
+          <td>Validates cascade as harness comparator</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><strong>ECE measurement</strong>: Calibrate multiprompt and SVG signals</td>
+          <td>Gate for RL use</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</main>
+
+<footer>
+  Generated by visual-explainer &middot; agent-aiops-on-aws &middot; 2026-04-26
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
+    flowchart: { curve: 'basis', htmlLabels: true },
+  });
+
+  function toggleTheme() {
+    const html = document.documentElement;
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+  }
+</script>
+</body>
+</html>

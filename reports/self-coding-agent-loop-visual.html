@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Self-Coding Agent Loop — Spec Explainer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --surface-2: #242740;
+      --border: #2e3151;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --accent: #6366f1;
+      --accent-2: #8b5cf6;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --info: #06b6d4;
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-2: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --accent: #4f46e5;
+      --accent-2: #7c3aed;
+      --success: #059669;
+      --warning: #d97706;
+      --danger: #dc2626;
+      --info: #0891b2;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    code, .mono { font-family: 'JetBrains Mono', monospace; }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    .meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .controls { display: flex; gap: 0.5rem; }
+    button {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+    button:hover { background: var(--border); }
+
+    main { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+    section { margin-bottom: 3rem; }
+    section h2 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    section h2 .num {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--accent);
+      background: var(--surface-2);
+      padding: 0.15rem 0.6rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+    }
+    section > p.lede {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .key-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 2rem;
+    }
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+    }
+    .stat .label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.4rem;
+    }
+    .stat .value {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .stat .value.success { color: var(--success); }
+    .stat .value.warning { color: var(--warning); }
+    .stat .value.danger { color: var(--danger); }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+    }
+    .panel + .panel { margin-top: 1rem; }
+    .panel h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; }
+
+    .mermaid-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      overflow: auto;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 1rem;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+    .grid-5 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 1rem;
+    }
+
+    .arm-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.15rem;
+      border-left: 4px solid var(--accent);
+    }
+    .arm-card.a { border-left-color: var(--success); }
+    .arm-card.b { border-left-color: var(--info); }
+    .arm-card.c { border-left-color: var(--accent-2); }
+    .arm-card.d { border-left-color: var(--warning); }
+    .arm-card.e { border-left-color: var(--text-muted); }
+
+    .arm-card .arm-title {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 0.4rem;
+    }
+    .arm-card h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin: 0;
+    }
+    .arm-card .arm-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .arm-card .desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+    .arm-card .attrs {
+      font-size: 0.75rem;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      column-gap: 0.75rem;
+      row-gap: 0.25rem;
+    }
+    .arm-card .attrs dt {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .arm-card .attrs dd { color: var(--text); }
+    .arm-card .gate {
+      margin-top: 0.75rem;
+      padding: 0.4rem 0.6rem;
+      background: var(--surface-2);
+      border-radius: 5px;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+    .arm-card .gate strong { color: var(--warning); }
+    .arm-card .cost {
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--accent);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    th, td {
+      padding: 0.55rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      background: var(--surface-2);
+      font-weight: 600;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    tr:last-child td { border-bottom: none; }
+    td.mono { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
+    td.num { text-align: right; }
+
+    .pill {
+      display: inline-block;
+      padding: 0.1rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .pill.success { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+    .pill.warning { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+    .pill.danger { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+    .pill.info { background: rgba(6, 182, 212, 0.15); color: var(--info); }
+    .pill.muted { background: var(--surface-2); color: var(--text-muted); }
+
+    .finding-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.15rem;
+      border-top: 3px solid var(--accent);
+    }
+    .finding-card.pass { border-top-color: var(--success); }
+    .finding-card.fail { border-top-color: var(--danger); }
+    .finding-card.partial { border-top-color: var(--warning); }
+
+    .finding-card .fc-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 0.4rem;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .finding-card h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin: 0;
+    }
+    .finding-card .summary {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 0.6rem;
+    }
+    .finding-card .metric-row {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: 0.6rem;
+    }
+    .finding-card .metric-row span {
+      color: var(--text-muted);
+    }
+    .finding-card .metric-row strong {
+      color: var(--text);
+    }
+    .finding-card .outcome {
+      font-size: 0.8rem;
+      padding: 0.5rem 0.7rem;
+      background: var(--surface-2);
+      border-radius: 5px;
+    }
+
+    .cost-table {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .cost-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      padding: 0.65rem 1rem;
+      align-items: center;
+      gap: 1rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+    .cost-row:last-child { border-bottom: none; }
+    .cost-row.total {
+      background: var(--surface-2);
+      font-weight: 600;
+    }
+    .cost-row .desc { color: var(--text); }
+    .cost-row .sub { color: var(--text-muted); font-size: 0.75rem; }
+    .cost-row .num { font-family: 'JetBrains Mono', monospace; text-align: right; }
+
+    .infra-cell {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.2rem;
+    }
+    .infra-cell h3 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .infra-cell h3 .tag {
+      font-size: 0.65rem;
+      font-weight: 500;
+      background: var(--accent);
+      color: white;
+      padding: 0.1rem 0.5rem;
+      border-radius: 4px;
+    }
+    .infra-cell p { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.4rem; }
+    .infra-cell .purpose {
+      font-size: 0.75rem;
+      color: var(--accent);
+      margin-top: 0.4rem;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+
+    .anchor-nav {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+      padding: 0.75rem 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.78rem;
+    }
+    .anchor-nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 0.25rem 0.55rem;
+      border-radius: 4px;
+    }
+    .anchor-nav a:hover {
+      color: var(--text);
+      background: var(--surface-2);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Self-Coding Agent Loop</h1>
+    <div class="meta">domains/autoresearch/specs/self-coding-agent-loop.md · 2026-05-10</div>
+  </div>
+  <div class="controls">
+    <button onclick="toggleTheme()">Theme</button>
+  </div>
+</header>
+
+<main>
+
+  <nav class="anchor-nav">
+    <a href="#stats">Key stats</a>
+    <a href="#architecture">Two-phase architecture</a>
+    <a href="#rlvr">Continuous-calibration RLVR</a>
+    <a href="#splits">Dataset splits</a>
+    <a href="#arms">Five arms</a>
+    <a href="#gates">V1b gate family</a>
+    <a href="#readiness">Verifier readiness</a>
+    <a href="#findings">M/M2 findings</a>
+    <a href="#loops">Loops 1-4</a>
+    <a href="#infra">Infrastructure</a>
+    <a href="#cost">Cost &amp; schedule</a>
+  </nav>
+
+  <section id="stats">
+    <h2>Key stats</h2>
+    <div class="key-stats">
+      <div class="stat">
+        <div class="label">Base model</div>
+        <div class="value">Qwen3.5-27B dense</div>
+      </div>
+      <div class="stat">
+        <div class="label">Harness (locked)</div>
+        <div class="value">OpenHands v0.54</div>
+      </div>
+      <div class="stat">
+        <div class="label">Gen0 baseline (SERA)</div>
+        <div class="value success">46.7%</div>
+      </div>
+      <div class="stat">
+        <div class="label">Target (CoderForge match)</div>
+        <div class="value">≥55%</div>
+      </div>
+      <div class="stat">
+        <div class="label">Published ceiling</div>
+        <div class="value">61.7%</div>
+      </div>
+      <div class="stat">
+        <div class="label">Training infra</div>
+        <div class="value">p4de spot (us-east-1 az6)</div>
+      </div>
+      <div class="stat">
+        <div class="label">Min viable budget</div>
+        <div class="value">~$1,615 / 4 weeks</div>
+      </div>
+      <div class="stat">
+        <div class="label">Full 5-arm budget</div>
+        <div class="value warning">~$3,855 / 6-8 weeks</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="architecture">
+    <h2>Two-phase architecture</h2>
+    <p class="lede">Phase 1 uses perfect reward (gold tests) on abundant labeled data. Phase 2 swaps in the calibrated verifier and operates on tasks without gold tests. The transition is gated by the verifier reaching <strong>RL-ready</strong>.</p>
+    <div class="mermaid-wrap">
+      <div class="mermaid">
+flowchart LR
+  subgraph P1[Phase 1: Gold-Labeled RL]
+    direction LR
+    N1[Nebius 67K<br/>OpenHands trajectories<br/>32.2K gold-passing]
+    N1 --> F1[Filter resolved=1]
+    F1 --> T1[GRPO / SFT<br/>Qwen3.5-27B + LoRA]
+    T1 --> E1[Docker gold eval<br/>m7i.16xlarge spot]
+    E1 -.-> C1[Loop 1<br/>passive calibration]
+    T1 --> H1[Held-out eval 500]
+  end
+  subgraph P2[Phase 2: Verifier-in-the-Loop]
+    direction LR
+    N2[New tasks<br/>no gold tests]
+    N2 --> T2[GRPO<br/>reward = verifier score]
+    T2 --> V2[Cascade verifier<br/>calibrated RL-ready]
+    V2 -.-> T2
+    T2 --> D2[Drift monitor<br/>sample 100 → gold]
+    D2 -.-> C1
+  end
+  C1 --> Gate{ECE &lt; 0.1<br/>AND<br/>Precision ≥ 0.9?}
+  H1 --> Gate
+  Gate -->|pass| P2
+  Gate -->|fail| P1
+
+  classDef phase1 fill:#1a3a5c,stroke:#06b6d4,color:#e2e8f0
+  classDef phase2 fill:#3a2a5c,stroke:#8b5cf6,color:#e2e8f0
+  classDef gate fill:#5c3a1a,stroke:#f59e0b,color:#e2e8f0
+  class N1,F1,T1,E1,H1 phase1
+  class N2,T2,V2,D2 phase2
+  class Gate gate
+      </div>
+    </div>
+  </section>
+
+  <section id="rlvr">
+    <h2>Continuous-calibration RLVR <span class="num">what this actually is</span></h2>
+    <p class="lede">Once you squint, the rolling-rounds structure reveals the real design: this isn't "Phase 1 then Phase 2" — it's a single <strong>RLVR loop with a verifier that co-evolves with the policy</strong>. The two phases differ only in <em>which labels are available</em>, not in the underlying algorithm. The name we'd use for this in an RL textbook: continuous-calibration RLVR, or model-verifier co-training.</p>
+
+    <div class="panel" style="border-left: 4px solid var(--accent-2);">
+      <h3>The unified loop</h3>
+      <div class="mermaid-wrap">
+        <div class="mermaid">
+flowchart LR
+  subgraph Round[Round N - repeats]
+    direction LR
+    Policy[Policy<br/>Gen-N checkpoint] -->|generates| Traj[Trajectories on<br/>round_N data]
+    Traj -->|scored by| Verifier[Verifier<br/>RF + v009 rubric]
+    Verifier -->|reward signal| PolicyUpdate[GRPO / STaR update]
+    PolicyUpdate -.->|produces| Policy
+
+    Traj -->|subset| GoldEval[Docker gold<br/>ground truth]
+    GoldEval -->|fresh labels| VerifierUpdate[Verifier recalibration<br/>retrain RF,<br/>iterate rubric]
+    VerifierUpdate -.->|produces| Verifier
+
+    GoldEval -.->|drift_audit_300<br/>identical inputs| DriftCurve[Drift trajectory<br/>24 data points]
+  end
+
+  Round -->|Gen-N+1, Ver-N+1| Round2[Round N+1]
+  Round2 -->|if drift &lt; threshold<br/>for 3 rounds| Phase2Entry[Phase 2: gold labels<br/>become a spot-check<br/>verifier is primary]
+
+  classDef policy fill:#1a5c3a,stroke:#10b981,color:#e2e8f0
+  classDef verifier fill:#3a2a5c,stroke:#8b5cf6,color:#e2e8f0
+  classDef gold fill:#5c3a1a,stroke:#f59e0b,color:#e2e8f0
+  classDef drift fill:#1a3a5c,stroke:#06b6d4,color:#e2e8f0
+  classDef phase fill:#1a5c3a,stroke:#10b981,color:#e2e8f0
+  class Policy,PolicyUpdate policy
+  class Verifier,VerifierUpdate verifier
+  class GoldEval gold
+  class DriftCurve drift
+  class Phase2Entry phase
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-top: 1rem;">
+      <div class="panel">
+        <h3>Policy side (the coding agent)</h3>
+        <p style="font-size: 0.85rem; color: var(--text); margin-bottom: 0.5rem;">
+          Each round, the policy is updated using the verifier's reward. Gen-(N+1) is produced by GRPO/STaR on Gen-N's outputs weighted by verifier scores. Standard RLVR.
+        </p>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">
+          The key property: the policy gets <em>stronger</em> each round. Its outputs shift. Things that looked "obviously broken" to Gen0 now look "subtle edge case" at Gen5.
+        </p>
+      </div>
+      <div class="panel">
+        <h3>Verifier side (the reward model)</h3>
+        <p style="font-size: 0.85rem; color: var(--text); margin-bottom: 0.5rem;">
+          Each round, the verifier is recalibrated using <strong>fresh gold labels from round_N's Docker eval</strong>. The verifier sees what the new-and-stronger policy actually produced, and adjusts — new feature distributions, new failure modes, new edge cases.
+        </p>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">
+          Without this loop, the verifier would drift: trained on Gen0 outputs but scoring Gen5 outputs. By the time Gen5 is generating patches the verifier's training set couldn't anticipate, the reward signal is noise. The co-training loop prevents that.
+        </p>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top: 1rem; border-left: 4px solid var(--info);">
+      <h3>Why the two phases are now just "which labels are available"</h3>
+      <table>
+        <thead>
+          <tr><th></th><th>Phase 1 (during experiment)</th><th>Phase 2 (production)</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Policy update</strong></td>
+            <td class="mono">GRPO/STaR, reward = verifier score</td>
+            <td class="mono">GRPO/STaR, reward = verifier score</td>
+          </tr>
+          <tr>
+            <td><strong>Verifier recalibration source</strong></td>
+            <td class="mono">Docker gold on round_N (every round)</td>
+            <td class="mono">Docker gold on 100-task drift-audit sample (every 3 iterations)</td>
+          </tr>
+          <tr>
+            <td><strong>Gold label cadence</strong></td>
+            <td class="mono">~800 / round (~$20-30)</td>
+            <td class="mono">~100 / 3 iterations (~$10)</td>
+          </tr>
+          <tr>
+            <td><strong>Drift signal</strong></td>
+            <td class="mono">drift_audit_300 re-evaluated every Gen</td>
+            <td class="mono">100-task spot check every 3 iterations</td>
+          </tr>
+          <tr>
+            <td><strong>If drift detected</strong></td>
+            <td class="mono">Label more, retrain verifier, continue</td>
+            <td class="mono">Pause → Loop 1 recalibration → resume</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.75rem;">
+        <strong>The actual Phase 1 → Phase 2 transition</strong> is just a reduction in gold-label density: from "every round's data is Docker-eval'd" to "periodic 100-task audits". Policy update logic is identical. Verifier recalibration logic is identical. Only the rate of fresh labels changes.
+      </p>
+    </div>
+
+    <div class="panel" style="margin-top: 1rem;">
+      <h3>Why this framing matters</h3>
+      <div class="grid-3">
+        <div>
+          <h3 style="color: var(--success); font-size: 0.9rem;">No big-bang transition</h3>
+          <p style="font-size: 0.8rem; color: var(--text-muted);">
+            The spec originally treats Phase 2 as a new regime. With continuous calibration, it's just a parameter change. Lowers risk: we're not flipping a switch; we're slowly reducing gold-eval coverage.
+          </p>
+        </div>
+        <div>
+          <h3 style="color: var(--success); font-size: 0.9rem;">Drift trajectory proves trust</h3>
+          <p style="font-size: 0.8rem; color: var(--text-muted);">
+            If ECE stays flat across 5 policy generations under <em>identical inputs</em>, that's strong evidence the verifier can keep up with the agent's evolution. Stronger than any single calibration number.
+          </p>
+        </div>
+        <div>
+          <h3 style="color: var(--success); font-size: 0.9rem;">Gold labels become a safety net</h3>
+          <p style="font-size: 0.8rem; color: var(--text-muted);">
+            In Phase 2, gold eval isn't the reward — it's the drift detector. 100 tasks × every 3 iterations ≈ $10. Cheap insurance against the verifier silently going wrong.
+          </p>
+        </div>
+        <div>
+          <h3 style="color: var(--warning); font-size: 0.9rem;">But the verifier must be recalibratable</h3>
+          <p style="font-size: 0.8rem; color: var(--text-muted);">
+            Loop 1's `bootstrap_new_distribution` path has to actually converge with ~200-500 fresh labels. M2 showed the Claude-trained RF flatlines OOD. Each round's 800 gold labels plus drift_audit's 300 should give ~1,100 labels to retrain on — well above the bootstrap minimum.
+          </p>
+        </div>
+        <div>
+          <h3 style="color: var(--warning); font-size: 0.9rem;">Rubric is still Claude-specific</h3>
+          <p style="font-size: 0.8rem; color: var(--text-muted);">
+            RF retrains freely round-over-round, but v009 rubric doesn't. If the policy's outputs drift far enough from what v009 was tuned for, V1b_rubric fires and manual rebuild is the only path. Planned gap in the flywheel.
+          </p>
+        </div>
+        <div>
+          <h3 style="color: var(--info); font-size: 0.9rem;">Formally, this is co-training</h3>
+          <p style="font-size: 0.8rem; color: var(--text-muted);">
+            Policy and reward model co-evolving with a shared data stream. Related: AlphaGo's value net updates during self-play. Different: we anchor to external gold tests to prevent reward hacking.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top: 1rem; border-left: 4px solid var(--danger);">
+      <h3>Risk this framing introduces: reward hacking</h3>
+      <p style="font-size: 0.85rem; color: var(--text);">
+        Co-training policy and verifier creates a well-known failure mode: the policy learns to produce outputs that score high on the verifier <em>without</em> being correct. Gold labels anchor us — but only if they catch the hack. Three guardrails:
+      </p>
+      <ul style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem; padding-left: 1.25rem;">
+        <li><strong>drift_audit_300 gold eval every round</strong> — if verifier score ↑ but gold pass rate ↓, that's literal reward hacking, full stop.</li>
+        <li><strong>Phase 2 gate requires 3 consecutive rounds of stable agreement</strong> — single-round alignment could be noise; 3-round monotonic stability is much harder to hack.</li>
+        <li><strong>v009 rubric is deliberately NOT retrained automatically</strong> — the RF adapts freely but the rubric stays adversarial. Hacking both simultaneously is strictly harder.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="splits">
+    <h2>Dataset splits <span class="num">revised 2026-05-10 · rolling rounds</span></h2>
+    <p class="lede">Partition <strong>by instance</strong>, into <strong>rolling rounds</strong> so we can measure verifier calibration AND drift AS the base model changes, while keeping a final stress set truly unseen all the way through. Solves two problems: (a) one static held-out set gives one post-hoc number, not a drift trajectory; (b) if we update the base model mid-experiment, we need fresh eval data each round or we're measuring memorization.</p>
+
+    <div class="panel" style="margin-bottom: 1rem;">
+      <h3>Why instance-level matters</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+        A trajectory-level split would put <code>django__django-10914 attempt #3</code> in training and <code>django__django-10914 attempt #7</code> in eval. The model sees the problem statement during training — the "eval" measures memorization, not generalization. Both failed and successful attempts on the same instance are training-distribution-adjacent for any held-out metric.
+      </p>
+      <div class="key-stats" style="margin-top: 0.75rem;">
+        <div class="stat">
+          <div class="label">Unique instances</div>
+          <div class="value">6,306</div>
+        </div>
+        <div class="stat">
+          <div class="label">Trajectories total</div>
+          <div class="value">67,074</div>
+        </div>
+        <div class="stat">
+          <div class="label">Attempts / instance</div>
+          <div class="value">10.64 avg</div>
+        </div>
+        <div class="stat">
+          <div class="label">Instances w/ ≥1 gold pass</div>
+          <div class="value success">3,792 (60.1%)</div>
+        </div>
+        <div class="stat">
+          <div class="label">Instances 0 gold passes</div>
+          <div class="value warning">2,514 (39.9%)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom: 1rem;">
+      <h3>The rolling-rounds structure</h3>
+      <p style="font-size: 0.9rem; color: var(--text); margin-bottom: 0.75rem;">
+        Five training rounds. Each round has its own 300-instance <strong>round-N control</strong> that the model has not been trained on at round N's start. After round N completes, that control set <em>joins the training pool for round N+1</em> — it's spent its "unseen" value, so we recycle it as labeled data. A fresh 300 instances emerge from the pool as round N+1's control. Meanwhile a <strong>final stress set of 500</strong> and a <strong>drift audit set of 300</strong> stay untouched by training at every round.
+      </p>
+      <p style="font-size: 0.85rem; color: var(--text-muted);">
+        This gives us five independent data points for every metric — model gold-pass rate, verifier ECE, verifier precision, verifier-gold agreement — across a series of increasingly-trained models. That's a <em>trajectory</em>, not a single number. If the verifier starts strong and drifts as the model improves, the curve shows it. The final stress set + drift audit set catch anything the rolling controls miss.
+      </p>
+    </div>
+
+    <div class="panel" style="margin-bottom: 1rem; border-left: 4px solid var(--success);">
+      <h3>Why this gives us a drift trajectory, not a single point</h3>
+      <p style="font-size: 0.9rem; color: var(--text); margin-bottom: 0.75rem;">
+        Traditional eval: train once, test once, one number. We don't learn <em>when</em> the verifier started disagreeing with gold or whether the model is still improving. With rolling rounds, the same 300-instance <code>drift_audit_300</code> set is re-evaluated under every Gen-N checkpoint. Same inputs, different models, five timepoints per metric.
+      </p>
+      <div class="mermaid-wrap">
+        <div class="mermaid">
+flowchart LR
+  subgraph Inputs[drift_audit_300 - same 300 instances throughout]
+    D[300 instance_ids<br/>write-locked]
+  end
+  subgraph Gens[Model versions over time]
+    direction TB
+    G0[Gen0 baseline]
+    G1[Gen1 after round 1]
+    G2[Gen2 after round 2]
+    G3[Gen3 after round 3]
+    G4[Gen4 after round 4]
+    G5[Gen5 after round 5]
+  end
+  D --> G0 --> M0[point 0<br/>ECE₀, Prec₀, PassRate₀, Agreement₀]
+  D --> G1 --> M1[point 1<br/>ECE₁, Prec₁, PassRate₁, Agreement₁]
+  D --> G2 --> M2[point 2<br/>ECE₂, Prec₂, PassRate₂, Agreement₂]
+  D --> G3 --> M3[point 3<br/>ECE₃, Prec₃, PassRate₃, Agreement₃]
+  D --> G4 --> M4[point 4<br/>ECE₄, Prec₄, PassRate₄, Agreement₄]
+  D --> G5 --> M5[point 5<br/>ECE₅, Prec₅, PassRate₅, Agreement₅]
+  M0 & M1 & M2 & M3 & M4 & M5 --> T[Drift trajectory<br/>6 points × 4 metrics<br/>= 24 independent measurements]
+
+  classDef input fill:#5c3a1a,stroke:#f59e0b,color:#e2e8f0
+  classDef gen fill:#3a2a5c,stroke:#8b5cf6,color:#e2e8f0
+  classDef point fill:#1a3a5c,stroke:#06b6d4,color:#e2e8f0
+  classDef result fill:#1a5c3a,stroke:#10b981,color:#e2e8f0
+  class D input
+  class G0,G1,G2,G3,G4,G5 gen
+  class M0,M1,M2,M3,M4,M5 point
+  class T result
+        </div>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.75rem;">
+        <strong>24 measurements (6 model versions × 4 metrics) on identical inputs</strong>. We can now answer: <em>"Did verifier precision degrade monotonically or did it jump at a specific round?"</em> ·  <em>"Did Gen3's gold pass rate improvement correlate with a verifier ECE spike?"</em> ·  <em>"At which round did verifier-gold agreement fall below drift-alarm level?"</em>
+      </p>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;">
+        Combined with round-N controls (5 more points each, but on <em>different</em> inputs per round — so those measure model quality on fresh distributions, not drift), we get 11 timepoints per metric for the complete picture.
+      </p>
+    </div>
+
+    <div class="mermaid-wrap" style="margin-bottom: 1rem;">
+      <div class="mermaid">
+flowchart LR
+  Pool[Nebius pool<br/>6,306 unique instances]
+  Pool --> Stress[Final stress set<br/>500 instances<br/>NEVER touched<br/>held to very end]
+  Pool --> Audit[Drift audit set<br/>300 instances<br/>regen EVERY round<br/>never enters training]
+  Pool --> R1[Round 1 control<br/>300 instances]
+  Pool --> R2[Round 2 control<br/>300 instances]
+  Pool --> R3[Round 3 control<br/>300 instances]
+  Pool --> R4[Round 4 control<br/>300 instances]
+  Pool --> R5[Round 5 control<br/>300 instances]
+  Pool --> T1[Round 1 train<br/>800 instances]
+
+  T1 -->|Gen1 model| R1
+  R1 -->|eval done, recycle|T2[Round 2 train<br/>+800 +R1 = 1,900]
+  T2 -->|Gen2 model| R2
+  R2 -->|recycle|T3[Round 3 train<br/>+800 +R2 = 3,000]
+  T3 -->|Gen3 model| R3
+  R3 -->|recycle|T4[Round 4 train<br/>+800 +R3 = 4,100]
+  T4 -->|Gen4 model| R4
+  R4 -->|recycle|T5[Round 5 train<br/>+800 +R4 = 5,200]
+  T5 -->|Gen5 model| R5
+
+  Audit -.->|every round<br/>fresh regen| AllGens[Gen1..Gen5<br/>drift trajectory]
+  Stress -.->|final only| FinalGen[Gen5 + Phase 2]
+
+  classDef pool fill:#1a3a5c,stroke:#06b6d4,color:#e2e8f0
+  classDef stress fill:#5c1a3a,stroke:#ef4444,color:#e2e8f0
+  classDef audit fill:#5c3a1a,stroke:#f59e0b,color:#e2e8f0
+  classDef ctrl fill:#3a2a5c,stroke:#8b5cf6,color:#e2e8f0
+  classDef train fill:#1a5c3a,stroke:#10b981,color:#e2e8f0
+  class Pool pool
+  class Stress,FinalGen stress
+  class Audit,AllGens audit
+  class R1,R2,R3,R4,R5 ctrl
+  class T1,T2,T3,T4,T5 train
+      </div>
+    </div>
+
+    <h3 style="font-size: 1rem; font-weight: 600; margin: 1rem 0 0.5rem;">Splits at a glance</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Split</th>
+          <th>Instances</th>
+          <th>Unseen through</th>
+          <th>Purpose</th>
+          <th>Reuse after round</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>final_stress_500</code></td>
+          <td class="num mono">500</td>
+          <td class="mono">every round + Phase 1</td>
+          <td>End-of-experiment generalization check. Measured once per phase, compared against drift audit trajectory.</td>
+          <td class="mono">never — write-locked entire run</td>
+        </tr>
+        <tr>
+          <td><code>drift_audit_300</code></td>
+          <td class="num mono">300</td>
+          <td class="mono">every round (all phases)</td>
+          <td>The only constant held-out set. Regen every Gen1..Gen5 to build a drift trajectory. Catches "did Gen3 get worse at something Gen1 handled?"</td>
+          <td class="mono">never — write-locked entire run</td>
+        </tr>
+        <tr>
+          <td><code>round_N_control</code> × 5</td>
+          <td class="num mono">300 each (1,500 total)</td>
+          <td class="mono">until round N starts</td>
+          <td>Round-N "must beat" number. Gen-N has never seen these instances when it's evaluated on them.</td>
+          <td class="mono">yes — joins training pool after round N completes</td>
+        </tr>
+        <tr>
+          <td><code>round_N_train</code> × 5</td>
+          <td class="num mono">800 each (4,000 fresh)</td>
+          <td>—</td>
+          <td>Each round's newly-introduced training instances. Cumulative training pool grows: 800, 1,900, 3,000, 4,100, 5,200.</td>
+          <td class="mono">—</td>
+        </tr>
+        <tr>
+          <td><code>v1b_bootstrap_200</code></td>
+          <td class="num mono">200</td>
+          <td>Week 1 only</td>
+          <td>Balanced pos/neg for RF recalibration. Sampled from round_1_train (already going into training anyway — no leak).</td>
+          <td class="mono">already in round_1_train</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">
+      Totals: 500 stress + 300 audit + 5×300 controls + 5×800 train = 6,300 instances (pool is 6,306 — 6-instance slack).
+    </p>
+
+    <div class="panel" style="margin-top: 1.5rem;">
+      <h3>What each round measures</h3>
+      <p style="font-size: 0.9rem; color: var(--text); margin-bottom: 0.75rem;">
+        After each round we produce a Gen-N checkpoint and run three evals. Combined across 5 rounds, we get curves for four metrics.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Metric</th><th>What it answers</th><th>Drift signal</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Gen-N gold pass rate</strong> on round_N_control</td>
+            <td>Is the model still improving?</td>
+            <td>Plateau or regression → stop training; activate Loop 3/4</td>
+          </tr>
+          <tr>
+            <td><strong>Gen-N gold pass rate</strong> on drift_audit_300</td>
+            <td>Is improvement general or specific to this round's data?</td>
+            <td>Round control improves but drift audit doesn't → overfitting to each round's distribution</td>
+          </tr>
+          <tr>
+            <td><strong>Verifier ECE</strong> on drift_audit_300</td>
+            <td>Is the verifier still calibrated as the model changes?</td>
+            <td>ECE rising ≥0.05 round-over-round → verifier drift; trigger recalibration</td>
+          </tr>
+          <tr>
+            <td><strong>Verifier-gold agreement</strong> on drift_audit_300</td>
+            <td>Do verifier pass/fail decisions still match Docker gold?</td>
+            <td>Precision drops below drift-alarm (0.80) → pause, return to Loop 1</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel" style="margin-top: 1rem;">
+      <h3>Why this structure answers the right question</h3>
+      <div class="grid-2" style="margin-top: 0.5rem;">
+        <div class="finding-card pass">
+          <div class="fc-head"><h3>Calibration across model versions</h3><span class="pill info">drift_audit</span></div>
+          <div class="summary">The same 300 instances are gold-eval'd and verifier-scored under Gen1, Gen2, Gen3, Gen4, Gen5.</div>
+          <div class="outcome">Same inputs, different models → isolates verifier behavior from data drift. If Gen3's patches on these 300 score differently from Gen1's patches on the same 300, that's pure model-output drift — exactly what Phase 2 will face in the wild.</div>
+        </div>
+        <div class="finding-card partial">
+          <div class="fc-head"><h3>Fresh vs recycled separation</h3><span class="pill warning">round_N_control</span></div>
+          <div class="summary">Round N evaluates on 300 instances Gen-N has never seen, but those 300 become training data for Gen-(N+1).</div>
+          <div class="outcome">Avoids wasting data: every instance is either training or eval-then-training, never just wasted. The "never seen before this round" guarantee is per-round, not absolute.</div>
+        </div>
+        <div class="finding-card pass">
+          <div class="fc-head"><h3>True unseen at end</h3><span class="pill danger">final_stress_500</span></div>
+          <div class="summary">500 instances written-locked through all 5 rounds and Phase 1. Read only for end-of-Phase-1 and Phase 2 evaluation.</div>
+          <div class="outcome">The "would this model work on truly novel problems" number. If Gen5 beats Gen0 on round_5_control but can't beat Gen0 on final_stress, the improvement was round-data-specific and Phase 2 claims collapse.</div>
+        </div>
+        <div class="finding-card partial">
+          <div class="fc-head"><h3>Phase 2 entry requires drift monotonicity</h3><span class="pill info">all sets</span></div>
+          <div class="summary">New gate: verifier-gold agreement on drift_audit must stay above SFT-ready level (0.85 precision) for at least 3 consecutive rounds before Phase 2 transition.</div>
+          <div class="outcome">Guards against "verifier looked good at Gen1 but was actually tracking superficial features that Gen2 broke." Monotonic 3-round stability is much stronger evidence than a single snapshot.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top: 1rem;">
+      <h3>Split invariants (things that MUST hold across all 5 rounds)</h3>
+      <table>
+        <thead><tr><th>Invariant</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">final_stress_500 is write-locked rounds 1..5 AND Phase 1</td><td>End-of-experiment generalization must be a genuinely unseen number</td></tr>
+          <tr><td class="mono">drift_audit_300 is write-locked rounds 1..5 (read-only each round)</td><td>Drift signal must be measured on identical inputs across model versions; adding them to training breaks the comparison</td></tr>
+          <tr><td class="mono">round_N_control ∉ train_pool at start of round N</td><td>Each round's gold-pass number must be genuine generalization for that round</td></tr>
+          <tr><td class="mono">round_N_control ⊂ train_pool at start of round N+1</td><td>Explicit recycling: after round N's eval lands, its controls become labeled data for round N+1. No data wasted.</td></tr>
+          <tr><td class="mono">final_stress_500 ∩ drift_audit_300 ∩ all round_N_control = ∅</td><td>No instance is ever in two eval sets. Metrics must be independent.</td></tr>
+          <tr><td class="mono">v1b_bootstrap_200 ⊂ round_1_train</td><td>Bootstrap pool is training data anyway — no leak, no waste</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel" style="margin-top: 1rem;">
+      <h3>What the current data files need (fix before launch)</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted);">
+        The first-pass data pipeline partitioned at the trajectory level, which leaks by instance_id. Before launching Round 1, regenerate with instance-level sampling:
+      </p>
+      <ol style="font-size: 0.85rem; color: var(--text); margin-top: 0.5rem; padding-left: 1.25rem;">
+        <li>Deduplicate <code>trajectories.parquet</code> by <code>instance_id</code> → 6,306 unique instances.</li>
+        <li>Random seed 42. Sample 500 for <code>final_stress_500</code>, 300 for <code>drift_audit_300</code>. Remove from pool.</li>
+        <li>From remaining 5,506 instances, random-sample 5 disjoint sets of 300 for <code>round_1_control</code> through <code>round_5_control</code>.</li>
+        <li>From remaining 4,006 instances, random-sample 5 disjoint sets of 800 for <code>round_1_train</code> through <code>round_5_train</code>.</li>
+        <li>Stratify 200 balanced pos/neg from <code>round_1_train</code> as <code>v1b_bootstrap_200</code> (already going into training → no leak).</li>
+        <li>Write a manifest <code>splits_manifest.json</code> listing every instance_id per split, SHA-pinned, committed to the repo. Any script that reads <code>final_stress_500</code> or <code>drift_audit_300</code> during Phase 1 is a bug.</li>
+      </ol>
+      <p style="font-size: 0.8rem; color: var(--warning); margin-top: 0.5rem;">
+        <strong>Open question</strong>: should <code>final_stress_500</code> be drawn from SWE-ReBench instances Nebius <em>never attempted</em> (if any exist in <code>nebius/SWE-rebench</code> but not the openhands-trajectories subset)? That's stronger — zero indirect exposure through Nebius's label distribution. If all 6,306 are attempted, we use the 500 random but document the weaker claim.
+      </p>
+    </div>
+  </section>
+
+  <section id="arms">
+    <h2>Five experimental arms</h2>
+    <p class="lede">All arms start from the same Gen0 checkpoint. Divergence isolates each variable: iteration, RL vs SFT, gold vs verifier, and noise-vs-sparsity in the verifier signal.</p>
+    <div class="grid-5">
+
+      <div class="arm-card a">
+        <div class="arm-title"><h3>Iterative STaR</h3><span class="arm-id">Arm A</span></div>
+        <div class="desc">Generate → gold filter → SFT → repeat. Cheapest, most stable. Must beat this to justify RL.</div>
+        <dl class="attrs">
+          <dt>Reward</dt><dd>gold test pass/fail</dd>
+          <dt>Data source</dt><dd>Nebius resolved=1 (32.2K)</dd>
+          <dt>Gen cost</dt><dd>$0 (pre-filtered)</dd>
+          <dt>Iterations</dt><dd>3</dd>
+        </dl>
+        <div class="gate"><strong>Gate</strong>: none — always runs</div>
+        <div class="cost">~$690</div>
+      </div>
+
+      <div class="arm-card b">
+        <div class="arm-title"><h3>GRPO + gold</h3><span class="arm-id">Arm B</span></div>
+        <div class="desc">GRPO with binary gold reward. Tests if RL adds value over STaR. Generates our own trajectories.</div>
+        <dl class="attrs">
+          <dt>Reward</dt><dd>gold test pass/fail</dd>
+          <dt>Group size</dt><dd>8 completions/task</dd>
+          <dt>Gen per iter</dt><dd>4K tasks × 8</dd>
+          <dt>Iterations</dt><dd>3</dd>
+        </dl>
+        <div class="gate"><strong>Needs</strong>: Arm A improving ≥3pp</div>
+        <div class="cost">~$930</div>
+      </div>
+
+      <div class="arm-card c">
+        <div class="arm-title"><h3>Verifier STaR</h3><span class="arm-id">Arm C</span></div>
+        <div class="desc">STaR with verifier instead of gold. Tests continuous-learning proxy. If C ≈ A, verifier can replace gold for SFT curation.</div>
+        <dl class="attrs">
+          <dt>Reward</dt><dd>cascade verifier</dd>
+          <dt>Data source</dt><dd>Nebius trajectories</dd>
+          <dt>Gen cost</dt><dd>$0 (pre-existing)</dd>
+          <dt>Iterations</dt><dd>3</dd>
+        </dl>
+        <div class="gate"><strong>Gate</strong>: V1b_validate ≥ V1b-unlock</div>
+        <div class="cost">~$870</div>
+      </div>
+
+      <div class="arm-card d">
+        <div class="arm-title"><h3>GRPO + verifier</h3><span class="arm-id">Arm D</span></div>
+        <div class="desc">GRPO with verifier score as reward. Full continuous RL. Only runs if both RL and verifier independently validated.</div>
+        <dl class="attrs">
+          <dt>Reward</dt><dd>cascade verifier (continuous)</dd>
+          <dt>Group size</dt><dd>8 completions/task</dd>
+          <dt>Gen per iter</dt><dd>4K tasks × 8</dd>
+          <dt>Iterations</dt><dd>2</dd>
+        </dl>
+        <div class="gate"><strong>Gate</strong>: V1b_validate pass AND B &gt; A</div>
+        <div class="cost">~$860</div>
+      </div>
+
+      <div class="arm-card e">
+        <div class="arm-title"><h3>Gold, subsampled</h3><span class="arm-id">Arm E</span></div>
+        <div class="desc">Same as A but discard 86% of positives (match verifier recall). Disentangles verifier noise from sparsity. If E ≈ C, verifier tax is pure sparsity.</div>
+        <dl class="attrs">
+          <dt>Reward</dt><dd>gold, 14% kept</dd>
+          <dt>Data source</dt><dd>Nebius resolved=1</dd>
+          <dt>Gen cost</dt><dd>$0</dd>
+          <dt>Iterations</dt><dd>2</dd>
+        </dl>
+        <div class="gate"><strong>Gate</strong>: only if C ≠ A</div>
+        <div class="cost">~$460</div>
+      </div>
+
+    </div>
+
+    <div class="panel" style="margin-top: 1.25rem;">
+      <h3>Decision tree</h3>
+      <div class="mermaid">
+flowchart TD
+  S[Start: Run Arm A, 2 iter] --> AQ{A improves<br/>≥3pp?}
+  AQ -->|NO| L34[Harness issue Loop 3<br/>or model ceiling Loop 4.<br/>Don't proceed to RL.]
+  AQ -->|YES| B[Run Arm B<br/>GRPO gold]
+  B --> BQ{B &gt; A<br/>by ≥2pp?}
+  BQ -->|YES - RL adds value| D[Run Arm D<br/>verifier GRPO]
+  BQ -->|NO - STaR sufficient| C1[Run Arm C<br/>verifier STaR]
+  D --> CQ{C ≈ A<br/>within 3pp?}
+  C1 --> CQ
+  CQ -->|YES| Phase2[Phase 2 unlock]
+  CQ -->|NO| E[Run Arm E<br/>subsampled gold]
+  E --> EQ{E ≈ C?}
+  EQ -->|YES| Sparsity[Verifier tax = sparsity<br/>compensate with volume]
+  EQ -->|NO| Noise[Verifier adds noise<br/>return to Loop 1]
+
+  classDef q fill:#5c3a1a,stroke:#f59e0b,color:#e2e8f0
+  classDef p1 fill:#1a3a5c,stroke:#06b6d4,color:#e2e8f0
+  classDef term fill:#1a5c3a,stroke:#10b981,color:#e2e8f0
+  classDef fail fill:#5c1a1a,stroke:#ef4444,color:#e2e8f0
+  class AQ,BQ,CQ,EQ q
+  class S,B,C1,D,E p1
+  class Phase2,Sparsity term
+  class L34,Noise fail
+      </div>
+    </div>
+  </section>
+
+  <section id="gates">
+    <h2>V1b gate family <span class="num">added 2026-05-09</span></h2>
+    <p class="lede">M2 (cross-pipeline transfer test) showed the Claude-trained RF flatlines on OOD traces. V1b is no longer a single check — it's a staged pipeline: <strong>bootstrap → validate → (rubric rebuild if needed)</strong>.</p>
+    <div class="mermaid-wrap">
+      <div class="mermaid">
+flowchart LR
+  Start([Start V1b]) --> B[V1b_bootstrap<br/>FlywheelBootstrap<br/>200 target-dist labels<br/>retrain RF<br/>~$30]
+  B --> V[V1b_validate<br/>check precision ≥ 0.70<br/>on target-dist calibration]
+  V -->|pass| Unlock([Arms C/D/E unlocked])
+  V -->|fail| ECE{ECE trending<br/>down with added<br/>labels?}
+  ECE -->|yes| Extend[Extend V1b_bootstrap<br/>+200 labels → 400-500 total]
+  Extend --> V
+  ECE -->|no - flat| R[V1b_rubric<br/>rebuild v009 for<br/>target distribution<br/>~$20-30 per variant]
+  R --> V
+  R -->|still fails| Escalate[Block C/D/E<br/>escalate rubric strategy<br/>no tested backup exists]
+
+  classDef step fill:#3a2a5c,stroke:#8b5cf6,color:#e2e8f0
+  classDef q fill:#5c3a1a,stroke:#f59e0b,color:#e2e8f0
+  classDef pass fill:#1a5c3a,stroke:#10b981,color:#e2e8f0
+  classDef fail fill:#5c1a1a,stroke:#ef4444,color:#e2e8f0
+  classDef start fill:#1a3a5c,stroke:#06b6d4,color:#e2e8f0
+  class B,V,Extend,R step
+  class ECE q
+  class Unlock pass
+  class Escalate fail
+  class Start start
+      </div>
+    </div>
+    <div class="grid-3" style="margin-top: 1rem;">
+      <div class="panel">
+        <h3>V1b_bootstrap</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">Mandatory (not conditional). Target = Qwen3.5-27B × OpenHands v0.54. 200-label lower bound, 400-500 budgeted if ECE slow to converge.</p>
+      </div>
+      <div class="panel">
+        <h3>V1b_validate</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">Checks the recalibrated RF against the readiness-level table. Pass at V1b-unlock (≥0.70 precision) unlocks Arms C/D/E to start — lower than SFT-ready because Arm C measures empirical convergence, not deployment readiness.</p>
+      </div>
+      <div class="panel">
+        <h3>V1b_rubric</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">Only fires if RF is well-calibrated but precision still fails — the v009 rubric itself is the bottleneck. v009 is Claude-specific (T4 showed Devstral 0.20, Nova Pro 0.14). No tested backup exists (E_constraint_agent negative).</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="readiness">
+    <h2>Verifier readiness levels <span class="num">single source of truth</span></h2>
+    <p class="lede">All downstream gates reference this table. Threshold numbers do not appear inline anywhere else in the spec.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Level</th>
+          <th>ECE</th>
+          <th>Precision (target-dist)</th>
+          <th>Unlocks</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="pill info">V1b-unlock</span></td>
+          <td class="mono">—</td>
+          <td class="mono">≥ 0.70</td>
+          <td>Arms C/D/E may <em>start</em></td>
+        </tr>
+        <tr>
+          <td><span class="pill warning">SFT-ready</span></td>
+          <td class="mono">&lt; 0.3</td>
+          <td class="mono">≥ 0.85</td>
+          <td>Arm C, Arm E deployable</td>
+        </tr>
+        <tr>
+          <td><span class="pill success">RL-ready</span></td>
+          <td class="mono">&lt; 0.1</td>
+          <td class="mono">≥ 0.90</td>
+          <td>Arm D, Phase 2 entry</td>
+        </tr>
+        <tr>
+          <td><span class="pill danger">Drift alarm</span></td>
+          <td class="mono">—</td>
+          <td class="mono">&lt; 0.80 (rolling)</td>
+          <td>Pause, return to Loop 1</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.75rem;">
+      <strong>Target distribution</strong> = traces the verifier will score at deployment, NOT the Claude×OpenCode distribution the original RF was trained on (M2, 2026-05-09).
+    </p>
+  </section>
+
+  <section id="findings">
+    <h2>Pre-flight findings <span class="num">M &amp; M2, 2026-05-09</span></h2>
+    <p class="lede">Four micro-experiments ran before the loop launched to de-risk Loop 1. Combined cost ~$2 against the budgeted ~$50. Results reshaped V1/V1b gate logic.</p>
+    <div class="grid-2">
+
+      <div class="finding-card partial">
+        <div class="fc-head">
+          <h3>E_env — environment variance</h3>
+          <span class="pill muted">M</span>
+        </div>
+        <div class="summary">Pool Claude×OpenCode + OpenHands + Nebius (n=3,398) on the 6-feature intersection; compare pooled RF vs per-cell RF ensemble.</div>
+        <div class="metric-row">
+          <span>pooled AUC <strong>0.784</strong></span>
+          <span>weighted per-cell <strong>0.639</strong></span>
+          <span>Δ AUC <strong style="color: var(--danger)">-0.144</strong></span>
+        </div>
+        <div class="outcome"><strong>Decision</strong>: <code>proceed_single_rf</code>. No per-pipeline ensemble. E6's routed-ensemble gain came from model-specific features unavailable at Loop 1 deployment time.</div>
+      </div>
+
+      <div class="finding-card pass">
+        <div class="fc-head">
+          <h3>E_attr — disagreement attribution</h3>
+          <span class="pill muted">M</span>
+        </div>
+        <div class="summary">2×2 (v009 × RF) vs gold on Phase 3 n=300. Originally hypothesized: v009_fail ∩ RF_pass is adversarial. <strong>Turned out opposite</strong>: it's an "override v009" region.</div>
+        <div class="metric-row">
+          <span>adversarial cell n=<strong>141</strong></span>
+          <span>gold rate <strong>72.3%</strong></span>
+          <span>vs agree_fail <strong>37.4%</strong></span>
+          <span>gap <strong style="color: var(--success)">+34.9pp</strong></span>
+        </div>
+        <div class="outcome"><strong>Decision</strong>: bake baseline <code>rate(v009_fail ∧ rf_pass) = 47%</code> into Loop 1 drift monitor. Alarm on ±10pp drift.</div>
+      </div>
+
+      <div class="finding-card fail">
+        <div class="fc-head">
+          <h3>E_constraint_agent — per-instance constraints</h3>
+          <span class="pill muted">M</span>
+        </div>
+        <div class="summary">Haiku extracts behavioral constraints per issue, checks against Qwen3.5×OpenCode agent patches (n=43). Tests viability as v009 replacement.</div>
+        <div class="metric-row">
+          <span>AUC <strong>0.558</strong></span>
+          <span>P@R≥0.30 <strong style="color: var(--danger)">0.286</strong></span>
+          <span>vs threshold 0.80</span>
+        </div>
+        <div class="outcome"><strong>Decision</strong>: <code>negative_result</code>. No constraint-verifier backup exists. If V1b_rubric fails on Qwen3.5, Loop 1 recalibration is the only path. <em>Caveat</em>: n=43 underpowered.</div>
+      </div>
+
+      <div class="finding-card fail">
+        <div class="fc-head">
+          <h3>E_transfer — cross-pipeline RF</h3>
+          <span class="pill muted">M2</span>
+        </div>
+        <div class="summary">Train on claude_opencode_300, evaluate OOD on 7 OpenHands cells + Qwen3.5×OpenCode. Answers the V1 transfer question directly.</div>
+        <div class="metric-row">
+          <span>in-sample AUC <strong>0.727</strong></span>
+          <span>OH::claude-sonnet <strong style="color: var(--danger)">0.486</strong></span>
+          <span>Qwen3.5×OC <strong style="color: var(--danger)">0.538</strong></span>
+          <span>prob std <strong>0.018</strong></span>
+        </div>
+        <div class="outcome"><strong>Decision</strong>: Claude-trained RF flatlines OOD. <code>bootstrap_new_distribution</code> promoted from edge case to <strong>default path</strong>. V1b_bootstrap mandatory before V1b_validate.</div>
+      </div>
+
+    </div>
+  </section>
+
+  <section id="loops">
+    <h2>Four sub-loops</h2>
+    <p class="lede">The meta-scheduler orchestrates four parallel optimization axes. Loop 1 runs passively in Phase 1 (free calibration), becomes critical in Phase 2 (verifier IS the reward).</p>
+    <div class="mermaid-wrap">
+      <div class="mermaid">
+flowchart TB
+  subgraph Sched[Outer scheduler - bottleneck-first priority]
+    P1[1 Reward Model<br/>trigger: ECE or precision drift]
+    P2[2 Data/RL Training<br/>trigger: yield low OR gold_pass flat]
+    P3[3 Agent Behavior<br/>trigger: parkinsons or low edit rate]
+    P4[4 Model Selection<br/>trigger: all loops ok AND plateau]
+  end
+  P1 --> L1
+  P2 --> L2
+  P3 --> L3
+  P4 --> L4
+
+  L1[Loop 1: Reward Model Calibration<br/>learned-verifier repo<br/>RF retrain + v009 rubric iterate]
+  L2[Loop 2: Training<br/>this blueprint<br/>GRPO/SFT over Arms A-E]
+  L3[Loop 3: Agent Behavior &amp; Harness<br/>OpenHands v0.54 locked<br/>turn pressure, context trim]
+  L4[Loop 4: Model Selection<br/>only if plateau<br/>Qwen3.5-27B baseline]
+
+  L2 -->|every gold eval| L1
+  L1 -->|ready flag| Gate([Phase 2 gate])
+  L2 -->|plateau| L3
+  L3 -->|no improvement| L4
+
+  classDef sched fill:#3a2a5c,stroke:#8b5cf6,color:#e2e8f0
+  classDef loop fill:#1a3a5c,stroke:#06b6d4,color:#e2e8f0
+  classDef gate fill:#1a5c3a,stroke:#10b981,color:#e2e8f0
+  class P1,P2,P3,P4 sched
+  class L1,L2,L3,L4 loop
+  class Gate gate
+      </div>
+    </div>
+  </section>
+
+  <section id="infra">
+    <h2>Infrastructure</h2>
+    <p class="lede">Three AWS instance types, one HF dataset. The big shift from the original plan: TractoAI removed because Nebius pre-computed gold labels (<code>resolved</code> column); Arms A/C/E need zero Docker runs.</p>
+    <div class="grid-3">
+      <div class="infra-cell">
+        <h3>p4de.24xlarge <span class="tag">training</span></h3>
+        <p>8× A100 80GB NVSwitch, 640GB HBM. Spot in <code>us-east-1 az6</code>.</p>
+        <p>Consolidates training + 4K-task generation (TP=8 inference between GPU cycles).</p>
+        <p class="mono" style="font-size:0.75rem;">~$230 / iteration (13-17 hr)</p>
+        <div class="purpose">Arms A-E training, Arms B/D generation</div>
+      </div>
+      <div class="infra-cell">
+        <h3>m7i.16xlarge <span class="tag">eval</span></h3>
+        <p>64 vCPU general compute, spot.</p>
+        <p>Parallel Docker gold eval for <em>our own</em> generated trajectories (Arms B/D). ~200-400 tasks/hr.</p>
+        <p class="mono" style="font-size:0.75rem;">~$2/hr × ~15 hr per 4K-task iter = ~$30</p>
+        <div class="purpose">Arm B/D per-iter gold eval, V1b_bootstrap labels</div>
+      </div>
+      <div class="infra-cell">
+        <h3>Nebius HF dataset <span class="tag">labels</span></h3>
+        <p><code>nebius/SWE-rebench-openhands-trajectories</code> — 67K trajectories with <code>resolved</code> gold column (47.9% pass).</p>
+        <p>Eliminates TractoAI dependency. Arms A/C/E use these labels directly.</p>
+        <p class="mono" style="font-size:0.75rem;">2.1 GB parquet · cost $0</p>
+        <div class="purpose">Arms A, C, E training + control set + bootstrap pool</div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top: 1rem;">
+      <h3>Spot reclaim handling (p4de NVMe is ephemeral)</h3>
+      <div class="mermaid">
+flowchart LR
+  W[Training step on /mnt/nvme] -->|every 1 hr| CP[Checkpoint to NVMe]
+  CP -->|async| S3[S3 same-region<br/>authoritative backup]
+  CP -->|best-effort| Laptop[Laptop rsync<br/>secondary archive]
+  IMDS[IMDS poll<br/>every 5s] --> Sig{Interruption<br/>signal?}
+  Sig -->|yes 2-min warning| Flush[Signal SIGUSR1<br/>→ checkpoint<br/>→ blocking S3 sync<br/>→ best-effort laptop rsync]
+  Sig -->|no| IMDS
+
+  classDef ok fill:#1a5c3a,stroke:#10b981,color:#e2e8f0
+  classDef alarm fill:#5c1a1a,stroke:#ef4444,color:#e2e8f0
+  classDef step fill:#1a3a5c,stroke:#06b6d4,color:#e2e8f0
+  class S3,Laptop ok
+  class Sig,Flush alarm
+  class W,CP,IMDS step
+      </div>
+    </div>
+  </section>
+
+  <section id="cost">
+    <h2>Cost &amp; schedule</h2>
+    <p class="lede">Minimum viable (A + V1b_bootstrap + V1b_validate + C) gets you the core "does continuous learning work" answer at ~$1,615. Full five-arm scope adds ~$2,240 for additional signals.</p>
+    <div class="cost-table">
+      <div class="cost-row">
+        <div>
+          <div class="desc">Gen0 OpenHands re-baseline</div>
+          <div class="sub">SWE-bench Lite 300, one-time</div>
+        </div>
+        <div class="num">$15</div>
+        <div class="num">once</div>
+        <div class="num">$15</div>
+      </div>
+      <div class="cost-row">
+        <div>
+          <div class="desc">V1b_bootstrap</div>
+          <div class="sub">200 target-dist gold labels + RF retrain</div>
+        </div>
+        <div class="num">$30</div>
+        <div class="num">1-2×</div>
+        <div class="num">~$30</div>
+      </div>
+      <div class="cost-row">
+        <div>
+          <div class="desc">V1b_validate / V1c_openhands</div>
+          <div class="sub">Haiku + 200 traces</div>
+        </div>
+        <div class="num">$20</div>
+        <div class="num">once</div>
+        <div class="num">$20</div>
+      </div>
+      <div class="cost-row">
+        <div>
+          <div class="desc">Arm A (STaR, Nebius data)</div>
+          <div class="sub">p4de spot train × 3 iters</div>
+        </div>
+        <div class="num">$230</div>
+        <div class="num">× 3</div>
+        <div class="num">~$690</div>
+      </div>
+      <div class="cost-row">
+        <div>
+          <div class="desc">Arm C (STaR, verifier)</div>
+          <div class="sub">Haiku verify + p4de train × 3 iters</div>
+        </div>
+        <div class="num">$290</div>
+        <div class="num">× 3</div>
+        <div class="num">~$870</div>
+      </div>
+      <div class="cost-row total">
+        <div>
+          <div>Minimum viable subtotal</div>
+          <div class="sub">unlocks "does continuous learning work" signal</div>
+        </div>
+        <div class="num"></div>
+        <div class="num"></div>
+        <div class="num" style="color: var(--success)">~$1,615</div>
+      </div>
+      <div class="cost-row">
+        <div>
+          <div class="desc">Arm B (GRPO gold)</div>
+          <div class="sub">p4de gen 4K + m7i eval + p4de train × 3</div>
+        </div>
+        <div class="num">$310</div>
+        <div class="num">× 3</div>
+        <div class="num">~$930</div>
+      </div>
+      <div class="cost-row">
+        <div>
+          <div class="desc">Arm D (GRPO verifier)</div>
+          <div class="sub">p4de gen + Haiku verify + m7i eval + p4de train × 2</div>
+        </div>
+        <div class="num">$430</div>
+        <div class="num">× 2</div>
+        <div class="num">~$860</div>
+      </div>
+      <div class="cost-row">
+        <div>
+          <div class="desc">Arm E (subsampled gold)</div>
+          <div class="sub">same as A but fewer accepted × 2</div>
+        </div>
+        <div class="num">$230</div>
+        <div class="num">× 2</div>
+        <div class="num">~$460</div>
+      </div>
+      <div class="cost-row total">
+        <div>
+          <div>Full five-arm total</div>
+          <div class="sub">fits under $3,000 outer-scheduler budget only with iteration trimming</div>
+        </div>
+        <div class="num"></div>
+        <div class="num"></div>
+        <div class="num" style="color: var(--warning)">~$3,855</div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top: 1rem;">
+      <h3>Week-by-week</h3>
+      <table>
+        <thead>
+          <tr><th>Week</th><th>Activity</th><th>Budget</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">1</td><td>Gen0 OpenHands re-baseline · V1b_bootstrap · Arm A iter 1 in parallel</td><td class="mono">~$280</td></tr>
+          <tr><td class="mono">1-2</td><td>V1b_validate · evaluate iter 1 · decision point</td><td class="mono">~$20</td></tr>
+          <tr><td class="mono">3-4</td><td>Arm A iter 2 · start Arm B (if A improving ≥3pp) · start Arm C (if V1b passes)</td><td class="mono">~$500-800</td></tr>
+          <tr><td class="mono">5-6</td><td>Compare A vs B vs C · Arm D if B &gt; A · Arm E (subsampled)</td><td class="mono">~$800-1500</td></tr>
+          <tr><td class="mono">7-8</td><td>Final iterations · full control eval · writeup</td><td class="mono">~$200</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  Generated by visual-explainer · agent-aiops-on-aws · Spec: <code>domains/autoresearch/specs/self-coding-agent-loop.md</code> · 2026-05-10
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
+    themeVariables: {
+      fontFamily: 'Inter, sans-serif',
+      fontSize: '13px',
+    },
+    flowchart: { curve: 'basis', padding: 10 },
+  });
+
+  function toggleTheme() {
+    const html = document.documentElement;
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    // Re-render mermaid with new theme
+    document.querySelectorAll('.mermaid').forEach(el => {
+      el.removeAttribute('data-processed');
+      // Wrap restore source: we need to preserve the original diagram text.
+      // Mermaid stores it as the svg content after render; easier to just reload.
+    });
+    // Simplest approach: reload the page so mermaid re-renders with the new theme.
+    location.reload();
+  }
+</script>
+</body>
+</html>

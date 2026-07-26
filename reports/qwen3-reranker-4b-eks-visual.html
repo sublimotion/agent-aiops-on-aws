@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qwen3-Reranker-4B on EKS L40S — Visual Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:#0f1117; --surface:#1a1d2e; --surface-2:#242740; --border:#2e3151;
+    --text:#e2e8f0; --text-muted:#8892a4;
+    --accent:#6366f1; --accent-2:#a78bfa; --accent-soft:rgba(99,102,241,0.15);
+    --green:#22c55e; --green-soft:rgba(34,197,94,0.14);
+    --red:#ef4444; --red-soft:rgba(239,68,68,0.14);
+    --yellow:#f59e0b; --yellow-soft:rgba(245,158,11,0.14);
+    --cyan:#06b6d4; --pink:#ec4899;
+  }
+  [data-theme="light"]{--bg:#f8fafc;--surface:#fff;--surface-2:#f1f5f9;--border:#e2e8f0;--text:#0f172a;--text-muted:#64748b;--accent-soft:rgba(99,102,241,.08);--green-soft:rgba(34,197,94,.08);--red-soft:rgba(239,68,68,.08);--yellow-soft:rgba(245,158,11,.08);}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.6}
+  header{background:linear-gradient(135deg,var(--surface) 0%,var(--surface-2) 100%);border-bottom:1px solid var(--border);padding:2rem;position:relative;overflow:hidden}
+  header::before{content:'';position:absolute;top:-50%;right:-10%;width:400px;height:400px;background:radial-gradient(circle,var(--accent-soft) 0%,transparent 70%);pointer-events:none}
+  header .wrap{max-width:1200px;margin:0 auto;position:relative}
+  header .row{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+  header h1{font-size:1.6rem;font-weight:700;letter-spacing:-.02em}
+  header .meta{font-size:.85rem;color:var(--text-muted);margin-top:.35rem}
+  .hero-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1rem;margin-top:1.5rem}
+  .hero-stat{background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem}
+  [data-theme="light"] .hero-stat{background:rgba(255,255,255,.7)}
+  .hero-stat .label{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:.25rem}
+  .hero-stat .value{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:1.45rem;font-weight:700;color:var(--accent)}
+  .hero-stat.lead .value{color:var(--green);font-size:1.7rem}
+  .hero-stat .sub{font-size:.75rem;color:var(--text-muted);margin-top:.2rem}
+  .theme-toggle{background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:.4rem .9rem;border-radius:6px;cursor:pointer;font-size:.8rem;font-family:inherit}
+  .theme-toggle:hover{background:var(--border)}
+  main{max-width:1200px;margin:0 auto;padding:2rem}
+  nav.toc{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.75rem 1.25rem;margin-bottom:2rem;display:flex;flex-wrap:wrap;gap:1rem;font-size:.8rem}
+  nav.toc a{color:var(--text-muted);text-decoration:none}
+  nav.toc a:hover{color:var(--accent)}
+  h2{font-size:1.25rem;font-weight:700;margin-bottom:1rem;letter-spacing:-.01em}
+  h3{font-size:.95rem;font-weight:600;margin:0 0 .75rem 0;color:var(--text-muted)}
+  .section{margin-bottom:2.75rem}
+  .hw-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin-bottom:1rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1rem}
+  .hw-item .label{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:.25rem}
+  .hw-item .value{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem}
+  .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.5rem;margin-bottom:1rem}
+  .chart-wrap{position:relative;height:340px}
+  .chart-wrap.tall{height:420px}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+  @media (max-width:850px){.two-col{grid-template-columns:1fr}}
+  table{width:100%;border-collapse:collapse;font-size:.85rem}
+  .table-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border);background:var(--surface)}
+  thead{background:var(--surface-2)}
+  th{padding:.75rem 1rem;text-align:left;font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);white-space:nowrap}
+  td{padding:.65rem 1rem;border-top:1px solid var(--border);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.82rem}
+  td.name{font-family:inherit;font-weight:500}
+  tr:hover td{background:var(--accent-soft)}
+  td.best{color:var(--green);font-weight:600}
+  td.worst{color:var(--red)}
+  td.warn{color:var(--yellow)}
+  .badge{display:inline-block;padding:.15rem .55rem;border-radius:999px;font-size:.7rem;font-weight:600}
+  .badge-pass{background:var(--green-soft);color:var(--green)}
+  .badge-fail{background:var(--red-soft);color:var(--red)}
+  .badge-skip{background:var(--yellow-soft);color:var(--yellow)}
+  .badge-na{background:var(--surface-2);color:var(--text-muted)}
+  .callout{background:var(--accent-soft);border-left:3px solid var(--accent);padding:1rem 1.25rem;border-radius:0 8px 8px 0;margin:1rem 0;font-size:.9rem}
+  .callout strong{color:var(--accent)}
+  .callout.green{background:var(--green-soft);border-left-color:var(--green)} .callout.green strong{color:var(--green)}
+  .callout.yellow{background:var(--yellow-soft);border-left-color:var(--yellow)} .callout.yellow strong{color:var(--yellow)}
+  .callout.red{background:var(--red-soft);border-left-color:var(--red)} .callout.red strong{color:var(--red)}
+  .heatmap{display:grid;gap:2px;background:var(--border);border-radius:10px;overflow:hidden;border:1px solid var(--border);font-size:.8rem}
+  .heatmap .cell{padding:.65rem .75rem;background:var(--surface);font-family:ui-monospace,SFMono-Regular,monospace;text-align:right}
+  .heatmap .cell.head{background:var(--surface-2);color:var(--text-muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;font-family:inherit;text-align:left}
+  .heatmap .cell.row-label{background:var(--surface-2);color:var(--text);font-family:inherit;font-weight:500;text-align:left}
+  .heatmap .cell.sweet{background:var(--green-soft);color:var(--green);font-weight:700}
+  .heatmap .cell.fail-cell{background:var(--red-soft);color:var(--red)}
+  .tier-grid{display:grid;gap:.5rem}
+  .tier-row-v{display:grid;grid-template-columns:70px 1fr 140px 100px;align-items:center;gap:1rem;padding:1rem 1.25rem;border:1px solid var(--border);border-radius:10px;background:var(--surface);font-size:.85rem}
+  .tier-row-v.landed{border-left:4px solid var(--green)}
+  .tier-row-v.blocked{opacity:.65;border-left:4px solid var(--yellow)}
+  .tier-row-v.na{opacity:.5;border-left:4px solid var(--text-muted)}
+  .tier-row-v .tier-name{font-weight:700;font-size:1.1rem}
+  .tier-row-v.landed .tier-name{color:var(--green)}
+  .tier-row-v.blocked .tier-name{color:var(--yellow)}
+  .tier-row-v.na .tier-name{color:var(--text-muted)}
+  .tier-row-v .metric{font-family:ui-monospace,SFMono-Regular,monospace;text-align:right;font-weight:600}
+  .slo-grid{display:grid;gap:2px;background:var(--border);border-radius:10px;overflow:hidden;border:1px solid var(--border);grid-template-columns:140px repeat(4,1fr);font-size:.82rem}
+  .slo-grid .cell{padding:.7rem .85rem;background:var(--surface);font-family:ui-monospace,monospace;text-align:center}
+  .slo-grid .cell.head{background:var(--surface-2);color:var(--text-muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;font-family:inherit}
+  .slo-grid .cell.row-label{background:var(--surface-2);color:var(--text);font-family:inherit;font-weight:500;text-align:left}
+  .slo-grid .pass{background:var(--green-soft);color:var(--green);font-weight:600}
+  .slo-grid .fail{background:var(--red-soft);color:var(--red);font-weight:600}
+  .slo-grid .na{color:var(--text-muted)}
+  footer{text-align:center;padding:2rem;color:var(--text-muted);font-size:.75rem;border-top:1px solid var(--border);margin-top:3rem}
+  footer code{font-size:.72rem;background:var(--surface-2);padding:.1rem .4rem;border-radius:4px}
+  .artifact-list{list-style:none;display:flex;flex-direction:column;gap:.35rem;align-items:center;margin-top:.75rem}
+  .caveat-banner{background:var(--yellow-soft);border:1px solid var(--yellow);border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.25rem;font-size:.88rem;display:flex;align-items:flex-start;gap:.9rem}
+  .caveat-banner .chip{background:var(--yellow);color:#1a1300;padding:.15rem .55rem;border-radius:6px;font-weight:700;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+  .caveat-banner strong{color:var(--yellow)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="row">
+      <div>
+        <h1>Qwen3-Reranker-4B on EKS · L40S 48GB</h1>
+        <div class="meta">Stage 6 benchmark · g6e.2xlarge · us-east-2 · vLLM 0.19.1 BF16 classifier · 2026-05-14</div>
+      </div>
+      <button class="theme-toggle" onclick="toggleTheme()">Toggle theme</button>
+    </div>
+
+    <div class="caveat-banner" style="margin-top:1.25rem;">
+      <span class="chip">Substrate-alt</span>
+      <div><strong>Running on L40S, not the spec-preferred L4.</strong> g6e.2xlarge (L40S 48GB, sm_89) was reused from the DeepSeek-OCR session instead of the spec-preferred g6.xlarge (L4 24GB). Per-stream latency here is an <em>upper bound</em>; cost-efficiency does <strong>not</strong> translate to the L4. Spec projects L4 at ~75% of this throughput and ~57% lower $/hr.</div>
+    </div>
+
+    <div class="hero-stats">
+      <div class="hero-stat lead">
+        <div class="label">Headline throughput</div>
+        <div class="value">700 pairs/s</div>
+        <div class="sub">pair_length=512 · c=4 · p99 7.6 ms/pair</div>
+      </div>
+      <div class="hero-stat">
+        <div class="label">Reference sweet spot</div>
+        <div class="value">13.7 ms/pair p99</div>
+        <div class="sub">pair_length=1024 · c=4 · 3.6× under 50 ms SLO</div>
+      </div>
+      <div class="hero-stat">
+        <div class="label">Saturation knee</div>
+        <div class="value">c=4</div>
+        <div class="sub">L40S · 1 GPU · max-num-seqs=64</div>
+      </div>
+      <div class="hero-stat">
+        <div class="label">Cost</div>
+        <div class="value">$0.00089 / 1K</div>
+        <div class="sub">pairs scored @ 700 pairs/s · $2.24/hr L40S</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <nav class="toc">
+    <a href="#config">Config</a>
+    <a href="#caveat">Substrate caveat</a>
+    <a href="#concurrency">Concurrency</a>
+    <a href="#pairlen">Pair-length</a>
+    <a href="#matrix">Efficiency matrix</a>
+    <a href="#methodology">Methodology</a>
+    <a href="#tier">Tier stack</a>
+    <a href="#slo">SLO</a>
+    <a href="#cost">Cost</a>
+    <a href="#deferred">Deferred</a>
+  </nav>
+
+  <!-- Config -->
+  <section id="config" class="section">
+    <h2>Configuration tiles</h2>
+    <div class="hw-card">
+      <div class="hw-item"><div class="label">Substrate</div><div class="value">Amazon EKS · managed NG</div></div>
+      <div class="hw-item"><div class="label">Node</div><div class="value">g6e.2xlarge · 1× L40S 48 GB · sm_89</div></div>
+      <div class="hw-item"><div class="label">Region</div><div class="value">us-east-2</div></div>
+      <div class="hw-item"><div class="label">Engine</div><div class="value">vLLM 0.19.1 · BF16</div></div>
+      <div class="hw-item"><div class="label">Runner / Convert</div><div class="value">--runner pooling --convert classify</div></div>
+      <div class="hw-item"><div class="label">HF overrides</div><div class="value">Qwen3ForSequenceClassification · "no"/"yes"</div></div>
+      <div class="hw-item"><div class="label">API endpoint</div><div class="value">POST /v1/score</div></div>
+      <div class="hw-item"><div class="label">max_num_seqs</div><div class="value">64</div></div>
+      <div class="hw-item"><div class="label">max_model_len</div><div class="value">4096</div></div>
+      <div class="hw-item"><div class="label">GPU mem util</div><div class="value">0.90</div></div>
+      <div class="hw-item"><div class="label">Attention</div><div class="value">flash-attn</div></div>
+      <div class="hw-item"><div class="label">SLO target</div><div class="value">p99 ≤ 50 ms/pair @ k=50</div></div>
+    </div>
+  </section>
+
+  <!-- Caveat detail -->
+  <section id="caveat" class="section">
+    <div class="callout yellow">
+      <strong>Why the L4 numbers aren't here.</strong> The spec prefers g6.xlarge (L4 24GB, ~0.8 $/hr) and projects ~75% of L40S throughput at ~57% of L40S $/hr — cheaper $/1K pairs. This artifact captures L40S only because the node was already warm from DeepSeek-OCR. A follow-up on L4 is needed to validate the cost-efficiency claim; treat the cost panel below accordingly.
+    </div>
+  </section>
+
+  <!-- Concurrency -->
+  <section id="concurrency" class="section">
+    <h2>Concurrency scaling · pair_length=1024 · extended sweep</h2>
+    <p style="color:var(--text-muted);font-size:.88rem;margin-bottom:1rem;">
+      Sweep levels c = [1, 4, 16, 64, 256] · k=50 candidates/request · n_steady=50 per level.
+      <strong style="color:var(--text);">c=4 is the throughput knee;</strong> beyond that, pairs/s flattens and e2e p99 grows ~10× while the server just queues.
+    </p>
+    <div class="chart-card">
+      <h3>pairs/s (line) and e2e p99 ms (bars) vs concurrency</h3>
+      <div class="chart-wrap tall"><canvas id="concChart"></canvas></div>
+    </div>
+  </section>
+
+  <!-- Pair length -->
+  <section id="pairlen" class="section">
+    <h2>Pair-length scaling · c=4 · k=50</h2>
+    <div class="callout">
+      <strong>pairs/s scales inverse-linearly with pair_length.</strong> Halving the pair doubles pairs/s, meaning per-pair latency is proportional to sequence length — L40S is <strong>compute-bound on attention across the whole pair</strong>, not request-overhead-bound. L=512 is the capacity headline at 700 pairs/s.
+    </div>
+    <div class="chart-card">
+      <h3>pairs/s per pair_length (L=4096 → config FAIL)</h3>
+      <div class="chart-wrap"><canvas id="pairChart"></canvas></div>
+    </div>
+    <div class="callout red">
+      <strong>L=4096 failed 50/50 with HTTP 400.</strong> The chat template adds ~1 token of overhead; requested 4097 tokens &gt; max_model_len=4096. Fix: deploy with <code>max_model_len=4352</code>, or cap sweep at 3840. Captured intentionally as a data point, not a capacity failure.
+    </div>
+  </section>
+
+  <!-- Efficiency matrix -->
+  <section id="matrix" class="section">
+    <h2>Per-pair efficiency matrix</h2>
+    <div class="chart-card">
+      <h3>ms/pair p99 · pairs/s · by pair_length × concurrency</h3>
+      <div class="heatmap" style="grid-template-columns: 140px repeat(5, 1fr);">
+        <div class="cell head">pair_length</div>
+        <div class="cell head">c=1</div>
+        <div class="cell head">c=4</div>
+        <div class="cell head">c=16</div>
+        <div class="cell head">c=64</div>
+        <div class="cell head">c=256</div>
+
+        <div class="cell row-label">L=512</div>
+        <div class="cell">—</div>
+        <div class="cell sweet">7.6 ms<br>700 p/s ★</div>
+        <div class="cell">—</div>
+        <div class="cell">—</div>
+        <div class="cell">—</div>
+
+        <div class="cell row-label">L=1024</div>
+        <div class="cell">9.0 ms<br>167 p/s</div>
+        <div class="cell">13.4 ms<br>389 p/s</div>
+        <div class="cell">49.3 ms<br>380 p/s</div>
+        <div class="cell fail-cell">135.4 ms<br>366 p/s</div>
+        <div class="cell fail-cell">127.1 ms<br>389 p/s</div>
+
+        <div class="cell row-label">L=2048</div>
+        <div class="cell">—</div>
+        <div class="cell">25.5 ms<br>204 p/s</div>
+        <div class="cell">—</div>
+        <div class="cell">—</div>
+        <div class="cell">—</div>
+
+        <div class="cell row-label">L=4096</div>
+        <div class="cell">—</div>
+        <div class="cell fail-cell">FAIL<br>ctx overflow</div>
+        <div class="cell">—</div>
+        <div class="cell">—</div>
+        <div class="cell">—</div>
+      </div>
+    </div>
+    <p style="color:var(--text-muted);font-size:.82rem;">
+      ms/pair p99 = e2e p99 / k (k=50). Green ★ cell is the sweet spot: pair_length=512 at c=4 — <strong style="color:var(--green)">700 pairs/s at 7.6 ms/pair p99</strong>. Red cells blow the 50 ms/pair SLO.
+    </p>
+  </section>
+
+  <!-- Methodology -->
+  <section id="methodology" class="section">
+    <h2>Methodology callout · the c=256 "surprise"</h2>
+    <div class="callout yellow">
+      <strong>c=256 tied c=4 on pairs/s and had lower p99 than c=64.</strong> That's not vLLM magic — it's a <strong>burst-mode artifact</strong>.
+      The aiohttp semaphore admits up to c=256 in flight, but n_steady=50 means only 50 requests are ever dispatched per level. Real in-flight peaks at ~50,
+      which is <em>below</em> vLLM's max-num-seqs=64 cap. So c=16/64/256 all collapse to the same batch, and the only difference is how quickly the burst is admitted.
+      Larger bursts let vLLM form more uniform continuous-batching groups on the first steps, giving <strong>tighter p99 at c=256 (6,355 ms) than at c=64 (6,772 ms)</strong> — a 6% effect, inside noise but consistent with the scheduler theory.
+    </div>
+    <div class="callout red">
+      <strong>Warning.</strong> Burst-mode sweeps misrepresent saturation. To measure true queue behavior, drive with a <em>sustained arrival rate</em> above service rate, not a fixed-batch burst bounded by n_steady. The c=4 knee here is real for this burst shape; the "c=256 is fine" signal is an artifact.
+    </div>
+  </section>
+
+  <!-- Tier stack -->
+  <section id="tier" class="section">
+    <h2>Tier stack · T0 landed · T1 deferred · T2/T3/T4 N/A</h2>
+    <div class="tier-grid">
+      <div class="tier-row-v landed">
+        <div class="tier-name">T0</div>
+        <div>
+          <strong>BF16 classifier baseline landed.</strong> vLLM 0.19.1 · <code>--runner pooling --convert classify</code> ·
+          <code>Qwen3ForSequenceClassification</code> hf-override · max-num-seqs=64 · TP=1 · flash-attn · /v1/score.
+        </div>
+        <div class="metric" style="color:var(--green)">700 pairs/s</div>
+        <div class="metric">1.0×</div>
+      </div>
+      <div class="tier-row-v blocked">
+        <div class="tier-name">T1</div>
+        <div>
+          <strong>FP8 (E4M3) weight-only</strong> — L40S sm_89 has FP8 tensor cores. Deferred this iteration; doable with <code>--quantization fp8</code> (or offline W8A8). Expected 1.3–1.7× throughput + ~2× VRAM headroom.
+          <span class="badge badge-skip" style="margin-left:.5rem;">next iteration</span>
+        </div>
+        <div class="metric">—</div>
+        <div class="metric">—</div>
+      </div>
+      <div class="tier-row-v na">
+        <div class="tier-name">T2</div>
+        <div>
+          <strong>Prefix / KV cache</strong> — reranker scores <em>k=50 distinct candidate pairs</em> per request; no shared prefix across pairs. HiCache/LMCache offer nothing here.
+          <span class="badge badge-na" style="margin-left:.5rem;">workload mismatch</span>
+        </div>
+        <div class="metric">—</div>
+        <div class="metric">—</div>
+      </div>
+      <div class="tier-row-v na">
+        <div class="tier-name">T3</div>
+        <div>
+          <strong>Speculative decode</strong> — classifier emits a single logit pair, not a token stream. No decode steps to accelerate.
+          <span class="badge badge-na" style="margin-left:.5rem;">classifier / no decode</span>
+        </div>
+        <div class="metric">—</div>
+        <div class="metric">—</div>
+      </div>
+      <div class="tier-row-v na">
+        <div class="tier-name">T4</div>
+        <div>
+          <strong>Parallelism</strong> — single GPU cell. 4B model fits comfortably on 1× L40S. TP/PP not applicable at this scale.
+          <span class="badge badge-na" style="margin-left:.5rem;">fixed TP=1</span>
+        </div>
+        <div class="metric">—</div>
+        <div class="metric">—</div>
+      </div>
+      <div class="tier-row-v landed">
+        <div class="tier-name">T5</div>
+        <div>
+          <strong>Kernels — vLLM default flash-attn is active.</strong> No explicit <code>--torch-compile</code>; default CUDA graphs in place. Additional kernel sweep deferred.
+        </div>
+        <div class="metric" style="color:var(--text-muted)">default</div>
+        <div class="metric">—</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLO -->
+  <section id="slo" class="section">
+    <h2>SLO pass/fail · p99 ≤ 50 ms per pair @ k=50</h2>
+    <div class="slo-grid">
+      <div class="cell head">level (L=1024)</div>
+      <div class="cell head">e2e p99</div>
+      <div class="cell head">ms/pair p99</div>
+      <div class="cell head">verdict</div>
+      <div class="cell head">errors</div>
+
+      <div class="cell row-label">c=1</div>
+      <div class="cell">452 ms</div>
+      <div class="cell">9.0 ms</div>
+      <div class="cell pass">PASS · 5.5× headroom</div>
+      <div class="cell pass">0 / 50</div>
+
+      <div class="cell row-label"><strong>c=4 ★</strong></div>
+      <div class="cell">669 ms</div>
+      <div class="cell">13.4 ms</div>
+      <div class="cell pass">PASS · 3.7× headroom</div>
+      <div class="cell pass">0 / 50</div>
+
+      <div class="cell row-label">c=16</div>
+      <div class="cell">2,465 ms</div>
+      <div class="cell">49.3 ms</div>
+      <div class="cell" style="background:var(--yellow-soft);color:var(--yellow);font-weight:600">BORDERLINE</div>
+      <div class="cell pass">0 / 50</div>
+
+      <div class="cell row-label">c=64</div>
+      <div class="cell">6,772 ms</div>
+      <div class="cell">135.4 ms</div>
+      <div class="cell fail">FAIL · 2.7× over</div>
+      <div class="cell pass">0 / 50</div>
+
+      <div class="cell row-label">c=256</div>
+      <div class="cell">6,355 ms</div>
+      <div class="cell">127.1 ms</div>
+      <div class="cell fail">FAIL · 2.5× over</div>
+      <div class="cell pass">0 / 50</div>
+
+      <div class="cell row-label">L=4096 (any c)</div>
+      <div class="cell">—</div>
+      <div class="cell">—</div>
+      <div class="cell fail">FAIL · config</div>
+      <div class="cell fail">50 / 50</div>
+    </div>
+    <div class="callout green" style="margin-top:1rem;">
+      <strong>Net: L40S comfortably meets the 50 ms/pair SLO at c ≤ 4.</strong> 0% error rate at every valid configuration. The only 100% failure rate is L=4096 — a known off-by-one against max_model_len, not a capacity issue.
+    </div>
+  </section>
+
+  <!-- Cost -->
+  <section id="cost" class="section">
+    <h2>Cost panel · $ per 1,000 pairs scored</h2>
+    <div class="chart-card">
+      <h3>On-demand pricing (us-east-2) · L4 row is projected, not measured</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>instance</th><th>GPU</th><th>$/hr</th><th>pairs/s</th><th>$ / 1K pairs</th><th>basis</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="name">g6e.2xlarge</td><td>1× L40S 48GB</td><td>$2.24</td><td>700</td><td class="best">$0.00089</td><td><span class="badge badge-pass">measured · L=512 / c=4</span></td></tr>
+            <tr><td class="name">g6e.2xlarge</td><td>1× L40S 48GB</td><td>$2.24</td><td>389</td><td>$0.00160</td><td><span class="badge badge-pass">measured · L=1024 / c=4</span></td></tr>
+            <tr><td class="name">g6e.2xlarge</td><td>1× L40S 48GB</td><td>$2.24</td><td>204</td><td>$0.00305</td><td><span class="badge badge-pass">measured · L=2048 / c=4</span></td></tr>
+            <tr><td class="name">g6.xlarge</td><td>1× L4 24GB</td><td>$0.80</td><td>~525 (proj)</td><td class="warn">~$0.00042</td><td><span class="badge badge-skip">projected · 75% of L40S throughput per spec</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="callout yellow">
+      <strong>L4 row is projected, not measured.</strong> Per the spec's expected ~57% $/hr delta at ~75% throughput, L4 should land at ~<strong>$0.00042 / 1K pairs — 2.1× cheaper than L40S</strong>. That claim is not validated by this artifact set. Run the same sweep on g6.xlarge before quoting the L4 number externally.
+    </div>
+  </section>
+
+  <!-- Deferred -->
+  <section id="deferred" class="section">
+    <h2>Deferred work</h2>
+    <div class="two-col">
+      <div class="chart-card">
+        <h3 style="color:var(--accent)">Tier-sweep follow-ups</h3>
+        <p style="font-size:.88rem;margin-bottom:.6rem;"><strong>FP8 (T1)</strong> — spec calls for it; L40S has FP8 TCs. Expected 1.3–1.7× throughput + ~2× VRAM headroom. Straightforward add in next iteration.</p>
+        <p style="font-size:.88rem;margin-bottom:.6rem;"><strong>pair_length axis with max_model_len=4352</strong> — actually land a L=4096 data point; today's artifact only shows the ctx-overflow failure.</p>
+        <p style="font-size:.88rem;"><strong>pair_length sweep at c=1</strong> — current sweep fixes c=4; a c=1 curve isolates per-stream latency from batching effects.</p>
+      </div>
+      <div class="chart-card">
+        <h3 style="color:var(--yellow)">Cells not yet run</h3>
+        <p style="font-size:.88rem;margin-bottom:.6rem;"><strong>L4 substrate run</strong> — the spec-preferred g6.xlarge row; needed to validate the 2.1× cost-efficiency claim.</p>
+        <p style="font-size:.88rem;margin-bottom:.6rem;"><strong>MIG partitioning</strong> — p5en only; out of scope on L40S.</p>
+        <p style="font-size:.88rem;margin-bottom:.6rem;"><strong>Burn-in (O5)</strong> — 30-min sustained run to detect throttling / regression.</p>
+        <p style="font-size:.88rem;"><strong>Power-efficiency (O11)</strong> — DCGM power draw per pair; requires Prometheus scrape.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div>Generated from 3 Common Benchmark Artifacts v1.0.0 + <code>lessons.md</code> + <code>sidecars/benchmark-g6e-2xlarge.yaml</code> · agent-aiops-on-aws</div>
+  <div style="margin-top:.75rem;font-weight:600;color:var(--text);">Source artifacts</div>
+  <ul class="artifact-list">
+    <li><code>qwen3-reranker-4b_eks_g6e-2xl_vllm_concurrency-sweep_20260514T163014Z.json</code> · iter 1 · c∈[1,4,16,64] @ L=1024</li>
+    <li><code>qwen3-reranker-4b_eks_g6e-2xl_vllm_pair-length-sweep_20260514T171508Z.json</code> · iter 2 · L∈[512,1024,2048,4096] @ c=4</li>
+    <li><code>qwen3-reranker-4b_eks_g6e-2xl_vllm_concurrency-sweep-extended_20260514T171607Z.json</code> · iter 2 · c∈[1,4,16,64,256] @ L=1024</li>
+  </ul>
+</footer>
+
+<script>
+  function toggleTheme(){
+    const html=document.documentElement;
+    const next=html.getAttribute('data-theme')==='dark'?'light':'dark';
+    html.setAttribute('data-theme',next);
+    Object.values(window._charts||{}).forEach(c=>{if(c&&c.update)c.update()});
+  }
+  const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const palette=()=>({text:css('--text'),textMuted:css('--text-muted'),border:css('--border'),accent:css('--accent'),accent2:css('--accent-2'),green:css('--green'),red:css('--red'),yellow:css('--yellow'),cyan:css('--cyan'),pink:css('--pink')});
+  Chart.defaults.font.family='-apple-system, BlinkMacSystemFont, Segoe UI, Inter, sans-serif';
+  Chart.defaults.color=css('--text-muted');
+  window._charts={};
+
+  // Concurrency chart — dual axis
+  (()=>{
+    const p=palette();
+    const ctx=document.getElementById('concChart').getContext('2d');
+    const labels=['c=1','c=4 ★','c=16','c=64','c=256'];
+    const pairsPs=[166.45, 388.77, 379.81, 365.66, 389.21];
+    const p99=[452.14, 668.66, 2464.69, 6772.08, 6355.22];
+    const barColors=p99.map(v=>v<=50*50?p.green:(v<=100*50?p.yellow:p.red));
+    window._charts.conc=new Chart(ctx,{
+      type:'bar',
+      data:{labels,datasets:[
+        {type:'bar',label:'e2e p99 (ms)',data:p99,backgroundColor:barColors,borderRadius:4,yAxisID:'y2',order:2},
+        {type:'line',label:'pairs/s',data:pairsPs,borderColor:p.green,backgroundColor:p.green+'33',yAxisID:'y1',tension:.3,pointRadius:6,borderWidth:3,order:1},
+      ]},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        scales:{
+          y1:{type:'linear',position:'left',grid:{color:p.border},ticks:{color:p.green},title:{display:true,text:'pairs/s',color:p.green},beginAtZero:true},
+          y2:{type:'linear',position:'right',grid:{display:false},ticks:{color:p.red},title:{display:true,text:'e2e p99 (ms)',color:p.red},beginAtZero:true},
+          x:{grid:{display:false},ticks:{color:p.text}}
+        },
+        plugins:{legend:{position:'top',labels:{color:p.text}}}
+      },
+      plugins:[{
+        id:'sloMark',
+        afterDraw(chart){
+          const {ctx,chartArea,scales}=chart;
+          const y=scales.y2.getPixelForValue(50*50); // 50ms/pair * 50 pairs = 2500ms
+          if(y<chartArea.bottom && y>chartArea.top){
+            ctx.save();
+            ctx.strokeStyle=p.yellow;ctx.setLineDash([6,4]);ctx.lineWidth=1.5;
+            ctx.beginPath();ctx.moveTo(chartArea.left,y);ctx.lineTo(chartArea.right,y);ctx.stroke();
+            ctx.fillStyle=p.yellow;ctx.font='11px ui-monospace, monospace';ctx.textAlign='right';
+            ctx.fillText('SLO p99 = 2,500 ms (50 ms/pair × k=50)',chartArea.right-6,y-6);
+            ctx.restore();
+          }
+        }
+      }]
+    });
+  })();
+
+  // Pair-length chart
+  (()=>{
+    const p=palette();
+    const ctx=document.getElementById('pairChart').getContext('2d');
+    const labels=['L=512','L=1024','L=2048','L=4096'];
+    const vals=[699.72, 393.01, 204.44, 0];
+    const colors=[p.green, p.accent, p.cyan, p.red];
+    window._charts.pair=new Chart(ctx,{
+      type:'bar',
+      data:{labels,datasets:[{label:'pairs/s @ c=4',data:vals,backgroundColor:colors,borderRadius:6}]},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        scales:{
+          y:{grid:{color:p.border},ticks:{color:p.textMuted},title:{display:true,text:'pairs/s',color:p.textMuted},beginAtZero:true},
+          x:{grid:{display:false},ticks:{color:p.text}}
+        },
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{label:(c)=>c.label==='L=4096'?'FAIL · 50/50 ctx overflow (4097 > 4096)':`${c.parsed.y.toFixed(1)} pairs/s`}}
+        }
+      },
+      plugins:[{
+        id:'failLabel',
+        afterDraw(chart){
+          const {ctx,chartArea,scales}=chart;
+          const x=scales.x.getPixelForValue(3); // L=4096 index
+          const y=chartArea.bottom-24;
+          ctx.save();
+          ctx.fillStyle=p.red;ctx.font='bold 13px ui-monospace, monospace';ctx.textAlign='center';
+          ctx.fillText('FAIL · ctx overflow',x,y);
+          ctx.font='10px ui-monospace, monospace';ctx.fillStyle=p.textMuted;
+          ctx.fillText('(50/50 · 4097 > max_model_len=4096)',x,y+14);
+          ctx.restore();
+        }
+      }]
+    });
+  })();
+</script>
+</body>
+</html>

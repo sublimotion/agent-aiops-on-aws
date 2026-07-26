@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ray Serve Video Pipeline - Benchmark Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2a2d3a;
+    --text: #e4e4e7;
+    --muted: #9ca3af;
+    --green: #22c55e;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --orange: #f59e0b;
+    --purple: #a855f7;
+    --cyan: #06b6d4;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 1.8rem; margin-bottom: 0.3rem; }
+  .subtitle { color: var(--muted); font-size: 0.95rem; margin-bottom: 2rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+  }
+  .card h2 { font-size: 1.1rem; margin-bottom: 1rem; }
+  .card h3 { font-size: 0.95rem; color: var(--muted); margin-bottom: 0.5rem; }
+  .stat-row { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-label { color: var(--muted); }
+  .stat-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat-value.green { color: var(--green); }
+  .stat-value.red { color: var(--red); }
+  .stat-value.orange { color: var(--orange); }
+  .hero { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2rem; }
+  .hero-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+  }
+  .hero-card .big { font-size: 2.5rem; font-weight: 700; line-height: 1.2; }
+  .hero-card .label { color: var(--muted); font-size: 0.85rem; margin-top: 0.3rem; }
+  .chart-container { position: relative; height: 300px; }
+  .wide { grid-column: 1 / -1; }
+  .tag {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .tag-a { background: rgba(59,130,246,0.2); color: var(--blue); }
+  .tag-b { background: rgba(245,158,11,0.2); color: var(--orange); }
+  .finding { padding: 0.8rem 1rem; margin-bottom: 0.5rem; border-radius: 8px; border-left: 3px solid; }
+  .finding-green { background: rgba(34,197,94,0.1); border-color: var(--green); }
+  .finding-red { background: rgba(239,68,68,0.1); border-color: var(--red); }
+  .finding-blue { background: rgba(59,130,246,0.1); border-color: var(--blue); }
+  .arch-diagram {
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    background: #12141c;
+    padding: 1.5rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .arch-diagram .green { color: var(--green); }
+  .arch-diagram .orange { color: var(--orange); }
+  .arch-diagram .blue { color: var(--blue); }
+  .arch-diagram .muted { color: var(--muted); }
+  footer { text-align: center; color: var(--muted); font-size: 0.8rem; margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<h1>Ray Serve Video Pipeline Benchmark</h1>
+<p class="subtitle">Config A (in-memory DeploymentHandle) vs Config B (S3 passthrough) | 2026-03-27 | 2x g5.xlarge A10G | COCO val2017 images</p>
+
+<!-- Hero stats -->
+<div class="hero">
+  <div class="hero-card">
+    <div class="big green">1.57x</div>
+    <div class="label">Config A faster (E2E p50)</div>
+  </div>
+  <div class="hero-card">
+    <div class="big orange">111ms</div>
+    <div class="label">S3 overhead per frame (PUT + GET)</div>
+  </div>
+  <div class="hero-card">
+    <div class="big red">3.3s/s</div>
+    <div class="label">Added latency at 30 fps with S3</div>
+  </div>
+</div>
+
+<!-- Architecture diagrams -->
+<div class="grid">
+  <div class="card">
+    <h2><span class="tag tag-a">Config A</span> In-Memory Pipeline</h2>
+    <div class="arch-diagram"><span class="muted">Kafka</span> --> <span class="blue">KafkaIngress</span> --> <span class="blue">FrameDecode</span> --> <span class="green">PTDetector</span> --<span class="green">[Ray ObjectStore]</span>--> <span class="green">TFClassifier</span> --> <span class="blue">ResultWriter</span>
+                      <span class="muted">CPU</span>              <span class="muted">CPU, S3</span>            <span class="green">GPU, YOLO</span>    <span class="green">numpy in-memory</span>      <span class="green">GPU, MobileNet</span>      <span class="muted">CPU</span>
+
+<span class="green">PT-->TF: ~10ms (shared memory, zero-copy)</span></div>
+  </div>
+  <div class="card">
+    <h2><span class="tag tag-b">Config B</span> S3 Passthrough Pipeline</h2>
+    <div class="arch-diagram"><span class="muted">Kafka</span> --> <span class="blue">KafkaIngress</span> --> <span class="blue">FrameDecode</span> --> <span class="green">PTDetector</span> --<span class="orange">[S3 PUT+GET]</span>--> <span class="green">TFClassifier</span> --> <span class="blue">ResultWriter</span>
+                      <span class="muted">CPU</span>              <span class="muted">CPU, S3</span>            <span class="green">GPU, YOLO</span>    <span class="orange">numpy via S3</span>       <span class="green">GPU, MobileNet</span>      <span class="muted">CPU</span>
+
+<span class="orange">PT-->TF: ~111ms (S3 PUT 80ms + GET 32ms)</span></div>
+  </div>
+</div>
+
+<!-- Charts -->
+<div class="grid">
+  <div class="card">
+    <h2>E2E Latency Distribution (ms)</h2>
+    <div class="chart-container"><canvas id="e2eChart"></canvas></div>
+  </div>
+  <div class="card">
+    <h2>Per-Stage Latency Breakdown (p50, ms)</h2>
+    <div class="chart-container"><canvas id="stageChart"></canvas></div>
+  </div>
+  <div class="card">
+    <h2>S3 Overhead per Frame (Config B only)</h2>
+    <div class="chart-container"><canvas id="s3Chart"></canvas></div>
+  </div>
+  <div class="card">
+    <h2>PT to TF Handoff Time (ms)</h2>
+    <div class="chart-container"><canvas id="handoffChart"></canvas></div>
+  </div>
+</div>
+
+<!-- Detailed stats -->
+<div class="grid">
+  <div class="card">
+    <h2><span class="tag tag-a">Config A</span> Detailed Latencies</h2>
+    <div class="stat-row"><span class="stat-label">E2E Latency (p50)</span><span class="stat-value green">159.3ms</span></div>
+    <div class="stat-row"><span class="stat-label">E2E Latency (p95)</span><span class="stat-value">330.0ms</span></div>
+    <div class="stat-row"><span class="stat-label">S3 Decode</span><span class="stat-value">31.9ms</span></div>
+    <div class="stat-row"><span class="stat-label">PT Detect (GPU)</span><span class="stat-value">9.4ms</span></div>
+    <div class="stat-row"><span class="stat-label">TF Classify</span><span class="stat-value">90.1ms</span></div>
+    <div class="stat-row"><span class="stat-label">PT->TF Handoff</span><span class="stat-value green">10.2ms</span></div>
+    <div class="stat-row"><span class="stat-label">S3 Overhead</span><span class="stat-value green">0ms</span></div>
+  </div>
+  <div class="card">
+    <h2><span class="tag tag-b">Config B</span> Detailed Latencies</h2>
+    <div class="stat-row"><span class="stat-label">E2E Latency (p50)</span><span class="stat-value orange">249.5ms</span></div>
+    <div class="stat-row"><span class="stat-label">E2E Latency (p95)</span><span class="stat-value">470.2ms</span></div>
+    <div class="stat-row"><span class="stat-label">S3 Decode</span><span class="stat-value">31.4ms</span></div>
+    <div class="stat-row"><span class="stat-label">PT Detect (GPU)</span><span class="stat-value">10.0ms</span></div>
+    <div class="stat-row"><span class="stat-label">TF Classify</span><span class="stat-value">107.2ms</span></div>
+    <div class="stat-row"><span class="stat-label">PT->TF Handoff</span><span class="stat-value">2.6ms</span></div>
+    <div class="stat-row"><span class="stat-label">S3 Write (PUT)</span><span class="stat-value red">79.8ms</span></div>
+    <div class="stat-row"><span class="stat-label">S3 Read (GET)</span><span class="stat-value red">31.6ms</span></div>
+    <div class="stat-row"><span class="stat-label">S3 Total</span><span class="stat-value red">111.4ms</span></div>
+  </div>
+</div>
+
+<!-- Scale projections -->
+<div class="card wide" style="margin-bottom: 2rem;">
+  <h2>Scale Projections: S3 Overhead at Production Frame Rates</h2>
+  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem;">
+    <div style="text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--green);">1 fps</div>
+      <div style="color: var(--muted); font-size: 0.85rem;">+111ms/s overhead</div>
+      <div style="color: var(--green); font-size: 0.8rem; margin-top: 0.3rem;">Manageable</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--orange);">10 fps</div>
+      <div style="color: var(--muted); font-size: 0.85rem;">+1.1s/s overhead</div>
+      <div style="color: var(--orange); font-size: 0.8rem; margin-top: 0.3rem;">Pipeline falls behind</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--red);">30 fps</div>
+      <div style="color: var(--muted); font-size: 0.85rem;">+3.3s/s overhead</div>
+      <div style="color: var(--red); font-size: 0.8rem; margin-top: 0.3rem;">Untenable</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--red);">30 fps x 10 cams</div>
+      <div style="color: var(--muted); font-size: 0.85rem;">~1,050 S3 PUTs/s</div>
+      <div style="color: var(--red); font-size: 0.8rem; margin-top: 0.3rem;">Near S3 throttle (3,500/s)</div>
+    </div>
+  </div>
+</div>
+
+<!-- Findings -->
+<div class="card wide">
+  <h2>Key Findings</h2>
+  <div style="margin-top: 1rem;">
+    <div class="finding finding-green">
+      <strong>Single-cluster in-memory is 1.57x faster</strong> at E2E p50. The S3 round-trip between PT and TF adds 111ms per frame — this overhead is eliminated entirely by using DeploymentHandle within one RayService cluster.
+    </div>
+    <div class="finding finding-red">
+      <strong>S3 passthrough doesn't scale to real-time video.</strong> At 30 fps, the S3 overhead alone (3.3s/s) exceeds the processing budget. With 10+ cameras, S3 PUT throttling (3,500 req/s) becomes a hard ceiling.
+    </div>
+    <div class="finding finding-blue">
+      <strong>PT + TF coexist on GPU via runtime_env isolation.</strong> Each deployment gets its own virtualenv — torch and tensorflow don't conflict. Key dependencies: pin <code>protobuf&lt;5</code> and install <code>nvidia-cudnn-cu12==9.3.0.75</code> for TF GPU on Ray's CUDA 12.5 image.
+    </div>
+    <div class="finding finding-green">
+      <strong>Dedicated KafkaIngress avoids GPU waste.</strong> The CPU-only ingress deployment decouples Kafka consumer scaling from GPU model scaling. No GPU cycles wasted on polling.
+    </div>
+  </div>
+</div>
+
+<!-- Test details -->
+<div class="card wide" style="margin-top: 1.5rem;">
+  <h2>Test Configuration</h2>
+  <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 0.5rem; font-size: 0.9rem;">
+    <div>
+      <h3>Infrastructure</h3>
+      <div class="stat-row"><span class="stat-label">EKS Cluster</span><span class="stat-value">qn-sglang-eks-cluster</span></div>
+      <div class="stat-row"><span class="stat-label">Region</span><span class="stat-value">us-west-2</span></div>
+      <div class="stat-row"><span class="stat-label">GPU Workers</span><span class="stat-value">2x g5.xlarge (A10G 24GB)</span></div>
+      <div class="stat-row"><span class="stat-label">Ray Version</span><span class="stat-value">2.44.1</span></div>
+      <div class="stat-row"><span class="stat-label">Kafka</span><span class="stat-value">3.7.2 (KRaft, single broker)</span></div>
+      <div class="stat-row"><span class="stat-label">GCS FT</span><span class="stat-value">ElastiCache Serverless + stunnel</span></div>
+    </div>
+    <div>
+      <h3>Models & Data</h3>
+      <div class="stat-row"><span class="stat-label">PT Model</span><span class="stat-value">YOLOv8n (detection)</span></div>
+      <div class="stat-row"><span class="stat-label">TF Model</span><span class="stat-value">MobileNetV2 (classification)</span></div>
+      <div class="stat-row"><span class="stat-label">Test Images</span><span class="stat-value">10x COCO val2017</span></div>
+      <div class="stat-row"><span class="stat-label">Messages</span><span class="stat-value">20 per config</span></div>
+      <div class="stat-row"><span class="stat-label">Avg Detections</span><span class="stat-value">3.5 per frame</span></div>
+      <div class="stat-row"><span class="stat-label">Frame Size</span><span class="stat-value">~640x480 (100-330KB JPEG)</span></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Ray Serve Video Pipeline POC | Agent AIOps on AWS | Benchmark run 2026-03-27T15:00Z
+</footer>
+
+<script>
+// Chart.js config
+Chart.defaults.color = '#9ca3af';
+Chart.defaults.borderColor = '#2a2d3a';
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
+
+// E2E Latency box comparison
+const e2eCtx = document.getElementById('e2eChart').getContext('2d');
+new Chart(e2eCtx, {
+  type: 'bar',
+  data: {
+    labels: ['p50', 'p95', 'mean', 'min', 'max'],
+    datasets: [
+      {
+        label: 'Config A (in-memory)',
+        data: [159.3, 330.0, 184.7, 136.5, 330.0],
+        backgroundColor: 'rgba(59,130,246,0.7)',
+        borderColor: '#3b82f6',
+        borderWidth: 1,
+      },
+      {
+        label: 'Config B (S3 passthrough)',
+        data: [249.5, 470.2, 263.9, 198.8, 470.2],
+        backgroundColor: 'rgba(245,158,11,0.7)',
+        borderColor: '#f59e0b',
+        borderWidth: 1,
+      },
+    ],
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top' },
+    },
+    scales: {
+      y: { title: { display: true, text: 'Latency (ms)' }, beginAtZero: true },
+    },
+  },
+});
+
+// Per-stage breakdown
+const stageCtx = document.getElementById('stageChart').getContext('2d');
+new Chart(stageCtx, {
+  type: 'bar',
+  data: {
+    labels: ['S3 Decode', 'PT Detect\n(GPU)', 'PT->TF\nHandoff', 'S3 Write', 'S3 Read', 'TF Classify'],
+    datasets: [
+      {
+        label: 'Config A (in-memory)',
+        data: [31.9, 9.4, 10.2, 0, 0, 90.1],
+        backgroundColor: 'rgba(59,130,246,0.7)',
+        borderColor: '#3b82f6',
+        borderWidth: 1,
+      },
+      {
+        label: 'Config B (S3 passthrough)',
+        data: [31.4, 10.0, 2.6, 79.8, 31.6, 107.2],
+        backgroundColor: 'rgba(245,158,11,0.7)',
+        borderColor: '#f59e0b',
+        borderWidth: 1,
+      },
+    ],
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top' },
+    },
+    scales: {
+      y: { title: { display: true, text: 'Latency (ms)' }, beginAtZero: true },
+    },
+  },
+});
+
+// S3 overhead scatter
+const s3Ctx = document.getElementById('s3Chart').getContext('2d');
+const s3WriteData = [42.0, 48.1, 54.0, 66.6, 68.1, 70.3, 73.2, 76.1, 78.1, 79.8, 80.5, 82.3, 85.7, 90.1, 94.3, 98.5, 105.2, 112.7, 130.4, 142.2];
+const s3ReadData = [23.5, 24.1, 25.3, 26.4, 27.1, 28.0, 29.1, 30.2, 30.8, 31.6, 32.0, 32.5, 33.1, 34.2, 35.0, 36.1, 38.2, 42.5, 55.3, 64.8];
+new Chart(s3Ctx, {
+  type: 'scatter',
+  data: {
+    datasets: [
+      {
+        label: 'S3 Write (PUT)',
+        data: s3WriteData.map((v, i) => ({x: i+1, y: v})),
+        backgroundColor: 'rgba(239,68,68,0.7)',
+        borderColor: '#ef4444',
+      },
+      {
+        label: 'S3 Read (GET)',
+        data: s3ReadData.map((v, i) => ({x: i+1, y: v})),
+        backgroundColor: 'rgba(245,158,11,0.7)',
+        borderColor: '#f59e0b',
+      },
+    ],
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top' },
+    },
+    scales: {
+      x: { title: { display: true, text: 'Message #' }, min: 0, max: 21 },
+      y: { title: { display: true, text: 'Latency (ms)' }, beginAtZero: true },
+    },
+  },
+});
+
+// Handoff comparison
+const handoffCtx = document.getElementById('handoffChart').getContext('2d');
+const handoffA = [3.4, 3.5, 7.6, 7.9, 8.7, 8.9, 9.1, 9.1, 9.8, 10.1, 10.2, 12.9, 13.4, 14.0, 14.2, 14.3, 15.1, 15.2, 15.3, 62.2];
+const handoffB = [2.5, 2.5, 2.5, 2.5, 2.5, 2.6, 2.6, 2.6, 2.6, 2.6, 2.6, 2.6, 2.7, 2.7, 2.7, 2.7, 2.8, 2.8, 3.0, 4.5];
+// But Config B has S3 overhead ON TOP of the handoff
+const s3Overhead = s3WriteData.map((w, i) => w + s3ReadData[i]);
+new Chart(handoffCtx, {
+  type: 'bar',
+  data: {
+    labels: ['Config A\n(in-memory)', 'Config B\n(S3 passthrough)'],
+    datasets: [
+      {
+        label: 'DeploymentHandle handoff',
+        data: [10.2, 2.6],
+        backgroundColor: ['rgba(59,130,246,0.7)', 'rgba(59,130,246,0.3)'],
+        borderColor: ['#3b82f6', '#3b82f6'],
+        borderWidth: 1,
+      },
+      {
+        label: 'S3 overhead (PUT + GET)',
+        data: [0, 111.4],
+        backgroundColor: ['rgba(239,68,68,0)', 'rgba(239,68,68,0.7)'],
+        borderColor: ['transparent', '#ef4444'],
+        borderWidth: 1,
+      },
+    ],
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top' },
+    },
+    scales: {
+      x: { stacked: true },
+      y: { stacked: true, title: { display: true, text: 'Total handoff time (ms)' }, beginAtZero: true },
+    },
+  },
+});
+</script>
+</body>
+</html>

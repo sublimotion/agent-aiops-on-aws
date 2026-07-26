@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verification Research Program — Visual Explainer</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --card: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --orange: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --pink: #f778ba;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+  h2 { font-size: 1.4rem; margin: 2rem 0 1rem; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+  h3 { font-size: 1.1rem; margin: 1rem 0 0.5rem; color: var(--muted); }
+  .subtitle { color: var(--muted); font-size: 0.95rem; margin-bottom: 2rem; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1rem 0; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin: 1rem 0; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+  }
+  .card.full { grid-column: 1 / -1; }
+  .stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0; }
+  .stat {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    text-align: center;
+    flex: 1;
+    min-width: 150px;
+  }
+  .stat .value { font-size: 2rem; font-weight: 700; }
+  .stat .label { color: var(--muted); font-size: 0.85rem; margin-top: 0.25rem; }
+  .stat.green .value { color: var(--green); }
+  .stat.blue .value { color: var(--accent); }
+  .stat.orange .value { color: var(--orange); }
+  .stat.purple .value { color: var(--purple); }
+  .stat.pink .value { color: var(--pink); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th, td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.best td { color: var(--green); font-weight: 600; }
+  .tag {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .tag.pass { background: rgba(63,185,80,0.15); color: var(--green); }
+  .tag.fail { background: rgba(248,81,73,0.15); color: var(--red); }
+  .tag.warn { background: rgba(210,153,34,0.15); color: var(--orange); }
+  .insight {
+    background: rgba(88,166,255,0.08);
+    border-left: 3px solid var(--accent);
+    padding: 0.75rem 1rem;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+  }
+  .cascade {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.85rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    line-height: 1.8;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .plotly-chart { width: 100%; min-height: 400px; }
+  .section-intro { color: var(--muted); font-size: 0.95rem; margin-bottom: 1rem; }
+  .experiment-badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-right: 0.5rem;
+  }
+  .badge-svg { background: rgba(188,140,255,0.2); color: var(--purple); }
+  .badge-debate { background: rgba(88,166,255,0.2); color: var(--accent); }
+  .badge-pivot { background: rgba(210,153,34,0.2); color: var(--orange); }
+  .badge-tiny { background: rgba(63,185,80,0.2); color: var(--green); }
+  .badge-phase3 { background: rgba(247,120,186,0.2); color: var(--pink); }
+  .badge-vp { background: rgba(139,148,158,0.2); color: var(--muted); }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.8rem; }
+</style>
+</head>
+<body>
+
+<h1>Verification Research Program</h1>
+<p class="subtitle">
+  6 experiments &middot; SWE-bench Lite n=300 &middot; 58.3% gold pass rate &middot; $17 total API cost
+  <br>
+  <span class="experiment-badge badge-vp">VP SWE-bench</span>
+  <span class="experiment-badge badge-svg">SVG ECE</span>
+  <span class="experiment-badge badge-debate">Debate</span>
+  <span class="experiment-badge badge-pivot">Pivot Analysis</span>
+  <span class="experiment-badge badge-tiny">Tiny Judge</span>
+  <span class="experiment-badge badge-phase3">Phase 3 Learned</span>
+</p>
+
+<!-- ─── Hero stats ─── -->
+<div class="stat-row">
+  <div class="stat green">
+    <div class="value">0.727</div>
+    <div class="label">Best AUC (Phase 3)</div>
+  </div>
+  <div class="stat blue">
+    <div class="value">0.933</div>
+    <div class="label">P@R≥30% (4-feat RF)</div>
+  </div>
+  <div class="stat purple">
+    <div class="value">0.031</div>
+    <div class="label">Best ECE (RL-ready)</div>
+  </div>
+  <div class="stat orange">
+    <div class="value">$0</div>
+    <div class="label">Inference cost</div>
+  </div>
+  <div class="stat pink">
+    <div class="value">4</div>
+    <div class="label">Features needed</div>
+  </div>
+</div>
+
+<!-- ─── 1. The Verification Landscape ─── -->
+<h2>1. The Precision-Recall Frontier</h2>
+<p class="section-intro">Each experiment discovered a verifier occupying a different point on the frontier. No single method dominates.</p>
+
+<div class="grid">
+  <div class="card">
+    <div id="pr-frontier" class="plotly-chart"></div>
+  </div>
+  <div class="card">
+    <table>
+      <thead>
+        <tr><th>Verifier</th><th>Type</th><th class="num">Prec</th><th class="num">Rec</th><th class="num">F1</th><th class="num">ECE</th><th class="num">$/inst</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>v009 (4/4)</td><td><span class="experiment-badge badge-vp">VP</span></td><td class="num">0.963</td><td class="num">0.149</td><td class="num">0.257</td><td class="num">—</td><td class="num">$0.030</td></tr>
+        <tr><td>SVG consensus</td><td><span class="experiment-badge badge-svg">SVG</span></td><td class="num">0.963</td><td class="num">0.149</td><td class="num">0.257</td><td class="num">0.031*</td><td class="num">$0</td></tr>
+        <tr><td>Debate (2-round)</td><td><span class="experiment-badge badge-debate">Debate</span></td><td class="num">0.725</td><td class="num">0.592</td><td class="num">0.652</td><td class="num">0.234</td><td class="num">$0.024</td></tr>
+        <tr><td>Tiny Judge (5-feat)</td><td><span class="experiment-badge badge-tiny">Tiny</span></td><td class="num">0.949†</td><td class="num">0.300†</td><td class="num">—</td><td class="num">0.089</td><td class="num">~$0</td></tr>
+        <tr class="best"><td>Phase 3 (4-feat RF)</td><td><span class="experiment-badge badge-phase3">P3</span></td><td class="num">0.933†</td><td class="num">0.300†</td><td class="num">0.712</td><td class="num">0.072</td><td class="num">~$0</td></tr>
+        <tr><td>v009 + Debate</td><td><span class="experiment-badge badge-debate">Combined</span></td><td class="num">0.882</td><td class="num">0.662</td><td class="num">0.756</td><td class="num">TBD</td><td class="num">$0.054</td></tr>
+      </tbody>
+    </table>
+    <p style="color:var(--muted);font-size:0.75rem;margin-top:0.5rem;">* After Platt scaling &nbsp; † P@R≥30% operating point</p>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Key finding:</strong> v009 and SVG are structurally different methods (adversarial rubric vs patch overlap) arriving at the <em>same</em> operating point (precision ~0.96, recall ~0.15). This is the <strong>static analysis precision ceiling</strong>. Debate breaks through at 4x the recall.
+</div>
+
+<!-- ─── 2. ECE and RL Readiness ─── -->
+<h2>2. Calibration (ECE) — The RL Gate</h2>
+<p class="section-intro">ECE measures whether predicted probabilities match reality. Two verifiers with identical AUC but 7x ECE difference: one works for RL, the other collapses training.</p>
+
+<div class="grid">
+  <div class="card">
+    <div id="ece-bar" class="plotly-chart"></div>
+  </div>
+  <div class="card">
+    <h3>What ECE Means</h3>
+    <p style="margin:0.5rem 0">When the model says <strong>"80% confident"</strong>, do 80% of those patches actually pass?</p>
+    <table style="margin-top:1rem">
+      <thead><tr><th>ECE Range</th><th>Assessment</th><th>Use Case</th></tr></thead>
+      <tbody>
+        <tr><td>&lt; 0.05</td><td><span class="tag pass">Excellent</span></td><td>Safe for RL reward</td></tr>
+        <tr><td>0.05 – 0.10</td><td><span class="tag pass">Good</span></td><td>RL with monitoring</td></tr>
+        <tr><td>0.10 – 0.30</td><td><span class="tag warn">Marginal</span></td><td>Ranking only, recalibrate first</td></tr>
+        <tr><td>&gt; 0.30</td><td><span class="tag fail">Poor</span></td><td>Not usable as continuous signal</td></tr>
+      </tbody>
+    </table>
+    <div class="insight" style="margin-top:1rem">
+      <strong>Weather analogy:</strong> When the forecast says "80% rain," it should rain ~80% of those days. ECE = 0.30 means the forecast is off by 30 percentage points on average. You can still tell rainy days from dry (good AUC), but the <em>numbers are wrong</em> — and RL multiplies by those numbers.
+    </div>
+  </div>
+</div>
+
+<!-- ─── 3. Feature Convergence ─── -->
+<h2>3. The Feature Convergence Discovery</h2>
+<p class="section-intro">Pivot analysis and tiny-judge independently identified the same behavioral signals as the strongest predictors.</p>
+
+<div class="grid">
+  <div class="card">
+    <div id="feature-convergence" class="plotly-chart"></div>
+  </div>
+  <div class="card">
+    <div id="phase3-importance" class="plotly-chart"></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>The surprise:</strong> Phase 3 forward selection chose <strong>zero</strong> LLM-based features. All 4 selected features are behavioral: <code>total_cost_usd</code>, <code>action_pct_edit</code>, <code>adversarial_review_used</code>, <code>loop_count</code>. Efficient agents succeed; thrashing agents fail. This is the quantitative signature of Parkinson's Law for agents.
+</div>
+
+<!-- ─── 4. Signal Contribution ─── -->
+<h2>4. Signal Contribution — Does Combining Help?</h2>
+<p class="section-intro">Adding LLM signals (v009, debate, SVG) to behavioral features has different effects on discrimination vs calibration.</p>
+
+<div class="grid">
+  <div class="card">
+    <div id="signal-auc" class="plotly-chart"></div>
+  </div>
+  <div class="card">
+    <div id="signal-ece" class="plotly-chart"></div>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Two profiles emerge:</strong><br>
+  <strong>Profile A</strong> (max discrimination): 4-feature RF, AUC=0.727, P@R30=0.933, ECE=0.072, cost=$0<br>
+  <strong>Profile B</strong> (max calibration): 60-feature RF + Platt, AUC=0.707, ECE=0.026, cost=$0.054/patch — optimal RL reward
+</div>
+
+<!-- ─── 5. Pivot Analysis ─── -->
+<h2>5. Where Variance Lives (Pivot Analysis)</h2>
+<p class="section-intro">Mutual information ranking of behavioral signals by their predictive power for patch success.</p>
+
+<div class="grid">
+  <div class="card">
+    <div id="pivot-mi" class="plotly-chart"></div>
+  </div>
+  <div class="card">
+    <h3>Composition Patterns</h3>
+    <div id="composition-patterns" class="plotly-chart"></div>
+  </div>
+</div>
+
+<!-- ─── 6. The Cascade Architecture ─── -->
+<h2>6. The Cascade Architecture</h2>
+<p class="section-intro">All 6 experiments converge on a tiered verification cascade.</p>
+
+<div class="card full">
+<pre class="cascade" style="background:transparent;border:none;padding:0;">
+Patch generated (with VP two-stage checkpoint active)
+    │
+    ├── <span style="color:var(--pink)">Tier 0: Phase 3 selected RF</span> (real-time, ~$0)
+    │   ├── P(correct) > 0.85 → <span style="color:var(--green)">ACCEPT</span> (precision 0.933 at recall ≥ 0.30)
+    │   └── P(correct) < 0.15 → <span style="color:var(--red)">EARLY ABORT</span> (save generation cost)
+    │
+    ├── <span style="color:var(--muted)">Tier 1: v009 (4/4 unanimous)</span>
+    │   └── likely_correct → <span style="color:var(--green)">ACCEPT</span> (precision 0.963)
+    │       Coverage: ~15%
+    │
+    ├── <span style="color:var(--accent)">Tier 2: Debate (2-round)</span>
+    │   ├── CORRECT → <span style="color:var(--green)">ACCEPT</span> (precision ~0.73)
+    │   ├── INCORRECT → <span style="color:var(--red)">REJECT</span>
+    │   └── UNCERTAIN → Tier 3
+    │       Coverage: ~87%
+    │
+    └── <span style="color:var(--purple)">Tier 3: All-signals RF</span> (ECE 0.031)
+        └── Continuous confidence → human review priority / RL reward
+</pre>
+</div>
+
+<div class="stat-row" style="margin-top:1rem">
+  <div class="stat green"><div class="value">~87%</div><div class="label">Precision (estimated)</div></div>
+  <div class="stat blue"><div class="value">~67%</div><div class="label">Recall (estimated)</div></div>
+  <div class="stat orange"><div class="value">~3%</div><div class="label">Human review rate</div></div>
+  <div class="stat purple"><div class="value">$0.054</div><div class="label">Full cascade cost/patch</div></div>
+</div>
+
+<!-- ─── 7. Experiment Timeline ─── -->
+<h2>7. Experiment Summary</h2>
+
+<div class="grid-3">
+  <div class="card">
+    <h3><span class="experiment-badge badge-vp">VP</span> Verification Primitives</h3>
+    <p style="font-size:0.85rem;color:var(--muted)">SWE-bench Lite, n=300</p>
+    <p style="margin-top:0.5rem"><strong>175/300 = 58.3%</strong> gold pass rate</p>
+    <p>Tool users: 69.5% vs non-users: 18.8% (OR=9.86)</p>
+    <p>Two-stage checkpoint: 95% fix rate</p>
+  </div>
+  <div class="card">
+    <h3><span class="experiment-badge badge-svg">SVG</span> SVG ECE Measurement</h3>
+    <p style="font-size:0.85rem;color:var(--muted)">Pure analysis, $0 cost</p>
+    <p style="margin-top:0.5rem">Raw ECE: <span style="color:var(--red)">0.512</span> (degenerate)</p>
+    <p>Platt-scaled: <span style="color:var(--green)">0.031</span> (excellent)</p>
+    <p>82% of scores are zero — bimodal, not continuous</p>
+  </div>
+  <div class="card">
+    <h3><span class="experiment-badge badge-debate">Debate</span> Debate Verification</h3>
+    <p style="font-size:0.85rem;color:var(--muted)">3-agent protocol, $7.29</p>
+    <p style="margin-top:0.5rem">2-round rebuttal wins: P=0.725, R=0.592</p>
+    <p>4x recall vs v009/SVG</p>
+    <p>v009+debate: P=0.882, R=0.662</p>
+  </div>
+  <div class="card">
+    <h3><span class="experiment-badge badge-pivot">Pivot</span> Pivot Analysis</h3>
+    <p style="font-size:0.85rem;color:var(--muted)">Information theory, $0 cost</p>
+    <p style="margin-top:0.5rem">#1: Tool usage (MI=0.067, +46.3%)</p>
+    <p>#2: Action count (MI=0.044)</p>
+    <p>#3: Explore ratio (MI=0.022)</p>
+  </div>
+  <div class="card">
+    <h3><span class="experiment-badge badge-tiny">Tiny</span> Tiny Judge</h3>
+    <p style="font-size:0.85rem;color:var(--muted)">Classical ML, ~$0</p>
+    <p style="margin-top:0.5rem">5-feat RF: P@R30=0.949, AUC=0.670</p>
+    <p>Full RF: AUC=0.675, ECE=0.043</p>
+    <p>4/5 features novel vs Critic Rubrics</p>
+  </div>
+  <div class="card">
+    <h3><span class="experiment-badge badge-phase3">P3</span> Phase 3 Learned</h3>
+    <p style="font-size:0.85rem;color:var(--muted)">Combined verifier, $3.31</p>
+    <p style="margin-top:0.5rem">4-feat RF: AUC=0.727, P@R30=0.933</p>
+    <p>All-signals RF: ECE=0.031</p>
+    <p>Behavioral features dominate selection</p>
+  </div>
+</div>
+
+<!-- ─── 8. RL Readiness ─── -->
+<h2>8. RL Reward Readiness</h2>
+
+<div class="card full">
+  <table>
+    <thead>
+      <tr><th>Signal</th><th class="num">ECE</th><th class="num">Coverage</th><th>RL-Ready?</th><th>Recommended Use</th></tr>
+    </thead>
+    <tbody>
+      <tr class="best"><td>All-signals RF + Platt</td><td class="num">0.026</td><td class="num">94%</td><td><span class="tag pass">Yes</span></td><td><strong>Primary RL reward</strong></td></tr>
+      <tr><td>SVG + Platt</td><td class="num">0.031</td><td class="num">9.6%</td><td><span class="tag pass">Yes</span></td><td>High-confidence anchor</td></tr>
+      <tr><td>Phase 3 all-signals RF</td><td class="num">0.031</td><td class="num">94%</td><td><span class="tag pass">Yes</span></td><td>Primary reward (uncalibrated)</td></tr>
+      <tr><td>Behavioral-only RF</td><td class="num">0.055</td><td class="num">100%</td><td><span class="tag pass">Yes</span></td><td>Lightweight fallback</td></tr>
+      <tr><td>Phase 3 selected RF</td><td class="num">0.072</td><td class="num">100%</td><td><span class="tag pass">Yes</span></td><td>Best for auto-accept/reject</td></tr>
+      <tr><td>v009-only RF</td><td class="num">0.092</td><td class="num">94%</td><td><span class="tag pass">Yes</span></td><td>Precision-first decisions</td></tr>
+      <tr><td>Debate (2-round)</td><td class="num">0.234</td><td class="num">95%</td><td><span class="tag warn">No</span></td><td>Binary signal only</td></tr>
+      <tr><td>SVG raw</td><td class="num">0.512</td><td class="num">100%</td><td><span class="tag fail">No</span></td><td>Must recalibrate first</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<footer>
+  <p>Generated 2026-04-05 &middot; Dataset: SWE-bench Lite n=300 (175 pass / 125 fail) &middot; Total research cost: ~$17 API + $0 training</p>
+</footer>
+
+<script>
+const colors = {
+  accent: '#58a6ff', green: '#3fb950', orange: '#d29922',
+  red: '#f85149', purple: '#bc8cff', pink: '#f778ba',
+  muted: '#8b949e', bg: '#0d1117', card: '#161b22', border: '#30363d', text: '#e6edf3'
+};
+const layout_base = {
+  paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+  font: { color: colors.text, family: '-apple-system, BlinkMacSystemFont, sans-serif', size: 12 },
+  margin: { l: 60, r: 30, t: 40, b: 50 },
+  xaxis: { gridcolor: colors.border, zerolinecolor: colors.border },
+  yaxis: { gridcolor: colors.border, zerolinecolor: colors.border },
+};
+
+// 1. Precision-Recall Frontier
+Plotly.newPlot('pr-frontier', [
+  {
+    x: [0.149, 0.149, 0.592, 0.300, 0.300, 0.662],
+    y: [0.963, 0.963, 0.725, 0.949, 0.933, 0.882],
+    text: ['v009', 'SVG', 'Debate', 'Tiny Judge', 'Phase 3', 'v009+Debate'],
+    mode: 'markers+text',
+    textposition: ['top right', 'bottom right', 'top left', 'bottom left', 'top right', 'bottom left'],
+    textfont: { size: 11 },
+    marker: {
+      size: [14, 14, 16, 14, 18, 16],
+      color: [colors.muted, colors.purple, colors.accent, colors.green, colors.pink, colors.orange],
+      line: { width: 2, color: colors.text }
+    },
+    hovertemplate: '%{text}<br>Precision: %{y:.3f}<br>Recall: %{x:.3f}<extra></extra>'
+  }
+], {
+  ...layout_base,
+  title: { text: 'Precision vs Recall', font: { size: 14 } },
+  xaxis: { ...layout_base.xaxis, title: 'Recall', range: [0, 0.8] },
+  yaxis: { ...layout_base.yaxis, title: 'Precision', range: [0.6, 1.0] },
+  shapes: [
+    { type: 'line', x0: 0, x1: 0.8, y0: 0.85, y1: 0.85, line: { dash: 'dot', color: colors.muted, width: 1 } },
+    { type: 'line', x0: 0.30, x1: 0.30, y0: 0.6, y1: 1.0, line: { dash: 'dot', color: colors.muted, width: 1 } },
+  ],
+  annotations: [
+    { x: 0.75, y: 0.855, text: 'P=0.85', showarrow: false, font: { size: 10, color: colors.muted } },
+    { x: 0.305, y: 0.62, text: 'R=0.30', showarrow: false, font: { size: 10, color: colors.muted }, textangle: -90 },
+  ]
+}, { responsive: true, displayModeBar: false });
+
+// 2. ECE Bar Chart
+const ece_verifiers = ['SVG raw', 'Debate', 'v009 RF', 'Phase 3\nselected', 'Behavioral\nRF', 'All-signals\nRF', 'SVG+Platt', 'All-signals\n+Platt'];
+const ece_values = [0.512, 0.234, 0.092, 0.072, 0.055, 0.031, 0.031, 0.026];
+const ece_colors = ece_values.map(v => v > 0.30 ? colors.red : v > 0.10 ? colors.orange : v > 0.05 ? colors.green : colors.green);
+
+Plotly.newPlot('ece-bar', [{
+  x: ece_verifiers, y: ece_values,
+  type: 'bar',
+  marker: { color: ece_colors, line: { width: 0 } },
+  text: ece_values.map(v => v.toFixed(3)),
+  textposition: 'outside',
+  textfont: { size: 11 },
+  hovertemplate: '%{x}<br>ECE: %{y:.3f}<extra></extra>'
+}], {
+  ...layout_base,
+  title: { text: 'ECE by Verifier (lower = better)', font: { size: 14 } },
+  yaxis: { ...layout_base.yaxis, title: 'ECE', range: [0, 0.6] },
+  shapes: [
+    { type: 'line', x0: -0.5, x1: 7.5, y0: 0.10, y1: 0.10, line: { dash: 'dash', color: colors.green, width: 1.5 } },
+    { type: 'line', x0: -0.5, x1: 7.5, y0: 0.05, y1: 0.05, line: { dash: 'dot', color: colors.accent, width: 1 } },
+  ],
+  annotations: [
+    { x: 7.3, y: 0.105, text: 'RL threshold', showarrow: false, font: { size: 10, color: colors.green } },
+  ]
+}, { responsive: true, displayModeBar: false });
+
+// 3. Feature Convergence — Pivot MI vs Tiny Judge Importance
+Plotly.newPlot('feature-convergence', [
+  {
+    x: ['Tool Usage', 'Action Count', 'Explore Ratio', 'Patch Size', 'Revision', 'Review Type', 'Edit Timing'],
+    y: [0.0668, 0.0439, 0.0219, 0.0087, 0.0021, 0.0007, 0.0003],
+    name: 'Pivot MI (bits)',
+    type: 'bar',
+    marker: { color: colors.orange },
+    hovertemplate: '%{x}<br>MI: %{y:.4f} bits<extra></extra>'
+  }
+], {
+  ...layout_base,
+  title: { text: 'Pivot Analysis: Mutual Information', font: { size: 14 } },
+  yaxis: { ...layout_base.yaxis, title: 'MI (bits)' },
+  shapes: [
+    { type: 'line', x0: -0.5, x1: 6.5, y0: 0.01, y1: 0.01, line: { dash: 'dot', color: colors.muted, width: 1 } },
+  ],
+  annotations: [
+    { x: 5.5, y: 0.012, text: 'p<0.05 threshold', showarrow: false, font: { size: 10, color: colors.muted } },
+  ]
+}, { responsive: true, displayModeBar: false });
+
+// Phase 3 feature importance
+Plotly.newPlot('phase3-importance', [{
+  y: ['beh_loop_count', 'beh_adversarial_review_used', 'beh_action_pct_edit', 'beh_total_cost_usd'],
+  x: [0.2265, 0.0718, 0.2436, 0.4581],
+  type: 'bar',
+  orientation: 'h',
+  marker: { color: [colors.pink, colors.pink, colors.pink, colors.pink] },
+  text: ['loop_count', 'adversarial_review', 'action_pct_edit', 'total_cost_usd'],
+  textposition: 'inside',
+  textfont: { size: 11, color: colors.bg },
+  hovertemplate: '%{y}<br>Importance: %{x:.3f}<extra></extra>'
+}], {
+  ...layout_base,
+  title: { text: 'Phase 3 Selected Features (all behavioral)', font: { size: 14 } },
+  xaxis: { ...layout_base.xaxis, title: 'RF Importance' },
+  yaxis: { ...layout_base.yaxis, showticklabels: false },
+}, { responsive: true, displayModeBar: false });
+
+// 4. Signal contribution — AUC
+Plotly.newPlot('signal-auc', [{
+  x: ['Behavioral\nonly', '+ v009', '+ Debate', '+ v009\n+ Debate', '+ All\nSignals', 'Selected 4'],
+  y: [0.713, 0.704, 0.705, 0.700, 0.707, 0.727],
+  type: 'bar',
+  marker: {
+    color: [colors.green, colors.muted, colors.muted, colors.muted, colors.accent, colors.pink],
+    line: { width: 0 }
+  },
+  text: [0.713, 0.704, 0.705, 0.700, 0.707, 0.727].map(v => v.toFixed(3)),
+  textposition: 'outside',
+  textfont: { size: 11 },
+}], {
+  ...layout_base,
+  title: { text: 'AUC by Feature Set (RF)', font: { size: 14 } },
+  yaxis: { ...layout_base.yaxis, title: 'AUC', range: [0.65, 0.75] },
+  shapes: [
+    { type: 'line', x0: -0.5, x1: 5.5, y0: 0.713, y1: 0.713, line: { dash: 'dash', color: colors.green, width: 1 } },
+  ],
+  annotations: [
+    { x: 5, y: 0.715, text: 'behavioral baseline', showarrow: false, font: { size: 10, color: colors.green } },
+  ]
+}, { responsive: true, displayModeBar: false });
+
+// Signal contribution — ECE
+Plotly.newPlot('signal-ece', [{
+  x: ['Behavioral\nonly', '+ v009', '+ Debate', '+ v009\n+ Debate', '+ All\nSignals', 'Selected 4'],
+  y: [0.055, 0.055, 0.092, 0.044, 0.031, 0.072],
+  type: 'bar',
+  marker: {
+    color: [colors.green, colors.green, colors.orange, colors.green, colors.accent, colors.pink],
+    line: { width: 0 }
+  },
+  text: [0.055, 0.055, 0.092, 0.044, 0.031, 0.072].map(v => v.toFixed(3)),
+  textposition: 'outside',
+  textfont: { size: 11 },
+}], {
+  ...layout_base,
+  title: { text: 'ECE by Feature Set (RF, lower = better)', font: { size: 14 } },
+  yaxis: { ...layout_base.yaxis, title: 'ECE', range: [0, 0.12] },
+  shapes: [
+    { type: 'line', x0: -0.5, x1: 5.5, y0: 0.10, y1: 0.10, line: { dash: 'dash', color: colors.red, width: 1 } },
+  ],
+  annotations: [
+    { x: 5, y: 0.103, text: 'RL threshold', showarrow: false, font: { size: 10, color: colors.red } },
+  ]
+}, { responsive: true, displayModeBar: false });
+
+// 5. Pivot MI chart already done above
+
+// Composition patterns
+Plotly.newPlot('composition-patterns', [{
+  x: ['full_pipeline', 'generate_run', 'gen_run_iterate', 'ignore'],
+  y: [67.3, 70.4, 42.9, 21.2],
+  type: 'bar',
+  marker: { color: [colors.green, colors.green, colors.orange, colors.red] },
+  text: ['67.3%', '70.4%', '42.9%', '21.2%'],
+  textposition: 'outside',
+  textfont: { size: 11 },
+  hovertemplate: '%{x}<br>Pass rate: %{y:.1f}%<extra></extra>'
+}], {
+  ...layout_base,
+  title: { text: 'Gold Pass Rate by Tool Pattern', font: { size: 14 } },
+  yaxis: { ...layout_base.yaxis, title: 'Pass Rate (%)', range: [0, 85] },
+  annotations: [
+    { x: 'full_pipeline', y: 72, text: 'n=208', showarrow: false, font: { size: 9, color: colors.muted } },
+    { x: 'ignore', y: 26, text: 'n=33', showarrow: false, font: { size: 9, color: colors.muted } },
+  ]
+}, { responsive: true, displayModeBar: false });
+</script>
+
+</body>
+</html>

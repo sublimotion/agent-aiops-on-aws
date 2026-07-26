@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pragmatic Inference Optimization Guide — Visual Explainer</title>
+<style>
+  :root {
+    --bg: #0f172a; --card: #1e293b; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --dim: #64748b;
+    --green: #10b981; --green-light: #34d399;
+    --blue: #3b82f6; --blue-light: #60a5fa;
+    --amber: #f59e0b; --amber-light: #fbbf24;
+    --purple: #8b5cf6; --red: #ef4444; --pink: #ec4899;
+    --cyan: #06b6d4;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; padding: 24px; }
+  .header { text-align: center; margin-bottom: 40px; }
+  .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+  .header p { color: var(--muted); font-size: 14px; max-width: 700px; margin: 0 auto; }
+  .section { max-width: 1400px; margin: 0 auto 40px; }
+  .section-title { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; }
+  .insight { background: #0f172a; border-radius: 8px; padding: 14px; border: 1.5px solid var(--green); margin-top: 16px; }
+  .insight h4 { color: var(--green); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .insight p { font-size: 11px; color: var(--text); line-height: 1.6; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 600; }
+  .tag-green { background: #064e3b; color: #6ee7b7; }
+  .tag-amber { background: #451a03; color: #fcd34d; }
+  .tag-red { background: #450a0a; color: #fca5a5; }
+  .tag-blue { background: #1e3a5f; color: #93c5fd; }
+  .tag-purple { background: #2e1065; color: #c4b5fd; }
+  .flow-arrow { display: flex; align-items: center; justify-content: center; color: var(--dim); font-size: 20px; }
+  @media (max-width: 900px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Pragmatic Inference Optimization Guide</h1>
+  <p>A visual decision framework for deploying open-weight LLMs on AWS GPU instances. Start with your use case, follow the decision tree, avoid the anti-patterns.</p>
+</div>
+
+<!-- ═══════════ SECTION 1: THE FUNDAMENTAL LAW ═══════════ -->
+<div class="section">
+  <div class="section-title">The Fundamental Law</div>
+  <div class="card">
+    <div style="text-align: center; padding: 20px 0;">
+      <div style="font-size: 18px; font-weight: 700; color: var(--text);">Higher interactivity = fewer tokens amortized = higher $/token</div>
+      <div style="font-size: 12px; color: var(--muted); margin-top: 8px;">Fast mode (2.5x speed) costs 6-12x more. This is physics, not pricing strategy.</div>
+    </div>
+
+    <!-- The throughput-interactivity curve -->
+    <div style="position: relative; height: 200px; margin: 20px 40px; border-left: 2px solid var(--dim); border-bottom: 2px solid var(--dim);">
+      <!-- Y axis label -->
+      <div style="position: absolute; left: -35px; top: 50%; transform: rotate(-90deg) translateX(50%); font-size: 10px; color: var(--dim);">$/M tokens</div>
+      <!-- X axis label -->
+      <div style="position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--dim);">Interactivity (tok/s/user)</div>
+
+      <!-- Curve -->
+      <svg style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;" viewBox="0 0 400 180" preserveAspectRatio="none">
+        <path d="M 10 170 Q 80 165 120 140 Q 180 100 250 60 Q 320 25 390 10" stroke="#3b82f6" stroke-width="3" fill="none"/>
+        <!-- Fill under curve -->
+        <path d="M 10 170 Q 80 165 120 140 Q 180 100 250 60 Q 320 25 390 10 L 390 180 L 10 180 Z" fill="#3b82f6" opacity="0.05"/>
+      </svg>
+
+      <!-- Data points -->
+      <div style="position: absolute; left: 8%; bottom: 10%; width: 10px; height: 10px; background: var(--green); border-radius: 50%;"></div>
+      <div style="position: absolute; left: 8%; bottom: 0%; font-size: 9px; color: var(--green);">Batch<br>10 tok/s</div>
+
+      <div style="position: absolute; left: 30%; bottom: 25%; width: 10px; height: 10px; background: var(--blue); border-radius: 50%;"></div>
+      <div style="position: absolute; left: 28%; bottom: 15%; font-size: 9px; color: var(--blue);">Chat<br>50 tok/s</div>
+
+      <div style="position: absolute; left: 55%; bottom: 50%; width: 10px; height: 10px; background: var(--amber); border-radius: 50%;"></div>
+      <div style="position: absolute; left: 53%; bottom: 40%; font-size: 9px; color: var(--amber);">Reasoning<br>75 tok/s</div>
+
+      <div style="position: absolute; left: 82%; bottom: 80%; width: 10px; height: 10px; background: var(--red); border-radius: 50%;"></div>
+      <div style="position: absolute; left: 78%; bottom: 70%; font-size: 9px; color: var(--red);">Agentic<br>130 tok/s</div>
+    </div>
+
+    <div class="grid-4" style="margin-top: 40px;">
+      <div style="background: #0f172a; border-radius: 8px; padding: 12px; border-left: 3px solid var(--green);">
+        <div style="font-size: 11px; font-weight: 700; color: var(--green);">Batch / Eval</div>
+        <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">10-30 tok/s/user</div>
+        <div style="font-size: 10px; color: var(--dim); margin-top: 4px;">Wide EP, high batch, FP4</div>
+        <div style="margin-top: 6px;"><span class="tag tag-green">Cheapest $/tok</span></div>
+      </div>
+      <div style="background: #0f172a; border-radius: 8px; padding: 12px; border-left: 3px solid var(--blue);">
+        <div style="font-size: 11px; font-weight: 700; color: var(--blue);">Interactive Chat</div>
+        <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">40-75 tok/s/user</div>
+        <div style="font-size: 10px; color: var(--dim); margin-top: 4px;">Hybrid TP+EP, disagg</div>
+        <div style="margin-top: 6px;"><span class="tag tag-blue">Balanced</span></div>
+      </div>
+      <div style="background: #0f172a; border-radius: 8px; padding: 12px; border-left: 3px solid var(--amber);">
+        <div style="font-size: 11px; font-weight: 700; color: var(--amber);">Reasoning (CoT)</div>
+        <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">50-100 tok/s/user</div>
+        <div style="font-size: 10px; color: var(--dim); margin-top: 4px;">More decode nodes, MTP</div>
+        <div style="margin-top: 6px;"><span class="tag tag-amber">Decode-heavy</span></div>
+      </div>
+      <div style="background: #0f172a; border-radius: 8px; padding: 12px; border-left: 3px solid var(--red);">
+        <div style="font-size: 11px; font-weight: 700; color: var(--red);">Agentic Coding</div>
+        <div style="font-size: 10px; color: var(--muted); margin-top: 4px;">100-150 tok/s/user</div>
+        <div style="font-size: 10px; color: var(--dim); margin-top: 4px;">TP, MTP/EAGLE3, low batch</div>
+        <div style="margin-top: 6px;"><span class="tag tag-red">Highest $/tok</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 2: OPTIMIZATION PRIORITY STACK ═══════════ -->
+<div class="section">
+  <div class="section-title">Optimization Priority Stack (Agentic Coding — Single Node)</div>
+  <div class="card">
+    <div style="font-size: 12px; color: var(--muted); margin-bottom: 16px;">Apply in order. Each subsequent optimization has decreasing marginal value. Stop when you hit your cost/latency target.</div>
+
+    <!-- Stack visualization -->
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="width: 36px; height: 36px; background: var(--green); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff;">1</div>
+        <div style="flex: 1; background: #0f172a; border-radius: 8px; padding: 12px; border: 1px solid var(--green);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <span style="font-size: 12px; font-weight: 600; color: var(--text);">CUDA Graphs</span>
+              <span style="font-size: 10px; color: var(--muted); margin-left: 8px;">Eliminates kernel launch overhead</span>
+            </div>
+            <div style="font-size: 14px; font-weight: 700; color: var(--green);">14.9x</div>
+          </div>
+          <div style="height: 6px; background: #334155; border-radius: 3px; margin-top: 8px;"><div style="width: 100%; height: 100%; background: var(--green); border-radius: 3px;"></div></div>
+        </div>
+        <div style="width: 80px; text-align: right; font-size: 9px; color: var(--dim);">Always on<br>(free)</div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="width: 36px; height: 36px; background: var(--green); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff;">2</div>
+        <div style="flex: 1; background: #0f172a; border-radius: 8px; padding: 12px; border: 1px solid var(--green);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <span style="font-size: 12px; font-weight: 600; color: var(--text);">MoE Tile Config</span>
+              <span style="font-size: 10px; color: var(--muted); margin-left: 8px;">Correct kernel parameters for your GPU</span>
+            </div>
+            <div style="font-size: 14px; font-weight: 700; color: var(--green);">+23%</div>
+          </div>
+          <div style="height: 6px; background: #334155; border-radius: 3px; margin-top: 8px;"><div style="width: 23%; height: 100%; background: var(--green); border-radius: 3px;"></div></div>
+        </div>
+        <div style="width: 80px; text-align: right; font-size: 9px; color: var(--dim);">Check exists<br>for your GPU</div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="width: 36px; height: 36px; background: var(--blue); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff;">3</div>
+        <div style="flex: 1; background: #0f172a; border-radius: 8px; padding: 12px; border: 1px solid var(--blue);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <span style="font-size: 12px; font-weight: 600; color: var(--text);">Prefix Caching</span>
+              <span style="font-size: 10px; color: var(--muted); margin-left: 8px;">Skip prefill for repeated system prompts + tool defs</span>
+            </div>
+            <div style="font-size: 14px; font-weight: 700; color: var(--blue);">103x TTFT</div>
+          </div>
+          <div style="height: 6px; background: #334155; border-radius: 3px; margin-top: 8px;"><div style="width: 95%; height: 100%; background: var(--blue); border-radius: 3px;"></div></div>
+        </div>
+        <div style="width: 80px; text-align: right; font-size: 9px; color: var(--dim);">Always on<br>(multi-turn)</div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="width: 36px; height: 36px; background: var(--amber); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff;">4</div>
+        <div style="flex: 1; background: #0f172a; border-radius: 8px; padding: 12px; border: 1.5px solid var(--amber);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <span style="font-size: 12px; font-weight: 600; color: var(--text);">EAGLE3 Speculative Decode</span>
+              <span style="font-size: 10px; color: var(--muted); margin-left: 8px;">+136% c=1 tuned; net-neg c&gt;256 (stock draft)</span>
+            </div>
+            <div style="font-size: 14px; font-weight: 700; color: var(--amber);">+136% / −26%</div>
+          </div>
+          <div style="height: 6px; background: #334155; border-radius: 3px; margin-top: 8px;"><div style="width: 60%; height: 100%; background: var(--amber); border-radius: 3px;"></div></div>
+        </div>
+        <div style="width: 80px; text-align: right; font-size: 9px; color: var(--amber);">TESTED<br>draft fine-tune = unlock</div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="width: 36px; height: 36px; background: var(--amber); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff;">5</div>
+        <div style="flex: 1; background: #0f172a; border-radius: 8px; padding: 12px; border: 1.5px solid var(--amber);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <span style="font-size: 12px; font-weight: 600; color: var(--text);">Dynamic MLA/MHA Routing</span>
+              <span style="font-size: 10px; color: var(--muted); margin-left: 8px;">Faster kernel for short prefills (&lt;1K tokens)</span>
+            </div>
+            <div style="font-size: 14px; font-weight: 700; color: var(--amber);">2-3x TTFT</div>
+          </div>
+          <div style="height: 6px; background: #334155; border-radius: 3px; margin-top: 8px;"><div style="width: 40%; height: 100%; background: var(--amber); border-radius: 3px;"></div></div>
+        </div>
+        <div style="width: 80px; text-align: right; font-size: 9px; color: var(--amber);">HIGH PRIORITY<br>UNTESTED</div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="width: 36px; height: 36px; background: var(--dim); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff;">6</div>
+        <div style="flex: 1; background: #0f172a; border-radius: 8px; padding: 12px; border: 1px solid var(--border);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <span style="font-size: 12px; font-weight: 600; color: var(--text);">HiCache (KV Offload)</span>
+              <span style="font-size: 10px; color: var(--muted); margin-left: 8px;">NVMe/DRAM for idle session KV retention</span>
+            </div>
+            <div style="font-size: 14px; font-weight: 700; color: var(--dim);">+71% @ c=64</div>
+          </div>
+          <div style="height: 6px; background: #334155; border-radius: 3px; margin-top: 8px;"><div style="width: 20%; height: 100%; background: var(--dim); border-radius: 3px;"></div></div>
+        </div>
+        <div style="width: 80px; text-align: right; font-size: 9px; color: var(--dim);">Only if KV<br>pressure</div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="width: 36px; height: 36px; background: var(--red); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff;">7</div>
+        <div style="flex: 1; background: #0f172a; border-radius: 8px; padding: 12px; border: 1px solid var(--red); opacity: 0.6;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <span style="font-size: 12px; font-weight: 600; color: var(--text);">Disagg P/D</span>
+              <span style="font-size: 10px; color: var(--muted); margin-left: 8px;">Separate prefill/decode pools</span>
+            </div>
+            <div style="font-size: 14px; font-weight: 700; color: var(--red);">LAST RESORT</div>
+          </div>
+          <div style="height: 6px; background: #334155; border-radius: 3px; margin-top: 8px;"><div style="width: 5%; height: 100%; background: var(--red); border-radius: 3px;"></div></div>
+        </div>
+        <div style="width: 80px; text-align: right; font-size: 9px; color: var(--red);">Only multi-node<br>or miss >40%</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 2b: SPEC-DECODE POTENTIAL vs ACTUAL ═══════════ -->
+<div class="section">
+  <div class="section-title">Speculative Decoding: Potential vs Actual (the Stock-Draft Trap)</div>
+  <div class="card">
+    <div style="background: #1e293b; border-left: 3px solid var(--amber); padding: 12px 14px; border-radius: 6px; margin-bottom: 14px;">
+      <div style="font-size: 12px; color: var(--text); line-height: 1.6;">
+        <strong style="color: var(--amber);">The dominant factor in real-world spec-decode performance is whether the draft model has been fine-tuned on the target's serving distribution.</strong>
+        Off-the-shelf EAGLE3 drafts (<code>lightseekorg/kimi-k2.6-eagle3</code>, <code>lmsys/Qwen3-235B-A22B-EAGLE3</code>) are trained on generic mixtures and do not match production traffic.
+        Synthetic benchmarks (<code>vllm bench --dataset-name random</code>) inflate stock-draft EAGLE3 by <strong>3–5×</strong> over real ShareGPT traffic.
+      </div>
+    </div>
+
+    <div class="grid-2" style="gap: 16px;">
+      <div style="background: #0f172a; border-radius: 8px; padding: 14px; border: 1px solid var(--green);">
+        <div style="font-size: 12px; font-weight: 700; color: var(--green); margin-bottom: 10px;">Synthetic (theoretical potential)</div>
+        <div style="font-size: 11px; color: var(--text); line-height: 1.9;">
+          Accept rate: <strong>1.00</strong><br>
+          Accept length: <strong>5.0</strong><br>
+          Per-req tok/s (K2.6 c=1): <strong>325</strong>
+        </div>
+        <div style="margin-top: 10px; font-size: 10px; color: var(--dim);">What a perfectly-aligned draft <em>could</em> deliver. Used in most published EAGLE3 / MTP throughput claims.</div>
+      </div>
+      <div style="background: #0f172a; border-radius: 8px; padding: 14px; border: 1px solid var(--red);">
+        <div style="font-size: 12px; font-weight: 700; color: var(--red); margin-bottom: 10px;">ShareGPT (actual, stock draft)</div>
+        <div style="font-size: 11px; color: var(--text); line-height: 1.9;">
+          Accept rate: <strong>0.156</strong><br>
+          Accept length: <strong>1.62</strong><br>
+          Per-req tok/s (K2.6 c=1): <strong>54</strong>
+        </div>
+        <div style="margin-top: 10px; font-size: 10px; color: var(--dim);">What ships in production with off-the-shelf draft weights.</div>
+      </div>
+    </div>
+
+    <div style="margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+      <div style="background: #0f172a; border-radius: 8px; padding: 12px; border: 1px solid var(--border);">
+        <div style="font-size: 11px; font-weight: 600; color: var(--blue); margin-bottom: 6px;">Kimi K2.6 (B300, SGLang EAGLE3 s4_d4_k1, tuned)</div>
+        <div style="font-size: 10px; color: var(--muted); line-height: 1.7;">
+          c=1 single-stream: 128 → <strong style="color:var(--green)">302 tok/s (+136%)</strong><br>
+          c=128: <strong style="color:var(--green)">6,410 tok/s</strong> (net positive)<br>
+          c=512 fullstack: 7,759 vs <strong style="color:var(--red)">10,437 no-spec (−26%)</strong><br>
+          SGLang defaults s3_d4_k1: <strong style="color:var(--red)">−65% @ c=64</strong> — do not ship.
+        </div>
+      </div>
+      <div style="background: #0f172a; border-radius: 8px; padding: 12px; border: 1px solid var(--border);">
+        <div style="font-size: 11px; font-weight: 600; color: var(--blue); margin-bottom: 6px;">Qwen3-235B (B300, FP8 TP8, SGLang EAGLE3)</div>
+        <div style="font-size: 10px; color: var(--muted); line-height: 1.7;">
+          Draft accept length: 3.0–3.5 (vs K2.6's 5.0 → less headroom)<br>
+          ShareGPT c=16: <strong>63.8 tok/s/req</strong>, tied with vLLM no-spec (63.3)<br>
+          <strong style="color:var(--red)">~2× behind CoreWeave's 128.2</strong> (custom NVFP4 + custom-trained draft)<br>
+          DP+EP+EAGLE3: crashes (SGLang 0.5.10).
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 14px; padding: 10px 12px; background: #0f172a; border-radius: 6px; border-left: 3px solid var(--blue); font-size: 10px; color: var(--muted); line-height: 1.7;">
+      <strong style="color: var(--text);">Reporting rule:</strong> always quote both synthetic and ShareGPT/production numbers. Treat synthetic figures as <em>upper bound</em>, not deliverable. Both the −26% K2.6 regression at c=512 and the 2× CoreWeave gap on Qwen3 are properties of the <strong>draft</strong>, not of EAGLE3 itself — budget for draft fine-tuning on real traffic, or evict spec-decode from the rollout plan.
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 3: DISAGG ANTI-PATTERNS ═══════════ -->
+<div class="section">
+  <div class="section-title">Disaggregation: The Most Overapplied Optimization</div>
+  <div class="card">
+    <div style="text-align: center; margin-bottom: 20px;">
+      <div style="font-size: 14px; font-weight: 600; color: var(--red);">4 scenarios where disagg is actively harmful</div>
+      <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">Our field data shows disagg hurts in the majority of single-node deployments</div>
+    </div>
+
+    <div class="grid-2">
+      <div style="background: #0f172a; border-radius: 8px; padding: 14px; border: 1px solid var(--red);">
+        <div style="font-size: 11px; font-weight: 700; color: var(--red); margin-bottom: 6px;">ANTI-PATTERN 1: Disagg + Prefix Caching</div>
+        <div style="font-size: 11px; color: var(--muted); line-height: 1.6;">Prefix caching already eliminates 60-90% of prefill. Adding disagg introduces KV transfer latency for work that doesn't exist.</div>
+        <div style="margin-top: 8px; padding: 8px; background: #1e293b; border-radius: 4px; font-size: 10px; font-family: monospace; color: var(--dim);">
+          Without cache: prefill 5,928ms → disagg helps<br>
+          With cache: prefill 57ms → disagg adds cost for 0 gain
+        </div>
+      </div>
+      <div style="background: #0f172a; border-radius: 8px; padding: 14px; border: 1px solid var(--red);">
+        <div style="font-size: 11px; font-weight: 700; color: var(--red); margin-bottom: 6px;">ANTI-PATTERN 2: Disagg + Single-Node TP&gt;1</div>
+        <div style="font-size: 11px; color: var(--muted); line-height: 1.6;">TP8 already uses NVLink for AllReduce. KV transfer competes for the same fabric. Result: worse than no disagg.</div>
+        <div style="margin-top: 8px; padding: 8px; background: #1e293b; border-radius: 4px; font-size: 10px; font-family: monospace; color: var(--dim);">
+          K2.6 TP8 no-disagg: 10,437 tok/s<br>
+          No disagg config matched this on same HW
+        </div>
+      </div>
+      <div style="background: #0f172a; border-radius: 8px; padding: 14px; border: 1px solid var(--red);">
+        <div style="font-size: 11px; font-weight: 700; color: var(--red); margin-bottom: 6px;">ANTI-PATTERN 3: Disagg for Agentic (Short Turns)</div>
+        <div style="font-size: 11px; color: var(--muted); line-height: 1.6;">Agentic turns have 1-4K input (mostly cached). Prefill is either free or takes <50ms. Disagg adds fixed overhead on every request.</div>
+      </div>
+      <div style="background: #0f172a; border-radius: 8px; padding: 14px; border: 1px solid var(--red);">
+        <div style="font-size: 11px; font-weight: 700; color: var(--red); margin-bottom: 6px;">ANTI-PATTERN 4: Disagg Without InfiniBand</div>
+        <div style="font-size: 11px; color: var(--muted); line-height: 1.6;">On EFA, KV transfer requires CPU bounce (GPU→CPU→EFA→CPU→GPU). Adds 6-12ms per request. Wipes out any scheduling benefit.</div>
+      </div>
+    </div>
+
+    <div class="insight" style="border-color: var(--blue);">
+      <h4 style="color: var(--blue);">When Disagg IS the Right Call</h4>
+      <p>Multi-node (model doesn't fit one node) | Prefill-heavy workloads (RAG with 32K+ docs, first-turn only) | Mixed-priority traffic (batch + interactive sharing fleet) | InfiniBand + TP=1 (zero-contention cuda_ipc)</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 4: COMPOSITION MATRIX ═══════════ -->
+<div class="section">
+  <div class="section-title">Optimization Composition: What Stacks vs What Conflicts</div>
+  <div class="card">
+    <div class="grid-2">
+      <!-- Composes well -->
+      <div>
+        <div style="font-size: 12px; font-weight: 600; color: var(--green); margin-bottom: 12px;">Composes Well (Multiplicative/Additive)</div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #0f172a; border-radius: 6px;">
+            <div style="width: 8px; height: 8px; background: var(--green); border-radius: 50%;"></div>
+            <span style="font-size: 10px; color: var(--text);">Prefix caching + TP8</span>
+            <span style="font-size: 9px; color: var(--dim); margin-left: auto;">Independent</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #0f172a; border-radius: 6px;">
+            <div style="width: 8px; height: 8px; background: var(--green); border-radius: 50%;"></div>
+            <span style="font-size: 10px; color: var(--text);">CUDA graphs + Prefix caching</span>
+            <span style="font-size: 9px; color: var(--dim); margin-left: auto;">Independent</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #064e3b; border-radius: 6px; border: 1px solid var(--green);">
+            <div style="width: 8px; height: 8px; background: var(--green); border-radius: 50%;"></div>
+            <span style="font-size: 10px; color: var(--text); font-weight: 600;">EAGLE3 + Prefix caching</span>
+            <span style="font-size: 9px; color: var(--green); margin-left: auto;">Multiplicative!</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #0f172a; border-radius: 6px;">
+            <div style="width: 8px; height: 8px; background: var(--green); border-radius: 50%;"></div>
+            <span style="font-size: 10px; color: var(--text);">HiCache + Long context</span>
+            <span style="font-size: 9px; color: var(--dim); margin-left: auto;">Additive</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #0f172a; border-radius: 6px;">
+            <div style="width: 8px; height: 8px; background: var(--green); border-radius: 50%;"></div>
+            <span style="font-size: 10px; color: var(--text);">FP8 quant + Any parallelism</span>
+            <span style="font-size: 9px; color: var(--dim); margin-left: auto;">Independent</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Conflicts -->
+      <div>
+        <div style="font-size: 12px; font-weight: 600; color: var(--red); margin-bottom: 12px;">Conflicts or Redundant</div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #0f172a; border-radius: 6px;">
+            <div style="width: 8px; height: 8px; background: var(--red); border-radius: 50%;"></div>
+            <span style="font-size: 10px; color: var(--text);">Disagg + Prefix caching</span>
+            <span style="font-size: 9px; color: var(--red); margin-left: auto;">Redundant</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #450a0a; border-radius: 6px; border: 1px solid var(--red);">
+            <div style="width: 8px; height: 8px; background: var(--red); border-radius: 50%;"></div>
+            <span style="font-size: 10px; color: var(--text); font-weight: 600;">EAGLE3 + DCP</span>
+            <span style="font-size: 9px; color: var(--red); margin-left: auto;">Deadlocks!</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #0f172a; border-radius: 6px;">
+            <div style="width: 8px; height: 8px; background: var(--amber); border-radius: 50%;"></div>
+            <span style="font-size: 10px; color: var(--text);">EAGLE3 + High concurrency (c&gt;64)</span>
+            <span style="font-size: 9px; color: var(--amber); margin-left: auto;">Diminishing</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #0f172a; border-radius: 6px;">
+            <div style="width: 8px; height: 8px; background: var(--red); border-radius: 50%;"></div>
+            <span style="font-size: 10px; color: var(--text);">EP + Single-node TP8</span>
+            <span style="font-size: 9px; color: var(--red); margin-left: auto;">Conflicts</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #0f172a; border-radius: 6px;">
+            <div style="width: 8px; height: 8px; background: var(--red); border-radius: 50%;"></div>
+            <span style="font-size: 10px; color: var(--text);">Disagg + Single-node TP&gt;1</span>
+            <span style="font-size: 9px; color: var(--red); margin-left: auto;">NVLink contention</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 5: HARDWARE SELECTION ═══════════ -->
+<div class="section">
+  <div class="section-title">Hardware Selection: Match SKU to Workload</div>
+  <div class="card">
+    <div class="grid-3">
+      <div style="background: #0f172a; border-radius: 8px; padding: 16px; border: 1px solid var(--border);">
+        <div style="font-size: 13px; font-weight: 700; color: var(--cyan);">g7e.24xlarge</div>
+        <div style="font-size: 10px; color: var(--muted); margin: 4px 0 10px;">4x RTX PRO 6000 (96GB/GPU)</div>
+        <div style="font-size: 10px; color: var(--dim); line-height: 1.6;">
+          PCIe only (no NVSwitch)<br>
+          Best: 4x TP1 replicas (models &le;24B)<br>
+          No NCCL TP across GPUs<br>
+          ~$4/hr spot
+        </div>
+        <div style="margin-top: 10px;"><span class="tag tag-green">Devstral, Qwen3.5-32B, SERA-32B</span></div>
+      </div>
+      <div style="background: #0f172a; border-radius: 8px; padding: 16px; border: 1.5px solid var(--blue);">
+        <div style="font-size: 13px; font-weight: 700; color: var(--blue);">p5e.48xlarge (B200)</div>
+        <div style="font-size: 10px; color: var(--muted); margin: 4px 0 10px;">8x H200 (141GB/GPU, NVSwitch)</div>
+        <div style="font-size: 10px; color: var(--dim); line-height: 1.6;">
+          8 TB/s BW per GPU<br>
+          Best: TP8 for large MoE<br>
+          Same BW as B300 (cheaper!)<br>
+          ~$48/hr spot
+        </div>
+        <div style="margin-top: 10px;"><span class="tag tag-blue">K2.6, GLM-5, Qwen3-235B</span></div>
+      </div>
+      <div style="background: #0f172a; border-radius: 8px; padding: 16px; border: 1px solid var(--purple);">
+        <div style="font-size: 13px; font-weight: 700; color: var(--purple);">p6-b300.48xlarge</div>
+        <div style="font-size: 10px; color: var(--muted); margin: 4px 0 10px;">8x B300 (275GB/GPU, NVSwitch)</div>
+        <div style="font-size: 10px; color: var(--dim); line-height: 1.6;">
+          8 TB/s BW per GPU (same as B200!)<br>
+          Best: When VRAM is the constraint<br>
+          128K context + many sessions<br>
+          ~$65/hr spot
+        </div>
+        <div style="margin-top: 10px;"><span class="tag tag-purple">K2.6 @ 128K, future &gt;1T models</span></div>
+      </div>
+    </div>
+
+    <div class="insight">
+      <h4>The B200 = B300 Secret</h4>
+      <p>B200 and B300 have <strong>identical HBM bandwidth</strong> (8 TB/s/GPU). Since LLM decode is bandwidth-bound, they have nearly identical throughput. B300's only advantage is more VRAM (275 vs 141 GB). For agentic workloads with 32K effective context: <strong>B200 gives the same performance at 26% less cost.</strong></p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 6: ENGINE SELECTION ═══════════ -->
+<div class="section">
+  <div class="section-title">Engine Selection</div>
+  <div class="card">
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+      <div style="background: #0f172a; border-radius: 8px; padding: 16px; border: 1px solid var(--blue);">
+        <div style="font-size: 14px; font-weight: 700; color: var(--blue); margin-bottom: 8px;">vLLM</div>
+        <div style="font-size: 10px; color: var(--muted); line-height: 1.6;">
+          Best tool calling ecosystem<br>
+          Best prefix caching<br>
+          K2.6: 3.1x better scaling vs SGLang<br>
+          Qwen3: best support<br>
+          Anthropic API compat (/v1/messages)
+        </div>
+        <div style="margin-top: 10px;"><span class="tag tag-blue">Best for: K2.6, Qwen3, agentic</span></div>
+      </div>
+      <div style="background: #0f172a; border-radius: 8px; padding: 16px; border: 1px solid var(--green);">
+        <div style="font-size: 14px; font-weight: 700; color: var(--green); margin-bottom: 8px;">SGLang</div>
+        <div style="font-size: 10px; color: var(--muted); line-height: 1.6;">
+          Fastest cold start (2.8x vs vLLM)<br>
+          Native HiCache<br>
+          Native EP scaling<br>
+          GLM-5: only full support<br>
+          EAGLE3: more mature on MoE
+        </div>
+        <div style="margin-top: 10px;"><span class="tag tag-green">Best for: GLM-5, spot instances, EP</span></div>
+      </div>
+      <div style="background: #0f172a; border-radius: 8px; padding: 16px; border: 1px solid var(--amber);">
+        <div style="font-size: 14px; font-weight: 700; color: var(--amber); margin-bottom: 8px;">TRT-LLM + Dynamo</div>
+        <div style="font-size: 10px; color: var(--muted); line-height: 1.6;">
+          Highest peak throughput<br>
+          Best disagg + wide EP<br>
+          DeepSeek R1: 2x vs SGLang<br>
+          Complex setup<br>
+          Limited tool calling
+        </div>
+        <div style="margin-top: 10px;"><span class="tag tag-amber">Best for: DeepSeek, max throughput</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 7: COST DECISION TREE ═══════════ -->
+<div class="section">
+  <div class="section-title">Cost Decision Tree</div>
+  <div class="card">
+    <div style="position: relative; padding: 20px;">
+      <!-- Root -->
+      <div style="text-align: center; margin-bottom: 24px;">
+        <div style="display: inline-block; background: var(--card); border: 2px solid var(--blue); border-radius: 8px; padding: 10px 20px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--text);">What's your interactivity target?</div>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <!-- Branch 1: >100 tok/s -->
+        <div style="background: #0f172a; border-radius: 8px; padding: 14px; border-top: 3px solid var(--red);">
+          <div style="font-size: 12px; font-weight: 700; color: var(--red); margin-bottom: 8px;">&gt;100 tok/s/user</div>
+          <div style="font-size: 10px; color: var(--muted); margin-bottom: 4px;">Agentic, fast mode</div>
+          <ul style="font-size: 10px; color: var(--text); line-height: 1.8; padding-left: 14px;">
+            <li>EAGLE3/MTP enabled? <span style="color:var(--amber)">→ up to 21x cost reduction (theoretical, draft-fine-tuned)</span></li>
+            <li>Small batch → use TP, NOT EP</li>
+            <li>Accept higher $/token (this is the race car)</li>
+          </ul>
+          <div style="margin-top: 8px; padding: 6px; background: #1e293b; border-radius: 4px; font-size: 10px; color: var(--red); text-align: center;">$$$ but fast</div>
+        </div>
+
+        <!-- Branch 2: 40-100 tok/s -->
+        <div style="background: #0f172a; border-radius: 8px; padding: 14px; border-top: 3px solid var(--blue);">
+          <div style="font-size: 12px; font-weight: 700; color: var(--blue); margin-bottom: 8px;">40-100 tok/s/user</div>
+          <div style="font-size: 10px; color: var(--muted); margin-bottom: 4px;">Interactive chat, reasoning</div>
+          <ul style="font-size: 10px; color: var(--text); line-height: 1.8; padding-left: 14px;">
+            <li>Disagg + hybrid TP/EP → best $/tok</li>
+            <li>Prefix caching → critical (103x TTFT)</li>
+            <li>FP8 sufficient, FP4 if throughput-limited</li>
+          </ul>
+          <div style="margin-top: 8px; padding: 6px; background: #1e293b; border-radius: 4px; font-size: 10px; color: var(--blue); text-align: center;">$$ balanced</div>
+        </div>
+
+        <!-- Branch 3: <40 tok/s -->
+        <div style="background: #0f172a; border-radius: 8px; padding: 14px; border-top: 3px solid var(--green);">
+          <div style="font-size: 12px; font-weight: 700; color: var(--green); margin-bottom: 8px;">&lt;40 tok/s/user</div>
+          <div style="font-size: 10px; color: var(--muted); margin-bottom: 4px;">Batch, throughput</div>
+          <ul style="font-size: 10px; color: var(--text); line-height: 1.8; padding-left: 14px;">
+            <li>Wide EP (EP32+) on NVL72 → lowest $/tok</li>
+            <li>FP4 if model supports → 2-3x cheaper</li>
+            <li>Maximize batch size</li>
+          </ul>
+          <div style="margin-top: 8px; padding: 6px; background: #1e293b; border-radius: 4px; font-size: 10px; color: var(--green); text-align: center;">$ pack it full</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 8: INTELLIGENCE-ADJUSTED COST ═══════════ -->
+<div class="section">
+  <div class="section-title">Intelligence-Adjusted Cost: The Real Metric</div>
+  <div class="card">
+    <div style="text-align: center; margin-bottom: 16px;">
+      <div style="font-size: 14px; font-weight: 600; color: var(--text);">$/M tokens varies 1,875x. True cost only varies 2.5x.</div>
+      <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">Human intervention cost dominates. Pass rate matters more than infra cost.</div>
+    </div>
+
+    <!-- The formula -->
+    <div style="background: #0f172a; border-radius: 8px; padding: 16px; border: 1px solid var(--border); margin-bottom: 20px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 13px;">
+      <span style="color: var(--green);">True Cost</span> = <span style="color: var(--dim);">$/task</span> + (1 - <span style="color: var(--blue);">pass_rate</span>) &times; <span style="color: var(--red);">$25 human cost</span>
+    </div>
+
+    <!-- Visual comparison -->
+    <div style="display: flex; gap: 4px; align-items: flex-end; height: 200px; padding: 0 20px;">
+      <!-- K2.6 B200 -->
+      <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;">
+        <div style="font-size: 11px; font-weight: 700; color: var(--green);">$5.01</div>
+        <div style="width: 100%; height: 40%; background: linear-gradient(to top, #064e3b, #10b981); border-radius: 6px 6px 0 0; margin-top: 4px;"></div>
+        <div style="font-size: 9px; color: var(--muted); margin-top: 6px; text-align: center;">K2.6+EAGLE3<br>B200</div>
+      </div>
+      <!-- K2.6 B300 -->
+      <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;">
+        <div style="font-size: 11px; font-weight: 700; color: var(--green);">$5.01</div>
+        <div style="width: 100%; height: 40%; background: linear-gradient(to top, #1e3a5f, #3b82f6); border-radius: 6px 6px 0 0; margin-top: 4px;"></div>
+        <div style="font-size: 9px; color: var(--muted); margin-top: 6px; text-align: center;">K2.6<br>B300</div>
+      </div>
+      <!-- Claude Opus -->
+      <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;">
+        <div style="font-size: 11px; font-weight: 700; color: var(--purple);">$7.50</div>
+        <div style="width: 100%; height: 60%; background: linear-gradient(to top, #2e1065, #8b5cf6); border-radius: 6px 6px 0 0; margin-top: 4px;"></div>
+        <div style="font-size: 9px; color: var(--muted); margin-top: 6px; text-align: center;">Claude<br>Opus API</div>
+      </div>
+      <!-- Sonnet -->
+      <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;">
+        <div style="font-size: 11px; font-weight: 700; color: var(--purple);">$7.53</div>
+        <div style="width: 100%; height: 60%; background: linear-gradient(to top, #2e1065, #7c3aed); border-radius: 6px 6px 0 0; margin-top: 4px;"></div>
+        <div style="font-size: 9px; color: var(--muted); margin-top: 6px; text-align: center;">Claude<br>Sonnet API</div>
+      </div>
+      <!-- Qwen3.5 -->
+      <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;">
+        <div style="font-size: 11px; font-weight: 700; color: var(--amber);">$8.51</div>
+        <div style="width: 100%; height: 68%; background: linear-gradient(to top, #451a03, #f59e0b); border-radius: 6px 6px 0 0; margin-top: 4px;"></div>
+        <div style="font-size: 9px; color: var(--muted); margin-top: 6px; text-align: center;">Qwen3.5<br>g7e</div>
+      </div>
+      <!-- Devstral -->
+      <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;">
+        <div style="font-size: 11px; font-weight: 700; color: var(--red);">$12.50</div>
+        <div style="width: 100%; height: 100%; background: linear-gradient(to top, #450a0a, #ef4444); border-radius: 6px 6px 0 0; margin-top: 4px;"></div>
+        <div style="font-size: 9px; color: var(--muted); margin-top: 6px; text-align: center;">Devstral<br>g7e</div>
+      </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 8px; font-size: 10px; color: var(--dim);">True cost per successful coding task (includes $25 human fallback on failure)</div>
+
+    <div class="insight" style="margin-top: 16px;">
+      <h4>Self-Hosted Break-Even</h4>
+      <p>B200 + EAGLE3 monthly cost: ~$8,760. Claude Opus API: $2.25/task. Break-even at <strong>3,893 tasks/month = 16 coding agents</strong>. Above 16 active agents: self-hosted dominates. The value isn't cheaper tokens — it's unlimited tasks within fixed budget.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 9: SCALE THRESHOLDS ═══════════ -->
+<div class="section">
+  <div class="section-title">Scale Thresholds: When to Add Complexity</div>
+  <div class="card">
+    <div style="position: relative; padding: 0 20px;">
+      <!-- Scale bar -->
+      <div style="display: flex; height: 50px; border-radius: 8px; overflow: hidden; margin-bottom: 16px;">
+        <div style="flex: 25; background: linear-gradient(90deg, #064e3b, #10b981); display: flex; align-items: center; justify-content: center; flex-direction: column;">
+          <span style="font-size: 11px; color: #fff; font-weight: 700;">1-50 users</span>
+          <span style="font-size: 9px; color: #d1fae5;">Single node</span>
+        </div>
+        <div style="flex: 25; background: linear-gradient(90deg, #10b981, #34d399); display: flex; align-items: center; justify-content: center; flex-direction: column;">
+          <span style="font-size: 11px; color: #000; font-weight: 700;">50-200</span>
+          <span style="font-size: 9px; color: #064e3b;">2 replicas</span>
+        </div>
+        <div style="flex: 25; background: linear-gradient(90deg, #f59e0b, #fbbf24); display: flex; align-items: center; justify-content: center; flex-direction: column;">
+          <span style="font-size: 11px; color: #000; font-weight: 700;">200-500</span>
+          <span style="font-size: 9px; color: #451a03;">3-5 + routing</span>
+        </div>
+        <div style="flex: 25; background: linear-gradient(90deg, #ef4444, #f87171); display: flex; align-items: center; justify-content: center; flex-direction: column;">
+          <span style="font-size: 11px; color: #fff; font-weight: 700;">500+</span>
+          <span style="font-size: 9px; color: #fecaca;">Fleet + disagg</span>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--dim); margin-bottom: 20px;">
+        <span>Most enterprise teams HERE</span>
+        <span></span>
+        <span></span>
+        <span>Baseten/Fireworks territory</span>
+      </div>
+
+      <!-- Key numbers -->
+      <div class="grid-3">
+        <div style="background: #0f172a; border-radius: 8px; padding: 14px; text-align: center; border: 1px solid var(--green);">
+          <div style="font-size: 28px; font-weight: 700; color: var(--green);">345</div>
+          <div style="font-size: 11px; color: var(--text); font-weight: 500;">concurrent agents per B200 node</div>
+          <div style="font-size: 9px; color: var(--dim); margin-top: 4px;">With EAGLE3 @ 4 req/agent/min</div>
+        </div>
+        <div style="background: #0f172a; border-radius: 8px; padding: 14px; text-align: center; border: 1px solid var(--amber);">
+          <div style="font-size: 28px; font-weight: 700; color: var(--amber);">14 req/s</div>
+          <div style="font-size: 11px; color: var(--text); font-weight: 500;">add 2nd replica threshold</div>
+          <div style="font-size: 9px; color: var(--dim); margin-top: 4px;">70% of single-node saturation</div>
+        </div>
+        <div style="background: #0f172a; border-radius: 8px; padding: 14px; text-align: center; border: 1px solid var(--red);">
+          <div style="font-size: 28px; font-weight: 700; color: var(--red);">50+ req/s</div>
+          <div style="font-size: 11px; color: var(--text); font-weight: 500;">consider disagg threshold</div>
+          <div style="font-size: 9px; color: var(--dim); margin-top: 4px;">Only if cache miss &gt;40% + prefills &gt;4K</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION 10: QUICK REFERENCE ═══════════ -->
+<div class="section">
+  <div class="section-title">Quick Reference: What to Do First</div>
+  <div class="card" style="padding: 16px;">
+    <div class="grid-2">
+      <div style="background: #0f172a; border-radius: 8px; padding: 16px; border: 1px solid var(--green);">
+        <div style="font-size: 12px; font-weight: 700; color: var(--green); margin-bottom: 10px;">DO (in this order)</div>
+        <ol style="font-size: 11px; color: var(--text); line-height: 2; padding-left: 18px;">
+          <li>Enable CUDA graphs (default in vLLM/SGLang)</li>
+          <li>Verify MoE tile config exists for your GPU</li>
+          <li>Enable prefix caching (--enable-prefix-caching)</li>
+          <li>Add EAGLE3 only if draft is fine-tuned on your traffic (stock drafts net-negative past c≈256)</li>
+          <li>Test dynamic MLA routing for short prefills</li>
+          <li>Right-size: B200 unless you need &gt;100 sessions @ 128K</li>
+          <li>Measure with standard workload catalog</li>
+        </ol>
+      </div>
+      <div style="background: #0f172a; border-radius: 8px; padding: 16px; border: 1px solid var(--red);">
+        <div style="font-size: 12px; font-weight: 700; color: var(--red); margin-bottom: 10px;">DON'T</div>
+        <ol style="font-size: 11px; color: var(--text); line-height: 2; padding-left: 18px;">
+          <li>Add disagg before trying prefix caching</li>
+          <li>Use EP on single-node (dispatch overhead &gt; GEMM gains)</li>
+          <li>Benchmark with --enforce-eager (5-15x worse than prod)</li>
+          <li>Assume bigger instance = more throughput (BW matters, not VRAM)</li>
+          <li>Optimize kernels before measuring system overhead</li>
+          <li>Go multi-node before exhausting single-node optimizations</li>
+          <li>Choose model by $/token (choose by $/successful-task)</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<div style="text-align: center; margin-top: 40px; padding: 20px; color: var(--dim); font-size: 11px;">
+  <p>Based on field deployments: K2.6 on B300/B200, GLM-5 on B200, Qwen3-235B on B300, Devstral on g7e</p>
+  <p style="margin-top: 4px;">Full guide: <code>docs/inference-optimization-guide.md</code> | Benchmark spec: <code>domains/gpu-serving/specs/kimi-k2.6-speculative.md</code></p>
+</div>
+
+</body>
+</html>

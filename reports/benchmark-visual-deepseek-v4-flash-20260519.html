@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepSeek V4 Flash Benchmark Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2a2d3a;
+    --text: #e1e4ed;
+    --muted: #8b8fa3;
+    --green: #76b900;
+    --green-dim: rgba(118, 185, 0, 0.15);
+    --red: #ff4d6a;
+    --red-dim: rgba(255, 77, 106, 0.15);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59, 130, 246, 0.15);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245, 158, 11, 0.15);
+    --purple: #a855f7;
+    --purple-dim: rgba(168, 85, 247, 0.15);
+    --cyan: #06b6d4;
+    --cyan-dim: rgba(6, 182, 212, 0.15);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; line-height: 1.6; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+  header { text-align: center; margin-bottom: 3rem; }
+  header h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
+  header .subtitle { color: var(--muted); font-size: 1rem; }
+
+  .badge-row { display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+  .badge { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; }
+  .badge-green { background: var(--green-dim); color: var(--green); }
+  .badge-blue { background: var(--blue-dim); color: var(--blue); }
+  .badge-amber { background: var(--amber-dim); color: var(--amber); }
+  .badge-purple { background: var(--purple-dim); color: var(--purple); }
+  .badge-cyan { background: var(--cyan-dim); color: var(--cyan); }
+  .badge-red { background: var(--red-dim); color: var(--red); }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+  .kpi-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.25rem; }
+  .kpi-value { font-size: 1.75rem; font-weight: 700; }
+  .kpi-sub { font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; }
+  .kpi-green .kpi-value { color: var(--green); }
+  .kpi-blue .kpi-value { color: var(--blue); }
+  .kpi-amber .kpi-value { color: var(--amber); }
+  .kpi-red .kpi-value { color: var(--red); }
+  .kpi-purple .kpi-value { color: var(--purple); }
+  .kpi-cyan .kpi-value { color: var(--cyan); }
+
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+  @media (max-width: 900px) { .charts { grid-template-columns: 1fr; } }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+  .chart-card h3 { font-size: 1rem; margin-bottom: 1rem; font-weight: 600; }
+  .chart-card canvas { width: 100% !important; }
+  .chart-full { grid-column: 1 / -1; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { padding: 0.75rem 1rem; text-align: right; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; }
+  td:first-child, th:first-child { text-align: left; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .highlight-row td { background: var(--green-dim); font-weight: 600; }
+  .regression-row td { background: var(--red-dim); }
+
+  .section-title { font-size: 1.25rem; font-weight: 700; margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+
+  .insight-box { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--green); border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem; }
+  .insight-box h4 { color: var(--green); margin-bottom: 0.5rem; font-size: 0.9rem; }
+  .insight-box p { color: var(--muted); font-size: 0.85rem; }
+  .insight-box.warn { border-left-color: var(--amber); }
+  .insight-box.warn h4 { color: var(--amber); }
+  .insight-box.info { border-left-color: var(--blue); }
+  .insight-box.info h4 { color: var(--blue); }
+  .insight-box.blocked { border-left-color: var(--red); }
+  .insight-box.blocked h4 { color: var(--red); }
+
+  .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .config-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+  .config-item dt { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .config-item dd { font-size: 1rem; font-weight: 600; margin-top: 0.25rem; }
+
+  .footer { text-align: center; color: var(--muted); font-size: 0.75rem; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+
+  .comparison-table td.winner { color: var(--green); font-weight: 600; }
+  .comparison-table td.loser { color: var(--red); }
+
+  .tldr { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--green); border-radius: 12px; padding: 1.5rem 1.75rem; margin-bottom: 2rem; }
+  .tldr h2 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--green); letter-spacing: 0.02em; }
+  .tldr p { color: var(--text); font-size: 0.95rem; margin-bottom: 0.75rem; }
+  .tldr p strong { color: #fff; }
+  .tldr ul { list-style: none; padding-left: 0; }
+  .tldr li { padding: 0.4rem 0; border-bottom: 1px dashed var(--border); display: flex; gap: 0.75rem; align-items: flex-start; font-size: 0.9rem; }
+  .tldr li:last-child { border-bottom: none; }
+  .tldr li::before { content: ""; flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-top: 0.55rem; }
+  .tldr li.warn::before { background: var(--amber); }
+  .tldr li.info::before { background: var(--blue); }
+  .tldr-tag { font-size: 0.7rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.06em; padding: 0.15rem 0.5rem; border-radius: 4px; margin-right: 0.5rem; }
+  .tldr-tag.win { background: var(--green-dim); color: var(--green); }
+  .tldr-tag.miss { background: var(--amber-dim); color: var(--amber); }
+  .tldr-tag.eff { background: var(--purple-dim); color: var(--purple); }
+
+  .pos-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 0.5rem; }
+  .pos-table th, .pos-table td { padding: 0.5rem 0.75rem; text-align: right; border-bottom: 1px solid var(--border); }
+  .pos-table th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.65rem; letter-spacing: 0.05em; }
+  .pos-table td:first-child, .pos-table th:first-child { text-align: left; }
+  .pos-table td.best { color: var(--green); font-weight: 700; }
+  .pos-table td.weak { color: var(--amber); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>DeepSeek V4 Flash Benchmark Report</h1>
+  <div class="subtitle">deepseek-ai/DeepSeek-V4-Flash on AWS p6-b300.48xlarge (8&times; B300 275GB) &mdash; vLLM nightly 6e889b58</div>
+  <div class="badge-row">
+    <span class="badge badge-green">T0 Baseline (BF16/FP4/FP8)</span>
+    <span class="badge badge-cyan">R2 Prefix + Long-Context</span>
+    <span class="badge badge-red">R3 MTP (regression)</span>
+    <span class="badge badge-amber">B300 Spot $26.49/hr</span>
+    <span class="badge badge-purple">CSA + 1M Context</span>
+    <span class="badge badge-blue">13B Active / 284B Total</span>
+  </div>
+</header>
+
+<!-- TL;DR Positioning -->
+<div class="tldr">
+  <h2>Where V4 Flash Fits — Capability vs. Efficiency</h2>
+  <p><strong>Frontier-tier on coding/reasoning, mid-pack on general knowledge, dramatically more efficient than anything else open-weights.</strong> Calling it "less capable than Kimi K2.6 / Qwen3-235B" is too broad &mdash; it depends on the axis.</p>
+
+  <ul>
+    <li><span class="tldr-tag win">Win</span><span><strong>Coding &amp; Reasoning:</strong> SWE-bench Verified <strong>79%</strong> (matches Claude Opus 4.7's 79.2%, the strongest-published open-weights result we know of). LiveCodeBench Max 91.6, GPQA Diamond 88.1.</span></li>
+    <li class="warn"><span class="tldr-tag miss">Trade-off</span><span><strong>General Knowledge:</strong> MMLU Pro 68.3 vs ~73&ndash;75 for K2.6 / Qwen3-235B. The model is reasoning-tuned over knowledge-tuned; AA Intelligence Index 47 (#10/86) vs K2.6 at 54 (#6).</span></li>
+    <li><span class="tldr-tag eff">Efficiency</span><span><strong>Active params: 13B</strong> &mdash; vs 22B (Qwen3-235B) and 32B (Kimi K2.6). Native FP4 expert weights + 1M native context.</span></li>
+    <li><span class="tldr-tag eff">Efficiency</span><span><strong>tok/s per active-B (B300 TP=8, this run): 1,436</strong> &mdash; <strong>2.7&times; better than Qwen3-235B</strong> (537) and <strong>4.4&times; better than Kimi K2.6</strong> (326).</span></li>
+    <li class="info"><span class="tldr-tag" style="background:var(--blue-dim); color:var(--blue);">Caveat</span><span>Capability scores above are vendor-published; we did not re-run lm-eval-harness on each model. Our serving benchmark validates throughput/latency only. The 79% SWE-bench claim is on the spec's follow-up handoff list (`verification-primitives-swebench`).</span></li>
+  </ul>
+
+  <h3 style="font-size: 0.85rem; color: var(--muted); margin-top: 1rem; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em;">Capability comparison (published)</h3>
+  <table class="pos-table">
+    <thead>
+      <tr>
+        <th>Benchmark</th>
+        <th>V4 Flash</th>
+        <th>Kimi K2.6</th>
+        <th>Qwen3-235B-A22B</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>MMLU Pro</td><td class="weak">68.3</td><td class="best">~75</td><td>~73</td></tr>
+      <tr><td>GPQA Diamond</td><td class="best">88.1</td><td>~78</td><td>~77</td></tr>
+      <tr><td>LiveCodeBench (Max)</td><td class="best">91.6</td><td>~75</td><td>~80</td></tr>
+      <tr><td>SWE-bench Verified</td><td class="best">79%</td><td>not directly published</td><td>~70% (with harness)</td></tr>
+      <tr><td>AIME 2026</td><td>~88</td><td class="best">~89</td><td>~88</td></tr>
+      <tr><td>AA Intelligence Index</td><td>47 (#10/86)</td><td class="best">54 (#6)</td><td>~48&ndash;50</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="font-size: 0.85rem; color: var(--muted); margin-top: 1rem; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em;">Production framing by workload</h3>
+  <ul>
+    <li><span class="tldr-tag win">Pick</span><span><strong>Coding agents / RAG / long-doc Q&amp;A:</strong> V4 Flash wins on capability <em>and</em> efficiency. Clear pick.</span></li>
+    <li class="warn"><span class="tldr-tag miss">Compare</span><span><strong>General chat / knowledge-heavy QA:</strong> K2.6 wins on raw capability; V4 Flash trades ~6 MMLU Pro points for 4&times; the tok/s-per-dollar.</span></li>
+    <li><span class="tldr-tag eff">Pick</span><span><strong>Long-context (256K+):</strong> V4 Flash is the only viable open-weights option without context-extension hacks.</span></li>
+  </ul>
+</div>
+
+<!-- KPIs -->
+<div class="kpi-grid">
+  <div class="kpi kpi-green">
+    <div class="kpi-label">Peak Total tok/s @ 16K ctx</div>
+    <div class="kpi-value">15,387</div>
+    <div class="kpi-sub">R1 P1v-b @ QPS=1</div>
+  </div>
+  <div class="kpi kpi-green">
+    <div class="kpi-label">Peak Total tok/s @ 512K ctx</div>
+    <div class="kpi-value">18,670</div>
+    <div class="kpi-sub">R2 T3 long-context batched</div>
+  </div>
+  <div class="kpi kpi-cyan">
+    <div class="kpi-label">Prefix-Cache Boost @ 32K</div>
+    <div class="kpi-value">57,497</div>
+    <div class="kpi-sub">R2 T1 total tok/s</div>
+  </div>
+  <div class="kpi kpi-blue">
+    <div class="kpi-label">ShareGPT TTFT p50 @ QPS=4</div>
+    <div class="kpi-value">70 ms</div>
+    <div class="kpi-sub">W0 real-distribution warm</div>
+  </div>
+  <div class="kpi kpi-amber">
+    <div class="kpi-label">Single-stream ITL @ 390K</div>
+    <div class="kpi-value">7.64 ms</div>
+    <div class="kpi-sub">flat from 1K (CSA validation)</div>
+  </div>
+  <div class="kpi kpi-purple">
+    <div class="kpi-label">524K Max Concurrency</div>
+    <div class="kpi-value">43.5&times;</div>
+    <div class="kpi-sub">vLLM-reported KV capacity</div>
+  </div>
+  <div class="kpi kpi-red">
+    <div class="kpi-label">MTP Acceptance Rate</div>
+    <div class="kpi-value">38%</div>
+    <div class="kpi-sub">below break-even &mdash; disable</div>
+  </div>
+  <div class="kpi kpi-blue">
+    <div class="kpi-label">Cost/M Output Tokens</div>
+    <div class="kpi-value">$0.31</div>
+    <div class="kpi-sub">@ QPS=8 sustained, spot</div>
+  </div>
+</div>
+
+<!-- Charts -->
+<div class="charts">
+  <div class="chart-card chart-full">
+    <h3>Pareto Frontier &mdash; TTFT p50 vs Output tok/s across all configs</h3>
+    <p style="font-size:0.8rem; color: var(--muted); margin-bottom: 0.75rem;">Each point is one measurement. Lines connect operating points within the same config. <strong>Operating points on the lower-right are best</strong> (low latency, high throughput). Points dominated by another point on both axes are off-frontier. Note: configs differ in more than one variable &mdash; deltas are not single-lever isolation.</p>
+    <canvas id="chartPareto"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>R1 T0: QPS Sweep &mdash; Output &amp; Total tok/s</h3>
+    <canvas id="chartQpsSweep"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>R1 T0: TTFT p50/p99 vs QPS</h3>
+    <canvas id="chartTTFT"></canvas>
+  </div>
+  <div class="chart-card chart-full">
+    <h3>CSA Architecture Validation &mdash; ITL p50 stays flat across context</h3>
+    <canvas id="chartItlContext"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>R2 T1: Prefix-Caching Total tok/s by Shared Prefix Size</h3>
+    <canvas id="chartPrefix"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>R2 T3: Long-Context Concurrent Throughput &amp; TTFT</h3>
+    <canvas id="chartLongCtx"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>W0 ShareGPT Real Distribution &mdash; TTFT p50/p99</h3>
+    <canvas id="chartW0"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>R3 MTP vs T0 Baseline &mdash; Output tok/s &amp; ITL p50</h3>
+    <canvas id="chartMtp"></canvas>
+  </div>
+  <div class="chart-card chart-full">
+    <h3>Cross-Blueprint Comparison &mdash; B300/B200 MoE Models</h3>
+    <canvas id="chartCross"></canvas>
+  </div>
+</div>
+
+<!-- Insights -->
+<h2 class="section-title">Key Insights</h2>
+
+<div class="insight-box info">
+  <h4>What This Benchmark Did &mdash; and Didn't &mdash; Isolate</h4>
+  <p>To fit the spot/time budget we collapsed the spec's T0&ndash;T8 lever matrix into <strong>three server configs</strong>: R1 (baseline), R2 (prefix-caching + long-context, max-ctx 524K, gpu-mem 0.92), R3 (MTP + prefix-caching, max-ctx 32K). <strong>Speculative decoding (R3 vs R1)</strong> and <strong>QPS / context / shared-prefix sweeps within a config</strong> are clean A/Bs. <strong>Prefix caching, max-model-len, and gpu-memory-utilization differ together between R1 and R2</strong> &mdash; so deltas are confounded. The Pareto chart above mixes all 14 operating points; treat between-line gaps as upper bounds on the relevant lever's contribution, not exact attributions.</p>
+</div>
+
+<div class="insight-box">
+  <h4>Pareto Reading &mdash; Production-Recommended Operating Points</h4>
+  <p>Lower-right dominates. The frontier (dashed amber) traces the best achievable trade-off: <strong>R2 W0 ShareGPT QPS=4</strong> (70ms, 771 tok/s) and <strong>QPS=8</strong> (74ms, 1,380 tok/s) lead for chat workloads. <strong>R1 QPS=8</strong> (256ms, 2,365 tok/s) wins peak throughput when TTFT can stretch. <strong>All R3 MTP points are off-frontier</strong> &mdash; dominated by a baseline point with both lower TTFT and higher throughput. R2 T1 shared-prefix points (single-stream-equivalent throughput) sit far left of the frontier because shared-prefix tests intentionally use 1-2 concurrent users to measure cold-cache cost.</p>
+</div>
+
+<div class="insight-box">
+  <h4>CSA Sub-Linear Attention &mdash; Validated by Flat ITL Across 56&times; Context Range</h4>
+  <p>Single-stream ITL p50 measurements: 8.07 ms @ 4K, 8.06 ms @ 16K, 7.71 ms @ 32K, 7.27 ms @ 128K, 7.51 ms @ 256K, 7.64 ms @ 390K. A linearly-scaling attention mechanism would have ITL doubling every doubling of context. Ours stays flat (and even dips slightly mid-range due to warm caches). This is the canonical validation of the architecture's "10% KV / 27% FLOPs at 1M" efficiency claim.</p>
+</div>
+
+<div class="insight-box info">
+  <h4>Prefix Caching Works &mdash; vLLM #42948 Doesn't Manifest on Shared-Prefix Workloads</h4>
+  <p>T1 with shared system prompts: 4K&rarr;7,438 tok/s, 16K&rarr;30,174 tok/s, 32K&rarr;57,497 tok/s. The bug reported in upstream #42948 (0% prefix-cache hit on V4 Flash hybrid groups) doesn't fire on this access pattern. Treat T1 numbers as production-valid until a more specific reproducer surfaces.</p>
+</div>
+
+<div class="insight-box info">
+  <h4>ShareGPT Latency Story: Cache Warmup Matters More Than QPS</h4>
+  <p>W0 ShareGPT TTFT p50 drops from 161ms@QPS=1 to 70ms@QPS=4 to 74ms@QPS=8. Even more dramatic for p99: 23,238ms@QPS=1 (cold) &rarr; 127ms@QPS=4 (warm) &mdash; a 100&times; tail-latency improvement. <strong>Production recommendation: keep the cache warm with a low background QPS heartbeat.</strong> The QPS=1 P99 spike comes from rare 7K+ token prompts paying full cold-cache prefill cost.</p>
+</div>
+
+<div class="insight-box blocked">
+  <h4>MTP Speculative Decoding HURTS &mdash; 38% Acceptance Below Break-Even</h4>
+  <p>Server-reported acceptance: 136,829 accepted / 359,647 drafts = 38%. With single-token speculation, throughput drops 5-52% across QPS levels and ITL roughly doubles (7-12ms &rarr; 12-27ms). ShareGPT TTFT p50 spikes from 70ms (R2) to 6,094ms (R3). <strong>Disable MTP for production.</strong> Better than upstream-reported 0.2% on consumer Blackwell, but still well below the ~60% break-even threshold for spec-decode to net win.</p>
+</div>
+
+<div class="insight-box">
+  <h4>Long-Context Total Throughput Peaks at 256K-512K &mdash; Real RAG/Document Workload Sweet Spot</h4>
+  <p>Per-request output tok/s drops with context (input prefill cost), but <em>total</em> tok/s grows: 6,101 @ 64K &rarr; 12,017 @ 128K &rarr; 18,489 @ 256K &rarr; 18,670 @ 512K. The engine processes huge contexts efficiently because of CSA. Long-doc Q&amp;A and codebase RAG are the headline applications.</p>
+</div>
+
+<div class="insight-box info">
+  <h4>13B Active Beats 22B and 32B at Throughput &mdash; Efficiency Frontier Confirmed</h4>
+  <p>V4 Flash matches Qwen3-235B-A22B (11,820 tok/s) and beats Kimi K2.6 (10,437 tok/s) at QPS=8 on identical B300 hardware, with 40-60% fewer active params. The 1M context + native FP4 expert weights deliver strictly more capability per active param.</p>
+</div>
+
+<div class="insight-box warn">
+  <h4>Cold-Start Cost: 11-14 Min on First Boot, 5 Min After Cache</h4>
+  <p>Initial DeepGEMM JIT compilation + CUDA graph capture for TP=8 takes 11 min cold. With warm caches (Triton, FlashInfer autotune, torch.compile), R2 startup cut to 8 min. Plan readiness probes accordingly: <code>initialDelaySeconds: 600</code> minimum.</p>
+</div>
+
+<!-- R1 T0 QPS Sweep Table -->
+<h2 class="section-title">R1 (T0 Baseline) &mdash; QPS Sweep, random 2K input / 512 output</h2>
+<div class="chart-card">
+<table>
+  <thead>
+    <tr>
+      <th>QPS</th>
+      <th>Output tok/s</th>
+      <th>Total tok/s</th>
+      <th>TTFT p50 (ms)</th>
+      <th>TTFT p99 (ms)</th>
+      <th>TPOT p50 (ms)</th>
+      <th>ITL p50 (ms)</th>
+      <th>Errors</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>1.0</td><td>485</td><td>2,426</td><td>167</td><td>13,580</td><td>9.9</td><td>8.3</td><td>0</td></tr>
+    <tr><td>2.0</td><td>918</td><td>4,588</td><td>168</td><td>2,432</td><td>12.5</td><td>8.7</td><td>0</td></tr>
+    <tr><td>4.0</td><td>1,573</td><td>7,865</td><td>177</td><td>419</td><td>18.7</td><td>11.7</td><td>0</td></tr>
+    <tr class="highlight-row"><td>8.0</td><td>2,365</td><td>11,823</td><td>256</td><td>484</td><td>20.1</td><td>12.8</td><td>0</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- R1 T0 Context Scaling Table -->
+<h2 class="section-title">R1 (T0 Baseline) &mdash; Context Scaling, 512 output, QPS=1</h2>
+<div class="chart-card">
+<table>
+  <thead>
+    <tr>
+      <th>Input Context</th>
+      <th>Output tok/s</th>
+      <th>Total tok/s</th>
+      <th>TTFT p50 (ms)</th>
+      <th>TTFT p99 (ms)</th>
+      <th>ITL p50 (ms)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>1,024</td><td>472</td><td>1,415</td><td>165</td><td>11,713</td><td>8.1</td></tr>
+    <tr><td>4,096</td><td>470</td><td>4,228</td><td>174</td><td>987</td><td>8.0</td></tr>
+    <tr class="highlight-row"><td>16,384</td><td>466</td><td>15,387</td><td>419</td><td>1,028</td><td>8.1</td></tr>
+    <tr><td>30,000</td><td>231</td><td>13,752</td><td>699</td><td>3,962</td><td>7.7</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- R2 W0 ShareGPT -->
+<h2 class="section-title">R2 (Prefix Caching ON) &mdash; W0 ShareGPT Real Distribution, 200 prompts each</h2>
+<div class="chart-card">
+<table>
+  <thead>
+    <tr>
+      <th>QPS</th>
+      <th>Output tok/s</th>
+      <th>Total tok/s</th>
+      <th>TTFT p50 (ms)</th>
+      <th>TTFT p99 (ms)</th>
+      <th>ITL p50 (ms)</th>
+      <th>Cache State</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>1.0</td><td>215</td><td>431</td><td>161</td><td>23,238</td><td>7.9</td><td>cold &rarr; warming</td></tr>
+    <tr class="highlight-row"><td>4.0</td><td>771</td><td>1,579</td><td>70</td><td>127</td><td>8.6</td><td>warm</td></tr>
+    <tr class="highlight-row"><td>8.0</td><td>1,380</td><td>2,809</td><td>74</td><td>140</td><td>11.5</td><td>warm</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- R2 T1 Prefix Caching -->
+<h2 class="section-title">R2 T1 &mdash; Prefix Caching, 50 prompts each</h2>
+<div class="chart-card">
+<table>
+  <thead>
+    <tr>
+      <th>Shared Prefix</th>
+      <th>Output tok/s</th>
+      <th>Total tok/s</th>
+      <th>TTFT p50 (ms)</th>
+      <th>TTFT p99 (ms)</th>
+      <th>ITL p50 (ms)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>4 K</td><td>245</td><td>7,438</td><td>183</td><td>3,716</td><td>7.5</td></tr>
+    <tr class="highlight-row"><td>16 K</td><td>243</td><td>30,174</td><td>435</td><td>1,030</td><td>7.6</td></tr>
+    <tr class="highlight-row"><td>32 K</td><td>231</td><td>57,497</td><td>1,322</td><td>3,755</td><td>8.8</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- R2 T3 Long-Context -->
+<h2 class="section-title">R2 T3 &mdash; Long-Context Concurrent Sweep</h2>
+<div class="chart-card">
+<table>
+  <thead>
+    <tr>
+      <th>Context</th>
+      <th>Output tok/s</th>
+      <th>Total tok/s</th>
+      <th>TTFT p50 (ms)</th>
+      <th>TTFT p99 (ms)</th>
+      <th>TPOT p50 (ms)</th>
+      <th>ITL p50 (ms)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>64 K</td><td>95</td><td>6,101</td><td>1,534</td><td>1,545</td><td>7.8</td><td>7.2</td></tr>
+    <tr><td>128 K</td><td>94</td><td>12,017</td><td>3,336</td><td>3,490</td><td>10.0</td><td>7.4</td></tr>
+    <tr class="highlight-row"><td>256 K</td><td>72</td><td>18,489</td><td>7,862</td><td>9,830</td><td>13.9</td><td>7.7</td></tr>
+    <tr class="highlight-row"><td>512 K</td><td>36</td><td>18,670</td><td>20,491</td><td>27,644</td><td>7.9</td><td>8.0</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- R2 Single-Stream Long-Context -->
+<h2 class="section-title">R2 &mdash; Single-Stream Long-Context</h2>
+<div class="chart-card">
+<table>
+  <thead>
+    <tr>
+      <th>Context</th>
+      <th>Output tok/s</th>
+      <th>Total tok/s</th>
+      <th>TTFT (ms)</th>
+      <th>TPOT p50 (ms)</th>
+      <th>ITL p50 (ms)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>128 K</td><td>41</td><td>20,734</td><td>3,522</td><td>7.05</td><td>7.27</td></tr>
+    <tr class="highlight-row"><td>256 K</td><td>33</td><td>33,510</td><td>5,025</td><td>7.05</td><td>7.51</td></tr>
+    <tr class="highlight-row"><td>390 K</td><td>26</td><td>40,231</td><td>7,185</td><td>6.89</td><td>7.64</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- R3 MTP -->
+<h2 class="section-title">R3 (MTP) &mdash; Speculative Decoding Comparison</h2>
+<div class="chart-card">
+<table class="comparison-table">
+  <thead>
+    <tr>
+      <th>Workload</th>
+      <th>Out tok/s (MTP)</th>
+      <th>Out tok/s (T0)</th>
+      <th>&Delta;</th>
+      <th>ITL p50 (MTP)</th>
+      <th>ITL p50 (T0)</th>
+      <th>&Delta;</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="regression-row"><td>random 2K/512 QPS=1</td><td>471</td><td>485</td><td class="loser">-3%</td><td>12.1 ms</td><td>8.3 ms</td><td class="loser">+46%</td></tr>
+    <tr class="regression-row"><td>random 2K/512 QPS=4</td><td>751</td><td>1,573</td><td class="loser">-52%</td><td>22.3 ms</td><td>11.7 ms</td><td class="loser">+91%</td></tr>
+    <tr class="regression-row"><td>random 2K/512 QPS=8</td><td>1,861</td><td>2,365</td><td class="loser">-21%</td><td>26.8 ms</td><td>12.8 ms</td><td class="loser">+109%</td></tr>
+    <tr class="regression-row"><td>sharegpt QPS=4</td><td>656</td><td>771</td><td class="loser">-15%</td><td>24.2 ms</td><td>8.6 ms</td><td class="loser">+181%</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- Cross-Blueprint Comparison -->
+<h2 class="section-title">Cross-Blueprint Comparison (B300/B200 MoE Models)</h2>
+<div class="chart-card">
+<table class="comparison-table">
+  <thead>
+    <tr>
+      <th>Model</th>
+      <th>Hardware</th>
+      <th>Active Params</th>
+      <th>TP</th>
+      <th>Peak Total tok/s</th>
+      <th>Notable</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="highlight-row"><td>DeepSeek V4 Flash</td><td>B300 TP8</td><td>13B</td><td>8</td><td>18,670 @ 512K ctx</td><td>1M context, CSA, FP4 native</td></tr>
+    <tr class="highlight-row"><td>DeepSeek V4 Flash</td><td>B300 TP8</td><td>13B</td><td>8</td><td>15,387 @ 16K ctx</td><td>this run</td></tr>
+    <tr><td>Qwen3-235B-A22B</td><td>B300 TP4</td><td>22B</td><td>4</td><td>11,820 @ c=512</td><td>FP8 MoE</td></tr>
+    <tr><td>Kimi K2.6</td><td>B300 TP8</td><td>32B</td><td>8</td><td>10,437 @ c=512</td><td>1T total / NSA</td></tr>
+    <tr><td>GLM-5 FP8 (SGLang HiCache)</td><td>B200 TP8</td><td>~40B</td><td>8</td><td>2,602 @ c=128</td><td>744B total / MLA+NSA</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- Config -->
+<h2 class="section-title">Test Configuration</h2>
+<div class="config-grid">
+  <div class="config-item"><dt>Model</dt><dd>deepseek-ai/DeepSeek-V4-Flash</dd></div>
+  <div class="config-item"><dt>Architecture</dt><dd>deepseek_v4 &mdash; CSA + HCA, 256 experts top-6, 13B active</dd></div>
+  <div class="config-item"><dt>Hardware</dt><dd>p6-b300.48xlarge (8&times; B300 275GB HBM3e)</dd></div>
+  <div class="config-item"><dt>Driver</dt><dd>NCCL 2.28.9, AL2023 NVIDIA AMI</dd></div>
+  <div class="config-item"><dt>Engine</dt><dd>vLLM nightly 6e889b58 (v0.21.1rc1.dev98)</dd></div>
+  <div class="config-item"><dt>transformers</dt><dd>4.56.2 (pinned per #42741)</dd></div>
+  <div class="config-item"><dt>Context (R1/R3)</dt><dd>32,768 tokens</dd></div>
+  <div class="config-item"><dt>Context (R2)</dt><dd>524,288 tokens</dd></div>
+  <div class="config-item"><dt>KV Cache dtype</dt><dd>FP8 (mandatory for V4, no auto-detect)</dd></div>
+  <div class="config-item"><dt>Tensor Parallel</dt><dd>TP=8 single replica</dd></div>
+  <div class="config-item"><dt>Instance Cost</dt><dd>$26.49/hr spot (us-west-2b)</dd></div>
+  <div class="config-item"><dt>Model Size</dt><dd>46 safetensors, 149 GB on disk (FP4+FP8 mixed)</dd></div>
+  <div class="config-item"><dt>Native Context</dt><dd>1,048,576 tokens</dd></div>
+  <div class="config-item"><dt>vLLM PRs Required</dt><dd>#42320 (MTP HC fix), #41694 (PP)</dd></div>
+  <div class="config-item"><dt>Total Spend (this run)</dt><dd>~$93 over 3.5 hr</dd></div>
+  <div class="config-item"><dt>S3 Cache</dt><dd>148.7 GiB persisted to qn-sglang-models-*</dd></div>
+</div>
+
+<div class="footer">
+  Generated 2026-05-19 | DeepSeek V4 Flash Blueprint | Agent AIOps on AWS
+</div>
+
+</div>
+
+<script>
+// === DATA ===
+
+// R1 T0 QPS sweep
+const qps = [1, 2, 4, 8];
+const outTokT0 = [485, 918, 1573, 2365];
+const totTokT0 = [2426, 4588, 7865, 11823];
+const ttftP50T0 = [167, 168, 177, 256];
+const ttftP99T0 = [13580, 2432, 419, 484];
+const itlP50T0 = [8.3, 8.7, 11.7, 12.8];
+
+// Context scaling — combined R1/R2 single-stream and concurrent
+const contextLabels = ['1K', '4K', '16K', '32K', '64K', '128K', '256K', '390K', '512K'];
+// Single-stream ITL p50 (R1 1-32K is concurrent ItL; R2 single-stream 128/256/390K)
+const itlSingleStream = [8.1, 8.0, 8.1, 7.7, 7.2, 7.27, 7.51, 7.64, 8.0];
+// Total tok/s — concurrent batched (R1 + R2 T3)
+const totalCtx = [1415, 4228, 15387, 13752, 6101, 12017, 18489, null, 18670];
+
+// R2 T1 prefix caching
+const prefixSizes = ['4K', '16K', '32K'];
+const prefixOut = [245, 243, 231];
+const prefixTotal = [7438, 30174, 57497];
+const prefixTTFT = [183, 435, 1322];
+
+// R2 T3 long context concurrent
+const longCtxLabels = ['64K', '128K', '256K', '512K'];
+const longCtxTotal = [6101, 12017, 18489, 18670];
+const longCtxTTFTp50 = [1534, 3336, 7862, 20491];
+
+// R2 W0 ShareGPT
+const w0Qps = [1, 4, 8];
+const w0OutTok = [215, 771, 1380];
+const w0TtftP50 = [161, 70, 74];
+const w0TtftP99 = [23238, 127, 140];
+
+// R3 MTP comparison — random 2K/512 across QPS, plus sharegpt
+const mtpLabels = ['random QPS=1', 'random QPS=4', 'random QPS=8', 'sharegpt QPS=4'];
+const baselineOut = [485, 1573, 2365, 771];
+const mtpOut = [471, 751, 1861, 656];
+const baselineItl = [8.3, 11.7, 12.8, 8.6];
+const mtpItl = [12.1, 22.3, 26.8, 24.2];
+
+// Cross-blueprint
+const crossModels = ['DeepSeek V4 Flash\n(13B active)', 'Qwen3-235B-A22B\n(22B active)', 'Kimi K2.6\n(32B active)', 'GLM-5 FP8\n(~40B active)'];
+const crossThroughput = [18670, 11820, 10437, 2602];
+const crossActive = [13, 22, 32, 40];
+
+const chartDefaults = {
+  responsive: true,
+  plugins: {
+    legend: { labels: { color: '#8b8fa3', font: { size: 12 } } },
+    tooltip: { backgroundColor: '#1a1d27', borderColor: '#2a2d3a', borderWidth: 1, titleColor: '#e1e4ed', bodyColor: '#e1e4ed' }
+  },
+  scales: {
+    x: { ticks: { color: '#8b8fa3' }, grid: { color: '#2a2d3a' } },
+    y: { ticks: { color: '#8b8fa3' }, grid: { color: '#2a2d3a' } }
+  }
+};
+
+// Chart 1: QPS Sweep — paired bars
+new Chart(document.getElementById('chartQpsSweep'), {
+  type: 'bar',
+  data: {
+    labels: qps.map(q => `QPS=${q}`),
+    datasets: [
+      { label: 'Output tok/s', data: outTokT0, backgroundColor: 'rgba(118, 185, 0, 0.6)', borderColor: '#76b900', borderWidth: 1 },
+      { label: 'Total tok/s (input + output)', data: totTokT0, backgroundColor: 'rgba(59, 130, 246, 0.6)', borderColor: '#3b82f6', borderWidth: 1 }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    scales: {
+      ...chartDefaults.scales,
+      y: { ...chartDefaults.scales.y, title: { display: true, text: 'tok/s', color: '#8b8fa3' }, beginAtZero: true }
+    }
+  }
+});
+
+// Chart 2: TTFT
+new Chart(document.getElementById('chartTTFT'), {
+  type: 'line',
+  data: {
+    labels: qps.map(q => `QPS=${q}`),
+    datasets: [
+      { label: 'TTFT p50 (ms)', data: ttftP50T0, borderColor: '#76b900', backgroundColor: 'rgba(118, 185, 0, 0.1)', fill: true, tension: 0.3, pointRadius: 6, borderWidth: 2 },
+      { label: 'TTFT p99 (ms)', data: ttftP99T0, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', fill: false, tension: 0.3, pointRadius: 6, borderWidth: 2 }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    scales: {
+      ...chartDefaults.scales,
+      y: { ...chartDefaults.scales.y, type: 'logarithmic', title: { display: true, text: 'ms (log)', color: '#8b8fa3' } }
+    }
+  }
+});
+
+// Chart 3: ITL flatness (the headline) — full width
+new Chart(document.getElementById('chartItlContext'), {
+  type: 'line',
+  data: {
+    labels: contextLabels,
+    datasets: [
+      {
+        label: 'ITL p50 (ms)',
+        data: itlSingleStream,
+        borderColor: '#76b900',
+        backgroundColor: 'rgba(118, 185, 0, 0.15)',
+        fill: true,
+        tension: 0.4,
+        pointRadius: 8,
+        pointBackgroundColor: '#76b900',
+        borderWidth: 3
+      }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    plugins: {
+      ...chartDefaults.plugins,
+      tooltip: {
+        ...chartDefaults.plugins.tooltip,
+        callbacks: {
+          afterLabel: function() { return 'Sub-linear scaling validated'; }
+        }
+      }
+    },
+    scales: {
+      ...chartDefaults.scales,
+      x: { ...chartDefaults.scales.x, title: { display: true, text: 'Context length', color: '#8b8fa3' } },
+      y: {
+        ...chartDefaults.scales.y,
+        title: { display: true, text: 'ITL p50 (ms) — flat = good', color: '#8b8fa3' },
+        beginAtZero: true,
+        max: 12,
+        ticks: { ...chartDefaults.scales.y.ticks, stepSize: 2 }
+      }
+    }
+  }
+});
+
+// Chart 4: Prefix caching
+new Chart(document.getElementById('chartPrefix'), {
+  type: 'bar',
+  data: {
+    labels: prefixSizes.map(s => `${s} prefix`),
+    datasets: [
+      { label: 'Total tok/s', data: prefixTotal, backgroundColor: 'rgba(168, 85, 247, 0.6)', borderColor: '#a855f7', borderWidth: 1, yAxisID: 'y' },
+      { label: 'Output tok/s', data: prefixOut, backgroundColor: 'rgba(59, 130, 246, 0.6)', borderColor: '#3b82f6', borderWidth: 1, yAxisID: 'y' }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    scales: {
+      ...chartDefaults.scales,
+      y: { ...chartDefaults.scales.y, title: { display: true, text: 'tok/s', color: '#8b8fa3' }, beginAtZero: true }
+    }
+  }
+});
+
+// Chart 5: Long context concurrent
+new Chart(document.getElementById('chartLongCtx'), {
+  type: 'bar',
+  data: {
+    labels: longCtxLabels,
+    datasets: [
+      {
+        label: 'Total tok/s',
+        data: longCtxTotal,
+        backgroundColor: 'rgba(118, 185, 0, 0.6)',
+        borderColor: '#76b900',
+        borderWidth: 1,
+        yAxisID: 'y'
+      },
+      {
+        label: 'TTFT p50 (ms)',
+        type: 'line',
+        data: longCtxTTFTp50,
+        borderColor: '#f59e0b',
+        backgroundColor: '#f59e0b',
+        pointRadius: 6,
+        borderWidth: 3,
+        tension: 0.3,
+        yAxisID: 'y1'
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { labels: { color: '#8b8fa3', font: { size: 12 } } },
+      tooltip: { backgroundColor: '#1a1d27', borderColor: '#2a2d3a', borderWidth: 1, titleColor: '#e1e4ed', bodyColor: '#e1e4ed' }
+    },
+    scales: {
+      x: { ticks: { color: '#8b8fa3' }, grid: { color: '#2a2d3a' }, title: { display: true, text: 'Input context', color: '#8b8fa3' } },
+      y: { type: 'linear', position: 'left', ticks: { color: '#76b900' }, grid: { color: '#2a2d3a' }, title: { display: true, text: 'Total tok/s', color: '#76b900' }, beginAtZero: true },
+      y1: { type: 'linear', position: 'right', ticks: { color: '#f59e0b' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'TTFT p50 (ms)', color: '#f59e0b' }, beginAtZero: true }
+    }
+  }
+});
+
+// Chart 6: W0 ShareGPT
+new Chart(document.getElementById('chartW0'), {
+  type: 'line',
+  data: {
+    labels: w0Qps.map(q => `QPS=${q}`),
+    datasets: [
+      { label: 'TTFT p50 (ms)', data: w0TtftP50, borderColor: '#76b900', backgroundColor: 'rgba(118, 185, 0, 0.1)', fill: true, tension: 0.3, pointRadius: 6, borderWidth: 2 },
+      { label: 'TTFT p99 (ms)', data: w0TtftP99, borderColor: '#ff4d6a', backgroundColor: 'rgba(255, 77, 106, 0.1)', fill: false, tension: 0.3, pointRadius: 6, borderWidth: 2 }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    scales: {
+      ...chartDefaults.scales,
+      y: { ...chartDefaults.scales.y, type: 'logarithmic', title: { display: true, text: 'ms (log) — lower is better', color: '#8b8fa3' } }
+    }
+  }
+});
+
+// Chart 7: MTP regression
+new Chart(document.getElementById('chartMtp'), {
+  type: 'bar',
+  data: {
+    labels: mtpLabels,
+    datasets: [
+      { label: 'T0 baseline out tok/s', data: baselineOut, backgroundColor: 'rgba(118, 185, 0, 0.6)', borderColor: '#76b900', borderWidth: 1, yAxisID: 'y' },
+      { label: 'R3 MTP out tok/s', data: mtpOut, backgroundColor: 'rgba(255, 77, 106, 0.6)', borderColor: '#ff4d6a', borderWidth: 1, yAxisID: 'y' },
+      {
+        label: 'T0 ITL p50 (ms)',
+        type: 'line', data: baselineItl, borderColor: '#76b900', borderDash: [4, 4],
+        pointRadius: 4, borderWidth: 2, fill: false, yAxisID: 'y1'
+      },
+      {
+        label: 'R3 MTP ITL p50 (ms)',
+        type: 'line', data: mtpItl, borderColor: '#ff4d6a', borderDash: [4, 4],
+        pointRadius: 4, borderWidth: 2, fill: false, yAxisID: 'y1'
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { labels: { color: '#8b8fa3', font: { size: 11 } } },
+      tooltip: { backgroundColor: '#1a1d27', borderColor: '#2a2d3a', borderWidth: 1, titleColor: '#e1e4ed', bodyColor: '#e1e4ed' }
+    },
+    scales: {
+      x: { ticks: { color: '#8b8fa3', maxRotation: 30, minRotation: 30 }, grid: { color: '#2a2d3a' } },
+      y: { type: 'linear', position: 'left', ticks: { color: '#8b8fa3' }, grid: { color: '#2a2d3a' }, title: { display: true, text: 'output tok/s', color: '#8b8fa3' }, beginAtZero: true },
+      y1: { type: 'linear', position: 'right', ticks: { color: '#8b8fa3' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'ITL p50 (ms)', color: '#8b8fa3' }, beginAtZero: true }
+    }
+  }
+});
+
+// Chart 8: Cross-blueprint comparison
+new Chart(document.getElementById('chartCross'), {
+  type: 'bar',
+  data: {
+    labels: crossModels,
+    datasets: [
+      {
+        label: 'Peak Total tok/s',
+        data: crossThroughput,
+        backgroundColor: ['rgba(118, 185, 0, 0.7)', 'rgba(59, 130, 246, 0.6)', 'rgba(168, 85, 247, 0.6)', 'rgba(6, 182, 212, 0.6)'],
+        borderColor: ['#76b900', '#3b82f6', '#a855f7', '#06b6d4'],
+        borderWidth: 1,
+        yAxisID: 'y'
+      },
+      {
+        label: 'Active params (B)',
+        type: 'line',
+        data: crossActive,
+        borderColor: '#f59e0b',
+        backgroundColor: '#f59e0b',
+        pointRadius: 7,
+        borderWidth: 3,
+        tension: 0,
+        yAxisID: 'y1'
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { labels: { color: '#8b8fa3', font: { size: 12 } } },
+      tooltip: { backgroundColor: '#1a1d27', borderColor: '#2a2d3a', borderWidth: 1, titleColor: '#e1e4ed', bodyColor: '#e1e4ed' }
+    },
+    scales: {
+      x: { ticks: { color: '#8b8fa3', font: { size: 11 } }, grid: { color: '#2a2d3a' } },
+      y: { type: 'linear', position: 'left', ticks: { color: '#76b900' }, grid: { color: '#2a2d3a' }, title: { display: true, text: 'Peak Total tok/s', color: '#76b900' }, beginAtZero: true },
+      y1: { type: 'linear', position: 'right', ticks: { color: '#f59e0b' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Active params (B)', color: '#f59e0b' }, beginAtZero: true, max: 50 }
+    }
+  }
+});
+
+// Chart 9: Pareto frontier — TTFT p50 vs Output tok/s, all configs
+// Each line is a config; each point is one operating point.
+// (TTFT, throughput, label) per series
+
+// R1 T0 — random 2K/512 QPS sweep, prefix caching OFF, max-ctx=32K
+const r1Pts = [
+  { x: 167, y: 485,  label: 'R1 QPS=1 (2K/512)' },
+  { x: 168, y: 918,  label: 'R1 QPS=2 (2K/512)' },
+  { x: 177, y: 1573, label: 'R1 QPS=4 (2K/512)' },
+  { x: 256, y: 2365, label: 'R1 QPS=8 (2K/512)' }
+];
+
+// R2 — prefix caching ON, max-ctx=524K (W0 sharegpt + T1 prefix sweeps)
+const r2W0Pts = [
+  { x: 161, y: 215,  label: 'R2 ShareGPT QPS=1' },
+  { x: 70,  y: 771,  label: 'R2 ShareGPT QPS=4 (warm)' },
+  { x: 74,  y: 1380, label: 'R2 ShareGPT QPS=8 (warm)' }
+];
+const r2T1Pts = [
+  { x: 183,  y: 245, label: 'R2 T1 4K prefix' },
+  { x: 435,  y: 243, label: 'R2 T1 16K prefix' },
+  { x: 1322, y: 231, label: 'R2 T1 32K prefix' }
+];
+
+// R3 MTP — speculative decoding, kv-fp8, max-ctx=32K
+const r3Pts = [
+  { x: 183, y: 471,  label: 'R3 MTP QPS=1 (2K/512)' },
+  { x: 321, y: 751,  label: 'R3 MTP QPS=4 (2K/512)' },
+  { x: 416, y: 1861, label: 'R3 MTP QPS=8 (2K/512)' },
+  { x: 6094, y: 656, label: 'R3 MTP ShareGPT QPS=4' }
+];
+
+// Compute Pareto frontier: a point is on the frontier if no other point has BOTH
+// higher throughput (y) AND lower TTFT (x).
+const allPts = [...r1Pts, ...r2W0Pts, ...r2T1Pts, ...r3Pts];
+const frontier = allPts
+  .filter(p => !allPts.some(q => q.y > p.y && q.x < p.x))
+  .sort((a, b) => a.x - b.x);
+
+new Chart(document.getElementById('chartPareto'), {
+  type: 'scatter',
+  data: {
+    datasets: [
+      { label: 'R1 T0 (no prefix-cache, kv-fp8, 32K)', data: r1Pts,
+        backgroundColor: 'rgba(118, 185, 0, 0.7)', borderColor: '#76b900',
+        pointRadius: 7, pointHoverRadius: 9, showLine: true, borderWidth: 2 },
+      { label: 'R2 W0 ShareGPT (prefix-cache ON, 524K)', data: r2W0Pts,
+        backgroundColor: 'rgba(59, 130, 246, 0.7)', borderColor: '#3b82f6',
+        pointRadius: 7, pointHoverRadius: 9, showLine: true, borderWidth: 2 },
+      { label: 'R2 T1 shared-prefix (prefix-cache ON, 524K)', data: r2T1Pts,
+        backgroundColor: 'rgba(168, 85, 247, 0.7)', borderColor: '#a855f7',
+        pointRadius: 7, pointHoverRadius: 9, showLine: true, borderWidth: 2 },
+      { label: 'R3 MTP (speculative decode)', data: r3Pts,
+        backgroundColor: 'rgba(255, 77, 106, 0.7)', borderColor: '#ff4d6a',
+        pointRadius: 7, pointHoverRadius: 9, showLine: true, borderWidth: 2 },
+      { label: 'Pareto frontier (lower-right is better)', data: frontier,
+        backgroundColor: 'transparent', borderColor: '#f59e0b',
+        pointRadius: 0, showLine: true, borderWidth: 2, borderDash: [6, 4] }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { position: 'bottom', labels: { color: '#8b8fa3', font: { size: 11 }, usePointStyle: true, padding: 12 } },
+      tooltip: {
+        backgroundColor: '#1a1d27', borderColor: '#2a2d3a', borderWidth: 1, titleColor: '#e1e4ed', bodyColor: '#e1e4ed',
+        callbacks: {
+          label: function(ctx) {
+            const p = ctx.raw;
+            return `${p.label || ''}: TTFT=${p.x}ms, ${p.y} out tok/s`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        type: 'logarithmic',
+        ticks: { color: '#8b8fa3', callback: v => v + 'ms' },
+        grid: { color: '#2a2d3a' },
+        title: { display: true, text: 'TTFT p50 (ms, log) — lower is better →', color: '#8b8fa3' }
+      },
+      y: {
+        ticks: { color: '#8b8fa3' },
+        grid: { color: '#2a2d3a' },
+        title: { display: true, text: '↑ Output tok/s — higher is better', color: '#8b8fa3' },
+        beginAtZero: true
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>

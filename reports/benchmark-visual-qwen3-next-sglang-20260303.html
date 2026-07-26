@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Qwen3-Next vs Devstral — Coding Agent Benchmark</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --surface-2: #242740;
+      --border: #2e3151;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --accent: #6366f1;
+      --accent-soft: rgba(99,102,241,0.15);
+      --green: #22c55e;
+      --green-soft: rgba(34,197,94,0.12);
+      --red: #ef4444;
+      --red-soft: rgba(239,68,68,0.12);
+      --yellow: #f59e0b;
+      --yellow-soft: rgba(245,158,11,0.12);
+      --blue: #3b82f6;
+      --blue-soft: rgba(59,130,246,0.15);
+      --orange: #f97316;
+      --orange-soft: rgba(249,115,22,0.15);
+      --track-s: #6366f1;
+      --track-s-soft: rgba(99,102,241,0.25);
+      --track-d: #f59e0b;
+      --track-d-soft: rgba(245,158,11,0.25);
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-2: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --accent-soft: rgba(99,102,241,0.08);
+      --green-soft: rgba(34,197,94,0.08);
+      --red-soft: rgba(239,68,68,0.08);
+      --yellow-soft: rgba(245,158,11,0.08);
+      --track-s-soft: rgba(99,102,241,0.15);
+      --track-d-soft: rgba(245,158,11,0.15);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    header .meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .theme-toggle {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+    .theme-toggle:hover { background: var(--border); }
+    main { max-width: 1280px; margin: 0 auto; padding: 2rem; }
+
+    /* Hardware cards */
+    .hw-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem; }
+    .hw-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+    }
+    .hw-card.track-s { border-left: 3px solid var(--track-s); }
+    .hw-card.track-d { border-left: 3px solid var(--track-d); }
+    .hw-card h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.75rem; }
+    .hw-card .track-label {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      margin-bottom: 0.5rem;
+    }
+    .track-label.s { background: var(--track-s-soft); color: var(--track-s); }
+    .track-label.d { background: var(--track-d-soft); color: var(--track-d); }
+    .hw-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .hw-item .label {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+    .hw-item .value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+    }
+
+    /* Summary cards */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.1rem;
+    }
+    .summary-card .stat-label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.3rem;
+    }
+    .summary-card .stat-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.3rem;
+      font-weight: 600;
+    }
+    .summary-card .stat-sub { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.15rem; }
+    .val-s { color: var(--track-s); }
+    .val-d { color: var(--track-d); }
+    .val-green { color: var(--green); }
+    .val-red { color: var(--red); }
+
+    /* Sections */
+    .section { margin-bottom: 2.5rem; }
+    h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
+    .section-desc { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1rem; margin-top: -0.5rem; }
+
+    /* Charts */
+    .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+    .chart-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+    }
+    .chart-container h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 1rem; }
+    .chart-container canvas { max-height: 320px; }
+    .chart-full { grid-column: 1 / -1; }
+
+    /* Gate scorecard */
+    .gate-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    .gate-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+    .gate-card h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.75rem; }
+    .gate-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.82rem;
+    }
+    .gate-row:last-child { border-bottom: none; }
+    .gate-name { flex: 1; }
+    .gate-target { color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; margin-right: 1rem; }
+    .gate-result { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; margin-right: 0.75rem; }
+    .badge {
+      display: inline-block;
+      padding: 0.1rem 0.45rem;
+      border-radius: 4px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      font-family: 'Inter', sans-serif;
+      min-width: 52px;
+      text-align: center;
+    }
+    .badge-pass { background: var(--green-soft); color: var(--green); }
+    .badge-fail { background: var(--red-soft); color: var(--red); }
+    .badge-blocked { background: var(--yellow-soft); color: var(--yellow); }
+    .badge-na { background: var(--surface-2); color: var(--text-muted); }
+
+    /* Comparison table */
+    .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    thead { background: var(--surface-2); }
+    th {
+      padding: 0.7rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    td {
+      padding: 0.7rem 1rem;
+      border-top: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+    }
+    td.label-cell { font-family: 'Inter', sans-serif; font-weight: 500; }
+    tr:hover td { background: var(--accent-soft); }
+    td.winner { font-weight: 600; }
+    td.winner-s { color: var(--track-s); }
+    td.winner-d { color: var(--track-d); }
+    td.tie { color: var(--text-muted); }
+
+    /* Cost section */
+    .cost-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+    .cost-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+    .cost-card .cost-label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.4rem;
+    }
+    .cost-card .cost-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.4rem;
+      font-weight: 700;
+    }
+    .cost-card .cost-detail { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem; }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 1rem;
+      font-size: 0.78rem;
+    }
+    .legend-item { display: flex; align-items: center; gap: 0.4rem; }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .dot-s { background: var(--track-s); }
+    .dot-d { background: var(--track-d); }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+
+    @media (max-width: 768px) {
+      .hw-cards, .chart-grid, .gate-grid, .cost-grid { grid-template-columns: 1fr; }
+      .chart-full { grid-column: 1; }
+      main { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Qwen3-Next-80B vs Devstral Small 2 — Coding Agent Benchmark</h1>
+    <div class="meta">g7e.24xlarge (4x RTX PRO 6000 Blackwell) &middot; 2026-03-03</div>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()">Toggle theme</button>
+</header>
+
+<main>
+
+  <!-- Track hardware cards -->
+  <div class="hw-cards">
+    <div class="hw-card track-s">
+      <div class="track-label s">Track S</div>
+      <h3>Qwen3-Next-80B on SGLang</h3>
+      <div class="hw-grid">
+        <div class="hw-item"><div class="label">Framework</div><div class="value">SGLang nightly</div></div>
+        <div class="hw-item"><div class="label">GPUs</div><div class="value">4x TP=4 (FP8)</div></div>
+        <div class="hw-item"><div class="label">Architecture</div><div class="value">Hybrid DeltaNet+GQA</div></div>
+        <div class="hw-item"><div class="label">Context</div><div class="value">65,536 tokens</div></div>
+        <div class="hw-item"><div class="label">Params</div><div class="value">80B</div></div>
+        <div class="hw-item"><div class="label">Cost</div><div class="value">$16.57/hr</div></div>
+      </div>
+    </div>
+    <div class="hw-card track-d">
+      <div class="track-label d">Track D</div>
+      <h3>Devstral Small 2 on vLLM</h3>
+      <div class="hw-grid">
+        <div class="hw-item"><div class="label">Framework</div><div class="value">vLLM v0.15.0</div></div>
+        <div class="hw-item"><div class="label">GPUs</div><div class="value">1x TP=1 (FP8)</div></div>
+        <div class="hw-item"><div class="label">Architecture</div><div class="value">Dense GQA 32Q/8KV</div></div>
+        <div class="hw-item"><div class="label">Context</div><div class="value">131,072 tokens</div></div>
+        <div class="hw-item"><div class="label">Params</div><div class="value">24B</div></div>
+        <div class="hw-item"><div class="label">Cost</div><div class="value">~$4.14/hr</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary stat cards -->
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="stat-label">BFCL Score (Both)</div>
+      <div class="stat-value val-green">91.7%</div>
+      <div class="stat-sub">188/200 scenarios</div>
+    </div>
+    <div class="summary-card">
+      <div class="stat-label">Peak Throughput</div>
+      <div class="stat-value val-s">647 tok/s</div>
+      <div class="stat-sub">Qwen3-Next @ QPS 8.0</div>
+    </div>
+    <div class="summary-card">
+      <div class="stat-label">Fastest Latency</div>
+      <div class="stat-value val-d">1,205 ms</div>
+      <div class="stat-sub">Devstral BFCL avg</div>
+    </div>
+    <div class="summary-card">
+      <div class="stat-label">Best SVG Recall</div>
+      <div class="stat-value val-d">97%</div>
+      <div class="stat-sub">Devstral functional eval</div>
+    </div>
+    <div class="summary-card">
+      <div class="stat-label">Swarm Zero-Fail</div>
+      <div class="stat-value val-d">0%</div>
+      <div class="stat-sub">Devstral @ 32 agents</div>
+    </div>
+    <div class="summary-card">
+      <div class="stat-label">Cost Advantage</div>
+      <div class="stat-value val-d">4x</div>
+      <div class="stat-sub">Devstral $4.14 vs $16.57/hr</div>
+    </div>
+  </div>
+
+  <!-- Charts row 1: Radar + BFCL -->
+  <div class="chart-grid">
+    <div class="chart-container">
+      <h3>Head-to-Head Radar</h3>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot dot-s"></div>Qwen3-Next (Track S)</div>
+        <div class="legend-item"><div class="legend-dot dot-d"></div>Devstral (Track D)</div>
+      </div>
+      <canvas id="radarChart"></canvas>
+    </div>
+    <div class="chart-container">
+      <h3>BFCL Category Breakdown</h3>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot dot-s"></div>Qwen3-Next</div>
+        <div class="legend-item"><div class="legend-dot dot-d"></div>Devstral</div>
+      </div>
+      <canvas id="bfclChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Charts row 2: Throughput + Swarm -->
+  <div class="chart-grid">
+    <div class="chart-container">
+      <h3>S1: Throughput vs QPS (Qwen3-Next)</h3>
+      <canvas id="throughputChart"></canvas>
+    </div>
+    <div class="chart-container">
+      <h3>Swarm Concurrency Scaling (32-agent target)</h3>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot dot-s"></div>Qwen3-Next (1x TP=4)</div>
+        <div class="legend-item"><div class="legend-dot dot-d"></div>Devstral (4x TP=1)</div>
+      </div>
+      <canvas id="swarmChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Charts row 3: TTFT Swarm + Failure Rate -->
+  <div class="chart-grid">
+    <div class="chart-container">
+      <h3>Swarm TTFT p50 Comparison</h3>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot dot-s"></div>Qwen3-Next</div>
+        <div class="legend-item"><div class="legend-dot dot-d"></div>Devstral</div>
+      </div>
+      <canvas id="ttftSwarmChart"></canvas>
+    </div>
+    <div class="chart-container">
+      <h3>Swarm Failure Rate</h3>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot dot-s"></div>Qwen3-Next</div>
+        <div class="legend-item"><div class="legend-dot dot-d"></div>Devstral</div>
+      </div>
+      <canvas id="failureChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Gate Scorecard -->
+  <div class="section">
+    <h2>Gate Pass/Fail Scorecard</h2>
+    <p class="section-desc">Evaluated against spec-defined success criteria from qwen3-next-sglang.md</p>
+    <div class="gate-grid">
+      <div class="gate-card">
+        <h3 style="color: var(--track-s);">Track S: Qwen3-Next-80B</h3>
+        <div class="gate-row">
+          <span class="gate-name">S0: Model loads & generates</span>
+          <span class="gate-target"></span>
+          <span class="gate-result">21s load</span>
+          <span class="badge badge-pass">PASS</span>
+        </div>
+        <div class="gate-row">
+          <span class="gate-name">S1: Throughput >= 150 tok/s</span>
+          <span class="gate-target">>= 150</span>
+          <span class="gate-result">647 tok/s</span>
+          <span class="badge badge-pass">PASS</span>
+        </div>
+        <div class="gate-row">
+          <span class="gate-name">S2: BFCL >= 75</span>
+          <span class="gate-target">>= 75</span>
+          <span class="gate-result">91.7%</span>
+          <span class="badge badge-pass">PASS</span>
+        </div>
+        <div class="gate-row">
+          <span class="gate-name">S3: HiCache hit >= 80%</span>
+          <span class="gate-target">>= 80%</span>
+          <span class="gate-result">PR #19663</span>
+          <span class="badge badge-blocked">BLOCKED</span>
+        </div>
+        <div class="gate-row">
+          <span class="gate-name">S4: GPU util >= 80% @ sat.</span>
+          <span class="gate-target">>= 80%</span>
+          <span class="gate-result">N/A</span>
+          <span class="badge badge-na">N/A</span>
+        </div>
+        <div class="gate-row">
+          <span class="gate-name">S4: Swarm sub-500ms TTFT p50</span>
+          <span class="gate-target">&lt; 500ms</span>
+          <span class="gate-result">380ms</span>
+          <span class="badge badge-pass">PASS</span>
+        </div>
+        <div class="gate-row">
+          <span class="gate-name">S5: Functional pass >= 60%</span>
+          <span class="gate-target">>= 60%</span>
+          <span class="gate-result">100%</span>
+          <span class="badge badge-pass">PASS</span>
+        </div>
+        <div class="gate-row">
+          <span class="gate-name">Cost <= $3/task at swarm</span>
+          <span class="gate-target">&lt;= $3</span>
+          <span class="gate-result">~$0.27</span>
+          <span class="badge badge-pass">PASS</span>
+        </div>
+      </div>
+      <div class="gate-card">
+        <h3 style="color: var(--track-d);">Track D: Devstral Small 2</h3>
+        <div class="gate-row">
+          <span class="gate-name">D0: Model loads & generates</span>
+          <span class="gate-target"></span>
+          <span class="gate-result">OK</span>
+          <span class="badge badge-pass">PASS</span>
+        </div>
+        <div class="gate-row">
+          <span class="gate-name">D1: Throughput baseline</span>
+          <span class="gate-target">Measure</span>
+          <span class="gate-result">52.9 tok/s</span>
+          <span class="badge badge-pass">PASS</span>
+        </div>
+        <div class="gate-row">
+          <span class="gate-name">D2: BFCL >= 75</span>
+          <span class="gate-target">>= 75</span>
+          <span class="gate-result">91.7%</span>
+          <span class="badge badge-pass">PASS</span>
+        </div>
+        <div class="gate-row">
+          <span class="gate-name">D4: Zero failures @ 32 agents</span>
+          <span class="gate-target">0%</span>
+          <span class="gate-result">0%</span>
+          <span class="badge badge-pass">PASS</span>
+        </div>
+        <div class="gate-row">
+          <span class="gate-name">D4: TTFT p50 @ 32 agents</span>
+          <span class="gate-target">Measure</span>
+          <span class="gate-result">1,719ms</span>
+          <span class="badge badge-na">MEASURED</span>
+        </div>
+        <div class="gate-row">
+          <span class="gate-name">D5: Functional pass >= 60%</span>
+          <span class="gate-target">>= 60%</span>
+          <span class="gate-result">100%</span>
+          <span class="badge badge-pass">PASS</span>
+        </div>
+        <div class="gate-row">
+          <span class="gate-name">D5: SVG recall</span>
+          <span class="gate-target">Measure</span>
+          <span class="gate-result">97%</span>
+          <span class="badge badge-pass">PASS</span>
+        </div>
+        <div class="gate-row">
+          <span class="gate-name">Cost per GPU-hour</span>
+          <span class="gate-target">Measure</span>
+          <span class="gate-result">$4.14/hr</span>
+          <span class="badge badge-pass">4x SAVINGS</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Head-to-Head Table -->
+  <div class="section">
+    <h2>Head-to-Head Comparison</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Qwen3-Next (Track S)</th>
+            <th>Devstral (Track D)</th>
+            <th>Winner</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="label-cell">BFCL Score</td>
+            <td>91.7%</td>
+            <td>91.7%</td>
+            <td class="tie">Tie</td>
+          </tr>
+          <tr>
+            <td class="label-cell">Functional Completion</td>
+            <td>100% (5/5)</td>
+            <td>100% (5/5)</td>
+            <td class="tie">Tie</td>
+          </tr>
+          <tr>
+            <td class="label-cell">SVG Reproduction</td>
+            <td>60% (0% recall)</td>
+            <td class="winner winner-d">100% (97% recall)</td>
+            <td class="winner winner-d">Track D</td>
+          </tr>
+          <tr>
+            <td class="label-cell">BFCL Avg Latency</td>
+            <td>4,830 ms</td>
+            <td class="winner winner-d">1,205 ms</td>
+            <td class="winner winner-d">Track D (4x)</td>
+          </tr>
+          <tr>
+            <td class="label-cell">Functional Avg Latency</td>
+            <td>58.6s</td>
+            <td class="winner winner-d">9.2s</td>
+            <td class="winner winner-d">Track D (6.4x)</td>
+          </tr>
+          <tr>
+            <td class="label-cell">Peak Throughput</td>
+            <td class="winner winner-s">647 tok/s</td>
+            <td>52.9 tok/s</td>
+            <td class="winner winner-s">Track S (12x)</td>
+          </tr>
+          <tr>
+            <td class="label-cell">Swarm 32-agent tok/s</td>
+            <td class="winner winner-s">182 tok/s</td>
+            <td>161 tok/s</td>
+            <td class="winner winner-s">Track S</td>
+          </tr>
+          <tr>
+            <td class="label-cell">Swarm TTFT p50</td>
+            <td class="winner winner-s">380 ms</td>
+            <td>1,719 ms</td>
+            <td class="winner winner-s">Track S (4.5x)</td>
+          </tr>
+          <tr>
+            <td class="label-cell">Swarm Failure Rate</td>
+            <td>11%</td>
+            <td class="winner winner-d">0%</td>
+            <td class="winner winner-d">Track D</td>
+          </tr>
+          <tr>
+            <td class="label-cell">GPUs Required</td>
+            <td>4x RTX PRO 6000</td>
+            <td class="winner winner-d">1x RTX PRO 6000</td>
+            <td class="winner winner-d">Track D (4x)</td>
+          </tr>
+          <tr>
+            <td class="label-cell">Instance Cost/hr</td>
+            <td>$16.57</td>
+            <td class="winner winner-d">~$4.14</td>
+            <td class="winner winner-d">Track D (4x)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Cost comparison -->
+  <div class="section">
+    <h2>Cost Comparison</h2>
+    <p class="section-desc">Assuming g7e.24xlarge ($16.57/hr), Devstral uses 1/4 of instance = ~$4.14/hr effective</p>
+    <div class="cost-grid">
+      <div class="cost-card">
+        <div class="cost-label">Per Hour</div>
+        <div class="cost-value">
+          <span style="color: var(--track-s);">$16.57</span>
+          <span style="color: var(--text-muted); font-size: 0.9rem;"> vs </span>
+          <span style="color: var(--track-d);">$4.14</span>
+        </div>
+        <div class="cost-detail">Devstral is 4x cheaper</div>
+      </div>
+      <div class="cost-card">
+        <div class="cost-label">Per BFCL Scenario</div>
+        <div class="cost-value">
+          <span style="color: var(--track-s);">$0.022</span>
+          <span style="color: var(--text-muted); font-size: 0.9rem;"> vs </span>
+          <span style="color: var(--track-d);">$0.0014</span>
+        </div>
+        <div class="cost-detail">Based on avg latency per scenario</div>
+      </div>
+      <div class="cost-card">
+        <div class="cost-label">Per Functional Task</div>
+        <div class="cost-value">
+          <span style="color: var(--track-s);">$0.27</span>
+          <span style="color: var(--text-muted); font-size: 0.9rem;"> vs </span>
+          <span style="color: var(--track-d);">$0.011</span>
+        </div>
+        <div class="cost-detail">~59s vs ~9.2s per task</div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  Generated by visual-explainer &middot; agent-aiops-on-aws &middot; 2026-03-03
+</footer>
+
+<script>
+  // Theme management
+  const isDark = () => document.documentElement.getAttribute('data-theme') === 'dark';
+  function getChartColors() {
+    return {
+      text: isDark() ? '#e2e8f0' : '#0f172a',
+      muted: isDark() ? '#8892a4' : '#64748b',
+      grid: isDark() ? 'rgba(46,49,81,0.5)' : 'rgba(226,232,240,0.8)',
+      trackS: '#6366f1',
+      trackSBg: 'rgba(99,102,241,0.2)',
+      trackD: '#f59e0b',
+      trackDBg: 'rgba(245,158,11,0.2)',
+    };
+  }
+
+  const charts = [];
+
+  function toggleTheme() {
+    const html = document.documentElement;
+    const next = isDark() ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    charts.forEach(c => {
+      const colors = getChartColors();
+      if (c.options.scales) {
+        Object.values(c.options.scales).forEach(s => {
+          if (s.ticks) s.ticks.color = colors.text;
+          if (s.grid) s.grid.color = colors.grid;
+          if (s.title) s.title.color = colors.text;
+          if (s.pointLabels) s.pointLabels.color = colors.text;
+          if (s.angleLines) s.angleLines.color = colors.grid;
+        });
+      }
+      if (c.options.plugins && c.options.plugins.legend) {
+        c.options.plugins.legend.labels.color = colors.text;
+      }
+      c.update();
+    });
+  }
+
+  // Chart defaults
+  Chart.defaults.font.family = "'Inter', sans-serif";
+  Chart.defaults.font.size = 12;
+
+  const colors = getChartColors();
+
+  // 1. Radar Chart
+  const radarCtx = document.getElementById('radarChart').getContext('2d');
+  charts.push(new Chart(radarCtx, {
+    type: 'radar',
+    data: {
+      labels: ['BFCL Score', 'Throughput', 'Latency\n(inverse)', 'Cost\n(inverse)', 'Reliability', 'SVG Recall'],
+      datasets: [
+        {
+          label: 'Qwen3-Next',
+          data: [91.7, 100, 25, 25, 89, 0],
+          borderColor: colors.trackS,
+          backgroundColor: colors.trackSBg,
+          borderWidth: 2,
+          pointRadius: 4,
+          pointBackgroundColor: colors.trackS,
+        },
+        {
+          label: 'Devstral',
+          data: [91.7, 8.2, 100, 100, 100, 97],
+          borderColor: colors.trackD,
+          backgroundColor: colors.trackDBg,
+          borderWidth: 2,
+          pointRadius: 4,
+          pointBackgroundColor: colors.trackD,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        r: {
+          beginAtZero: true,
+          max: 100,
+          ticks: { stepSize: 25, color: colors.muted, backdropColor: 'transparent', font: { size: 10 } },
+          grid: { color: colors.grid },
+          angleLines: { color: colors.grid },
+          pointLabels: { color: colors.text, font: { size: 11 } }
+        }
+      }
+    }
+  }));
+
+  // 2. BFCL Category Chart
+  const bfclCtx = document.getElementById('bfclChart').getContext('2d');
+  charts.push(new Chart(bfclCtx, {
+    type: 'bar',
+    data: {
+      labels: ['Simple', 'Multi-Select', 'Parallel', 'Structured', 'Multi-Turn'],
+      datasets: [
+        {
+          label: 'Qwen3-Next',
+          data: [100, 100, 100, 100, 66.7],
+          backgroundColor: colors.trackS,
+          borderRadius: 4,
+        },
+        {
+          label: 'Devstral',
+          data: [100, 100, 100, 100, 66.7],
+          backgroundColor: colors.trackD,
+          borderRadius: 4,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: colors.text }, grid: { display: false } },
+        y: {
+          beginAtZero: true,
+          max: 100,
+          ticks: { color: colors.muted, callback: v => v + '%' },
+          grid: { color: colors.grid },
+          title: { display: true, text: 'Pass Rate (%)', color: colors.text }
+        }
+      }
+    }
+  }));
+
+  // 3. Throughput vs QPS (Track S)
+  const tpCtx = document.getElementById('throughputChart').getContext('2d');
+  charts.push(new Chart(tpCtx, {
+    type: 'line',
+    data: {
+      labels: ['0.5', '2.0', '4.0', '8.0'],
+      datasets: [
+        {
+          label: 'Throughput (tok/s)',
+          data: [146, 426, 607, 647],
+          borderColor: colors.trackS,
+          backgroundColor: colors.trackSBg,
+          fill: true,
+          tension: 0.3,
+          pointRadius: 6,
+          pointBackgroundColor: colors.trackS,
+          borderWidth: 2,
+          yAxisID: 'y',
+        },
+        {
+          label: 'TTFT p95 (ms)',
+          data: [590, 260, 27480, 37760],
+          borderColor: '#ef4444',
+          backgroundColor: 'rgba(239,68,68,0.1)',
+          borderDash: [5, 5],
+          tension: 0.3,
+          pointRadius: 5,
+          pointBackgroundColor: '#ef4444',
+          borderWidth: 2,
+          yAxisID: 'y1',
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: colors.text, font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => {
+          if (ctx.datasetIndex === 1) return `TTFT p95: ${(ctx.raw/1000).toFixed(1)}s`;
+          return `Throughput: ${ctx.raw} tok/s`;
+        }}}
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'QPS', color: colors.text },
+          ticks: { color: colors.text },
+          grid: { display: false }
+        },
+        y: {
+          type: 'linear',
+          position: 'left',
+          beginAtZero: true,
+          title: { display: true, text: 'Throughput (tok/s)', color: colors.trackS },
+          ticks: { color: colors.trackS },
+          grid: { color: colors.grid }
+        },
+        y1: {
+          type: 'linear',
+          position: 'right',
+          beginAtZero: true,
+          title: { display: true, text: 'TTFT p95 (ms)', color: '#ef4444' },
+          ticks: { color: '#ef4444', callback: v => (v/1000).toFixed(0) + 's' },
+          grid: { drawOnChartArea: false }
+        }
+      }
+    }
+  }));
+
+  // 4. Swarm Throughput Scaling
+  const swarmCtx = document.getElementById('swarmChart').getContext('2d');
+  charts.push(new Chart(swarmCtx, {
+    type: 'line',
+    data: {
+      labels: ['4', '8', '16', '32'],
+      datasets: [
+        {
+          label: 'Qwen3-Next',
+          data: [36, 65, 113, 182],
+          borderColor: colors.trackS,
+          backgroundColor: colors.trackSBg,
+          fill: false,
+          tension: 0.3,
+          pointRadius: 6,
+          pointBackgroundColor: colors.trackS,
+          borderWidth: 2,
+        },
+        {
+          label: 'Devstral (4 replicas)',
+          data: [15, 80, 90, 161],
+          borderColor: colors.trackD,
+          backgroundColor: colors.trackDBg,
+          fill: false,
+          tension: 0.3,
+          pointRadius: 6,
+          pointBackgroundColor: colors.trackD,
+          borderWidth: 2,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: colors.text, font: { size: 11 } } } },
+      scales: {
+        x: {
+          title: { display: true, text: 'Concurrent Agents', color: colors.text },
+          ticks: { color: colors.text },
+          grid: { display: false }
+        },
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'Throughput (tok/s)', color: colors.text },
+          ticks: { color: colors.muted },
+          grid: { color: colors.grid }
+        }
+      }
+    }
+  }));
+
+  // 5. Swarm TTFT p50
+  const ttftCtx = document.getElementById('ttftSwarmChart').getContext('2d');
+  charts.push(new Chart(ttftCtx, {
+    type: 'bar',
+    data: {
+      labels: ['4 agents', '8 agents', '16 agents', '32 agents'],
+      datasets: [
+        {
+          label: 'Qwen3-Next',
+          data: [506, 411, 374, 380],
+          backgroundColor: colors.trackS,
+          borderRadius: 4,
+        },
+        {
+          label: 'Devstral',
+          data: [29031, 2444, 1591, 1719],
+          backgroundColor: colors.trackD,
+          borderRadius: 4,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { labels: { color: colors.text, font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${(ctx.raw/1000).toFixed(1)}s` } }
+      },
+      scales: {
+        x: { ticks: { color: colors.text }, grid: { display: false } },
+        y: {
+          type: 'logarithmic',
+          title: { display: true, text: 'TTFT p50 (ms, log scale)', color: colors.text },
+          ticks: { color: colors.muted, callback: v => {
+            if (v >= 1000) return (v/1000) + 's';
+            return v + 'ms';
+          }},
+          grid: { color: colors.grid }
+        }
+      }
+    }
+  }));
+
+  // 6. Failure Rate
+  const failCtx = document.getElementById('failureChart').getContext('2d');
+  charts.push(new Chart(failCtx, {
+    type: 'bar',
+    data: {
+      labels: ['4 agents', '8 agents', '16 agents', '32 agents'],
+      datasets: [
+        {
+          label: 'Qwen3-Next',
+          data: [8, 0, 2, 11],
+          backgroundColor: colors.trackS,
+          borderRadius: 4,
+        },
+        {
+          label: 'Devstral',
+          data: [0, 0, 0, 0],
+          backgroundColor: colors.trackD,
+          borderRadius: 4,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: colors.text, font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { color: colors.text }, grid: { display: false } },
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'Failure Rate (%)', color: colors.text },
+          ticks: { color: colors.muted, callback: v => v + '%' },
+          grid: { color: colors.grid }
+        }
+      }
+    }
+  }));
+</script>
+</body>
+</html>

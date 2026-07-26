@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>MiniMax-M2 on B200 — Serving Benchmark Study</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0f1419; --panel:#1a2129; --panel2:#222c38; --fg:#e6edf3; --muted:#8b98a5;
+  --line:#2d3744; --accent:#4493f8; --green:#3fb950; --amber:#d29922; --red:#f85149; --violet:#bc8cff;
+}
+[data-theme=light]{--bg:#f6f8fa;--panel:#fff;--panel2:#f0f3f6;--fg:#1f2328;--muted:#636c76;--line:#d0d7de;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:Inter,-apple-system,system-ui,sans-serif;line-height:1.55}
+.wrap{max-width:1100px;margin:0 auto;padding:32px 20px 80px}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+h1{font-size:1.7rem;margin:0 0 4px}
+h2{font-size:1.25rem;margin:38px 0 14px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+h3{font-size:1rem;margin:22px 0 8px;color:var(--accent)}
+.sub{color:var(--muted);font-size:.92rem}
+.meta{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 0}
+.chip{background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:3px 11px;font-size:.78rem;color:var(--muted)}
+.toggle{background:var(--panel2);border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:7px 13px;cursor:pointer;font-size:.85rem}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:18px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.card .n{font-size:1.9rem;font-weight:700;letter-spacing:-.5px}
+.card .l{font-size:.8rem;color:var(--muted);margin-top:3px}
+.card.good .n{color:var(--green)} .card.warn .n{color:var(--amber)} .card.acc .n{color:var(--accent)} .card.vio .n{color:var(--violet)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin:16px 0}
+.finding{display:flex;gap:12px;align-items:flex-start;padding:13px 0;border-bottom:1px solid var(--line)}
+.finding:last-child{border-bottom:none}
+.badge{flex:none;font-size:.7rem;font-weight:700;padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.4px}
+.b-key{background:rgba(63,185,80,.15);color:var(--green)} .b-bound{background:rgba(68,147,248,.15);color:var(--accent)}
+.b-myth{background:rgba(188,140,255,.15);color:var(--violet)} .b-caveat{background:rgba(210,153,34,.15);color:var(--amber)}
+.chartbox{position:relative;height:340px;margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:.85rem;margin-top:8px}
+th,td{text-align:right;padding:7px 10px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:600;cursor:pointer;user-select:none}
+tbody tr:hover{background:var(--panel2)}
+.tag{font-size:.72rem;padding:2px 7px;border-radius:5px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+.kbound{color:var(--red);font-weight:600}
+.note{font-size:.85rem;color:var(--muted)}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:780px){.split{grid-template-columns:1fr}}
+code{background:var(--panel2);padding:1px 6px;border-radius:5px;font-size:.85em}
+ul{margin:8px 0;padding-left:20px} li{margin:4px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>MiniMax-M2 on B200 — Serving Benchmark Study</h1>
+    <div class="sub">230B MoE (10B active), FP8 · 4× B200 (SM100, NVSwitch) · vLLM · TP4 / TP4+EP4</div>
+    <div class="meta">
+      <span class="chip">base charts: vLLM 0.19.1rc1 (59 pts)</span>
+      <span class="chip">+ 2026-07-01 v0.23.0 update</span>
+      <span class="chip">MoE backend: triton</span>
+      <span class="chip">internal engineering report</span>
+    </div>
+  </div>
+  <button class="toggle" onclick="t()">◐ theme</button>
+</header>
+
+<div class="cards">
+  <div class="card good"><div class="n">~8×</div><div class="l">throughput from prefix caching<br>(226 → 1888 tok/s, cold→shared)</div></div>
+  <div class="card acc"><div class="n">2158</div><div class="l">peak tok/s (TP4+EP4, shared-prefix @c128)</div></div>
+  <div class="card vio"><div class="n">0.0</div><div class="l">CPU-offload tier-hit on v0.23<br>(no benefit — see v0.23 update)</div></div>
+  <div class="card warn"><div class="n">100%</div><div class="l">KV utilization @c512 on 100k-reuse<br>(queue 259 — the saturation knee)</div></div>
+</div>
+
+<h2>Headline findings</h2>
+<div class="panel">
+  <div class="finding"><span class="badge b-key">lever</span><div><b>Prefix caching is the dominant throughput &amp; latency lever.</b> Cold throughput plateaus at ~226 tok/s and TTFT collapses (2.3s→125s by c64). With a shared cacheable prefix, throughput climbs to 1,888 tok/s (TP4) / 2,158 tok/s (TP4+EP4) and TTFT stays low far longer. ~8× aggregate throughput at matched hardware — caching, not offload or parallelism, is the first-order win.</div></div>
+  <div class="finding"><span class="badge b-myth">myth-bust</span><div><b>CPU KV offload neither helped nor hurt under reuse.</b> Across every matched point, CPU-offload tracked GPU-only within ±4% (measurement noise), with 0 preemptions. A large offload "regression" is a <i>cold-workload / configuration</i> artifact, not an inherent cost of the offload tier on B200.</div></div>
+  <div class="finding"><span class="badge b-bound">bottleneck</span><div><b>The 100K / 90%-reuse regime is KV-capacity-bound.</b> Prefix hit-rate held at 90% as designed, but KV-pool utilization rose with concurrency to 100% at c512, where queue depth jumped to 259 and TTFT hit ~309s. This is the saturation knee: capacity, not prefill compute, caps this regime.</div></div>
+  <div class="finding"><span class="badge b-bound">parallelism</span><div><b>Expert parallelism (TP4+EP4) lifts the cached ceiling.</b> On shared-prefix at c128, TP4+EP4 reached 2,158 tok/s vs TP4's 1,544 (+40%) at <i>lower</i> TTFT (17s vs 32s). EP helps precisely where the workload is cache-fed and compute can be spread.</div></div>
+  <div class="finding"><span class="badge b-caveat">build</span><div><b>Engine build is a live constraint.</b> These charts: model-specific vLLM 0.19.1rc1 image. <s>The stock 0.23.0 image fails to boot on a missing tokenizer backend</s> — <b>SUPERSEDED (see v0.23 update above):</b> stock v0.23.0 now boots M2 cleanly via an integrity-repair preamble; 0.23 TP4 is the deployable config.</div></div>
+</div>
+
+<div class="panel" style="border-color:var(--amber)">
+  <h3 style="color:var(--amber);margin-top:0">⚠ Not measured (open — sweep cut early)</h3>
+  <p class="note">This run covered <b>2 of 3 KV arms</b> (gpu-only, cpu-offload) and <b>2 of 5 parallelism shapes</b> (TP4, TP4+EP4) — 59 points of a planned 45-config grid, stopped after the core comparisons landed. Explicitly <b>NOT measured</b>:</p>
+  <ul>
+    <li><b>NVMe KV-tiering</b> — the 3-tier GPU→CPU→NVMe disk hierarchy was configured (<code>OffloadingConnector</code> + <code>nvme_path</code>, 200k NVMe blocks) but never ran. <b>The "does a disk KV tier extend the reusable working set" question is OPEN.</b> (Caveat for a future run: the NVMe tier would share the physical disk with the 214GB model weights — a contention confound to control for.)</li>
+    <li><b>DP parallelism shapes</b> — TP2+DP2, TP4+DP2, TP2+DP4 (the "best shape across 8 GPUs" question) were not run. Only single-replica TP4 and TP4+EP4 have data.</li>
+    <li><b>v0.23.0 correctness/perf A/B</b> — blocked at boot by the tokenizer-backend gap; needs a patched image, then re-test.</li>
+  </ul>
+</div>
+
+<h2>⟳ v0.23.0 update (2026-07-01) — the deployable engine</h2>
+<div class="panel" style="border-color:var(--accent)">
+  <p class="note">The charts below this section are the original <b>0.19.1rc1</b> study. The customer must run <b>v0.23.0</b> (it has the <code>/v1/messages</code> endpoint their code agents need; 0.19 does not). This panel re-measures the load-bearing questions on stock v0.23.0, 4× B200, TP4, FP8 — all points <b>err=0</b>, served-model-name matched.</p>
+  <div class="finding"><span class="badge b-key">deploy</span><div><b>v0.23.0 TP4 is at parity with 0.19 on the base path.</b> Shared-prefix gpu-only: 0.23 reached <b>1,848 tok/s @c256</b> (vs 0.19's 1,752) and 1,573 @c128 (vs 1,544). No base-path regression — <b>0.23 TP4 is the recommended deployable config</b>.</div></div>
+  <div class="finding"><span class="badge b-caveat">regression</span><div><b>The +40% expert-parallel lever is GONE on 0.23 (as configured).</b> Identical shape (TP4, DP1, <code>--enable-expert-parallel</code>) that gave <b>2,158 tok/s @c128 on 0.19</b> yields only <b>1,486</b> on 0.23 — <i>below</i> its own TP4 (1,573). The MoE/EP path was reworked 0.19→0.23; the benefit now requires the <b>DP-based EP path</b> (<code>EP_SIZE=TP×DP</code>), which for M2 currently <b>fails to boot</b> (every <code>--data-parallel-size</code> shape dies at engine-init). So EP headroom is <b>unavailable on 0.23 until the DP-boot bug is resolved</b> — a gated <code>tp1dp4ep</code>/<code>tp2dp2ep</code> recovery run is built and pending.</div></div>
+  <div class="finding"><span class="badge b-myth">offload</span><div><b>CPU KV offload delivers no benefit on v0.23 — and appears not to engage.</b> gpu-only vs cpu-offload at the distinct-prefix knee is neutral-to-negative (N=86 c=64: 304→323 tok/s; N=172 c=64: 313→270). The decisive number: <b>offload_tier_hit = 0.000 in every config</b>, even at N=86/c=128 where the KV pool is <b>full (100%) and preempting (5/min)</b> — vLLM chose to <b>recompute</b> evicted blocks rather than fetch from CPU. <span style="color:var(--amber)"><b>OPEN:</b> "0 tier-hit + recompute-under-pressure" indicates offload is not catching evictions, but whether that is a genuine bug, a renamed-counter mis-measurement (0.23 restructured the offload module), or a missing store-threshold knob is <b>not yet settled</b> — needs a run that reads the 0.23 pod's actual connector store/load metrics.</span> Either way: <b>do not rely on CPU offload for this workload.</b></div></div>
+  <div class="finding"><span class="badge b-key">boot</span><div><b>Boot is solved on stock v0.23.0.</b> The 0.19-era "tokenizer backend missing" blocker below is <b>superseded</b>: stock <code>vllm/vllm-openai:v0.23.0</code> boots M2 cleanly with an integrity-repair preamble (re-fetch config/tokenizer, hyphen-free model dir). cpu-offload needs key <code>cpu_bytes_to_use</code> (not the 0.19 <code>num_cpu_blocks</code>); NVMe/disk tiering IS supported (<code>TieringOffloadingSpec</code>+<code>fs</code>).</div></div>
+  <p class="note" style="margin-top:12px"><b>vs the customer (4× H200):</b> we matched TP4/fp8/OffloadingConnector but NOT hardware — B200≠H200, so absolute tok/s and their RPM/ITL dashboards are <b>not directly comparable</b> (their RPM 65.9 vs our ~36 is dominated by OSL: their 66–485 vs our fixed 512). We reproduced their <i>qualitative</i> finding (offload doesn't help) and explained it (tier never engages). A true capacity number needs an <b>H200 like-for-like run</b> (still open).</p>
+</div>
+
+<h2>Model family evolution (M2 → M2.5 → M2.7)</h2>
+<div class="panel">
+  <p class="note">Architecture is <b>frozen across the family</b> — 229–230B MoE / <b>10B active</b>, 256 experts (8/tok), <code>MiniMaxM2ForCausalLM</code>, FP8-native, per-layer qk_norm, MTP, interleaved <code>&lt;think&gt;</code>. Capability scaled <b>purely through agent-native RL post-training</b>, not architecture. Cadence ~monthly (M2 late-Oct → M2.5 mid-Feb, per the official "3.5 months: M2, M2.1, M2.5"). Because the shell never changes, serving characterization (TP4/block-128, parsers, cold-start) <b>transfers across all versions</b>.</p>
+
+  <div class="chartbox" style="height:280px"><canvas id="evo"></canvas></div>
+  <p class="note">SWE-bench scores by version. Note the benchmark goalpost moved: M2/M2.5 report SWE-bench <b>Verified</b> (saturating ~80%); M2.7 reports the harder SWE-bench <b>Pro</b> (56.2%) once Verified saturated — the two are not directly comparable scales.</p>
+
+  <table style="margin-top:14px">
+    <thead><tr><th>Version</th><th>~Date</th><th>Context</th><th>SWE-bench</th><th>What changed</th></tr></thead>
+    <tbody>
+      <tr><td><b>M2</b></td><td>late Oct</td><td>192K</td><td>69.4 (Verified)</td><td>Compact-MoE baseline; "plan → act → verify" agent loop</td></tr>
+      <tr><td><b>M2.1</b></td><td>~Dec</td><td>—</td><td>55.4 (Pro)</td><td>Intermediate RL iteration</td></tr>
+      <tr><td><b>M2.5</b></td><td>~mid-Feb</td><td>—</td><td><b>80.2% (Verified)</b></td><td><b>Major leap.</b> Architect-style planning (decompose before coding); 37% faster SWE-bench runtime (31.3→22.8 min), ~20% fewer agentic rounds; Forge RL framework (~40× train speedup) + CISPO; 200K+ environments, 10+ languages; OOD harness generalization (beats Opus 4.6 on Droid/OpenCode)</td></tr>
+      <tr><td><b>M2.7</b></td><td>after Feb</td><td>200K</td><td>56.2 (Pro)</td><td><b>"Self-evolution"</b> — builds its own RL skills/scaffolds (autonomously optimized a scaffold +30% over 100+ rounds); native Agent Teams (multi-agent)</td></tr>
+    </tbody>
+  </table>
+  <p class="note"><b>Through-line:</b> each version optimized <b>agentic efficiency</b> (fewer rounds, less time, lower cost <i>per solved task</i>) as much as raw accuracy — which is why the right serving cost unit is <b>$/solved-task</b>, not $/token. The only things that shift version-to-version on the serving side are tokenizer/dependency <b>packaging</b> (the v0.23.0 boot blocker) and reasoning verbosity (real output length).</p>
+</div>
+
+<h2>Throughput vs concurrency</h2>
+<div class="panel"><div class="chartbox"><canvas id="tput"></canvas></div>
+<div class="note">GPU-only arm. Cold saturates early (~226 tok/s); both cached scenarios scale with concurrency. TP4+EP4 (dashed) extends the shared-prefix ceiling.</div></div>
+
+<h2>TTFT (p95) vs concurrency — the interactivity wall</h2>
+<div class="panel"><div class="chartbox"><canvas id="ttft"></canvas></div>
+<div class="note">Log scale. Cold TTFT explodes past c8 (prefill-bound, unbounded queue-wait). Shared-prefix stays low far longer; 100k-reuse climbs once KV nears capacity. Where each curve crosses a latency budget is the goodput knee.</div></div>
+
+<h2>Offload vs GPU-only — matched A/B</h2>
+<div class="split">
+  <div class="panel"><h3>Throughput delta (shared-prefix)</h3><div class="chartbox" style="height:280px"><canvas id="ab"></canvas></div>
+  <div class="note">Bars overlap within ±4% at every concurrency — offload is throughput-neutral under reuse.</div></div>
+  <div class="panel"><h3>KV utilization climb (100k-90%-reuse)</h3><div class="chartbox" style="height:280px"><canvas id="kv"></canvas></div>
+  <div class="note">KV rises with concurrency identically for both arms, reaching ~100% at c512 — the capacity ceiling that defines the knee.</div></div>
+</div>
+
+<h2>Bottleneck class by scenario</h2>
+<div class="panel">
+  <table>
+    <thead><tr><th>Scenario</th><th>Regime</th><th>Bound by</th><th>Peak tok/s</th><th>Knee (TTFT/KV)</th></tr></thead>
+    <tbody>
+      <tr><td>cold (no reuse)</td><td><span class="tag">prefill</span></td><td>TTFT / queue-wait</td><td>226</td><td>~c8–16 (TTFT 16–31s)</td></tr>
+      <tr><td>shared-prefix</td><td><span class="tag">prefill (cached)</span></td><td>compute; KV never &gt;5%</td><td>2158</td><td>~c64–128 (TTFT 12–32s)</td></tr>
+      <tr><td>100k / 90%-reuse</td><td><span class="tag">KV capacity</span></td><td class="kbound">KV pool → 100%</td><td>703</td><td>c256–512 (KV 85→100%, q 5→259)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>Full results</h2>
+<div class="panel">
+  <div class="note">Click a column to sort. KV/hit/queue populated where harvested. <span class="tag">cpf</span> = chunked-prefill active.</div>
+  <table id="tbl"><thead><tr>
+    <th data-k="shape">shape</th><th data-k="arm">arm</th><th data-k="scenario">scenario</th>
+    <th data-k="c">conc</th><th data-k="tok_s">tok/s</th><th data-k="ttft_p95">TTFT p95 (s)</th>
+    <th data-k="itl_ms">ITL (ms)</th><th data-k="hit">hit</th><th data-k="kv">KV</th><th data-k="q">queue</th>
+  </tr></thead><tbody></tbody></table>
+</div>
+
+<h2>Architecture decision framework — cache-hit rate is the selector</h2>
+<div class="panel">
+  <p class="note"><b>[inferred — roofline/queueing model, not measured.</b> Only the single-shared-prefix regime was benchmarked; the distinct-prefix regimes below are reasoned, not run.] The recurring question — "do we need CPU/NVMe KV offload, or P/D disaggregation?" — has a clean answer once you separate the two resources a serving engine contends on: <b>prefill compute</b> vs <b>decode counter-space (active-KV concurrency)</b>. They scale with different levers, and <b>prefix cache-hit rate selects which lever applies.</b></p>
+
+  <table>
+    <thead><tr><th>Regime</th><th>Prefill cost</th><th>Bound by</th><th>Right lever</th><th>NOT the lever</th></tr></thead>
+    <tbody>
+      <tr><td><b>High hit (≥~70%), working set fits HBM</b><br><span class="note">our measured case (single 90K prefix)</span></td><td>cheap (≈10% fresh)</td><td>decode counter-space (KV→100%)</td><td><b>Replicas</b> (TP4+DP2) / KV-quant / more GPUs</td><td>offload (nothing to evict), disagg (no prefill contention)</td></tr>
+      <tr><td><b>High hit, working set &gt; HBM</b><br><span class="note">many distinct codebases, each reused — the multi-tenant production regime</span></td><td>cheap on hit, but prefixes get evicted</td><td>prefix-<i>capacity</i> + PCIe fetch + counter-space</td><td><b>Tiered KV cache</b> (CPU→NVMe offload) <i>for TTFT/queue relief</i> + replicas for the ceiling</td><td><b>disagg</b> — prefill is cheap on hit, the contention it removes isn't there</td></tr>
+      <tr><td><b>Low hit (&lt;~30%) + long context + tight ITL</b></td><td>expensive (70K+ fresh, bursty)</td><td>prefill compute contending with decode ITL</td><td><b>P/D disaggregation</b> + KV-aware/prefix-affinity router (Dynamo / llm-d)</td><td>tiering alone (doesn't isolate the prefill burst from decode)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>The two key principles</h3>
+  <ul>
+    <li><b>Tiered KV cache and P/D disagg solve different problems.</b> Tiering scales <i>prefix-capacity</i> (hold more reusable prefixes than HBM fits) → relieves TTFT &amp; the pending queue (a shorter prefill = shorter holding time = faster slot turnover = queue drains). Disagg scales <i>prefill compute independently</i> → relieves decode-ITL degradation from prefill bursts. Dynamo bundles both, which is why they get conflated — but the <i>reason</i> to reach for each is distinct.</li>
+    <li><b>Neither relieves the decode throughput ceiling</b> — that is active-KV counter-space, moved only by replicas, KV quantization, or more HBM. Offload/disagg improve per-request <i>latency</i> (queue-wait + TTFT), not aggregate decode tok/s.</li>
+    <li><b>High cache-hit is structurally anti-disagg.</b> Hit-rate is the dial on prefill compute; at 90% hit the prefill that disagg would isolate is already ~gone. For a high-reuse workload, disagg is the <i>last</i> lever — and a measured analog (kimi-k2.6-nvfp4, same B200, 74% hit) showed disagg <b>lost 3.8×</b> to TP4+DP2 because disagg-decode mode <i>disabled the prefix cache</i> the workload lived on.</li>
+  </ul>
+
+  <p class="note"><b>Recommended ladder for a high-reuse coding workload:</b> (1) replicas (TP4+DP2) — relieves the counter-space ceiling, keeps cache intact, simplest; (2) tiered KV cache (CPU→NVMe) — for the distinct-prefix / working-set-&gt;-HBM case, buys TTFT + queue relief; (3) P/D disagg — only if, after 1+2, prefill <i>measurably</i> contends with decode ITL (i.e. hit rate is actually low) AND the engine's disagg mode preserves the prefix cache. <b>For a genuinely &gt;90%-reuse workload, the answer is distributed/tiered KV cache, not disagg.</b></p>
+</div>
+
+<h2>Methodology &amp; caveats</h2>
+<div class="panel">
+  <ul>
+    <li><b>Hardware is B200 (SM100), not a prior-generation card.</b> Absolute throughput reflects Blackwell's higher HBM bandwidth and FP8 throughput — treat numbers as B200 figures; the <i>relative</i> config deltas (caching, offload, parallelism) are the transferable findings.</li>
+    <li><b>Shared-prefix scenarios use a synthetic, byte-identical prefix.</b> Measured hit-rate (90% / 99.6%) is an upper bound on what variable real traffic would achieve; aggregate throughput on cached scenarios is correspondingly optimistic.</li>
+    <li><b>Partial sweep.</b> Run covered TP4 and TP4+EP4 × {GPU-only, CPU-offload} × 3 scenarios (59 points). NVMe KV-tiering and additional DP parallelism shapes were not completed in this window.</li>
+    <li><b>Cache-hit is read from server-side Prometheus counters</b>, not the per-request <code>cached_tokens</code> field (unset on this build) — client-side cache measurement would read 0 and be misleading.</li>
+    <li><b>Build:</b> vLLM 0.19.1rc1 (model-specific image), <code>--moe-backend triton</code> (avoids the FlashInfer FP8-MoE float32-router-logits assertion on SM100). Stock 0.23.0 needs a tokenizer-backend dependency added before it will boot this model.</li>
+    <li><b>Cold-start</b> on B200 is ~35–40 min (weight load alone ~25 min for 214 GB FP8) — size readiness probes accordingly.</li>
+  </ul>
+</div>
+
+<p class="sub" style="margin-top:30px">Generated from 59 measured benchmark points · MiniMax-M2 FP8 · 4× B200 · vLLM 0.19.1rc1</p>
+</div>
+
+<script>
+const DATA = [{"shape": "tp4", "arm": "gpu-only", "scenario": "cold", "c": 1, "tok_s": 75.7, "ttft_p95": 2.2834, "itl_ms": 9.0, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "cold", "c": 4, "tok_s": 151.6, "ttft_p95": 8.6559, "itl_ms": 16.6, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "cold", "c": 8, "tok_s": 184.4, "ttft_p95": 16.4747, "itl_ms": 28.2, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "cold", "c": 16, "tok_s": 206.8, "ttft_p95": 31.0495, "itl_ms": 52.5, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "cold", "c": 32, "tok_s": 219.3, "ttft_p95": 60.445, "itl_ms": 104.2, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "cold", "c": 64, "tok_s": 226.3, "ttft_p95": 125.3625, "itl_ms": 184.4, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "shared-prefix", "c": 1, "tok_s": 97.3, "ttft_p95": 3.8004, "itl_ms": 9.2, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "shared-prefix", "c": 4, "tok_s": 298.6, "ttft_p95": 4.1265, "itl_ms": 10.4, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "shared-prefix", "c": 8, "tok_s": 463.7, "ttft_p95": 4.0736, "itl_ms": 11.5, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "shared-prefix", "c": 16, "tok_s": 705.9, "ttft_p95": 4.9171, "itl_ms": 14.4, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "shared-prefix", "c": 32, "tok_s": 911.3, "ttft_p95": 8.2452, "itl_ms": 21.0, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "shared-prefix", "c": 64, "tok_s": 1236.4, "ttft_p95": 16.094, "itl_ms": 31.8, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "shared-prefix", "c": 128, "tok_s": 1544.2, "ttft_p95": 32.1323, "itl_ms": 48.599999999999994, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "shared-prefix", "c": 256, "tok_s": 1751.7, "ttft_p95": 65.0794, "itl_ms": 55.5, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "shared-prefix", "c": 512, "tok_s": 1888.4, "ttft_p95": 121.646, "itl_ms": 59.2, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "100k-90pct-reuse", "c": 1, "tok_s": 87.8, "ttft_p95": 4.7817, "itl_ms": 9.299999999999999, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "100k-90pct-reuse", "c": 4, "tok_s": 237.2, "ttft_p95": 6.1088, "itl_ms": 11.6, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "100k-90pct-reuse", "c": 8, "tok_s": 320.7, "ttft_p95": 8.1129, "itl_ms": 14.9, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "100k-90pct-reuse", "c": 16, "tok_s": 422.2, "ttft_p95": 12.1171, "itl_ms": 21.8, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "100k-90pct-reuse", "c": 32, "tok_s": 512.3, "ttft_p95": 22.7333, "itl_ms": 37.0, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "100k-90pct-reuse", "c": 64, "tok_s": 600.4, "ttft_p95": 38.6793, "itl_ms": 66.19999999999999, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "100k-90pct-reuse", "c": 128, "tok_s": 634.5, "ttft_p95": 76.6676, "itl_ms": 142.3, "hit": null, "kv": null, "q": null, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "100k-90pct-reuse", "c": 256, "tok_s": 692.7, "ttft_p95": 142.2033, "itl_ms": 278.3, "hit": 0.8998888204921011, "kv": 0.8464650537004308, "q": 5, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "gpu-only", "scenario": "100k-90pct-reuse", "c": 512, "tok_s": 703.1, "ttft_p95": 309.1899, "itl_ms": 363.3, "hit": 0.8998964500276363, "kv": 0.9999484325849808, "q": 259, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "cold", "c": 1, "tok_s": 79.9, "ttft_p95": 2.3, "itl_ms": 8.200000000000001, "hit": 0, "kv": 0.018512701991908576, "q": 0, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "cold", "c": 4, "tok_s": 155.4, "ttft_p95": 8.7308, "itl_ms": 15.5, "hit": 0, "kv": 0.07398048876533547, "q": 2, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "cold", "c": 8, "tok_s": 186.5, "ttft_p95": 16.6344, "itl_ms": 26.9, "hit": 0, "kv": 0.1479984811052304, "q": 4, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "cold", "c": 16, "tok_s": 208.6, "ttft_p95": 31.0951, "itl_ms": 51.9, "hit": 0, "kv": 0.29505937284647443, "q": 14, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "cold", "c": 32, "tok_s": 217.8, "ttft_p95": 62.2565, "itl_ms": 105.7, "hit": 0, "kv": 0.5909438243332568, "q": 28, "cpf": "false", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "shared-prefix", "c": 1, "tok_s": 104.5, "ttft_p95": 3.7781, "itl_ms": 8.5, "hit": 0.9960549981419546, "kv": 0.028310510845565018, "q": 0, "cpf": "unknown", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "shared-prefix", "c": 4, "tok_s": 307.6, "ttft_p95": 4.5714, "itl_ms": 9.799999999999999, "hit": 0.9959494778054291, "kv": 0.028868376517136807, "q": 0, "cpf": "unknown", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "shared-prefix", "c": 8, "tok_s": 478.7, "ttft_p95": 4.1066, "itl_ms": 10.9, "hit": 0.9960540077969003, "kv": 0.029759086412923685, "q": 0, "cpf": "unknown", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "shared-prefix", "c": 16, "tok_s": 720.4, "ttft_p95": 5.0963, "itl_ms": 13.700000000000001, "hit": 0.9959536260134156, "kv": 0.030977952586105917, "q": 0, "cpf": "unknown", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "shared-prefix", "c": 32, "tok_s": 906.5, "ttft_p95": 8.7114, "itl_ms": 20.400000000000002, "hit": 0.9959363705581937, "kv": 0.035567452522818566, "q": 0, "cpf": "unknown", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "shared-prefix", "c": 64, "tok_s": 1253.3, "ttft_p95": 16.915, "itl_ms": 29.4, "hit": 0.9959935971089817, "kv": 0.04206963476206327, "q": 0, "cpf": "unknown", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "shared-prefix", "c": 128, "tok_s": 1606.7, "ttft_p95": 33.1156, "itl_ms": 38.199999999999996, "hit": 0.9959328560609008, "kv": 0.04620440385724267, "q": 0, "cpf": "unknown", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "shared-prefix", "c": 256, "tok_s": 1739.0, "ttft_p95": 65.7463, "itl_ms": 51.2, "hit": 0.9959585060476327, "kv": 0.05408953040836706, "q": 0, "cpf": "unknown", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "shared-prefix", "c": 512, "tok_s": 1839.7, "ttft_p95": 124.437, "itl_ms": 57.4, "hit": 0.9959522429073565, "kv": 0.05376137413097182, "q": 0, "cpf": "unknown", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "100k-90pct-reuse", "c": 1, "tok_s": 93.8, "ttft_p95": 4.719, "itl_ms": 8.6, "hit": 0.8998794295193925, "kv": 0.03127329323576156, "q": 0, "cpf": "unknown", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "100k-90pct-reuse", "c": 4, "tok_s": 243.9, "ttft_p95": 6.5967, "itl_ms": 10.9, "hit": 0.8997769754610271, "kv": 0.041042974408498356, "q": 1, "cpf": "unknown", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "100k-90pct-reuse", "c": 8, "tok_s": 328.1, "ttft_p95": 8.1282, "itl_ms": 14.200000000000001, "hit": 0.8998120844514582, "kv": 0.05343321785357669, "q": 4, "cpf": "unknown", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "100k-90pct-reuse", "c": 16, "tok_s": 428.3, "ttft_p95": 12.0994, "itl_ms": 21.0, "hit": 0.899973389791177, "kv": 0.0787012512130062, "q": 12, "cpf": "unknown", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "100k-90pct-reuse", "c": 32, "tok_s": 521.4, "ttft_p95": 22.077, "itl_ms": 36.900000000000006, "hit": 0.8999583787182416, "kv": 0.13126719890489558, "q": 19, "cpf": "unknown", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "100k-90pct-reuse", "c": 64, "tok_s": 593.7, "ttft_p95": 39.3279, "itl_ms": 63.70000000000001, "hit": 0.8999197306967115, "kv": 0.23463173833756035, "q": 43, "cpf": "unknown", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "100k-90pct-reuse", "c": 128, "tok_s": 652.1, "ttft_p95": 72.5203, "itl_ms": 144.3, "hit": 0.8998881942431185, "kv": 0.44212495253453843, "q": 72, "cpf": "unknown", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "100k-90pct-reuse", "c": 256, "tok_s": 691.3, "ttft_p95": 142.3526, "itl_ms": 275.7, "hit": 0.8998263079755259, "kv": 0.851504596531857, "q": 135, "cpf": "unknown", "qpass": true}, {"shape": "tp4", "arm": "cpu-offload", "scenario": "100k-90pct-reuse", "c": 512, "tok_s": 703.0, "ttft_p95": 309.1965, "itl_ms": 362.9, "hit": 0.8998880651525589, "kv": 0.9998312339144825, "q": 270, "cpf": "unknown", "qpass": true}, {"shape": "tp4ep4", "arm": "gpu-only", "scenario": "cold", "c": 1, "tok_s": 75.2, "ttft_p95": 2.4872, "itl_ms": 9.0, "hit": 0, "kv": 0, "q": 0, "cpf": "false", "qpass": true}, {"shape": "tp4ep4", "arm": "gpu-only", "scenario": "cold", "c": 4, "tok_s": 212.3, "ttft_p95": 4.4863, "itl_ms": 12.1, "hit": 0, "kv": 0.03704415577109699, "q": 1, "cpf": "false", "qpass": true}, {"shape": "tp4ep4", "arm": "gpu-only", "scenario": "cold", "c": 8, "tok_s": 262.7, "ttft_p95": 10.3709, "itl_ms": 16.8, "hit": 0, "kv": 0.09229160904398703, "q": 2, "cpf": "false", "qpass": true}, {"shape": "tp4ep4", "arm": "gpu-only", "scenario": "cold", "c": 16, "tok_s": 367.9, "ttft_p95": 16.5807, "itl_ms": 27.5, "hit": 0, "kv": 0.14801254494569016, "q": 4, "cpf": "false", "qpass": true}, {"shape": "tp4ep4", "arm": "gpu-only", "scenario": "cold", "c": 32, "tok_s": 385.2, "ttft_p95": 31.0991, "itl_ms": 53.1, "hit": 0, "kv": 0.2772076713561762, "q": 12, "cpf": "false", "qpass": true}, {"shape": "tp4ep4", "arm": "gpu-only", "scenario": "shared-prefix", "c": 1, "tok_s": 104.3, "ttft_p95": 3.7803, "itl_ms": 8.5, "hit": 0.9960518777019637, "kv": 0.028273007271005568, "q": 0, "cpf": "false", "qpass": true}, {"shape": "tp4ep4", "arm": "gpu-only", "scenario": "shared-prefix", "c": 4, "tok_s": 314.7, "ttft_p95": 3.9524, "itl_ms": 9.799999999999999, "hit": 0.9960000728678984, "kv": 0.02892463187897598, "q": 0, "cpf": "false", "qpass": true}, {"shape": "tp4ep4", "arm": "gpu-only", "scenario": "shared-prefix", "c": 8, "tok_s": 480.7, "ttft_p95": 4.4383, "itl_ms": 10.9, "hit": 0.99591632636053, "kv": 0.029463745763268046, "q": 0, "cpf": "false", "qpass": true}, {"shape": "tp4ep4", "arm": "gpu-only", "scenario": "shared-prefix", "c": 16, "tok_s": 907.7, "ttft_p95": 4.3912, "itl_ms": 11.299999999999999, "hit": 0.9959619158595917, "kv": 0.03003567527529971, "q": 1, "cpf": "false", "qpass": true}, {"shape": "tp4ep4", "arm": "gpu-only", "scenario": "shared-prefix", "c": 32, "tok_s": 1171.2, "ttft_p95": 5.4372, "itl_ms": 16.6, "hit": 0.9960154750521506, "kv": 0.030359143605874883, "q": 0, "cpf": "false", "qpass": true}, {"shape": "tp4ep4", "arm": "gpu-only", "scenario": "shared-prefix", "c": 64, "tok_s": 1620.1, "ttft_p95": 12.1278, "itl_ms": 20.5, "hit": 0.9959521289587234, "kv": 0.035600268150558056, "q": 0, "cpf": "false", "qpass": true}, {"shape": "tp4ep4", "arm": "gpu-only", "scenario": "shared-prefix", "c": 128, "tok_s": 2158.4, "ttft_p95": 17.2536, "itl_ms": 30.4, "hit": 0.9960575679387313, "kv": 0.041558648558690736, "q": 0, "cpf": "false", "qpass": true}];
+function t(){const b=document.body;b.dataset.theme=b.dataset.theme==='light'?'':'light';draw();}
+const C={cold:'#f85149','shared-prefix':'#3fb950','100k-90pct-reuse':'#4493f8'};
+const LBL={cold:'cold (no reuse)','shared-prefix':'shared-prefix','100k-90pct-reuse':'100k / 90%-reuse'};
+function series(arm,shape,metric){
+  const out={};
+  for(const sc of Object.keys(C)){
+    const pts=DATA.filter(d=>d.arm===arm&&d.shape===shape&&d.scenario===sc&&d[metric]!=null)
+      .sort((a,b)=>a.c-b.c).map(d=>({x:d.c,y:d[metric]}));
+    if(pts.length)out[sc]=pts;
+  }
+  return out;
+}
+let charts=[];
+function mk(id,cfg){const el=document.getElementById(id);if(!el)return;const c=new Chart(el,cfg);charts.push(c);}
+function axisColor(){return getComputedStyle(document.body).getPropertyValue('--muted');}
+function gridColor(){return getComputedStyle(document.body).getPropertyValue('--line');}
+function draw(){
+  charts.forEach(c=>c.destroy());charts=[];
+  const ax=axisColor(),gr=gridColor();
+  const common=(logY,yt)=>({responsive:true,maintainAspectRatio:false,interaction:{mode:'nearest'},
+    plugins:{legend:{labels:{color:ax,usePointStyle:true}}},
+    scales:{x:{type:'linear',title:{display:true,text:'concurrency',color:ax},ticks:{color:ax},grid:{color:gr}},
+      y:{type:logY?'logarithmic':'linear',title:{display:true,text:yt,color:ax},ticks:{color:ax},grid:{color:gr}}}});
+  // throughput (gpu-only tp4 solid + tp4ep4 dashed for shared-prefix)
+  const tp=series('gpu-only','tp4','tok_s');
+  const ds=Object.keys(tp).map(sc=>({label:LBL[sc],data:tp[sc],borderColor:C[sc],backgroundColor:C[sc],tension:.3,pointRadius:3}));
+  const ep=series('gpu-only','tp4ep4','tok_s')['shared-prefix'];
+  if(ep)ds.push({label:'shared-prefix · TP4+EP4',data:ep,borderColor:'#3fb950',borderDash:[6,4],backgroundColor:'#3fb950',tension:.3,pointRadius:3});
+  mk('tput',{type:'line',data:{datasets:ds},options:common(false,'output tokens/sec')});
+  // ttft log
+  const tt=series('gpu-only','tp4','ttft_p95');
+  mk('ttft',{type:'line',data:{datasets:Object.keys(tt).map(sc=>({label:LBL[sc],data:tt[sc],borderColor:C[sc],backgroundColor:C[sc],tension:.3,pointRadius:3}))},options:common(true,'TTFT p95 (s, log)')});
+  // A/B shared-prefix gpu-only vs cpu-offload
+  const g=series('gpu-only','tp4','tok_s')['shared-prefix']||[], o=series('cpu-offload','tp4','tok_s')['shared-prefix']||[];
+  const cs=[...new Set([...g,...o].map(p=>p.x))].sort((a,b)=>a-b);
+  mk('ab',{type:'bar',data:{labels:cs.map(c=>'c'+c),datasets:[
+    {label:'GPU-only',data:cs.map(c=>(g.find(p=>p.x===c)||{}).y??null),backgroundColor:'#4493f8'},
+    {label:'CPU-offload',data:cs.map(c=>(o.find(p=>p.x===c)||{}).y??null),backgroundColor:'#bc8cff'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:ax}}},scales:{x:{ticks:{color:ax},grid:{color:gr}},y:{title:{display:true,text:'tok/s',color:ax},ticks:{color:ax},grid:{color:gr}}}}});
+  // KV climb 100k-reuse both arms
+  const kg=series('gpu-only','tp4','kv')['100k-90pct-reuse']||[], ko=series('cpu-offload','tp4','kv')['100k-90pct-reuse']||[];
+  mk('kv',{type:'line',data:{datasets:[
+    {label:'GPU-only',data:kg.map(p=>({x:p.x,y:p.y*100})),borderColor:'#4493f8',backgroundColor:'#4493f8',tension:.3,pointRadius:3},
+    {label:'CPU-offload',data:ko.map(p=>({x:p.x,y:p.y*100})),borderColor:'#bc8cff',backgroundColor:'#bc8cff',tension:.3,pointRadius:3}]},
+    options:common(false,'KV utilization %')});
+  // family evolution — SWE-bench by version (Verified vs Pro on separate series since scales differ)
+  mk('evo',{type:'bar',data:{labels:['M2','M2.1','M2.5','M2.7'],datasets:[
+    {label:'SWE-bench Verified %',data:[69.4,null,80.2,null],backgroundColor:'#3fb950'},
+    {label:'SWE-bench Pro %',data:[null,55.4,null,56.2],backgroundColor:'#d29922'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:ax}}},
+      scales:{x:{ticks:{color:ax},grid:{color:gr}},y:{title:{display:true,text:'SWE-bench score %',color:ax},ticks:{color:ax},grid:{color:gr},beginAtZero:true,max:100}}}});
+}
+// table
+function fmt(v,d=1){return v==null?'<span class="note">—</span>':(typeof v==='number'?(Math.abs(v)<1&&v!==0?v.toFixed(3):v.toFixed(d)):v);}
+let sortK='scenario',sortDir=1;
+function rows(){
+  const tb=document.querySelector('#tbl tbody');
+  const sorted=[...DATA].sort((a,b)=>{let x=a[sortK],y=b[sortK];if(typeof x==='string')return sortDir*(''+x).localeCompare(''+y);return sortDir*((x??-1)-(y??-1));});
+  tb.innerHTML=sorted.map(d=>{
+    const kvCls=(d.scenario==='100k-90pct-reuse'&&d.kv>0.9)?' class="kbound"':'';
+    return `<tr><td>${d.shape}</td><td>${d.arm}</td><td>${LBL[d.scenario]||d.scenario}</td><td>${d.c}</td>
+      <td>${fmt(d.tok_s)}</td><td>${fmt(d.ttft_p95)}</td><td>${fmt(d.itl_ms)}</td>
+      <td>${d.hit==null?'<span class=note>—</span>':(d.hit*100).toFixed(1)+'%'}</td>
+      <td${kvCls}>${d.kv==null?'<span class=note>—</span>':(d.kv*100).toFixed(0)+'%'}</td><td>${fmt(d.q,0)}</td></tr>`;
+  }).join('');
+}
+document.querySelectorAll('#tbl th').forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(k===sortK)sortDir*=-1;else{sortK=k;sortDir=1;}rows();});
+draw();rows();
+</script>
+</body>
+</html>

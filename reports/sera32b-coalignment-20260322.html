@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Harness-Model Co-Alignment — SERA-32B, 5 Models, 8 Harnesses</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --surface-2: #242740;
+      --border: #2e3151;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --accent: #6366f1;
+      --accent-soft: rgba(99,102,241,0.15);
+      --green: #22c55e;
+      --green-soft: rgba(34,197,94,0.12);
+      --red: #ef4444;
+      --red-soft: rgba(239,68,68,0.12);
+      --yellow: #f59e0b;
+      --yellow-soft: rgba(245,158,11,0.12);
+      --blue: #3b82f6;
+      --blue-soft: rgba(59,130,246,0.12);
+      --purple: #a855f7;
+      --purple-soft: rgba(168,85,247,0.12);
+      --orange: #f97316;
+      --orange-soft: rgba(249,115,22,0.12);
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-2: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --accent-soft: rgba(99,102,241,0.08);
+      --green-soft: rgba(34,197,94,0.08);
+      --red-soft: rgba(239,68,68,0.08);
+      --yellow-soft: rgba(245,158,11,0.08);
+      --blue-soft: rgba(59,130,246,0.08);
+      --purple-soft: rgba(168,85,247,0.08);
+      --orange-soft: rgba(249,115,22,0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { font-size: 1.25rem; font-weight: 600; }
+    header .meta { font-size: 0.85rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+    .theme-toggle {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    main { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+    .grid-full { grid-column: 1 / -1; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--accent);
+    }
+    .card h3 {
+      font-size: 0.85rem;
+      font-weight: 500;
+      margin-bottom: 0.75rem;
+      color: var(--text-muted);
+    }
+    .stat-row {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .stat {
+      background: var(--surface-2);
+      border-radius: 8px;
+      padding: 1rem 1.5rem;
+      flex: 1;
+      min-width: 150px;
+    }
+    .stat .label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat .value { font-size: 1.75rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .stat .sub { font-size: 0.75rem; color: var(--text-muted); }
+    .stat.green .value { color: var(--green); }
+    .stat.red .value { color: var(--red); }
+    .stat.yellow .value { color: var(--yellow); }
+    .stat.blue .value { color: var(--blue); }
+    .stat.purple .value { color: var(--purple); }
+    .stat.orange .value { color: var(--orange); }
+
+    .matrix-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    .matrix-table th, .matrix-table td {
+      padding: 0.75rem 1rem;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .matrix-table th {
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      background: var(--surface-2);
+    }
+    .matrix-table th:first-child, .matrix-table td:first-child {
+      text-align: left;
+      font-weight: 600;
+    }
+    .matrix-table tr:hover td { background: var(--surface-2); }
+
+    .cell-fix { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+    .cell-high { color: var(--green); }
+    .cell-mid { color: var(--yellow); }
+    .cell-low { color: var(--red); }
+    .cell-zero { color: var(--text-muted); opacity: 0.5; }
+    .cell-na { color: var(--text-muted); font-style: italic; opacity: 0.4; }
+    .cell-best { background: var(--green-soft) !important; border-radius: 4px; }
+
+    .bar-chart { margin-top: 1rem; }
+    .bar-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      gap: 0.75rem;
+    }
+    .bar-label {
+      width: 200px;
+      font-size: 0.8rem;
+      text-align: right;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .bar-track {
+      flex: 1;
+      height: 28px;
+      background: var(--surface-2);
+      border-radius: 6px;
+      position: relative;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 6px;
+      transition: width 0.6s ease;
+      display: flex;
+      align-items: center;
+      padding-left: 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      color: #fff;
+      min-width: 50px;
+    }
+    .bar-fill.green { background: linear-gradient(90deg, #16a34a, #22c55e); }
+    .bar-fill.yellow { background: linear-gradient(90deg, #d97706, #f59e0b); }
+    .bar-fill.red { background: linear-gradient(90deg, #dc2626, #ef4444); }
+    .bar-fill.blue { background: linear-gradient(90deg, #2563eb, #3b82f6); }
+    .bar-fill.purple { background: linear-gradient(90deg, #9333ea, #a855f7); }
+    .bar-fill.gray { background: linear-gradient(90deg, #4b5563, #6b7280); }
+    .bar-fill.orange { background: linear-gradient(90deg, #ea580c, #f97316); }
+
+    .overlap-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+    .overlap-cell {
+      background: var(--surface-2);
+      border-radius: 8px;
+      padding: 0.75rem;
+      text-align: center;
+    }
+    .overlap-cell .num { font-size: 1.5rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .overlap-cell .desc { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+    .finding {
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.5rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .finding.positive { background: var(--green-soft); border-left: 3px solid var(--green); }
+    .finding.negative { background: var(--red-soft); border-left: 3px solid var(--red); }
+    .finding.neutral { background: var(--blue-soft); border-left: 3px solid var(--blue); }
+    .finding.warning { background: var(--yellow-soft); border-left: 3px solid var(--yellow); }
+    .finding.insight { background: var(--purple-soft); border-left: 3px solid var(--purple); }
+    .finding strong { color: var(--text); }
+
+    /* Spectrum visualization */
+    .spectrum {
+      margin: 1rem 0;
+      position: relative;
+    }
+    .spectrum-track {
+      height: 8px;
+      border-radius: 4px;
+      background: linear-gradient(90deg, var(--red), var(--yellow), var(--green));
+      position: relative;
+      margin: 2rem 0 0.5rem;
+    }
+    .spectrum-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+    .spectrum-point {
+      position: absolute;
+      top: -22px;
+      transform: translateX(-50%);
+      text-align: center;
+    }
+    .spectrum-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid var(--bg);
+      display: inline-block;
+    }
+    .spectrum-name {
+      font-size: 0.7rem;
+      color: var(--text);
+      white-space: nowrap;
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-weight: 500;
+    }
+    .spectrum-delta {
+      font-size: 0.65rem;
+      font-family: 'JetBrains Mono', monospace;
+      position: absolute;
+      top: 36px;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+    }
+
+    /* Tool dialect grid */
+    .dialect-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+    .dialect-card {
+      background: var(--surface-2);
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-size: 0.8rem;
+    }
+    .dialect-card .name {
+      font-weight: 600;
+      font-size: 0.85rem;
+      margin-bottom: 0.5rem;
+    }
+    .dialect-card code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--accent);
+      display: block;
+      line-height: 1.7;
+    }
+
+    .section-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 2rem 0;
+    }
+
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+      .bar-label { width: 120px; font-size: 0.7rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Harness-Model Co-Alignment and the Overfitting Trap</h1>
+      <div class="meta">5 models x 8 harnesses | SWE-bench Lite 50-issue subset | 2026-03-22</div>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()">Toggle Theme</button>
+  </header>
+
+  <main>
+    <!-- Top stats -->
+    <div class="stat-row">
+      <div class="stat green">
+        <div class="label">Best Config</div>
+        <div class="value">88%</div>
+        <div class="sub">Qwen3.5 x OpenCode (44/50)</div>
+      </div>
+      <div class="stat purple">
+        <div class="label">8-Harness Ensemble</div>
+        <div class="value">36%</div>
+        <div class="sub">18/50 verified passes</div>
+      </div>
+      <div class="stat orange">
+        <div class="label">SERA-32B (SVG)</div>
+        <div class="value">64%</div>
+        <div class="sub">First model: SERA > OpenCode</div>
+      </div>
+      <div class="stat red">
+        <div class="label">SWE-LM (SFT)</div>
+        <div class="value">-30pp</div>
+        <div class="sub">vs Qwen 2.5 base (48% to 18%)</div>
+      </div>
+    </div>
+
+    <div class="grid">
+
+      <!-- ====== Fix Rate Matrix (5 models) ====== -->
+      <div class="card grid-full">
+        <h2>Fix Rate Matrix (5 Models x 3 Harnesses)</h2>
+        <table class="matrix-table">
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Params</th>
+              <th>Training</th>
+              <th>SERA</th>
+              <th>OpenCode</th>
+              <th>Claude Code</th>
+              <th>Best</th>
+              <th>Union</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Qwen3.5-397B MoE</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:var(--text-muted)">397B/17B</td>
+              <td><span style="color:var(--purple)">Base (frontier)</span></td>
+              <td class="cell-fix cell-high">36/50 (72%)</td>
+              <td class="cell-fix cell-high cell-best">44/50 (88%)</td>
+              <td class="cell-na">incompatible</td>
+              <td style="color:var(--green);font-weight:600">OpenCode</td>
+              <td class="cell-fix cell-high" style="color:var(--green)">48/50 (96%)</td>
+            </tr>
+            <tr style="background:var(--orange-soft)">
+              <td>SERA-32B (Allen AI)</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:var(--text-muted)">32B</td>
+              <td><span style="color:var(--orange)">SVG (Qwen3-32B)</span></td>
+              <td class="cell-fix cell-high cell-best">32/50 (64%)</td>
+              <td class="cell-fix cell-mid">27/50 (54%)</td>
+              <td class="cell-na">not tested</td>
+              <td style="color:var(--orange);font-weight:600">SERA</td>
+              <td class="cell-fix cell-high">37/50 (74%)</td>
+            </tr>
+            <tr>
+              <td>Devstral Small 2 24B</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:var(--text-muted)">24B</td>
+              <td><span style="color:var(--blue)">Base</span></td>
+              <td class="cell-fix cell-mid">23/50 (46%)</td>
+              <td class="cell-fix cell-high cell-best">44/50 (88%)</td>
+              <td class="cell-fix cell-mid">19/50 (38%)</td>
+              <td style="color:var(--green);font-weight:600">OpenCode</td>
+              <td class="cell-fix" style="color:var(--text-muted)">—</td>
+            </tr>
+            <tr>
+              <td>Qwen 2.5 Coder 32B</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:var(--text-muted)">32B</td>
+              <td><span style="color:var(--yellow)">Base (FT control)</span></td>
+              <td class="cell-fix cell-mid cell-best">24/50 (48%)</td>
+              <td class="cell-fix cell-zero">0/45 (0%)</td>
+              <td class="cell-na">not tested</td>
+              <td style="color:var(--yellow);font-weight:600">SERA</td>
+              <td class="cell-fix cell-mid">24/50 (48%)</td>
+            </tr>
+            <tr>
+              <td>SWE-agent-LM 32B</td>
+              <td style="font-family:'JetBrains Mono',monospace;color:var(--text-muted)">32B</td>
+              <td><span style="color:var(--red)">SWE-smith SFT</span></td>
+              <td class="cell-fix cell-low cell-best">9/50 (18%)</td>
+              <td class="cell-fix cell-zero">0/46 (0%)</td>
+              <td class="cell-na">not tested</td>
+              <td style="color:var(--red);font-weight:600">SERA</td>
+              <td class="cell-fix cell-low">9/50 (18%)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ====== The Overfitting Spectrum ====== -->
+      <div class="card grid-full">
+        <h2>The Finetuning Spectrum: From Overfitting to Co-Alignment</h2>
+        <h3>SWE-bench finetuning methodology determines whether models improve or degrade</h3>
+
+        <div class="spectrum">
+          <div class="spectrum-track">
+            <!-- SWE-agent-LM at ~5% (far left, overfitted) -->
+            <div class="spectrum-point" style="left:5%">
+              <div class="spectrum-dot" style="background:var(--red)"></div>
+              <div class="spectrum-name">SWE-agent-LM</div>
+              <div class="spectrum-delta" style="color:var(--red)">-30pp from base</div>
+            </div>
+            <!-- Qwen 2.5 base at ~40% -->
+            <div class="spectrum-point" style="left:40%">
+              <div class="spectrum-dot" style="background:var(--yellow)"></div>
+              <div class="spectrum-name">Qwen 2.5 (base)</div>
+              <div class="spectrum-delta" style="color:var(--text-muted)">48% baseline</div>
+            </div>
+            <!-- SERA-32B at ~65% -->
+            <div class="spectrum-point" style="left:65%">
+              <div class="spectrum-dot" style="background:var(--orange)"></div>
+              <div class="spectrum-name">SERA-32B</div>
+              <div class="spectrum-delta" style="color:var(--green)">+16pp from base</div>
+            </div>
+            <!-- Qwen3.5 base at ~90% -->
+            <div class="spectrum-point" style="left:90%">
+              <div class="spectrum-dot" style="background:var(--green)"></div>
+              <div class="spectrum-name">Qwen3.5 (base)</div>
+              <div class="spectrum-delta" style="color:var(--green)">72% (scale)</div>
+            </div>
+          </div>
+          <div class="spectrum-labels" style="margin-top:3.5rem">
+            <span>Overfit (narrow SFT)</span>
+            <span>Co-aligned (SVG)</span>
+            <span>General (scale)</span>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1.5rem">
+          <div class="finding negative">
+            <strong>SWE-smith SFT (Princeton):</strong> Trained on SWE-agent trajectories only. Model learned <code>open/goto/scroll</code> workflow so narrowly it can't use any other tool set. Result: <strong>-30pp</strong> from base.
+          </div>
+          <div class="finding positive">
+            <strong>SVG Training (Allen AI):</strong> Trained on verified successful trajectories with diverse exploration patterns. Model learned when to explore, when to edit, how to verify. Result: <strong>+16pp</strong> from base.
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== Co-Alignment Evidence ====== -->
+      <div class="card">
+        <h2>Co-Alignment Evidence</h2>
+        <h3>SERA-32B is the only model where SERA > OpenCode</h3>
+
+        <div class="bar-chart">
+          <div class="bar-row">
+            <div class="bar-label">SERA-32B x SERA</div>
+            <div class="bar-track"><div class="bar-fill orange" style="width:64%">64% (32/50)</div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">SERA-32B x OpenCode</div>
+            <div class="bar-track"><div class="bar-fill blue" style="width:54%">54% (27/50)</div></div>
+          </div>
+        </div>
+        <div style="margin-top:0.75rem;padding:0.5rem;background:var(--orange-soft);border-radius:6px;font-size:0.8rem;text-align:center">
+          Every other model: OpenCode >= SERA. SVG training inverts this.
+        </div>
+
+        <div class="overlap-grid" style="margin-top:1rem">
+          <div class="overlap-cell">
+            <div class="num" style="color:var(--green)">22</div>
+            <div class="desc">Both fix</div>
+          </div>
+          <div class="overlap-cell">
+            <div class="num" style="color:var(--orange)">10</div>
+            <div class="desc">Only SERA</div>
+          </div>
+          <div class="overlap-cell">
+            <div class="num" style="color:var(--blue)">5</div>
+            <div class="desc">Only OpenCode</div>
+          </div>
+        </div>
+        <div style="margin-top:0.75rem;text-align:center">
+          <div class="overlap-cell" style="display:inline-block;min-width:120px">
+            <div class="num" style="color:var(--text-muted)">13</div>
+            <div class="desc">Neither fixes</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== Qwen3.5 Overlap (comparison) ====== -->
+      <div class="card">
+        <h2>Qwen3.5: SERA vs OpenCode</h2>
+        <h3>Base model — OpenCode dominant as expected</h3>
+
+        <div class="bar-chart">
+          <div class="bar-row">
+            <div class="bar-label">Qwen3.5 x SERA</div>
+            <div class="bar-track"><div class="bar-fill blue" style="width:72%">72% (36/50)</div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">Qwen3.5 x OpenCode</div>
+            <div class="bar-track"><div class="bar-fill green" style="width:88%">88% (44/50)</div></div>
+          </div>
+        </div>
+
+        <div class="overlap-grid" style="margin-top:1rem">
+          <div class="overlap-cell">
+            <div class="num" style="color:var(--green)">32</div>
+            <div class="desc">Both fix</div>
+          </div>
+          <div class="overlap-cell">
+            <div class="num" style="color:var(--blue)">4</div>
+            <div class="desc">Only SERA</div>
+          </div>
+          <div class="overlap-cell">
+            <div class="num" style="color:var(--purple)">12</div>
+            <div class="desc">Only OpenCode</div>
+          </div>
+        </div>
+        <div style="margin-top:0.75rem;padding:0.5rem;background:var(--green-soft);border-radius:6px;font-size:0.8rem;text-align:center">
+          <strong style="color:var(--green)">48/50 (96%)</strong> — 2-harness union with a base model beats any finetuned single config
+        </div>
+      </div>
+
+      <!-- ====== 8-Harness Ensemble ====== -->
+      <div class="card grid-full">
+        <h2>8-Harness Verified Pass Rate Ensemble</h2>
+        <h3>Devstral Small 2 24B | gold test_patch verification | 18/50 union (36%)</h3>
+        <div class="bar-chart">
+          <div class="bar-row">
+            <div class="bar-label">OpenCode</div>
+            <div class="bar-track"><div class="bar-fill green" style="width:22%">22% (11/50)</div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">Claude Code</div>
+            <div class="bar-track"><div class="bar-fill green" style="width:20%">20% (10/50)</div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">Codex CLI</div>
+            <div class="bar-track"><div class="bar-fill blue" style="width:18%">18% (9/50)</div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">SERA</div>
+            <div class="bar-track"><div class="bar-fill blue" style="width:16%">16% (8/50)</div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">PiAgent (str_replace)</div>
+            <div class="bar-track"><div class="bar-fill blue" style="width:16%">16% (8/50)</div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">LangGraph</div>
+            <div class="bar-track"><div class="bar-fill yellow" style="width:14%">14% (7/50)</div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">Hashline (ohmypi)</div>
+            <div class="bar-track"><div class="bar-fill yellow" style="width:14%">14% (7/50)</div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">Droid</div>
+            <div class="bar-track"><div class="bar-fill red" style="width:8%">8% (2/24)</div></div>
+          </div>
+        </div>
+        <div style="margin-top:1rem;display:flex;gap:0.75rem;flex-wrap:wrap">
+          <div class="overlap-cell" style="flex:1;min-width:120px">
+            <div class="num" style="color:var(--green)">18/50</div>
+            <div class="desc">Union (36%)</div>
+          </div>
+          <div class="overlap-cell" style="flex:1;min-width:120px">
+            <div class="num" style="color:var(--purple)">6</div>
+            <div class="desc">Unique passes (4 harnesses)</div>
+          </div>
+          <div class="overlap-cell" style="flex:1;min-width:120px">
+            <div class="num" style="color:var(--yellow)">+2</div>
+            <div class="desc">Droid adds pylint + seaborn</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== Fragmented Ecosystem ====== -->
+      <div class="card grid-full">
+        <h2>The Fragmented Agent Tooling Ecosystem</h2>
+        <h3>Same capabilities, different dialects — training on one narrows the model</h3>
+        <div class="dialect-grid">
+          <div class="dialect-card">
+            <div class="name" style="color:var(--green)">OpenCode</div>
+            <code>glob(pattern)</code>
+            <code>read(path)</code>
+            <code>edit(path, old, new)</code>
+            <code>bash(cmd)</code>
+            <code>grep(pattern, path)</code>
+            <code>write(path, content)</code>
+          </div>
+          <div class="dialect-card">
+            <div class="name" style="color:var(--blue)">Claude Code</div>
+            <code>Read(file_path)</code>
+            <code>Edit(file_path, old, new)</code>
+            <code>Write(file_path, content)</code>
+            <code>Bash(command)</code>
+            <code>Glob(pattern)</code>
+            <code>Grep(pattern, path)</code>
+          </div>
+          <div class="dialect-card">
+            <div class="name" style="color:var(--yellow)">SWE-agent</div>
+            <code>open(path, line_number)</code>
+            <code>goto(line_number)</code>
+            <code>edit(start:end, content)</code>
+            <code>scroll_down()</code>
+            <code>search_file(term, path)</code>
+            <code>find_file(name, dir)</code>
+          </div>
+          <div class="dialect-card">
+            <div class="name" style="color:var(--purple)">Codex CLI</div>
+            <code>exec_command(cmd, timeout)</code>
+            <code>write_stdin(pid, data)</code>
+            <code>update_plan(items)</code>
+            <code>spawn_agent(prompt)</code>
+            <code style="color:var(--text-muted)"># edits via shell cmds</code>
+            <code style="color:var(--text-muted)"># cat >, sed, heredocs</code>
+          </div>
+          <div class="dialect-card">
+            <div class="name" style="color:var(--orange)">Droid</div>
+            <code>read_file(path)</code>
+            <code>edit_file(path, edits)</code>
+            <code>apply_diff(path, diff)</code>
+            <code>create_file(path, content)</code>
+            <code>run_command(cmd)</code>
+            <code>search(query, path)</code>
+          </div>
+        </div>
+      </div>
+
+      <hr class="section-divider">
+
+      <!-- ====== 5-Model SERA Comparison ====== -->
+      <div class="card">
+        <h2>5-Model SERA Ensemble</h2>
+        <h3>Each model fixes different issues</h3>
+        <div class="bar-chart">
+          <div class="bar-row">
+            <div class="bar-label">Qwen3.5 397B</div>
+            <div class="bar-track"><div class="bar-fill green" style="width:72%">72% (36)</div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">SERA-32B</div>
+            <div class="bar-track"><div class="bar-fill orange" style="width:64%">64% (32)</div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">Qwen 2.5 32B</div>
+            <div class="bar-track"><div class="bar-fill yellow" style="width:48%">48% (24)</div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">Devstral 24B</div>
+            <div class="bar-track"><div class="bar-fill yellow" style="width:46%">46% (23)</div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">SWE-LM 32B</div>
+            <div class="bar-track"><div class="bar-fill red" style="width:18%">18% (9)</div></div>
+          </div>
+        </div>
+        <div style="margin-top:1rem;display:flex;gap:0.75rem">
+          <div class="overlap-cell" style="flex:1">
+            <div class="num" style="color:var(--green)">47</div>
+            <div class="desc">Union (any model, 94%)</div>
+          </div>
+          <div class="overlap-cell" style="flex:1">
+            <div class="num" style="color:var(--red)">1</div>
+            <div class="desc">Intersection (all 5)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== Harness Compatibility ====== -->
+      <div class="card">
+        <h2>Harness Compatibility</h2>
+        <h3>Tool calling format determines harness access</h3>
+        <table class="matrix-table" style="font-size:0.8rem">
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Tool Format</th>
+              <th>SERA</th>
+              <th>OpenCode</th>
+              <th>Claude Code</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Devstral 24B</td>
+              <td style="font-family:'JetBrains Mono',monospace;font-size:0.75rem">Mistral native</td>
+              <td style="color:var(--green)">OK</td>
+              <td style="color:var(--green)">OK</td>
+              <td style="color:var(--green)">OK (3 patches)</td>
+            </tr>
+            <tr>
+              <td>SERA-32B</td>
+              <td style="font-family:'JetBrains Mono',monospace;font-size:0.75rem">Hermes (&lt;tools&gt;)</td>
+              <td style="color:var(--green)">OK</td>
+              <td style="color:var(--green)">OK</td>
+              <td style="color:var(--text-muted)">Not tested</td>
+            </tr>
+            <tr>
+              <td>Qwen3.5 397B</td>
+              <td style="font-family:'JetBrains Mono',monospace;font-size:0.75rem">Hermes native</td>
+              <td style="color:var(--green)">OK</td>
+              <td style="color:var(--green)">OK</td>
+              <td style="color:var(--red)">FAIL</td>
+            </tr>
+            <tr>
+              <td>Qwen 2.5 32B</td>
+              <td style="font-family:'JetBrains Mono',monospace;font-size:0.75rem">Bare JSON</td>
+              <td style="color:var(--green)">OK (regex)</td>
+              <td style="color:var(--red)">FAIL</td>
+              <td style="color:var(--text-muted)">N/A</td>
+            </tr>
+            <tr>
+              <td>SWE-LM 32B</td>
+              <td style="font-family:'JetBrains Mono',monospace;font-size:0.75rem">Bare JSON</td>
+              <td style="color:var(--green)">OK (regex)</td>
+              <td style="color:var(--red)">FAIL</td>
+              <td style="color:var(--text-muted)">N/A</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ====== Key Insights ====== -->
+      <div class="card grid-full">
+        <h2>Key Insights</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+          <div class="finding insight">
+            <strong>1. SVG training is harness-model co-alignment.</strong> SERA-32B learned SERA's interaction protocol (explore, targeted edit, verify) from successful SVG trajectories. It's the only model where SERA harness outperforms OpenCode (64% vs 54%).
+          </div>
+          <div class="finding negative">
+            <strong>2. Single-harness SFT destroys generality.</strong> SWE-agent-LM trained on only SWE-agent trajectories: -30pp from base. The model learned <code>open/goto/scroll</code> so narrowly it fails everything else.
+          </div>
+          <div class="finding positive">
+            <strong>3. Inference-time diversity beats training-time specialization.</strong> SERA-32B x SERA = 64%. Base Qwen3.5 x {SERA+OpenCode} = 96%. Ensembling across harnesses with a general model wins — for now.
+          </div>
+          <div class="finding warning">
+            <strong>4. The fragmented ecosystem makes this hard.</strong> No two harnesses share tool names, schemas, or interaction patterns. Training on one dialect narrows the model; training on none wastes potential.
+          </div>
+          <div class="finding neutral">
+            <strong>5. Each harness adds unique passes.</strong> 8-harness ensemble (36%) has 6 unique passes across 4 harnesses. Droid contributes 2 from previously unsolved repos (pylint, seaborn).
+          </div>
+          <div class="finding insight">
+            <strong>6. Multi-harness trajectory training is the path forward.</strong> Train on 3-4 diverse harness trajectories simultaneously. The model learns intent (explore, locate, fix, verify) not syntax (<code>edit_file</code> vs <code>Edit</code> vs <code>sed</code>).
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    function toggleTheme() {
+      const html = document.documentElement;
+      html.dataset.theme = html.dataset.theme === 'dark' ? 'light' : 'dark';
+    }
+  </script>
+</body>
+</html>
